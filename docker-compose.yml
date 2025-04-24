@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  blindtreasure-api:
+    image: blindtreasureapi
+    build:
+      context: .
+      dockerfile: BlindTreasure.API/Dockerfile
+    container_name: blindtreasure-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=blindtreasure-database;Port=5432;Database=blindtreasureapi;Username=postgres;Password=YourStrong!Passw0rd;
+      JWT__SecretKey: BlindTreasure_SECRETKEY_SIEUCAPBAOMAT_VAYMACHUADU16KYTU
+      JWT__Issuer: BlindTreasure_Issuer
+      JWT__Audience: BlindTreasure_Audience
+      JWT__RefreshTokenValidityInDays: 7
+    ports:
+      - "9000:8080"
+    depends_on:
+      - blindtreasure-database
+    volumes:
+      - ./appdata:/app/data
+
+  blindtreasure-database:
+    image: postgres:latest
+    container_name: blindtreasure-database
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: YourStrong!Passw0rd
+      POSTGRES_DB: blindtreasureapi
+    ports:
+      - "9432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
