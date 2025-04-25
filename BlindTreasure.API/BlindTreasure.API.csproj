@@ -15,10 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="..\.dockerignore" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\BlindTreasure.Application\BlindTreasure.Application.csproj" />
   </ItemGroup>
 
