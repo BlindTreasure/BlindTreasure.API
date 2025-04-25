@@ -7,14 +7,14 @@ services:
       context: .
       dockerfile: BlindTreasure.API/Dockerfile
     depends_on:
-      - postgres
+      - blindtreasure.database
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=blindtreasure_db;Username=postgres;Password=postgres
+      - ConnectionStrings__DefaultConnection=Host=blindtreasure.database;Port=5432;Database=blindtreasure_db;Username=postgres;Password=postgres
     ports:
       - "5000:5000"
 
-  postgres:
+  blindtreasure.database:
     image: postgres:15
     restart: always
     environment:
