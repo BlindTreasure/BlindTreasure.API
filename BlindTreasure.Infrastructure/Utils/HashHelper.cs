@@ -1,7 +1,7 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 
-namespace VaccinaCare.Repository.Utils;
+namespace BlindTreasure.Infrastructure.Utils;
 
 public class HashHelper
 {

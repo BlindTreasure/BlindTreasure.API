@@ -1,4 +1,4 @@
-﻿namespace VaccinaCare.Repository.Interfaces;
+﻿namespace BlindTreasure.Infrastructure.Interfaces;
 
 public interface ICurrentTime
 {

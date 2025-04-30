@@ -1,6 +1,6 @@
 ﻿using System.Reflection;
 
-namespace VaccinaCare.Repository.Utils;
+namespace BlindTreasure.Infrastructure.Utils;
 
 public static class ResourceHelper
 {

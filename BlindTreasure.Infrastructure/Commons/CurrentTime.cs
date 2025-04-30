@@ -1,6 +1,6 @@
-﻿using VaccinaCare.Repository.Interfaces;
+﻿using BlindTreasure.Infrastructure.Interfaces;
 
-namespace VaccinaCare.Repository.Commons;
+namespace BlindTreasure.Infrastructure.Commons;
 
 public class CurrentTime : ICurrentTime
 {

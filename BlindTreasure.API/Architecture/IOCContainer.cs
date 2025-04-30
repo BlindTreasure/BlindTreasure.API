@@ -1,43 +1,30 @@
-﻿using System.Text;
+﻿
+using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Net.payOS;
-using VaccinaCare.API.Resolvers;
-using VaccinaCare.Application.Interface;
-using VaccinaCare.Application.Interface.Common;
-using VaccinaCare.Application.Interface.PaymentService;
-using VaccinaCare.Application.Service;
-using VaccinaCare.Application.Service.Common;
-using VaccinaCare.Application.Service.ThirdParty;
-using VaccinaCare.Domain;
-using VaccinaCare.Repository;
-using VaccinaCare.Repository.Commons;
-using VaccinaCare.Repository.Interfaces;
-using VaccinaCare.Repository.Repositories;
 
-namespace VaccinaCare.API.Architechture;
+namespace BlindTreasure.API.Architecture;
 
 public static class IOCContainer
 {
     public static IServiceCollection SetupIOCContainer(this IServiceCollection services)
     {
         //Add Logger
-        services.AddScoped<ILoggerService, LoggerService>();
+        // services.AddScoped<ILoggerService, LoggerService>();
 
         //Add Project Services
         services.SetupDBContext();
         services.SetupSwagger();
 
         //Add generic repositories
-        services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+        // services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         //Add business services
         services.SetupBusinessServicesLayer();
 
         services.SetupCORS();
         services.SetupJWT();
-        services.SetupGraphQl();
+        // services.SetupGraphQl();
         services.SetupVnpay();
         services.SetupPayOs();
         return services;
@@ -45,15 +32,15 @@ public static class IOCContainer
 
 
 
-    public static IServiceCollection SetupGraphQl(this IServiceCollection services)
-    {
-        services
-            .AddGraphQLServer()
-            .AddErrorFilter<GraphQLErrorFilter>()
-            .AddQueryType<Query>();
-        
-        return services;
-    }
+    // public static IServiceCollection SetupGraphQl(this IServiceCollection services)
+    // {
+    //     services
+    //         .AddGraphQLServer()
+    //         .AddErrorFilter<GraphQLErrorFilter>()
+    //         .AddQueryType<Query>();
+    //     
+    //     return services;
+    // }
     
     public static IServiceCollection SetupPayOs(this IServiceCollection services)
     {
@@ -64,16 +51,6 @@ public static class IOCContainer
             .Build();
 
         //PayOS
-        services.AddSingleton<PayOS>(provider =>
-        {
-            var clientId = configuration["Payment:PayOS:ClientId"] ??
-                           throw new Exception("Cannot find PAYOS_CLIENT_ID");
-            var apiKey = configuration["Payment:PayOS:ApiKey"] ?? throw new Exception("Cannot find PAYOS_API_KEY");
-            var checksumKey = configuration["Payment:PayOS:ChecksumKey"] ??
-                              throw new Exception("Cannot find PAYOS_CHECKSUM_KEY");
-
-            return new PayOS(clientId, apiKey, checksumKey);
-        });
         return services;
     }
 
@@ -97,40 +74,16 @@ public static class IOCContainer
             .AddEnvironmentVariables()
             .Build();
 
-        services.AddDbContext<VaccinaCareDbContext>(options => 
-                options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")), 
-            ServiceLifetime.Scoped); 
 
         return services;
     }
 
     public static IServiceCollection SetupBusinessServicesLayer(this IServiceCollection services)
     {
-        services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+        // services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
         // Add application services
-        services.AddScoped<Query>();
-        services.AddScoped<IUnitOfWork, UnitOfWork>();
-        services.AddScoped<ICurrentTime, CurrentTime>();
-        services.AddScoped<IClaimsService, ClaimsService>();
-        services.AddScoped<ILoggerService, LoggerService>();
-        services.AddScoped<INotificationService, NotificationService>();
-        services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IUserService, UserService>();
-        services.AddScoped<IEmailService, EmailService>();
-        services.AddScoped<IVaccineService, VaccineService>();
-        services.AddScoped<IChildService, ChildService>();
-        services.AddScoped<IAppointmentService, AppointmentService>();
-        services.AddScoped<IVaccineSuggestionService, VaccineSuggestionService>();
-        services.AddScoped<IBlobService, BlobService>();
-        services.AddScoped<IVaccinePackageService, VaccinePackageService>();
-        services.AddScoped<IVaccineIntervalRulesService, VaccineIntervalRulesService>();
-        services.AddScoped<IVaccineRecordService, VaccineRecordService>();
-        services.AddScoped<IFeedbackService, FeedbackService>();
-        services.AddScoped<IVnPayService, VnPayService>();
-        services.AddScoped<IPaymentService, PaymentService>();
-        services.AddScoped<IVaccineRecordService, VaccineRecordService>();
-        services.AddScoped<IPolicyService, PolicyService>();
+   
 
         services.AddHttpContextAccessor();
 
@@ -155,7 +108,7 @@ public static class IOCContainer
             c.UseInlineDefinitionsForEnums();
 
             c.SwaggerDoc("v1",
-                new OpenApiInfo { Title = "VaccinaCareAPI", Version = "v1" });
+                new OpenApiInfo { Title = "BlindTreasureAPI", Version = "v1" });
             var jwtSecurityScheme = new OpenApiSecurityScheme
             {
                 Name = "JWT Authentication",
@@ -223,20 +176,20 @@ public static class IOCContainer
             });
         services.AddAuthorization(options =>
         {
-            options.AddPolicy("CustomerPolicy", policy =>
-                policy.RequireRole("Customer"));
-
-            options.AddPolicy("AdminPolicy", policy =>
-                policy.RequireRole("Admin"));
-
-            options.AddPolicy("StaffPolicy", policy =>
-                policy.RequireRole("Staff"));
-
-            options.AddPolicy("AdminOrStaffPolicy", policy =>
-                policy.RequireRole("Admin", "Staff"));
-
-            options.AddPolicy("StaffOrCustomerPolicy", policy =>
-                policy.RequireRole("Customer", "Staff"));
+            // options.AddPolicy("CustomerPolicy", policy =>
+            //     policy.RequireRole("Customer"));
+            //
+            // options.AddPolicy("AdminPolicy", policy =>
+            //     policy.RequireRole("Admin"));
+            //
+            // options.AddPolicy("StaffPolicy", policy =>
+            //     policy.RequireRole("Staff"));
+            //
+            // options.AddPolicy("AdminOrStaffPolicy", policy =>
+            //     policy.RequireRole("Admin", "Staff"));
+            //
+            // options.AddPolicy("StaffOrCustomerPolicy", policy =>
+            //     policy.RequireRole("Customer", "Staff"));
         });
 
         return services;

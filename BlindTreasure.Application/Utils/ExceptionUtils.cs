@@ -1,4 +1,4 @@
-﻿namespace VaccinaCare.Application.Ultils;
+﻿namespace BlindTreasure.Application.Utils;
 
 public static class ExceptionUtils
 {

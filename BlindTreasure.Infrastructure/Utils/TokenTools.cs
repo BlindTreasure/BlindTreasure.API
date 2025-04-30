@@ -5,7 +5,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
-namespace VaccinaCare.Repository.Utils;
+namespace BlindTreasure.Infrastructure.Utils;
 
 public static class TokenTools // NHỚ XEM LẠI CÁI BUỒI NÀY
 {

@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using SwaggerThemes;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,11 +45,17 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "BlindTreasureAPI API v1");
+        c.RoutePrefix = string.Empty;
+        c.InjectStylesheet("/swagger-ui/custom-theme.css");
+        c.HeadContent = $"<style>{SwaggerTheme.GetSwaggerThemeCss(Theme.Dracula)}</style>";
+    });
 }
 
-app.UseHttpsRedirection();
-
+// app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

@@ -1,4 +1,4 @@
-﻿namespace VaccinaCare.Repository.Commons;
+﻿namespace BlindTreasure.Infrastructure.Commons;
 
 public class PaginationParameter
 {

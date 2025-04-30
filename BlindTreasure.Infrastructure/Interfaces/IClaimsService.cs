@@ -1,7 +1,4 @@
-﻿using System.Security.Claims;
-using VaccinaCare.Domain.DTOs.UserDTOs;
-
-namespace VaccinaCare.Repository.Interfaces;
+﻿namespace BlindTreasure.Infrastructure.Interfaces;
 
 public interface IClaimsService
 {
@@ -9,5 +6,4 @@ public interface IClaimsService
 
     public string? IpAddress { get; }
 
-    Task<CurrentUserDTO> GetCurrentUserDetailsAsync(ClaimsPrincipal user);
 }

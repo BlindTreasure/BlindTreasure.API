@@ -4,7 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
-namespace VaccinaCare.Application.Ultils;
+namespace BlindTreasure.Application.Utils;
 
 public static class JwtUtils
 {

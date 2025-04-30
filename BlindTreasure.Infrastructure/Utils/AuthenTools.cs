@@ -2,7 +2,7 @@
 
 #pragma warning disable CS8603 // Possible null reference return =))
 
-namespace VaccinaCare.Repository.Utils;
+namespace BlindTreasure.Infrastructure.Utils;
 
 public static class AuthenTools
 {
