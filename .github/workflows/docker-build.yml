@@ -11,26 +11,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - uses: docker/setup-buildx-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - uses: actions/cache@v3
+      - name: Restore Docker layer cache
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      - uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: BlindTreasure.API/Dockerfile
-          tags: blindtreasure-api:latest
-          load: true
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new
+      - name: Log build start time
+        run: |
+         echo "🚀 Build start: $(date +'%Y-%m-%d %H:%M:%S')"
 
-      - run: |
+      - name: Build Docker image with time logging
+        run: |
+          START_TIME=$(date +%s)
+          
+          docker buildx build \
+            --file BlindTreasure.API/Dockerfile \
+            --tag blindtreasure-api:latest \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new \
+            --load \
+            .
+
+          END_TIME=$(date +%s)
+          BUILD_DURATION=$((END_TIME - START_TIME))
+
+          echo "✅ Build completed in $BUILD_DURATION seconds."
+
+      - name: Move Docker layer cache
+        run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
