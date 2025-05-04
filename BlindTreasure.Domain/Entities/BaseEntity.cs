@@ -1,8 +1,12 @@
-﻿namespace BlindTreasure.Domain.Entities
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace BlindTreasure.Domain.Entities
 {
     public class BaseEntity
     {
 
+        [Key]
+        public Guid Id { get; set; }
         // Soft delete flag
         public bool IsDeleted { get; set; }
 

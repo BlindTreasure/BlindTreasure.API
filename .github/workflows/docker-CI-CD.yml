@@ -1,0 +1,31 @@
+name: CI Build Only
+
+on:
+  push:
+    branches:
+      - main  # Chạy khi push lên nhánh main
+
+jobs:
+  build:
+    name: Build Docker Image Only
+    runs-on: ubuntu-latest
+
+    steps:
+      # Bước 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # Bước 2: Debug file (nếu cần)
+      - name: List project files
+        run: ls -R
+
+      # Bước 3: Cài đặt Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Bước 4: Build Docker image (không push)
+      - name: Build Docker Image
+        run: |
+          docker build -t blindtreasure-api:latest -f BlindTreasure.API/Dockerfile .
