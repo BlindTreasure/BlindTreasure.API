@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BlindTreasure.API.Architecture;
 using SwaggerThemes;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,7 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.SetupIOCContainer();
 builder.Configuration.AddEnvironmentVariables(); // Đọc từ biến môi trường
 builder.Configuration.AddJsonFile("appsettings.json", true, true); // Đọc từ appsettings.json nếu có
 

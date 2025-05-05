@@ -1,5 +1,7 @@
 ﻿using System.Text;
+using BlindTreasure.Domain;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
@@ -72,6 +74,16 @@ public static class IOCContainer
             .AddEnvironmentVariables()
             .Build();
 
+
+        // 2. Lấy connection string tên "DefaultConnection"
+        string connectionString = configuration.GetConnectionString("DefaultConnection");
+
+        // 3. Đăng ký DbContext với Npgsql
+        services.AddDbContext<BlindTreasureDbContext>(options =>
+            options.UseNpgsql(connectionString,
+                sql => sql.MigrationsAssembly(typeof(BlindTreasureDbContext).Assembly.FullName)
+            )
+        );
 
         return services;
     }

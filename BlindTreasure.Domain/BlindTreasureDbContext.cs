@@ -69,26 +69,21 @@ public class BlindTreasureDbContext : DbContext
                 .HasForeignKey<Seller>(s => s.UserId);
         });
 
-        // Seller ↔ Deposit (1-1 current)
         modelBuilder.Entity<Seller>(entity =>
         {
             entity.ToTable("Sellers");
             entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.UserId).IsUnique();
-            entity.HasOne(s => s.User)
-                .WithOne(u => u.Seller)
-                .HasForeignKey<Seller>(s => s.UserId);
+
+            // 1-1: Seller → Deposit (current)
             entity.HasOne(s => s.Deposit)
-                .WithOne(d => d.Seller)
-                .HasForeignKey<Seller>(s => s.DepositId);
-            // 1-n Seller ↔ Deposits (lịch sử)
+                .WithOne()                                // ✅ không dùng Deposit.Seller
+                .HasForeignKey<Seller>(s => s.DepositId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // 1-n: Seller → Deposits (lịch sử)
             entity.HasMany(s => s.Deposits)
-                .WithOne(d => d.Seller)
+                .WithOne(d => d.Seller)                  // ✅ dùng Deposit.Seller
                 .HasForeignKey(d => d.SellerId);
-            // Seller ↔ VerificationRequest (nếu có)
-            entity.HasOne(s => s.VerificationRequest)
-                .WithMany()
-                .HasForeignKey(s => s.VerificationRequestId);
         });
 
         // VerificationRequests
@@ -127,9 +122,12 @@ public class BlindTreasureDbContext : DbContext
         {
             entity.ToTable("Deposits");
             entity.HasKey(e => e.Id);
+            // Chỉ định rõ ngược lại cho 1-n
             entity.HasOne(d => d.Seller)
                 .WithMany(s => s.Deposits)
-                .HasForeignKey(d => d.SellerId);
+                .HasForeignKey(d => d.SellerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             entity.HasOne(d => d.ReleasedByUser)
                 .WithMany()
                 .HasForeignKey(d => d.ReleasedBy)
