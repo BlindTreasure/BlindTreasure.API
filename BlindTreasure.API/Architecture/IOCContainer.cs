@@ -76,7 +76,7 @@ public static class IOCContainer
 
 
         // 2. Lấy connection string tên "DefaultConnection"
-        string connectionString = configuration.GetConnectionString("DefaultConnection");
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
 
         // 3. Đăng ký DbContext với Npgsql
         services.AddDbContext<BlindTreasureDbContext>(options =>

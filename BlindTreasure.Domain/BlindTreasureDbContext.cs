@@ -76,13 +76,13 @@ public class BlindTreasureDbContext : DbContext
 
             // 1-1: Seller → Deposit (current)
             entity.HasOne(s => s.Deposit)
-                .WithOne()                                // ✅ không dùng Deposit.Seller
+                .WithOne() // ✅ không dùng Deposit.Seller
                 .HasForeignKey<Seller>(s => s.DepositId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // 1-n: Seller → Deposits (lịch sử)
             entity.HasMany(s => s.Deposits)
-                .WithOne(d => d.Seller)                  // ✅ dùng Deposit.Seller
+                .WithOne(d => d.Seller) // ✅ dùng Deposit.Seller
                 .HasForeignKey(d => d.SellerId);
         });
 

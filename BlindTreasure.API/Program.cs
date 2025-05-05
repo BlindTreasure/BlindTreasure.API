@@ -56,6 +56,16 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+try
+{
+    app.ApplyMigrations(app.Logger);
+}
+catch (Exception e)
+{
+    app.Logger.LogError(e, "An problem occurred during migration!");
+}
+
+
 // app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
