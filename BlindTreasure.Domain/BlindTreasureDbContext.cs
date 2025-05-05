@@ -2,13 +2,12 @@
 
 namespace BlindTreasure.Domain;
 
-public class BlindTreasureDbContext  : DbContext
+public class BlindTreasureDbContext : DbContext
 {
     public BlindTreasureDbContext()
     {
-        
     }
-    
+
     public BlindTreasureDbContext(DbContextOptions<BlindTreasureDbContext> options)
         : base(options)
     {

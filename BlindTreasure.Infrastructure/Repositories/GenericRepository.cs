@@ -4,6 +4,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
+namespace BlindTreasure.Infrastructure.Repositories;
 
 public class GenericRepository<TEntity> : IGenericRepository<TEntity> where TEntity : BaseEntity
 {

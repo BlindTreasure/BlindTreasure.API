@@ -1,6 +1,5 @@
-﻿namespace BlindTreasure.API.Architecture
+﻿namespace BlindTreasure.API.Architecture;
+
+public class MigrationExtensions
 {
-    public class MigrationExtensions
-    {
-    }
 }

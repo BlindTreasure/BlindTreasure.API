@@ -1,5 +1,4 @@
-﻿
-using System.Text;
+﻿using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -31,7 +30,6 @@ public static class IOCContainer
     }
 
 
-
     // public static IServiceCollection SetupGraphQl(this IServiceCollection services)
     // {
     //     services
@@ -41,7 +39,7 @@ public static class IOCContainer
     //     
     //     return services;
     // }
-    
+
     public static IServiceCollection SetupPayOs(this IServiceCollection services)
     {
         IConfiguration configuration = new ConfigurationBuilder()
@@ -83,7 +81,7 @@ public static class IOCContainer
         // services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
         // Add application services
-   
+
 
         services.AddHttpContextAccessor();
 

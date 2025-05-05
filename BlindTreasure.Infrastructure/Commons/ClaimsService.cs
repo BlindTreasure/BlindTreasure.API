@@ -26,5 +26,4 @@ public class ClaimsService : IClaimsService
     public Guid GetCurrentUserId { get; }
 
     public string? IpAddress { get; }
-
 }

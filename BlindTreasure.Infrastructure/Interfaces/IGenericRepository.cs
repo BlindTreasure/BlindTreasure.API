@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using BlindTreasure.Domain.Entities;
 
+namespace BlindTreasure.Infrastructure.Interfaces;
 
 public interface IGenericRepository<TEntity> where TEntity : BaseEntity
 {

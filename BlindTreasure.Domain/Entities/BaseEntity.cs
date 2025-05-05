@@ -1,25 +1,21 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace BlindTreasure.Domain.Entities
+namespace BlindTreasure.Domain.Entities;
+
+public class BaseEntity
 {
-    public class BaseEntity
-    {
+    [Key] public Guid Id { get; set; }
 
-        [Key]
-        public Guid Id { get; set; }
-        // Soft delete flag
-        public bool IsDeleted { get; set; }
+    // Soft delete flag
+    public bool IsDeleted { get; set; }
 
-        // Audit fields
-        public DateTime CreatedAt { get; set; }
-        public Guid CreatedBy { get; set; }
+    // Audit fields
+    public DateTime CreatedAt { get; set; }
+    public Guid CreatedBy { get; set; }
 
-        public DateTime? UpdatedAt { get; set; }
-        public Guid? UpdatedBy { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public Guid? UpdatedBy { get; set; }
 
-        public DateTime? DeletedAt { get; set; }
-        public Guid? DeletedBy { get; set; }
-    }
-
-
+    public DateTime? DeletedAt { get; set; }
+    public Guid? DeletedBy { get; set; }
 }
