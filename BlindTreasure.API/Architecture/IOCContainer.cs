@@ -1,33 +1,59 @@
 ﻿using System.Text;
+using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Services;
 using BlindTreasure.Domain;
+using BlindTreasure.Infrastructure.Interfaces;
+using BlindTreasure.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
 
 namespace BlindTreasure.API.Architecture;
 
-public static class IOCContainer
+public static class IocContainer
 {
-    public static IServiceCollection SetupIOCContainer(this IServiceCollection services)
+    public static IServiceCollection SetupIocContainer(this IServiceCollection services)
     {
         //Add Logger
         // services.AddScoped<ILoggerService, LoggerService>();
 
         //Add Project Services
-        services.SetupDBContext();
+        services.SetupDbContext();
         services.SetupSwagger();
 
         //Add generic repositories
-        // services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+        services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         //Add business services
         services.SetupBusinessServicesLayer();
 
-        services.SetupCORS();
-        services.SetupJWT();
+        services.SetupCors();
+        services.SetupJwt();
+
         // services.SetupGraphQl();
+        services.SetupRedisService();
         services.SetupVnpay();
-        services.SetupPayOs();
+        return services;
+    }
+
+
+    public static IServiceCollection SetupRedisService(this IServiceCollection services)
+    {
+        // Lấy kết nối Redis từ môi trường Docker
+        string? redisConnectionString = Environment.GetEnvironmentVariable("Redis__ConnectionString");
+
+        if (string.IsNullOrEmpty(redisConnectionString))
+        {
+            throw new InvalidOperationException("Redis connection string is missing in environment variables.");
+        }
+
+        // Cấu hình Redis cache
+        services.AddSingleton<IConnectionMultiplexer>(
+            ConnectionMultiplexer.Connect(redisConnectionString));
+
+        services.AddScoped<ICacheService, RedisCacheService>(); // Đăng ký Redis Cache Service
+
         return services;
     }
 
@@ -42,17 +68,18 @@ public static class IOCContainer
     //     return services;
     // }
 
-    public static IServiceCollection SetupPayOs(this IServiceCollection services)
-    {
-        IConfiguration configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json", true, true)
-            .AddEnvironmentVariables()
-            .Build();
 
-        //PayOS
-        return services;
-    }
+    // public static IServiceCollection SetupPayOs(this IServiceCollection services)
+    // {
+    //     IConfiguration configuration = new ConfigurationBuilder()
+    //         .SetBasePath(Directory.GetCurrentDirectory())
+    //         .AddJsonFile("appsettings.json", true, true)
+    //         .AddEnvironmentVariables()
+    //         .Build();
+    //
+    //     //PayOS
+    //     return services;
+    // }
 
     public static IServiceCollection SetupVnpay(this IServiceCollection services)
     {
@@ -66,7 +93,7 @@ public static class IOCContainer
         return services;
     }
 
-    private static IServiceCollection SetupDBContext(this IServiceCollection services)
+    private static IServiceCollection SetupDbContext(this IServiceCollection services)
     {
         IConfiguration configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -100,7 +127,7 @@ public static class IOCContainer
         return services;
     }
 
-    private static IServiceCollection SetupCORS(this IServiceCollection services)
+    private static IServiceCollection SetupCors(this IServiceCollection services)
     {
         services.AddCors(opt =>
         {
@@ -155,7 +182,7 @@ public static class IOCContainer
         return services;
     }
 
-    private static IServiceCollection SetupJWT(this IServiceCollection services)
+    private static IServiceCollection SetupJwt(this IServiceCollection services)
     {
         IConfiguration configuration = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
@@ -181,25 +208,23 @@ public static class IOCContainer
                     ValidIssuer = configuration["JWT:Issuer"],
                     ValidAudience = configuration["JWT:Audience"],
                     IssuerSigningKey =
-                        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:SecretKey"]))
+                        new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:SecretKey"] ??
+                                                                        throw new InvalidOperationException()))
                 };
             });
         services.AddAuthorization(options =>
         {
-            // options.AddPolicy("CustomerPolicy", policy =>
-            //     policy.RequireRole("Customer"));
-            //
-            // options.AddPolicy("AdminPolicy", policy =>
-            //     policy.RequireRole("Admin"));
-            //
-            // options.AddPolicy("StaffPolicy", policy =>
-            //     policy.RequireRole("Staff"));
-            //
-            // options.AddPolicy("AdminOrStaffPolicy", policy =>
-            //     policy.RequireRole("Admin", "Staff"));
-            //
-            // options.AddPolicy("StaffOrCustomerPolicy", policy =>
-            //     policy.RequireRole("Customer", "Staff"));
+            options.AddPolicy("CustomerPolicy", policy =>
+                policy.RequireRole("Customer"));
+
+            options.AddPolicy("AdminPolicy", policy =>
+                policy.RequireRole("Admin"));
+
+            options.AddPolicy("StaffPolicy", policy =>
+                policy.RequireRole("Staff"));
+
+            options.AddPolicy("SellerPolicy", policy =>
+                policy.RequireRole("Seller"));
         });
 
         return services;

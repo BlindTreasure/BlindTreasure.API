@@ -12,7 +12,7 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.SetupIOCContainer();
+builder.Services.SetupIocContainer();
 builder.Configuration.AddEnvironmentVariables(); // Đọc từ biến môi trường
 builder.Configuration.AddJsonFile("appsettings.json", true, true); // Đọc từ appsettings.json nếu có
 
