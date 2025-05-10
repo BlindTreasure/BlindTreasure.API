@@ -1,6 +1,10 @@
 ﻿using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
+using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.API.Controllers;
 
@@ -17,72 +21,217 @@ public class SystemController : ControllerBase
         _logger = logger;
     }
 
-    // private async Task SeedRolesAndUsers()
-    // {
-    //     // Seed Roles
-    //     var roles = new List<Role>
-    //     {
-    //         new() { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), RoleName = RoleType.Customer },
-    //         new() { Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), RoleName = RoleType.Staff },
-    //         new() { Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), RoleName = RoleType.Admin }
-    //     };
-    //
-    //     _logger.Info("Seeding roles...");
-    //     await _context.Roles.AddRangeAsync(roles);
-    //     await _context.SaveChangesAsync();
-    //     _logger.Success("Roles seeded successfully.");
-    //
-    //     // Seed Users
-    //     var passwordHasher = new PasswordHasher();
-    //     var users = new List<User>
-    //     {
-    //         new()
-    //         {
-    //             FullName = "Admin Phuc",
-    //             Email = "phucadmin@example.com",
-    //             Gender = true,
-    //             DateOfBirth = new DateTime(1985, 1, 1),
-    //             PhoneNumber = "0393734206",
-    //             PasswordHash = passwordHasher.HashPassword("AdminPassword@"),
-    //             RoleName = RoleType.Admin
-    //         },
-    //         new()
-    //         {
-    //             FullName = "Admin Two",
-    //             Email = "admin2@example.com",
-    //             Gender = false,
-    //             DateOfBirth = new DateTime(1987, 2, 2),
-    //             PhoneNumber = "0987654321",
-    //             PasswordHash = passwordHasher.HashPassword("AdminPassword@"),
-    //             RoleName = RoleType.Admin
-    //         },
-    //         new()
-    //         {
-    //             FullName = "Staff Phúc",
-    //             Email = "staff1@gmail.com",
-    //             Gender = true,
-    //             DateOfBirth = new DateTime(1990, 3, 3),
-    //             PhoneNumber = "1122334455",
-    //             PasswordHash = passwordHasher.HashPassword("1@"),
-    //             RoleName = RoleType.Staff
-    //         },
-    //         new()
-    //         {
-    //             FullName = "Staff uy lê",
-    //             Email = "staff2@gmail.com",
-    //             Gender = false,
-    //             DateOfBirth = new DateTime(1992, 4, 4),
-    //             PhoneNumber = "5566778899",
-    //             PasswordHash = passwordHasher.HashPassword("1@"),
-    //             RoleName = RoleType.Staff,
-    //             ImageUrl =
-    //                 "https://scontent-hkg4-1.xx.fbcdn.net/v/t1.15752-9/475528128_1134900321451127_3323942936519002305_n.png?_nc_cat=108&ccb=1-7&_nc_sid=9f807c&_nc_eui2=AeGc9uwG_xXuF9RJoF7bI17SeurTYb30fQh66tNhvfR9CKznXnCZn4dU5Bc59_JA3_eYgxJX5aKpI0iFLjxy86bK&_nc_ohc=7CpLZ9FbsmgQ7kNvgGSiMCT&_nc_oc=Adi_PRwfWJIV7gbsWdbStchrmVdAHsHWGFV_1nNFo5X716uaWl7yNxMqHEJLoZtyE4_nijOpXbFJrFCXfwWdjZWF&_nc_zt=23&_nc_ht=scontent-hkg4-1.xx&oh=03_Q7cD1gE_4j4t6T7fbVLzoUGvojV-dXqkEzD-KVSHY0aHx9PdgA&oe=67EFCCED"
-    //         }
-    //     };
-    //
-    //     _logger.Info("Seeding users...");
-    //     await _context.Users.AddRangeAsync(users);
-    //     await _context.SaveChangesAsync();
-    //     _logger.Success("Users seeded successfully.");
-    // }
+    [HttpPost("seed-all-data")]
+    public async Task<IActionResult> SeedData()
+    {
+        try
+        {
+            await ClearDatabase(_context);
+
+            // Seed data
+            await SeedRolesAndUsers();
+            return Ok(ApiResult<object>.Success(new
+            {
+                Message = "Data seeded successfully.",
+            }));
+        }
+        catch (DbUpdateException dbEx)
+        {
+            _logger.Error($"Database update error: {dbEx.Message}");
+            return StatusCode(500, "Error seeding data: Database issue.");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"General error: {ex.Message}");
+            return StatusCode(500, "Error seeding data: General failure.");
+        }
+    }
+
+    private async Task SeedRolesAndUsers()
+    {
+        // Seed Roles
+        var roles = new List<Role>
+        {
+            new()
+            {
+                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Name = RoleName.Seller,
+                Description = "Người bán chính thức"
+            },
+            new()
+            {
+                Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), Name = RoleName.Customer,
+                Description = "Khách hàng"
+            },
+            new()
+            {
+                Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), Name = RoleName.Staff,
+                Description = "Nhân viên kiểm duyệt"
+            },
+            new()
+            {
+                Id = Guid.Parse("44444444-4444-4444-4444-444444444444"), Name = RoleName.Admin,
+                Description = "Quản trị hệ thống"
+            }
+        };
+
+        _logger.Info("Seeding roles...");
+        await _context.Roles.AddRangeAsync(roles);
+        await _context.SaveChangesAsync();
+        _logger.Success("Roles seeded successfully.");
+
+        // Seed Users
+        var passwordHasher = new PasswordHasher();
+        var now = DateTime.UtcNow;
+        var defaultExpire = now.AddDays(1);
+
+        var users = new List<User>
+        {
+            new()
+            {
+                Email = "seller@blindtreasure.com",
+                Password = passwordHasher.HashPassword("Seller123!"),
+                FullName = "Seller User",
+                Phone = "0900000001",
+                Status = "ACTIVE",
+                RoleId = roles.First(r => r.Name == RoleName.Seller).Id,
+                IsEmailVerified = true,
+                EmailVerifyToken = Guid.NewGuid().ToString(),
+                EmailVerifyTokenExpires = defaultExpire,
+                ResetPasswordToken = "",
+                ResetPasswordExpires = null,
+                RefreshToken = "",
+                PendingEmail = "",
+                PendingEmailVerifyToken = "",
+                PendingEmailVerifyExpires = null,
+                AvatarUrl = "",
+                CreatedAt = now,
+                IsDeleted = false,
+            },
+            new()
+            {
+                Email = "customer@blindtreasure.com",
+                Password = passwordHasher.HashPassword("Customer123!"),
+                FullName = "Customer User",
+                Phone = "0900000002",
+                Status = "ACTIVE",
+                RoleId = roles.First(r => r.Name == RoleName.Customer).Id,
+                IsEmailVerified = true,
+                EmailVerifyToken = Guid.NewGuid().ToString(),
+                EmailVerifyTokenExpires = defaultExpire,
+                ResetPasswordToken = "",
+                ResetPasswordExpires = null,
+                RefreshToken = "",
+                PendingEmail = "",
+                PendingEmailVerifyToken = "",
+                PendingEmailVerifyExpires = null,
+                AvatarUrl = "",
+                CreatedAt = now,
+                IsDeleted = false,
+            },
+            new()
+            {
+                Email = "staff@blindtreasure.com",
+                Password = passwordHasher.HashPassword("Staff123!"),
+                FullName = "Staff User",
+                Phone = "0900000003",
+                Status = "ACTIVE",
+                RoleId = roles.First(r => r.Name == RoleName.Staff).Id,
+                IsEmailVerified = true,
+                EmailVerifyToken = Guid.NewGuid().ToString(),
+                EmailVerifyTokenExpires = defaultExpire,
+                ResetPasswordToken = "",
+                ResetPasswordExpires = null,
+                RefreshToken = "",
+                PendingEmail = "",
+                PendingEmailVerifyToken = "",
+                PendingEmailVerifyExpires = null,
+                AvatarUrl = "",
+                CreatedAt = now,
+                IsDeleted = false,
+            },
+            new()
+            {
+                Email = "admin@blindtreasure.com",
+                Password = passwordHasher.HashPassword("Admin123!"),
+                FullName = "Admin User",
+                Phone = "0900000004",
+                Status = "ACTIVE",
+                RoleId = roles.First(r => r.Name == RoleName.Admin).Id,
+                IsEmailVerified = true,
+                EmailVerifyToken = Guid.NewGuid().ToString(),
+                EmailVerifyTokenExpires = defaultExpire,
+                ResetPasswordToken = "",
+                ResetPasswordExpires = null,
+                RefreshToken = "",
+                PendingEmail = "",
+                PendingEmailVerifyToken = "",
+                PendingEmailVerifyExpires = null,
+                AvatarUrl = "",
+                CreatedAt = now,
+                IsDeleted = false,
+            }
+        };
+
+        _logger.Info("Seeding users...");
+        await _context.Users.AddRangeAsync(users);
+        await _context.SaveChangesAsync();
+        _logger.Success("Users seeded successfully.");
+    }
+
+
+    private async Task ClearDatabase(BlindTreasureDbContext context)
+    {
+        using var transaction = await context.Database.BeginTransactionAsync();
+
+        try
+        {
+            _logger.Info("Bắt đầu xóa dữ liệu trong database...");
+
+            var tablesToDelete = new List<Func<Task>>
+            {
+                // Bảng phụ thuộc trước
+                () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
+                () => context.BlindBoxItems.ExecuteDeleteAsync(),
+                () => context.CartItems.ExecuteDeleteAsync(),
+                () => context.OrderDetails.ExecuteDeleteAsync(),
+                () => context.Listings.ExecuteDeleteAsync(),
+                () => context.InventoryItems.ExecuteDeleteAsync(),
+                () => context.WishlistItems.ExecuteDeleteAsync(),
+                () => context.SupportTickets.ExecuteDeleteAsync(),
+                () => context.Reviews.ExecuteDeleteAsync(),
+                () => context.Shipments.ExecuteDeleteAsync(),
+                () => context.Transactions.ExecuteDeleteAsync(),
+                () => context.Notifications.ExecuteDeleteAsync(),
+
+                // Bảng chính
+                () => context.Wishlists.ExecuteDeleteAsync(),
+                () => context.CustomerDiscounts.ExecuteDeleteAsync(),
+                () => context.Orders.ExecuteDeleteAsync(),
+                () => context.Payments.ExecuteDeleteAsync(),
+                () => context.Promotions.ExecuteDeleteAsync(),
+                () => context.Addresses.ExecuteDeleteAsync(),
+                () => context.Products.ExecuteDeleteAsync(),
+                () => context.BlindBoxes.ExecuteDeleteAsync(),
+                () => context.Certificates.ExecuteDeleteAsync(),
+                () => context.Categories.ExecuteDeleteAsync(),
+                () => context.Sellers.ExecuteDeleteAsync(),
+                () => context.Users.ExecuteDeleteAsync(),
+                () => context.Roles.ExecuteDeleteAsync()
+            };
+
+            foreach (var deleteFunc in tablesToDelete)
+            {
+                await deleteFunc();
+            }
+
+            await transaction.CommitAsync();
+            _logger.Success("Xóa sạch dữ liệu trong database thành công.");
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.Error($"Xóa dữ liệu thất bại: {ex.Message}");
+            throw;
+        }
+    }
 }
