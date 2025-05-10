@@ -2,5 +2,5 @@
 
 public interface IEmailService
 {
-    
+    Task Execute();
 }

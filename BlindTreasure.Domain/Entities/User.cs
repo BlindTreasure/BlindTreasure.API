@@ -6,7 +6,7 @@ public class User : BaseEntity
     public string Email { get; set; }
 
     // Mật khẩu đã mã hoá
-    public string Password { get; set; }
+    public string? Password { get; set; }
 
     // Họ và tên đầy đủ
     public string FullName { get; set; }

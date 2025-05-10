@@ -16,6 +16,7 @@ services:
       - "JWT__Issuer=BlindTreasure_Issuer"
       - "JWT__Audience=BlindTreasure_Audience"
       - Redis__ConnectionString=redis:6379
+      - RESEND_APITOKEN=re_gQNBXJvY_ANFdgQphKQBxdW5DNf2UG6Zk
     ports:
       - "5000:5000"
 

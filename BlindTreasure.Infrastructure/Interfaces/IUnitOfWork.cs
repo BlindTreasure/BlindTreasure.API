@@ -1,6 +1,10 @@
-﻿namespace BlindTreasure.Infrastructure.Interfaces;
+﻿using BlindTreasure.Domain.Entities;
 
-public interface IUnitOfWork
+namespace BlindTreasure.Infrastructure.Interfaces;
+
+public interface IUnitOfWork : IDisposable
 {
+    IGenericRepository<User> Users { get; }
+
     Task<int> SaveChangesAsync();
 }

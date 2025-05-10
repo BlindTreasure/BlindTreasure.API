@@ -1,13 +1,18 @@
 ﻿using System.Text;
 using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services;
+using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Domain;
+using BlindTreasure.Infrastructure;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using BlindTreasure.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Resend;
 using StackExchange.Redis;
 
 namespace BlindTreasure.API.Architecture;
@@ -17,7 +22,7 @@ public static class IocContainer
     public static IServiceCollection SetupIocContainer(this IServiceCollection services)
     {
         //Add Logger
-        // services.AddScoped<ILoggerService, LoggerService>();
+        services.AddScoped<ILoggerService, LoggerService>();
 
         //Add Project Services
         services.SetupDbContext();
@@ -33,6 +38,8 @@ public static class IocContainer
 
         // services.SetupGraphQl();
         services.SetupRedisService();
+        services.SetupReSendService();
+        
         services.SetupVnpay();
         return services;
     }
@@ -67,19 +74,19 @@ public static class IocContainer
     //     
     //     return services;
     // }
-
-
-    // public static IServiceCollection SetupPayOs(this IServiceCollection services)
-    // {
-    //     IConfiguration configuration = new ConfigurationBuilder()
-    //         .SetBasePath(Directory.GetCurrentDirectory())
-    //         .AddJsonFile("appsettings.json", true, true)
-    //         .AddEnvironmentVariables()
-    //         .Build();
-    //
-    //     //PayOS
-    //     return services;
-    // }
+    
+    public static IServiceCollection SetupReSendService(this IServiceCollection services)
+    {
+        services.AddOptions();
+        services.AddHttpClient<ResendClient>();
+        services.Configure<ResendClientOptions>( o =>
+        {
+            o.ApiToken = Environment.GetEnvironmentVariable( "RESEND_APITOKEN" )!;
+        } );
+        services.AddTransient<IResend, ResendClient>();
+        
+        return services;
+    }
 
     public static IServiceCollection SetupVnpay(this IServiceCollection services)
     {
@@ -120,7 +127,12 @@ public static class IocContainer
         // services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
         // Add application services
-
+        services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<ILoggerService, LoggerService>();
+        services.AddScoped<ICurrentTime, CurrentTime>();
+        services.AddScoped<IClaimsService, ClaimsService>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IEmailService, EmailService>();
 
         services.AddHttpContextAccessor();
 
