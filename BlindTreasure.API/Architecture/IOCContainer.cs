@@ -37,7 +37,6 @@ public static class IocContainer
         services.SetupJwt();
 
         // services.SetupGraphQl();
-        services.SetupRedisService();
         services.SetupReSendService();
 
         services.SetupVnpay();
@@ -45,19 +44,17 @@ public static class IocContainer
     }
 
 
-    public static IServiceCollection SetupRedisService(this IServiceCollection services)
+    public static IServiceCollection SetupRedisService(this IServiceCollection services, IConfiguration configuration)
     {
-        // Lấy kết nối Redis từ môi trường Docker
-        var redisConnectionString = Environment.GetEnvironmentVariable("Redis__ConnectionString");
+        var redisConnectionString = configuration.GetConnectionString("Redis");
 
         if (string.IsNullOrEmpty(redisConnectionString))
             throw new InvalidOperationException("Redis connection string is missing in environment variables.");
 
-        // Cấu hình Redis cache
         services.AddSingleton<IConnectionMultiplexer>(
             ConnectionMultiplexer.Connect(redisConnectionString));
 
-        services.AddScoped<ICacheService, RedisCacheService>(); // Đăng ký Redis Cache Service
+        services.AddScoped<ICacheService, RedisCacheService>();
 
         return services;
     }

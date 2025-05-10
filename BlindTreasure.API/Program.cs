@@ -40,6 +40,7 @@ builder.Services.AddCors(options =>
 
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.SetupRedisService(builder.Configuration);
 
 var app = builder.Build();
 

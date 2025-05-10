@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Domain;
@@ -49,6 +50,17 @@ public class BlindTreasureDbContext : DbContext
             .HasMany(r => r.Users)
             .WithOne(u => u.Role)
             .HasForeignKey(u => u.RoleId);
+
+        modelBuilder.Entity<Role>(entity =>
+        {
+            entity.Property(r => r.Name)
+                .HasConversion(
+                    v => v.ToString(),
+                    v => Enum.Parse<RoleName>(v)
+                )
+                .HasMaxLength(20)
+                .IsRequired();
+        });
 
         // User ↔ Seller (1-1)
         modelBuilder.Entity<User>()

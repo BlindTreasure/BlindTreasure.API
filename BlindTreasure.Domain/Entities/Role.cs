@@ -1,9 +1,11 @@
-﻿namespace BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.Entities;
 
 public class Role : BaseEntity
 {
     // ‘seller’, ‘customer’, ‘staff’, ‘admin’
-    public string Name { get; set; }
+    public RoleName Name { get; set; }
 
     // Mô tả chi tiết vai trò
     public string Description { get; set; }

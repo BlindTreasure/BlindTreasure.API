@@ -7,26 +7,13 @@ namespace BlindTreasure.Application.Services;
 
 public class EmailService : IEmailService
 {
-    private readonly IResend _resend;
     private readonly string _fromEmail;
+    private readonly IResend _resend;
 
     public EmailService(IResend resend, IConfiguration configuration)
     {
         _resend = resend;
-        _fromEmail = configuration["RESEND_FROM"] ?? "noreply@ae-tao-fullstack-api.site"; 
-    }
-
-    private async Task SendEmailAsync(string to, string subject, string htmlContent)
-    {
-        var message = new EmailMessage
-        {
-            From = _fromEmail, 
-            Subject = subject,
-            HtmlBody = htmlContent
-        };
-
-        message.To.Add(to);
-        await _resend.EmailSendAsync(message);
+        _fromEmail = configuration["RESEND_FROM"] ?? "noreply@ae-tao-fullstack-api.site";
     }
 
     public async Task SendRegistrationSuccessEmailAsync(EmailRequestDto request)
@@ -94,5 +81,18 @@ public class EmailService : IEmailService
   </body>
 </html>";
         await SendEmailAsync(request.To, "Mật khẩu đã được thay đổi tại BlindTreasure", html);
+    }
+
+    private async Task SendEmailAsync(string to, string subject, string htmlContent)
+    {
+        var message = new EmailMessage
+        {
+            From = _fromEmail,
+            Subject = subject,
+            HtmlBody = htmlContent
+        };
+
+        message.To.Add(to);
+        await _resend.EmailSendAsync(message);
     }
 }
