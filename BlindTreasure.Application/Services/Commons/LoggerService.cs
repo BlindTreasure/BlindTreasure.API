@@ -1,5 +1,4 @@
-﻿
-using BlindTreasure.Application.Interfaces.Commons;
+﻿using BlindTreasure.Application.Interfaces.Commons;
 
 namespace BlindTreasure.Application.Services.Commons;
 

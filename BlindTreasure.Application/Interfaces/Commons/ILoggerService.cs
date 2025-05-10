@@ -1,4 +1,3 @@
-
 namespace BlindTreasure.Application.Interfaces.Commons;
 
 public interface ILoggerService

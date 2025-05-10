@@ -1,6 +1,11 @@
-﻿namespace BlindTreasure.Application.Interfaces;
+﻿using BlindTreasure.Domain.DTOs.EmailDTOs;
+
+namespace BlindTreasure.Application.Interfaces;
 
 public interface IEmailService
 {
-    Task SendEmailAsync(string to, string subject, string htmlContent);
+    Task SendRegistrationSuccessEmailAsync(EmailRequestDto request);
+    Task SendOtpVerificationEmailAsync(EmailRequestDto request);
+    Task SendForgotPasswordOtpEmailAsync(EmailRequestDto request);
+    Task SendPasswordChangeEmailAsync(EmailRequestDto request);
 }

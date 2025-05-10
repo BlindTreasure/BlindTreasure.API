@@ -7,11 +7,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\BlindTreasure.Infrastructure\BlindTreasure.Infrastructure.csproj" />
+        <ProjectReference Include="..\BlindTreasure.Infrastructure\BlindTreasure.Infrastructure.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Resend" Version="0.1.1" />
+        <PackageReference Include="Resend" Version="0.1.1"/>
     </ItemGroup>
 
 </Project>

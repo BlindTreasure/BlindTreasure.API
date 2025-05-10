@@ -39,7 +39,7 @@ public static class IocContainer
         // services.SetupGraphQl();
         services.SetupRedisService();
         services.SetupReSendService();
-        
+
         services.SetupVnpay();
         return services;
     }
@@ -48,12 +48,10 @@ public static class IocContainer
     public static IServiceCollection SetupRedisService(this IServiceCollection services)
     {
         // Lấy kết nối Redis từ môi trường Docker
-        string? redisConnectionString = Environment.GetEnvironmentVariable("Redis__ConnectionString");
+        var redisConnectionString = Environment.GetEnvironmentVariable("Redis__ConnectionString");
 
         if (string.IsNullOrEmpty(redisConnectionString))
-        {
             throw new InvalidOperationException("Redis connection string is missing in environment variables.");
-        }
 
         // Cấu hình Redis cache
         services.AddSingleton<IConnectionMultiplexer>(
@@ -74,17 +72,17 @@ public static class IocContainer
     //     
     //     return services;
     // }
-    
+
     public static IServiceCollection SetupReSendService(this IServiceCollection services)
     {
         services.AddOptions();
         services.AddHttpClient<ResendClient>();
-        services.Configure<ResendClientOptions>( o =>
+        services.Configure<ResendClientOptions>(o =>
         {
-            o.ApiToken = Environment.GetEnvironmentVariable( "RESEND_APITOKEN" )!;
-        } );
+            o.ApiToken = Environment.GetEnvironmentVariable("RESEND_APITOKEN")!;
+        });
         services.AddTransient<IResend, ResendClient>();
-        
+
         return services;
     }
 

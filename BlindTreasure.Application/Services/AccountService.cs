@@ -9,9 +9,9 @@ namespace BlindTreasure.Application.Services;
 
 public class AccountService : IAccountService
 {
+    private readonly ICacheService _cacheService;
     private readonly ILoggerService _loggerService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ICacheService  _cacheService;
 
     public AccountService(ILoggerService loggerService, IUnitOfWork unitOfWork, ICacheService cacheService)
     {
@@ -19,7 +19,7 @@ public class AccountService : IAccountService
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
     }
-    
+
     public async Task<bool> RegisterUserAsync(UserRegistrationDto registrationDto)
     {
         try
@@ -36,13 +36,13 @@ public class AccountService : IAccountService
                 return false;
             }
 
-            string cacheKey = $"user:{registrationDto.Email}";
+            var cacheKey = $"user:{registrationDto.Email}";
             var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
 
             if (cachedUser != null)
             {
                 _loggerService.Info($"User {registrationDto.Email} is already registered (cached).");
-                return false; 
+                return false;
             }
 
             try
@@ -59,8 +59,8 @@ public class AccountService : IAccountService
             var user = new User
             {
                 Email = registrationDto.Email,
-                Password = registrationDto.Password,  
-                FullName = registrationDto.FullName,
+                Password = registrationDto.Password,
+                FullName = registrationDto.FullName
             };
 
             await _unitOfWork.Users.AddAsync(user);
@@ -78,6 +78,4 @@ public class AccountService : IAccountService
             return false;
         }
     }
-
-    
 }
