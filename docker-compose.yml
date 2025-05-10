@@ -17,6 +17,8 @@ services:
       - "JWT__Audience=BlindTreasure_Audience"
       - Redis__ConnectionString=redis:6379
       - RESEND_APITOKEN=re_gQNBXJvY_ANFdgQphKQBxdW5DNf2UG6Zk
+      - RESEND_FROM=noreply@ae-tao-fullstack-api.site 
+
     ports:
       - "5000:5000"
 

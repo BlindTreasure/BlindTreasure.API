@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Domain.DTOs.EmailDTOs;
+using Microsoft.Extensions.Configuration;
 using Resend;
 
 namespace BlindTreasure.Application.Services;
@@ -7,20 +8,23 @@ namespace BlindTreasure.Application.Services;
 public class EmailService : IEmailService
 {
     private readonly IResend _resend;
+    private readonly string _fromEmail;
 
-    public EmailService(IResend resend)
+    public EmailService(IResend resend, IConfiguration configuration)
     {
         _resend = resend;
+        _fromEmail = configuration["RESEND_FROM"] ?? "noreply@ae-tao-fullstack-api.site"; 
     }
 
     private async Task SendEmailAsync(string to, string subject, string htmlContent)
     {
         var message = new EmailMessage
         {
-            From = "noreply@ae-tao-fullstack-api.site",
+            From = _fromEmail, 
             Subject = subject,
             HtmlBody = htmlContent
         };
+
         message.To.Add(to);
         await _resend.EmailSendAsync(message);
     }
@@ -40,6 +44,7 @@ public class EmailService : IEmailService
 </html>";
         await SendEmailAsync(request.To, "Đăng ký thành công tại BlindTreasure", html);
     }
+
 
     public async Task SendOtpVerificationEmailAsync(EmailRequestDto request)
     {
