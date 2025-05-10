@@ -1,8 +1,9 @@
 ﻿using BlindTreasure.Domain.DTOs.AccountDTOs;
+using BlindTreasure.Domain.DTOs.UserDTOs;
 
 namespace BlindTreasure.Application.Interfaces;
 
 public interface IAccountService
 {
-    Task<bool> RegisterUserAsync(UserRegistrationDto registrationDto);
+    Task<UserDto> RegisterUserAsync(UserRegistrationDto registrationDto);
 }

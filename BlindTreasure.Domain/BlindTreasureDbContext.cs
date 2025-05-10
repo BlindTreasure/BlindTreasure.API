@@ -25,6 +25,8 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<BlindBoxItem> BlindBoxItems { get; set; }
     public DbSet<ProbabilityConfig> ProbabilityConfigs { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
+
+    public DbSet<OtpVerification> OtpVerifications { get; set; }
     public DbSet<Listing> Listings { get; set; }
     public DbSet<CustomerDiscount> CustomerDiscounts { get; set; }
     public DbSet<CartItem> CartItems { get; set; }
@@ -46,22 +48,46 @@ public class BlindTreasureDbContext : DbContext
         base.OnModelCreating(modelBuilder);
 
         // Role ↔ User (1-n)
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Role)
+            .WithMany(r => r.Users)
+            .HasForeignKey(u => u.RoleName)
+            .IsRequired();
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.Status)
+            .HasConversion<string>();
+
         modelBuilder.Entity<Role>()
-            .HasMany(r => r.Users)
-            .WithOne(u => u.Role)
-            .HasForeignKey(u => u.RoleId);
+            .Property(r => r.Type)
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired();
 
-        modelBuilder.Entity<Role>(entity =>
+        // --- Cấu hình User.RoleName làm FK trỏ vào Role.Type ---
+        modelBuilder.Entity<User>()
+            .Property(u => u.RoleName)
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired();
+
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Role)
+            .WithMany(r => r.Users)
+            .HasForeignKey(u => u.RoleName)
+            .HasPrincipalKey(r => r.Type);
+
+        // --- Định nghĩa Alternate Key trên Role.Type ---
+        modelBuilder.Entity<Role>()
+            .HasAlternateKey(r => r.Type);
+
+        modelBuilder.Entity<OtpVerification>(entity =>
         {
-            entity.Property(r => r.Name)
-                .HasConversion(
-                    v => v.ToString(),
-                    v => Enum.Parse<RoleName>(v)
-                )
-                .HasMaxLength(20)
-                .IsRequired();
+            entity.Property(e => e.Purpose)
+                .HasConversion<string>() // enum -> string
+                .HasMaxLength(32);       // giới hạn độ dài nếu cần
         });
-
+        
         // User ↔ Seller (1-1)
         modelBuilder.Entity<User>()
             .HasOne(u => u.Seller)

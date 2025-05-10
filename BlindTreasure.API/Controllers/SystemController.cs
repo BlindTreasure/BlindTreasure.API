@@ -54,22 +54,22 @@ public class SystemController : ControllerBase
         {
             new()
             {
-                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Name = RoleName.Seller,
+                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Type = RoleType.Seller,
                 Description = "Người bán chính thức"
             },
             new()
             {
-                Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), Name = RoleName.Customer,
+                Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), Type = RoleType.Customer,
                 Description = "Khách hàng"
             },
             new()
             {
-                Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), Name = RoleName.Staff,
+                Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), Type = RoleType.Staff,
                 Description = "Nhân viên kiểm duyệt"
             },
             new()
             {
-                Id = Guid.Parse("44444444-4444-4444-4444-444444444444"), Name = RoleName.Admin,
+                Id = Guid.Parse("44444444-4444-4444-4444-444444444444"), Type = RoleType.Admin,
                 Description = "Quản trị hệ thống"
             }
         };
@@ -92,20 +92,8 @@ public class SystemController : ControllerBase
                 Password = passwordHasher.HashPassword("Seller123!"),
                 FullName = "Seller User",
                 Phone = "0900000001",
-                Status = "ACTIVE",
-                RoleId = roles.First(r => r.Name == RoleName.Seller).Id,
-                IsEmailVerified = true,
-                EmailVerifyToken = Guid.NewGuid().ToString(),
-                EmailVerifyTokenExpires = defaultExpire,
-                ResetPasswordToken = "",
-                ResetPasswordExpires = null,
-                RefreshToken = "",
-                PendingEmail = "",
-                PendingEmailVerifyToken = "",
-                PendingEmailVerifyExpires = null,
-                AvatarUrl = "",
-                CreatedAt = now,
-                IsDeleted = false,
+                Status = UserStatus.Active,
+                RoleName = RoleType.Seller,
             },
             new()
             {
@@ -113,20 +101,8 @@ public class SystemController : ControllerBase
                 Password = passwordHasher.HashPassword("Customer123!"),
                 FullName = "Customer User",
                 Phone = "0900000002",
-                Status = "ACTIVE",
-                RoleId = roles.First(r => r.Name == RoleName.Customer).Id,
-                IsEmailVerified = true,
-                EmailVerifyToken = Guid.NewGuid().ToString(),
-                EmailVerifyTokenExpires = defaultExpire,
-                ResetPasswordToken = "",
-                ResetPasswordExpires = null,
-                RefreshToken = "",
-                PendingEmail = "",
-                PendingEmailVerifyToken = "",
-                PendingEmailVerifyExpires = null,
-                AvatarUrl = "",
-                CreatedAt = now,
-                IsDeleted = false,
+                Status = UserStatus.Active,
+                RoleName = RoleType.Customer,
             },
             new()
             {
@@ -134,20 +110,8 @@ public class SystemController : ControllerBase
                 Password = passwordHasher.HashPassword("Staff123!"),
                 FullName = "Staff User",
                 Phone = "0900000003",
-                Status = "ACTIVE",
-                RoleId = roles.First(r => r.Name == RoleName.Staff).Id,
-                IsEmailVerified = true,
-                EmailVerifyToken = Guid.NewGuid().ToString(),
-                EmailVerifyTokenExpires = defaultExpire,
-                ResetPasswordToken = "",
-                ResetPasswordExpires = null,
-                RefreshToken = "",
-                PendingEmail = "",
-                PendingEmailVerifyToken = "",
-                PendingEmailVerifyExpires = null,
-                AvatarUrl = "",
-                CreatedAt = now,
-                IsDeleted = false,
+                Status = UserStatus.Active,
+                RoleName = RoleType.Staff,
             },
             new()
             {
@@ -155,20 +119,8 @@ public class SystemController : ControllerBase
                 Password = passwordHasher.HashPassword("Admin123!"),
                 FullName = "Admin User",
                 Phone = "0900000004",
-                Status = "ACTIVE",
-                RoleId = roles.First(r => r.Name == RoleName.Admin).Id,
-                IsEmailVerified = true,
-                EmailVerifyToken = Guid.NewGuid().ToString(),
-                EmailVerifyTokenExpires = defaultExpire,
-                ResetPasswordToken = "",
-                ResetPasswordExpires = null,
-                RefreshToken = "",
-                PendingEmail = "",
-                PendingEmailVerifyToken = "",
-                PendingEmailVerifyExpires = null,
-                AvatarUrl = "",
-                CreatedAt = now,
-                IsDeleted = false,
+                Status = UserStatus.Active,
+                RoleName = RoleType.Admin,
             }
         };
 

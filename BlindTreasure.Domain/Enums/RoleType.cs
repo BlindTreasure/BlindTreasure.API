@@ -1,6 +1,6 @@
 ﻿namespace BlindTreasure.Domain.Enums;
 
-public enum RoleName
+public enum RoleType
 {
     Seller,
     Customer,

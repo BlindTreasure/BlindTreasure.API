@@ -3,7 +3,9 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AccountDTOs;
 using BlindTreasure.Domain.DTOs.EmailDTOs;
+using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 
 namespace BlindTreasure.Application.Services;
@@ -25,33 +27,33 @@ public class AccountService : IAccountService
         _emailService = emailService;
     }
 
-    public async Task<bool> RegisterUserAsync(UserRegistrationDto registrationDto)
+    public async Task<UserDto> RegisterUserAsync(UserRegistrationDto registrationDto)
     {
         try
         {
-            // 1. Validate đầu vào
+            // Phase 1: Validate the input data
             if (string.IsNullOrWhiteSpace(registrationDto.Password))
             {
                 _loggerService.Error("Password cannot be empty.");
-                return false;
+                return null; // Return null to indicate failure
             }
 
             if (registrationDto.Password.Length < 6)
             {
                 _loggerService.Error("Password must be at least 6 characters long.");
-                return false;
+                return null;
             }
 
-            // 2. Kiểm tra cache tránh đăng ký trùng
+            // Phase 2: Check if the user is already registered (cached)
             var cacheKey = $"user:{registrationDto.Email}";
             var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
             if (cachedUser != null)
             {
                 _loggerService.Info($"User {registrationDto.Email} is already registered (cached).");
-                return false;
+                return null;
             }
 
-            // 3. Hash password
+            // Phase 3: Hash the password
             try
             {
                 var passwordHasher = new PasswordHasher();
@@ -60,37 +62,37 @@ public class AccountService : IAccountService
             catch (Exception ex)
             {
                 _loggerService.Error($"Error hashing password: {ex.Message}");
-                return false;
+                return null;
             }
 
-            // 4. Tạo mới User, mặc định chưa xác thực email
+            // Phase 4: Create the new User entity
             var user = new User
             {
                 Email = registrationDto.Email,
                 Password = registrationDto.Password,
                 FullName = registrationDto.FullName,
-                Status = "ACTIVE",
-                RoleId = Guid.Parse("..."), // gán RoleId phù hợp
-                IsEmailVerified = false
+                Status = UserStatus.Active,
+                RoleName = RoleType.Customer,
+                IsEmailVerified = false,
             };
 
-            // 5. Lưu user vào DB
+            // Phase 5: Save the user to the database
             await _unitOfWork.Users.AddAsync(user);
             await _unitOfWork.SaveChangesAsync();
 
-            // 6. Sinh OTP và gán vào user
+            // Phase 6: Generate OTP for email verification
             var otpToken = OtpGenerator.GenerateToken(6, TimeSpan.FromMinutes(10));
             user.EmailVerifyToken = otpToken.Code;
             user.EmailVerifyTokenExpires = otpToken.ExpiresAtUtc;
 
-            // 7. Cập nhật lại user với token
+            // Phase 7: Update user with OTP token
             await _unitOfWork.Users.Update(user);
             await _unitOfWork.SaveChangesAsync();
 
-            // 8. Cập nhật cache
+            // Phase 8: Update cache with new user data
             await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(24));
 
-            // 9. Gửi email xác thực OTP
+            // Phase 9: Send OTP verification email
             var emailRequest = new EmailRequestDto
             {
                 To = registrationDto.Email,
@@ -100,12 +102,22 @@ public class AccountService : IAccountService
             await _emailService.SendOtpVerificationEmailAsync(emailRequest);
 
             _loggerService.Info($"OTP verification email sent to {registrationDto.Email}.");
-            return true;
+
+            // Return the UserDto for the successfully registered user
+            return new UserDto
+            {
+                UserId = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                PhoneNumber = user.Phone,
+                RoleName = user.RoleName,
+                CreatedAt = user.CreatedAt
+            };
         }
         catch (Exception ex)
         {
             _loggerService.Error($"An error occurred while registering the user: {ex.Message}");
-            return false;
+            return null; // Return null if any error occurs
         }
     }
 }

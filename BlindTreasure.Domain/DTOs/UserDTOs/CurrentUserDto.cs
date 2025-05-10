@@ -1,7 +1,7 @@
 ﻿namespace BlindTreasure.Domain.DTOs.UserDTOs;
 
 [Serializable]
-public class CurrentUserDTO
+public class CurrentUserDto
 {
     public string? FullName { get; set; }
     public string? Email { get; set; }

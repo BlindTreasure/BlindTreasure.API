@@ -96,7 +96,7 @@ namespace BlindTreasure.Domain.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Description = table.Column<string>(type: "text", nullable: false),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -109,6 +109,7 @@ namespace BlindTreasure.Domain.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Roles", x => x.Id);
+                    table.UniqueConstraint("AK_Roles_Type", x => x.Type);
                 });
 
             migrationBuilder.CreateTable(
@@ -147,21 +148,21 @@ namespace BlindTreasure.Domain.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Email = table.Column<string>(type: "text", nullable: false),
-                    Password = table.Column<string>(type: "text", nullable: true),
-                    FullName = table.Column<string>(type: "text", nullable: false),
-                    Phone = table.Column<string>(type: "text", nullable: false),
+                    Email = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Password = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    FullName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Phone = table.Column<string>(type: "character varying(15)", maxLength: 15, nullable: false),
+                    RoleName = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Status = table.Column<string>(type: "text", nullable: false),
-                    RoleId = table.Column<Guid>(type: "uuid", nullable: false),
                     IsEmailVerified = table.Column<bool>(type: "boolean", nullable: false),
-                    EmailVerifyToken = table.Column<string>(type: "text", nullable: false),
+                    EmailVerifyToken = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     EmailVerifyTokenExpires = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    ResetPasswordToken = table.Column<string>(type: "text", nullable: false),
+                    ResetPasswordToken = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     ResetPasswordExpires = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    RefreshToken = table.Column<string>(type: "text", nullable: false),
-                    AvatarUrl = table.Column<string>(type: "text", nullable: false),
-                    PendingEmail = table.Column<string>(type: "text", nullable: false),
-                    PendingEmailVerifyToken = table.Column<string>(type: "text", nullable: false),
+                    RefreshToken = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    DateOfBirth = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    AvatarUrl = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    PendingEmailVerifyToken = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
                     PendingEmailVerifyExpires = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -175,10 +176,10 @@ namespace BlindTreasure.Domain.Migrations
                 {
                     table.PrimaryKey("PK_Users", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Users_Roles_RoleId",
-                        column: x => x.RoleId,
+                        name: "FK_Users_Roles_RoleName",
+                        column: x => x.RoleName,
                         principalTable: "Roles",
-                        principalColumn: "Id",
+                        principalColumn: "Type",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -1044,9 +1045,9 @@ namespace BlindTreasure.Domain.Migrations
                 column: "PaymentId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Users_RoleId",
+                name: "IX_Users_RoleName",
                 table: "Users",
-                column: "RoleId");
+                column: "RoleName");
 
             migrationBuilder.CreateIndex(
                 name: "IX_WishlistItems_BlindBoxId",
