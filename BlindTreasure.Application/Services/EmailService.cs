@@ -12,14 +12,16 @@ public class EmailService : IEmailService
         _resend = resend;
     }
     
-    public async Task Execute()
+    public async Task SendEmailAsync(string to, string subject, string htmlContent)
     {
-        var message = new EmailMessage();
-        message.From = "trangiaphuc362003181@gmail.com";
-        message.To.Add( "trangiaphuc362003181@gmail.com" );
-        message.Subject = "hello world";
-        message.HtmlBody = "<strong>it works!</strong>";
+        var message = new EmailMessage
+        {
+            From = "noreply@ae-tao-fullstack-api.site", // Thay thế bằng địa chỉ email của bạn
+            Subject = subject,
+            HtmlBody = htmlContent
+        };
+        message.To.Add(to);
 
-        await _resend.EmailSendAsync( message );
+        await _resend.EmailSendAsync(message);
     }
 }
