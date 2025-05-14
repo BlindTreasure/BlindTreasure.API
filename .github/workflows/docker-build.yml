@@ -37,7 +37,7 @@ jobs:
           context: .
           file: BlindTreasure.API/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/blindtreasureapi:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/blindtreasure-api:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
