@@ -1,0 +1,27 @@
+name: Deploy to VPS
+
+on:
+  workflow_run:
+    workflows: ["Build Docker Image"] 
+    types:
+      - completed
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}  
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH vào VPS & Deploy
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+            cd /root/projects/BlindTreasure.API
+            docker-compose pull
+            docker-compose down
+            docker-compose up -d --force-recreate
+            docker system prune -af

@@ -1,0 +1,59 @@
+name: Build Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build, Cache & Push Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Restore Docker layer cache
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Log build start time
+        run: |
+          echo "Build start: $(date +'%Y-%m-%d %H:%M:%S')"
+
+      # Bước 4: Đăng nhập DockerHub
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Bước 5: Build & Push Docker Image
+      - name: Build & Push Docker image
+        run: |
+          START_TIME=$(date +%s)
+
+          docker buildx build \
+            --file BlindTreasure.API/Dockerfile \
+            --tag ${{ secrets.DOCKERHUB_USERNAME }}/blindtreasure-api:latest \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new \
+            --push \
+            .
+
+          END_TIME=$(date +%s)
+          BUILD_DURATION=$((END_TIME - START_TIME))
+          echo "Build & Push completed in $BUILD_DURATION seconds."
+
+      - name: Move Docker layer cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
