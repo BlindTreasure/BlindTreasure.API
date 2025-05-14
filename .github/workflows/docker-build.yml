@@ -40,13 +40,14 @@ jobs:
       - name: Build & Push Docker image
         run: |
           START_TIME=$(date +%s)
-
           docker buildx build \
-            --file BlindTreasure.API/Dockerfile \  # Đường dẫn đúng đến Dockerfile
-            --tag ${{ secrets.DOCKERHUB_USERNAME }}/blindtreasure-api:latest \
+            --file BlindTreasure.API/Dockerfile \
+            --tag ${{ secrets.DOCKERHUB_USERNAME }}/blindtreasureapi:latest \
             --cache-from type=local,src=/tmp/.buildx-cache \
             --cache-to type=local,dest=/tmp/.buildx-cache-new \
             --push \
+            ./BlindTreasure.API  # Đảm bảo context là thư mục chứa Dockerfile
+
             ./BlindTreasure.API  # Đường dẫn đến thư mục chứa Dockerfile
          
 
