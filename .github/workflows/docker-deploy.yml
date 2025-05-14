@@ -2,7 +2,7 @@ name: Deploy to VPS
 
 on:
   workflow_run:
-    workflows: ["Build and Push Docker Image"] 
+    workflows: ["Build and Push Docker Image"]  # Chạy sau khi workflow build và push Docker image thành công
     types:
       - completed
 
@@ -12,28 +12,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: SSH vào VPS & Deploy
+      - name: SSH vào VPS và Deploy
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
+          host: ${{ secrets.VPS_HOST }}        # Địa chỉ IP VPS
+          username: ${{ secrets.VPS_USER }}    # Tên người dùng SSH (root hoặc user của bạn)
+          password: ${{ secrets.VPS_PASSWORD }}# Mật khẩu SSH
           script: |
             # Đăng nhập vào DockerHub
             docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-            
+
             # Chuyển đến thư mục chứa docker-compose.yml
-            cd /root/projects/blindtreasure  # Chắc chắn rằng bạn đang ở đúng thư mục chứa docker-compose.yml
-            
+            cd /root/projects/blindtreasure
+
             # Pull image mới từ DockerHub
             docker-compose pull
-            
-            # Dừng và xóa các container hiện tại
-            docker-compose down
-            
-            # Khởi động lại containers với docker-compose
-            docker-compose up -d --force-recreate
-            
-            # Dọn dẹp hệ thống Docker
-            docker system prune -af
 
+            # Khởi động lại các container với docker-compose
+            docker-compose up -d --force-recreate
+
+            # Dọn dẹp hệ thống Docker (xóa container không sử dụng, image, volume...)
+            docker system prune -af
