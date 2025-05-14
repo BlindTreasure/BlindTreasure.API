@@ -19,9 +19,21 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
+            # Đăng nhập vào DockerHub
             docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-            cd /root/projects/BlindTreasure.API
+            
+            # Chuyển đến thư mục chứa docker-compose.yml
+            cd /root/projects/blindtreasure  # Chắc chắn rằng bạn đang ở đúng thư mục chứa docker-compose.yml
+            
+            # Pull image mới từ DockerHub
             docker-compose pull
+            
+            # Dừng và xóa các container hiện tại
             docker-compose down
+            
+            # Khởi động lại containers với docker-compose
             docker-compose up -d --force-recreate
+            
+            # Dọn dẹp hệ thống Docker
             docker system prune -af
+
