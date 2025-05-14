@@ -14,6 +14,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Set up QEMU (for multi-arch)
+        uses: docker/setup-qemu-action@v2
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -21,7 +24,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
 
@@ -38,17 +41,19 @@ jobs:
       - name: Build & Push Docker image
         run: |
           START_TIME=$(date +%s)
+
           docker buildx build \
-            --file BlindTreasure.API/Dockerfile \
+            --file ./BlindTreasure.API/Dockerfile \
             --tag ${{ secrets.DOCKERHUB_USERNAME }}/blindtreasure-api:latest \
             --cache-from type=local,src=/tmp/.buildx-cache \
-            --cache-to type=local,dest=/tmp/.buildx-cache-new \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new,mode=max \
             --push \
-            BlindTreasure.API
+            .
+
           END_TIME=$(date +%s)
           echo "Build & Push completed in $((END_TIME - START_TIME)) seconds."
 
-      - name: Move Docker layer cache
+      - name: Save new cache
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
