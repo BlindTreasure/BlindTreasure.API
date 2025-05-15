@@ -137,10 +137,15 @@ public static class IocContainer
 
     private static IServiceCollection SetupCors(this IServiceCollection services)
     {
-        services.AddCors(opt =>
+        services.AddCors(options =>
         {
-            opt.AddPolicy("CorsPolicy",
-                policy => { policy.WithOrigins("*").AllowAnyHeader().AllowAnyMethod(); });
+            options.AddPolicy("AllowAll",
+                builder =>
+                {
+                    builder.AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader();
+                });
         });
 
         return services;
