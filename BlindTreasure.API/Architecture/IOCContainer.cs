@@ -129,7 +129,9 @@ public static class IocContainer
         services.AddScoped<IClaimsService, ClaimsService>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IBlobService, BlobService>();
 
+        
         services.AddHttpContextAccessor();
 
         return services;
@@ -139,13 +141,14 @@ public static class IocContainer
     {
         services.AddCors(options =>
         {
-            options.AddPolicy("AllowAll",
-                builder =>
-                {
-                    builder.AllowAnyOrigin()
-                        .AllowAnyMethod()
-                        .AllowAnyHeader();
-                });
+            options.AddPolicy("AllowSpecificOrigin", option =>
+            {
+                option.WithOrigins("http://localhost:4040") 
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            });
+
         });
 
         return services;
