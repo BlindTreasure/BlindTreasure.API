@@ -53,7 +53,7 @@ catch (Exception e)
     app.Logger.LogError(e, "An problem occurred during migration!");
 }
 
-app.UseCors("CorsPolicy");
+app.UseCors("AllowAll");
 
 // app.UseHttpsRedirection();
 app.UseAuthentication();
