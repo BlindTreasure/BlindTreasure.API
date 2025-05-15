@@ -1,35 +1,36 @@
 name: Deploy to VPS
 
 on:
-  workflow_run:
-    workflows: ["Build and Push Docker Image"]  # Chạy sau khi workflow build và push Docker image thành công
-    types:
-      - completed
+  repository_dispatch:
+    types: [deploy-blindtreasure]  # Workflow này được kích hoạt khi workflow build gửi tín hiệu "deploy-blindtreasure"
 
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}  
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Máy chủ ảo của GitHub để thực hiện thao tác SSH
 
     steps:
-      - name: SSH vào VPS và Deploy
-        uses: appleboy/ssh-action@v0.1.10
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3  # Plugin để chạy lệnh SSH từ xa vào VPS
         with:
-          host: ${{ secrets.VPS_HOST }}        # Địa chỉ IP VPS
-          username: ${{ secrets.VPS_USER }}    # Tên người dùng SSH (root hoặc user của bạn)
-          password: ${{ secrets.VPS_PASSWORD }}# Mật khẩu SSH
+          host: ${{ secrets.VPS_HOST }}  # IP hoặc domain của VPS (khai báo trong repo secret)
+          username: ${{ secrets.VPS_USER }}  # Tên user đăng nhập (thường là root)
+          key: ${{ secrets.VPS_PRIVATE_KEY }}  # SSH private key để đăng nhập
+
           script: |
-            # Đăng nhập vào DockerHub
-            docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+            cd /root/projects/blindtreasure  # Di chuyển đến thư mục chứa file docker-compose.yml trên VPS
 
-            # Chuyển đến thư mục chứa docker-compose.yml
-            cd /root/projects/blindtreasure
+            echo "Pulling latest Docker image..."
+            docker compose pull  # Kéo image mới nhất từ Docker Hub
 
-            # Pull image mới từ DockerHub
-            docker-compose pull
+            echo "Backing up previous image tag..."
+            docker image tag blindtreasureapi:latest blindtreasureapi:backup || true  # Gắn tag dự phòng để rollback nếu cần
 
-            # Khởi động lại các container với docker-compose
-            docker-compose up -d --force-recreate
+            echo "Restarting container..."
+            docker compose up -d  # Chạy hoặc restart container với image mới
 
-            # Dọn dẹp hệ thống Docker (xóa container không sử dụng, image, volume...)
-            docker system prune -af
+            echo "Removing dangling images to save space..."
+            docker image prune -f  # Xóa những image không dùng tới để tiết kiệm dung lượng ổ đĩa
+
+            echo "Checking health status..."
+            curl -f http://localhost:5000/health || echo "WARNING: Healthcheck failed"  
+            # Gọi thử endpoint của API xem có chạy không, nếu lỗi thì cảnh báo nhưng không dừng workflow
