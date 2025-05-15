@@ -33,7 +33,6 @@ public static class IocContainer
         //Add business services
         services.SetupBusinessServicesLayer();
 
-        services.SetupCors();
         services.SetupJwt();
 
         // services.SetupGraphQl();
@@ -137,22 +136,7 @@ public static class IocContainer
         return services;
     }
 
-    private static IServiceCollection SetupCors(this IServiceCollection services)
-    {
-        services.AddCors(options =>
-        {
-            options.AddPolicy("AllowSpecificOrigin", option =>
-            {
-                option.WithOrigins("http://localhost:4040") 
-                    .AllowAnyHeader()
-                    .AllowAnyMethod()
-                    .AllowCredentials();
-            });
 
-        });
-
-        return services;
-    }
     
     private static IServiceCollection SetupSwagger(this IServiceCollection services)
     {
