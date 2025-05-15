@@ -31,7 +31,7 @@ builder.Services.SetupRedisService(builder.Configuration);
 
 var app = builder.Build();
 
-app.UseCors("AllowAll");
+app.UseCors("AllowSpecificOrigin");
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

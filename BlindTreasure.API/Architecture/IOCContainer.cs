@@ -141,13 +141,14 @@ public static class IocContainer
     {
         services.AddCors(options =>
         {
-            options.AddPolicy("AllowAll",
-                builder =>
-                {
-                    builder.AllowAnyOrigin()
-                        .AllowAnyMethod()
-                        .AllowAnyHeader();
-                });
+            options.AddPolicy("AllowSpecificOrigin", option =>
+            {
+                option.WithOrigins("http://localhost:4040") 
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            });
+
         });
 
         return services;
