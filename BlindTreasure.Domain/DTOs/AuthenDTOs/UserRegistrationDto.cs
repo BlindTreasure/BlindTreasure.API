@@ -28,9 +28,4 @@ public class UserRegistrationDto
     [RegularExpression(@"^0[0-9]{9}$", ErrorMessage = "Phone number must be 10 digits and start with 0.")]
     [DefaultValue("0393734206")]
     public required string PhoneNumber { get; set; }
-
-    [Required(ErrorMessage = "Avatar URL is required.")]
-    [Url(ErrorMessage = "Invalid URL format.")]
-    [DefaultValue("https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg")]
-    public required string AvatarUrl { get; set; }
 }
