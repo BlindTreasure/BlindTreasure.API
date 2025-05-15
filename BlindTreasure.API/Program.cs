@@ -25,17 +25,6 @@ builder.Services.AddControllers()
 // Tắt việc map claim mặc định
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
-// Thêm CORS policy
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("CorsPolicy", policy =>
-    {
-        policy.AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
-    });
-});
-
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.SetupRedisService(builder.Configuration);
@@ -63,6 +52,7 @@ catch (Exception e)
 {
     app.Logger.LogError(e, "An problem occurred during migration!");
 }
+
 app.UseCors("CorsPolicy");
 
 // app.UseHttpsRedirection();
