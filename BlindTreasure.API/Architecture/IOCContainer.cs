@@ -145,7 +145,7 @@ public static class IocContainer
 
         return services;
     }
-
+    
     private static IServiceCollection SetupSwagger(this IServiceCollection services)
     {
         services.AddSwaggerGen(c =>
