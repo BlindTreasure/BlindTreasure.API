@@ -31,6 +31,8 @@ builder.Services.SetupRedisService(builder.Configuration);
 
 var app = builder.Build();
 
+app.UseCors("AllowAll");
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -53,12 +55,10 @@ catch (Exception e)
     app.Logger.LogError(e, "An problem occurred during migration!");
 }
 
-app.UseCors("AllowAll");
 
 // app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
