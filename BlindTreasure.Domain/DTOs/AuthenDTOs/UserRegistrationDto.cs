@@ -1,6 +1,5 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 
 namespace BlindTreasure.Domain.DTOs.AuthenDTOs;
 
@@ -16,13 +15,13 @@ public class UserRegistrationDto
     [DataType(DataType.Password)]
     [DefaultValue("Cubin2003@")]
     public required string Password { get; set; }
+
     [Required(ErrorMessage = "Full name is required.")]
     [StringLength(100, ErrorMessage = "Full name cannot exceed 100 characters.")]
     [DefaultValue("phuc")]
     public required string FullName { get; set; }
 
-    [DefaultValue("2003-03-06T00:00:00Z")]
-    public DateTime DateOfBirth { get; set; }
+    [DefaultValue("2003-03-06T00:00:00Z")] public DateTime DateOfBirth { get; set; }
 
     [Required(ErrorMessage = "Phone number is required.")]
     [Phone(ErrorMessage = "Invalid phone number.")]

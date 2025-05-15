@@ -8,5 +8,4 @@ public class CurrentTime : ICurrentTime
     {
         return DateTime.UtcNow; // Đảm bảo trả về thời gian UTC
     }
-
 }

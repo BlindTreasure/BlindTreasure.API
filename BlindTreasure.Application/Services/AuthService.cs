@@ -75,7 +75,7 @@ public class AuthService : IAuthService
                 FullName = registrationDto.FullName,
                 Phone = registrationDto.PhoneNumber,
                 DateOfBirth = registrationDto.DateOfBirth,
-                AvatarUrl = registrationDto.AvatarUrl,
+                AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
                 Status = UserStatus.Pending,
                 RoleName = RoleType.Customer,
                 IsEmailVerified = false
@@ -111,6 +111,7 @@ public class AuthService : IAuthService
                 FullName = user.FullName,
                 Email = user.Email,
                 DateOfBirth = user.DateOfBirth,
+                AvatarUrl = user.AvatarUrl,
                 PhoneNumber = user.Phone,
                 RoleName = user.RoleName,
                 CreatedAt = user.CreatedAt
@@ -311,7 +312,8 @@ public class AuthService : IAuthService
             await _unitOfWork.OtpVerifications.AddAsync(otp);
             await _unitOfWork.SaveChangesAsync();
             await _cacheService.SetAsync($"forgot-otp:{email}", otpToken.Code, TimeSpan.FromMinutes(10));
-            await _cacheService.SetAsync($"forgot-otp-sent:{email}", true, TimeSpan.FromMinutes(1)); // cooldown 1p, sau 1p có thể resend otp
+            await _cacheService.SetAsync($"forgot-otp-sent:{email}", true,
+                TimeSpan.FromMinutes(1)); // cooldown 1p, sau 1p có thể resend otp
 
             await _emailService.SendForgotPasswordOtpEmailAsync(new EmailRequestDto
             {
@@ -334,7 +336,8 @@ public class AuthService : IAuthService
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(otp) || string.IsNullOrWhiteSpace(newPassword))
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(otp) ||
+                string.IsNullOrWhiteSpace(newPassword))
                 return false;
 
             var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
