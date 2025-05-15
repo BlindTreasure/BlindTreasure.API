@@ -129,7 +129,9 @@ public static class IocContainer
         services.AddScoped<IClaimsService, ClaimsService>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IBlobService, BlobService>();
 
+        
         services.AddHttpContextAccessor();
 
         return services;
