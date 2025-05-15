@@ -35,6 +35,6 @@ jobs:
       - name: Trigger Deployment
         uses: peter-evans/repository-dispatch@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}            # OK: dùng token mặc định
+          token: ${{ secrets.REPO_DISPATCH_TOKEN }}
           repository: BlindTreasure/BlindTreasure.API   # OK: repo hiện tại
           event-type: deploy-blindtreasure              # OK: khớp với tên sự kiện trong deploy.yml
