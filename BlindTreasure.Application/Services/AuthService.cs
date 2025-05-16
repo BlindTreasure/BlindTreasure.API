@@ -11,7 +11,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace BlindTreasure.Application.Services;
 
-public class AuthService : IAuthService
+public class AuthService : IAuthService // alo
 {
     private readonly ICacheService _cacheService;
     private readonly IEmailService _emailService;
