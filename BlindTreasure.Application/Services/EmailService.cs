@@ -19,7 +19,7 @@ public class EmailService : IEmailService
     public EmailService(IResend resend, IConfiguration configuration)
     {
         _resend = resend;
-        _fromEmail = configuration["RESEND_FROM"] ?? "noreply@ae-tao-fullstack-api.site";
+        _fromEmail = configuration["RESEND_FROM"] ?? "noreply@fpt-devteam.fun";
     }
 
     public async Task SendRegistrationSuccessEmailAsync(EmailRequestDto request)

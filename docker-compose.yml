@@ -19,7 +19,7 @@ services:
       - JWT__Issuer=BlindTreasure_Issuer
       - JWT__Audience=BlindTreasure_Audience
       - RESEND_APITOKEN=re_gQNBXJvY_ANFdgQphKQBxdW5DNf2UG6Zk
-      - RESEND_FROM=noreply@ae-tao-fullstack-api.site
+      - RESEND_FROM=noreply@fpt-devteam.fun
       - "MINIO_ENDPOINT=minio.ae-tao-fullstack-api.site:9000"
       - "MINIO_ACCESS_KEY=103.211.201.162"
       - "MINIO_SECRET_KEY=Ccubin2003@"
