@@ -12,7 +12,7 @@ using Microsoft.Extensions.Configuration;
 namespace BlindTreasure.Application.Services;
 
 /// <summary>
-/// Service for authentication, registration, OTP, and password management.
+///     Service for authentication, registration, OTP, and password management.
 /// </summary>
 public class AuthService : IAuthService
 {
@@ -34,7 +34,7 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
-    /// Registers a new user and sends OTP for email verification.
+    ///     Registers a new user and sends OTP for email verification.
     /// </summary>
     public async Task<UserDto?> RegisterUserAsync(UserRegistrationDto registrationDto)
     {
@@ -85,14 +85,14 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
-    /// Authenticates a user and returns JWT tokens.
+    ///     Authenticates a user and returns JWT tokens.
     /// </summary>
     public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto loginDto, IConfiguration configuration)
     {
         _loggerService.Info($"[LoginAsync] Login attempt for {loginDto.Email}");
 
-        // Get user from cache or DB
-        var user = await GetUserByEmailAsync(loginDto.Email!, useCache: true);
+        // Get user from cache or DBB
+        var user = await GetUserByEmailAsync(loginDto.Email!, true);
         if (user == null)
         {
             _loggerService.Warn($"[LoginAsync] User {loginDto.Email} not found.");
@@ -142,7 +142,7 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
-    /// Verifies the OTP for email registration and activates the user.
+    ///     Verifies the OTP for email registration and activates the user.
     /// </summary>
     public async Task<bool> VerifyEmailOtpAsync(string email, string otp)
     {
@@ -156,6 +156,7 @@ public class AuthService : IAuthService
                 _loggerService.Warn($"[VerifyEmailOtpAsync] User {email} not found.");
                 return false;
             }
+
             if (user.IsEmailVerified)
             {
                 _loggerService.Warn($"[VerifyEmailOtpAsync] User {email} already verified.");
@@ -198,7 +199,7 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
-    /// Resends OTP for registration (with cooldown).
+    ///     Resends OTP for registration (with cooldown).
     /// </summary>
     public async Task<bool> ResendRegisterOtpAsync(string email)
     {
@@ -212,6 +213,7 @@ public class AuthService : IAuthService
                 _loggerService.Warn($"[ResendRegisterOtpAsync] User {email} not found.");
                 return false;
             }
+
             if (user.IsEmailVerified)
             {
                 _loggerService.Warn($"[ResendRegisterOtpAsync] User {email} already verified.");
@@ -240,7 +242,7 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
-    /// Sends or resends OTP for forgot password (with cooldown).
+    ///     Sends or resends OTP for forgot password (with cooldown).
     /// </summary>
     public async Task<bool> SendForgotPasswordOtpRequestAsync(string email)
     {
@@ -254,6 +256,7 @@ public class AuthService : IAuthService
                 _loggerService.Warn($"[SendForgotPasswordOtpRequestAsync] User {email} not found.");
                 return false;
             }
+
             if (!user.IsEmailVerified)
             {
                 _loggerService.Warn($"[SendForgotPasswordOtpRequestAsync] User {email} not verified.");
@@ -282,7 +285,7 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
-    /// Resets the user's password after verifying OTP.
+    ///     Resets the user's password after verifying OTP.
     /// </summary>
     public async Task<bool> ResetPasswordAsync(string email, string otp, string newPassword)
     {
@@ -296,6 +299,7 @@ public class AuthService : IAuthService
                 _loggerService.Warn($"[ResetPasswordAsync] User {email} not found.");
                 return false;
             }
+
             if (!user.IsEmailVerified)
             {
                 _loggerService.Warn($"[ResetPasswordAsync] User {email} not verified.");
@@ -339,7 +343,7 @@ public class AuthService : IAuthService
     // ----------------- PRIVATE HELPER METHODS -----------------
 
     /// <summary>
-    /// Checks if a user exists in cache or DB.
+    ///     Checks if a user exists in cache or DB.
     /// </summary>
     private async Task<bool> UserExistsAsync(string email)
     {
@@ -352,7 +356,7 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
-    /// Gets a user by email, optionally using cache.
+    ///     Gets a user by email, optionally using cache.
     /// </summary>
     private async Task<User?> GetUserByEmailAsync(string email, bool useCache = false)
     {
@@ -367,14 +371,12 @@ public class AuthService : IAuthService
                 await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
             return user;
         }
-        else
-        {
-            return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
-        }
+
+        return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
     }
 
     /// <summary>
-    /// Generates an OTP, saves it to DB and cache, and sends the appropriate email.
+    ///     Generates an OTP, saves it to DB and cache, and sends the appropriate email.
     /// </summary>
     private async Task GenerateAndSendOtpAsync(User user, OtpPurpose purpose, string otpCachePrefix)
     {
@@ -416,7 +418,7 @@ public class AuthService : IAuthService
     }
 
     /// <summary>
-    /// Verifies the OTP from cache or DB. Removes OTP from cache after successful verification.
+    ///     Verifies the OTP from cache or DB. Removes OTP from cache after successful verification.
     /// </summary>
     private async Task<bool> VerifyOtpAsync(string email, string otp, OtpPurpose purpose, string otpCachePrefix)
     {
@@ -429,43 +431,47 @@ public class AuthService : IAuthService
                 _loggerService.Warn($"[VerifyOtpAsync] OTP mismatch for {email} (purpose: {purpose})");
                 return false;
             }
+
             // Remove OTP from cache after successful verification
             await _cacheService.RemoveAsync(cacheKey);
-            _loggerService.Info($"[VerifyOtpAsync] OTP for {email} (purpose: {purpose}) verified and removed from cache.");
+            _loggerService.Info(
+                $"[VerifyOtpAsync] OTP for {email} (purpose: {purpose}) verified and removed from cache.");
             return true;
         }
-        else
+
+        // Fallback: check in DB if not found in cache
+        var otpRecord = await _unitOfWork.OtpVerifications.FirstOrDefaultAsync(o =>
+            o.Target == email && o.OtpCode == otp && o.Purpose == purpose && !o.IsUsed);
+
+        if (otpRecord == null || otpRecord.ExpiredAt < DateTime.UtcNow)
         {
-            // Fallback: check in DB if not found in cache
-            var otpRecord = await _unitOfWork.OtpVerifications.FirstOrDefaultAsync(o =>
-                o.Target == email && o.OtpCode == otp && o.Purpose == purpose && !o.IsUsed);
-
-            if (otpRecord == null || otpRecord.ExpiredAt < DateTime.UtcNow)
-            {
-                _loggerService.Warn($"[VerifyOtpAsync] OTP not found or expired for {email} (purpose: {purpose})");
-                return false;
-            }
-
-            otpRecord.IsUsed = true;
-            await _unitOfWork.OtpVerifications.Update(otpRecord);
-            await _unitOfWork.SaveChangesAsync();
-            _loggerService.Info($"[VerifyOtpAsync] OTP for {email} (purpose: {purpose}) verified and marked as used in DB.");
-            return true;
+            _loggerService.Warn($"[VerifyOtpAsync] OTP not found or expired for {email} (purpose: {purpose})");
+            return false;
         }
+
+        otpRecord.IsUsed = true;
+        await _unitOfWork.OtpVerifications.Update(otpRecord);
+        await _unitOfWork.SaveChangesAsync();
+        _loggerService.Info(
+            $"[VerifyOtpAsync] OTP for {email} (purpose: {purpose}) verified and marked as used in DB.");
+        return true;
     }
 
     /// <summary>
-    /// Maps User entity to UserDto.
+    ///     Maps User entity to UserDto.
     /// </summary>
-    private static UserDto ToUserDto(User user) => new()
+    private static UserDto ToUserDto(User user)
     {
-        UserId = user.Id,
-        FullName = user.FullName,
-        Email = user.Email,
-        DateOfBirth = user.DateOfBirth,
-        AvatarUrl = user.AvatarUrl,
-        PhoneNumber = user.Phone,
-        RoleName = user.RoleName,
-        CreatedAt = user.CreatedAt
-    };
+        return new UserDto
+        {
+            UserId = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            DateOfBirth = user.DateOfBirth,
+            AvatarUrl = user.AvatarUrl,
+            PhoneNumber = user.Phone,
+            RoleName = user.RoleName,
+            CreatedAt = user.CreatedAt
+        };
+    }
 }

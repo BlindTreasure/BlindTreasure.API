@@ -1,6 +1,5 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
-using BlindTreasure.Infrastructure.Interfaces;
 using Minio;
 using Minio.DataModel.Args;
 using Minio.Exceptions;

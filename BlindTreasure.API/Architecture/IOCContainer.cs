@@ -130,14 +130,13 @@ public static class IocContainer
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IBlobService, BlobService>();
 
-        
+
         services.AddHttpContextAccessor();
 
         return services;
     }
 
 
-    
     private static IServiceCollection SetupSwagger(this IServiceCollection services)
     {
         services.AddSwaggerGen(c =>
