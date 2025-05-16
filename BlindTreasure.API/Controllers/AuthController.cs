@@ -19,15 +19,20 @@ public class AuthController : ControllerBase
 
     [HttpPost("register")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
-    [ProducesResponseType(typeof(ApiResult<UserDto>), 400)]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 409)]
     public async Task<IActionResult> Register([FromBody] UserRegistrationDto dto)
     {
-        var result = await _authService.RegisterUserAsync(dto);
-        if (result == null)
-            return BadRequest(ApiResult<UserDto>.Failure("400", "Email đã tồn tại hoặc dữ liệu không hợp lệ."));
-
-        return Ok(ApiResult<UserDto>.Success(result, "200",
-            "Đăng ký thành công. Vui lòng kiểm tra email để xác thực."));
+        try
+        {
+            var result = await _authService.RegisterUserAsync(dto);
+            return Ok(ApiResult<UserDto>.Success(result!, "200", "Đăng ký thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<UserDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
     }
 
     [HttpPost("login")]
@@ -42,18 +47,13 @@ public class AuthController : ControllerBase
         try
         {
             var result = await _authService.LoginAsync(dto, configuration);
-            return Ok(ApiResult<LoginResponseDto>.Success(result ?? throw new InvalidOperationException(), "200",
-                "Đăng nhập thành công."));
+            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập thành công."));
         }
         catch (Exception ex)
         {
-            // Sử dụng ExceptionUtils để trích xuất mã lỗi và message
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex.Message); // Lấy mã lỗi HTTP từ exception message
-            var message =
-                ex.Message.Contains('|') ? ex.Message.Split('|', 2)[1] : "Lỗi không xác định.";
-
-            // Trả về response với mã lỗi và message từ ExceptionUtils
-            return StatusCode(statusCode, ApiResult<LoginResponseDto>.Failure(statusCode.ToString(), message));
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<LoginResponseDto>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
 

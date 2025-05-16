@@ -2,32 +2,22 @@
 
 public static class ExceptionUtils
 {
-    /// <summary>
-    ///     Extracts the status code from an exception message or defaults to 500.
-    /// </summary>
-    /// <param name="exceptionMessage">The exception message.</param>
-    /// <returns>An HTTP status code.</returns>
-    public static int ExtractStatusCode(string exceptionMessage)
+    public static int ExtractStatusCode(Exception ex)
     {
-        if (!string.IsNullOrWhiteSpace(exceptionMessage) && exceptionMessage.Length >= 3)
-            if (int.TryParse(exceptionMessage.Substring(0, 3), out var statusCode))
-                return statusCode;
-
-        return 500; // Default status code
+        if (ex.Data.Contains("StatusCode") && int.TryParse(ex.Data["StatusCode"]?.ToString(), out var code))
+            return code;
+        return 500;
     }
 
-    /// <summary>
-    ///     Creates a standardized error response object.
-    /// </summary>
-    /// <param name="message">The error message.</param>
-    /// <returns>An object containing the error response in a standard format.</returns>
-    public static object CreateErrorResponse(string message)
+    public static string ExtractMessage(Exception ex)
     {
-        return new
-        {
-            isSuccess = false,
-            message,
-            data = (object)null
-        };
+        return ex.Message ?? "Lỗi không xác định.";
+    }
+
+    public static ApiResult<T> CreateErrorResponse<T>(Exception ex)
+    {
+        var code = ExtractStatusCode(ex).ToString();
+        var message = ExtractMessage(ex);
+        return ApiResult<T>.Failure(code, message);
     }
 }
