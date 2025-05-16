@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 
 namespace BlindTreasure.Application.Interfaces;
@@ -14,4 +15,6 @@ public interface IAuthService
     Task<bool> ResendRegisterOtpAsync(string email);
     Task<bool> ResetPasswordAsync(string email, string otp, string newPassword);
     Task<bool> SendForgotPasswordOtpRequestAsync(string email);
+    Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto);
+    Task<UpdateAvatarResultDto?> UpdateAvatarAsync(Guid userId, IFormFile file);
 }

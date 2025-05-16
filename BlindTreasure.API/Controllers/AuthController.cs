@@ -2,7 +2,10 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace BlindTreasure.API.Controllers;
 
@@ -11,10 +14,12 @@ namespace BlindTreasure.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IConfiguration configuration;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IConfiguration configuration)
     {
         _authService = authService;
+        this.configuration = configuration;
     }
 
     [HttpPost("register")]
@@ -40,10 +45,10 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<LoginResponseDto>), 400)]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
     {
-        IConfiguration configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddEnvironmentVariables()
-            .Build();
+        //IConfiguration configuration = new ConfigurationBuilder()
+        //    .SetBasePath(Directory.GetCurrentDirectory())
+        //    .AddEnvironmentVariables()
+        //    .Build();
         try
         {
             var result = await _authService.LoginAsync(dto, configuration);
@@ -103,5 +108,45 @@ public class AuthController : ControllerBase
         if (!reset)
             return BadRequest(ApiResult.Failure("400", "OTP không hợp lệ, đã hết hạn hoặc dữ liệu không hợp lệ."));
         return Ok(ApiResult.Success("200", "Mật khẩu đã được đặt lại thành công."));
+    }
+
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
+    {
+        // Lấy userId từ JWT claims: ưu tiên "sub", fallback sang NameIdentifier
+        // Thật ra là nên xài claim service nhưng code thế này cũng tiện, đỡ inject tùm lum
+        var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                       ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized(ApiResult.Failure("401", "Không xác định được người dùng."));
+
+        var result = await _authService.UpdateProfileAsync(userId, dto);
+        if (result == null)
+            return BadRequest(ApiResult.Failure("400", "Không thể cập nhật thông tin."));
+        return Ok(ApiResult<UserDto>.Success(result, "200", "Cập nhật thông tin thành công."));
+    }
+
+    [Authorize]
+    [HttpPost("profile/avatar")]
+    [ProducesResponseType(typeof(ApiResult<UpdateAvatarResultDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> UpdateAvatar([FromForm] IFormFile file)
+    {
+        var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                   ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized(ApiResult.Failure("401", "Không xác định được người dùng."));
+
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
+
+        var result = await _authService.UpdateAvatarAsync(userId, file);
+        if (result == null)
+            return BadRequest(ApiResult.Failure("400", "Không thể cập nhật avatar."));
+
+        return Ok(ApiResult<UpdateAvatarResultDto>.Success(result, "200", "Cập nhật avatar thành công."));
     }
 }

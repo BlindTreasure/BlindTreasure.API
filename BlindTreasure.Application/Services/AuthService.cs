@@ -7,6 +7,7 @@ using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 
 namespace BlindTreasure.Application.Services;
@@ -35,39 +36,48 @@ public class AuthService : IAuthService
 
     public async Task<UserDto?> RegisterUserAsync(UserRegistrationDto registrationDto)
     {
-        _loggerService.Info($"[RegisterUserAsync] Start registration for {registrationDto.Email}");
-
-        if (await UserExistsAsync(registrationDto.Email))
+        try
         {
-            _loggerService.Warn($"[RegisterUserAsync] Email {registrationDto.Email} already registered.");
-            throw ErrorHelper.Conflict("Email đã được sử dụng.");
+            _loggerService.Info($"[RegisterUserAsync] Start registration for {registrationDto.Email}");
+
+            if (await UserExistsAsync(registrationDto.Email))
+            {
+                _loggerService.Warn($"[RegisterUserAsync] Email {registrationDto.Email} already registered.");
+                throw ErrorHelper.Conflict("Email đã được sử dụng.");
+            }
+
+            var hashedPassword = new PasswordHasher().HashPassword(registrationDto.Password);
+
+            var user = new User
+            {
+                Email = registrationDto.Email,
+                Password = hashedPassword,
+                FullName = registrationDto.FullName,
+                Phone = registrationDto.PhoneNumber,
+                DateOfBirth = registrationDto.DateOfBirth,
+                AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
+                Status = UserStatus.Pending,
+                RoleName = RoleType.Customer,
+                IsEmailVerified = false
+            };
+
+            await _unitOfWork.Users.AddAsync(user);
+            await _unitOfWork.SaveChangesAsync();
+
+            _loggerService.Success($"[RegisterUserAsync] User {user.Email} created successfully.");
+
+            await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
+
+            _loggerService.Info($"[RegisterUserAsync] OTP sent to {user.Email} for verification.");
+
+            return ToUserDto(user);
         }
-
-        var hashedPassword = new PasswordHasher().HashPassword(registrationDto.Password);
-
-        var user = new User
+        catch (Exception ex)
         {
-            Email = registrationDto.Email,
-            Password = hashedPassword,
-            FullName = registrationDto.FullName,
-            Phone = registrationDto.PhoneNumber,
-            DateOfBirth = registrationDto.DateOfBirth,
-            AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
-            Status = UserStatus.Pending,
-            RoleName = RoleType.Customer,
-            IsEmailVerified = false
-        };
 
-        await _unitOfWork.Users.AddAsync(user);
-        await _unitOfWork.SaveChangesAsync();
-
-        _loggerService.Success($"[RegisterUserAsync] User {user.Email} created successfully.");
-
-        await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
-
-        _loggerService.Info($"[RegisterUserAsync] OTP sent to {user.Email} for verification.");
-
-        return ToUserDto(user);
+            _loggerService.Error($"[RegisterUserAsync] failed: {ex.Message}");
+            throw new Exception($"[RegisterUserAsync] failed: {ex.Message}");
+        }
     }
 
 
@@ -76,45 +86,102 @@ public class AuthService : IAuthService
     /// </summary>
     public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto loginDto, IConfiguration configuration)
     {
-        _loggerService.Info($"[LoginAsync] Login attempt for {loginDto.Email}");
-
-        // Get user from cache or DBB
-        var user = await GetUserByEmailAsync(loginDto.Email!, true);
-        if (user == null)
-            throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
-
-        if (!new PasswordHasher().VerifyPassword(loginDto.Password!, user.Password))
-            throw ErrorHelper.Unauthorized("Mật khẩu không chính xác.");
-
-        if (user.Status == UserStatus.Pending)
-            throw ErrorHelper.Forbidden("Tài khoản chưa được kích hoạt.");
-
-        _loggerService.Success($"[LoginAsync] User {loginDto.Email} authenticated successfully.");
-
-        var accessToken = JwtUtils.GenerateJwtToken(
-            user.Id,
-            user.Email,
-            user.RoleName.ToString(),
-            configuration,
-            TimeSpan.FromMinutes(30)
-        );
-
-        var refreshToken = Guid.NewGuid().ToString();
-        user.RefreshToken = refreshToken;
-        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-
-        await _unitOfWork.Users.Update(user);
-        await _unitOfWork.SaveChangesAsync();
-        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
-
-        _loggerService.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
-
-        return new LoginResponseDto
+        try
         {
-            AccessToken = accessToken,
-            RefreshToken = refreshToken
-        };
+            _loggerService.Info($"[LoginAsync] Login attempt for {loginDto.Email}");
+
+            // Get user from cache or DBB
+            var user = await GetUserByEmailAsync(loginDto.Email!, true);
+            if (user == null)
+                throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
+
+            if (!new PasswordHasher().VerifyPassword(loginDto.Password!, user.Password))
+                throw ErrorHelper.Unauthorized("Mật khẩu không chính xác.");
+
+            if (user.Status == UserStatus.Pending)
+                throw ErrorHelper.Forbidden("Tài khoản chưa được kích hoạt.");
+
+            _loggerService.Success($"[LoginAsync] User {loginDto.Email} authenticated successfully.");
+
+            var accessToken = JwtUtils.GenerateJwtToken(
+                user.Id,
+                user.Email,
+                user.RoleName.ToString(),
+                configuration,
+                TimeSpan.FromMinutes(30)
+            );
+
+            var refreshToken = Guid.NewGuid().ToString();
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+            await _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+            _loggerService.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
+
+            return new LoginResponseDto
+            {
+                AccessToken = accessToken,
+                RefreshToken = refreshToken
+            };
+        }
+        catch (Exception ex)
+        {
+
+            _loggerService.Error($"[LoginAsync] failed: {ex.Message}");
+            throw new Exception($"[LoginAsync] failed: {ex.Message}");
+        }
     }
+
+    public async Task<UpdateAvatarResultDto?> UpdateAvatarAsync(Guid userId, IFormFile file)
+    {
+        try
+        {
+            _loggerService.Info($"[UpdateAvatarAsync] Update avatar for user {userId}");
+
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+            {
+                _loggerService.Warn($"[UpdateAvatarAsync] User {userId} not found.");
+                return null;
+            }
+
+            // Xử lý lưu file, ví dụ lưu vào wwwroot/avatars
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "avatars");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            var fileExt = Path.GetExtension(file.FileName);
+            var fileName = $"{Guid.NewGuid()}{fileExt}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // Cập nhật đường dẫn avatar (giả sử dùng đường dẫn tĩnh)
+            user.AvatarUrl = $"/avatars/{fileName}";
+
+            await _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+            _loggerService.Success($"[UpdateAvatarAsync] Avatar updated for user {user.Email}");
+
+            return new UpdateAvatarResultDto { AvatarUrl = user.AvatarUrl };
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error($"[UpdateAvatarAsync] failed: {ex.Message}");
+            throw ex;
+        }
+    }
+
+
+
 
     /// <summary>
     ///     Verifies the OTP for email registration and activates the user.
@@ -168,8 +235,8 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"[VerifyEmailOtpAsync] failed: {ex}");
-            return false;
+            _loggerService.Error($"[VerifyEmailOtpAsync] failed: {ex.Message}");
+            throw new Exception($"[VerifyEmailOtpAsync] failed: {ex.Message}");
         }
     }
 
@@ -211,8 +278,8 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"[ResendRegisterOtpAsync] failed: {ex}");
-            return false;
+            _loggerService.Error($"[ResendRegisterOtpAsync] failed: {ex.Message}");
+            throw new Exception($"[ResendRegisterOtpAsync] failed: {ex.Message}");
         }
     }
 
@@ -254,8 +321,8 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"[SendForgotPasswordOtpRequestAsync] failed: {ex}");
-            return false;
+            _loggerService.Error($"[SendForgotPasswordOtpRequestAsync] failed: {ex.Message}");
+            throw new Exception($"[SendForgotPasswordOtpRequestAsync] failed: {ex.Message}");
         }
     }
 
@@ -310,8 +377,45 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"[ResetPasswordAsync] failed: {ex}");
+            _loggerService.Error($"[ResetPasswordAsync] failed: {ex.Message}");
             return false;
+        }
+    }
+
+
+    public async Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto)
+    {
+        try
+        {
+            _loggerService.Info($"[UpdateProfileAsync] Update profile for user {userId}");
+
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+            {
+                _loggerService.Warn($"[UpdateProfileAsync] User {userId} not found.");
+                return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.FullName))
+                user.FullName = dto.FullName;
+            if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+                user.Phone = dto.PhoneNumber;
+            if (dto.DateOfBirth.HasValue)
+                user.DateOfBirth = dto.DateOfBirth.Value;
+            if (dto.Gender.HasValue)
+                user.Gender = dto.Gender.Value;
+
+            await _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+            _loggerService.Success($"[UpdateProfileAsync] Profile updated for user {user.Email}");
+            return ToUserDto(user);
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error($"[UpdateProfileAsync] failed: {ex.Message}");
+            return null;
         }
     }
 
