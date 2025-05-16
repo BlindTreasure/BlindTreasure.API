@@ -74,7 +74,7 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
     public async Task<IActionResult> ResendOtp([FromBody] ResendOtpDto dto)
     {
-        var sent = await _authService.ResendOtpAsync(dto.Email);
+        var sent = await _authService.ResendRegisterOtpAsync(dto.Email);
         if (!sent)
             return BadRequest(ApiResult.Failure("400",
                 "Không thể gửi lại OTP. Email không tồn tại hoặc đã được xác thực."));

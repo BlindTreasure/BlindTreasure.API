@@ -11,6 +11,9 @@ using Microsoft.Extensions.Configuration;
 
 namespace BlindTreasure.Application.Services;
 
+/// <summary>
+/// Service for authentication, registration, OTP, and password management.
+/// </summary>
 public class AuthService : IAuthService
 {
     private readonly ICacheService _cacheService;
@@ -18,8 +21,10 @@ public class AuthService : IAuthService
     private readonly ILoggerService _loggerService;
     private readonly IUnitOfWork _unitOfWork;
 
-
-    public AuthService(ILoggerService loggerService, IUnitOfWork unitOfWork, ICacheService cacheService,
+    public AuthService(
+        ILoggerService loggerService,
+        IUnitOfWork unitOfWork,
+        ICacheService cacheService,
         IEmailService emailService)
     {
         _loggerService = loggerService;
@@ -28,46 +33,26 @@ public class AuthService : IAuthService
         _emailService = emailService;
     }
 
+    /// <summary>
+    /// Registers a new user and sends OTP for email verification.
+    /// </summary>
     public async Task<UserDto?> RegisterUserAsync(UserRegistrationDto registrationDto)
     {
         try
         {
-            // Phase 1: Validate dữ liệu cơ bản
-            if (string.IsNullOrWhiteSpace(registrationDto.Email) || !registrationDto.Email.Contains('@'))
+            _loggerService.Info($"[RegisterUserAsync] Start registration for {registrationDto.Email}");
+
+            // Check if user already exists (cache or DB)
+            if (await UserExistsAsync(registrationDto.Email))
             {
-                _loggerService.Error("Invalid email format.");
+                _loggerService.Warn($"[RegisterUserAsync] Email {registrationDto.Email} already registered.");
                 return null;
             }
 
-            if (string.IsNullOrWhiteSpace(registrationDto.Password) || registrationDto.Password.Length < 6)
-            {
-                _loggerService.Error("Password too short.");
-                return null;
-            }
+            // Hash the password
+            var hashedPassword = new PasswordHasher().HashPassword(registrationDto.Password);
 
-
-            // Phase 2: Check cache hoặc DB xem user đã tồn tại
-            var cacheKey = $"user:{registrationDto.Email}";
-            var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
-            if (cachedUser != null)
-            {
-                _loggerService.Info("Email already registered in cache.");
-                return null;
-            }
-
-            var existingUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == registrationDto.Email);
-
-            if (existingUser != null)
-            {
-                _loggerService.Info("Email already exists in database.");
-                return null;
-            }
-
-            // Phase 3: Hash mật khẩu
-            var passwordHasher = new PasswordHasher();
-            var hashedPassword = passwordHasher.HashPassword(registrationDto.Password);
-
-            // Phase 4: Tạo và lưu User
+            // Create new user entity
             var user = new User
             {
                 Email = registrationDto.Email,
@@ -80,80 +65,57 @@ public class AuthService : IAuthService
                 RoleName = RoleType.Customer,
                 IsEmailVerified = false
             };
+
             await _unitOfWork.Users.AddAsync(user);
             await _unitOfWork.SaveChangesAsync();
+            _loggerService.Success($"[RegisterUserAsync] User {user.Email} created successfully.");
 
-            // Phase 5: Sinh OTP và lưu cache + DB
-            var otpToken = OtpGenerator.GenerateToken(6, TimeSpan.FromMinutes(10));
-            var otp = new OtpVerification
-            {
-                Target = user.Email,
-                OtpCode = otpToken.Code,
-                ExpiredAt = otpToken.ExpiresAtUtc,
-                IsUsed = false,
-                Purpose = OtpPurpose.Register
-            };
-            await _unitOfWork.OtpVerifications.AddAsync(otp);
-            await _unitOfWork.SaveChangesAsync();
-            await _cacheService.SetAsync($"register-otp:{user.Email}", otpToken.Code, TimeSpan.FromMinutes(10));
+            // Generate and send OTP for registration
+            await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
 
-            // Phase 6: Gửi email
-            await _emailService.SendOtpVerificationEmailAsync(new EmailRequestDto
-            {
-                To = user.Email,
-                Otp = otpToken.Code,
-                UserName = user.FullName
-            });
+            _loggerService.Info($"[RegisterUserAsync] OTP sent to {user.Email} for verification.");
 
-            return new UserDto
-            {
-                UserId = user.Id,
-                FullName = user.FullName,
-                Email = user.Email,
-                DateOfBirth = user.DateOfBirth,
-                AvatarUrl = user.AvatarUrl,
-                PhoneNumber = user.Phone,
-                RoleName = user.RoleName,
-                CreatedAt = user.CreatedAt
-            };
+            return ToUserDto(user);
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"RegisterUserAsync failed: {ex.Message}");
+            _loggerService.Error($"[RegisterUserAsync] failed: {ex}");
             return null;
         }
     }
 
+    /// <summary>
+    /// Authenticates a user and returns JWT tokens.
+    /// </summary>
     public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto loginDto, IConfiguration configuration)
     {
-        _loggerService.Info("Login process initiated.");
+        _loggerService.Info($"[LoginAsync] Login attempt for {loginDto.Email}");
 
-        if (string.IsNullOrWhiteSpace(loginDto.Email) || string.IsNullOrWhiteSpace(loginDto.Password))
-            throw new Exception("400|Email hoặc mật khẩu không được để trống.");
-
-        var cacheKey = $"user:{loginDto.Email}";
-        var user = await _cacheService.GetAsync<User>(cacheKey);
-
+        // Get user from cache or DB
+        var user = await GetUserByEmailAsync(loginDto.Email!, useCache: true);
         if (user == null)
         {
-            user = await _unitOfWork.Users.FirstOrDefaultAsync(u =>
-                u.Email == loginDto.Email && !u.IsDeleted);
-
-            if (user == null)
-                throw new Exception("404|Tài khoản không tồn tại.");
-
-            await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
+            _loggerService.Warn($"[LoginAsync] User {loginDto.Email} not found.");
+            throw new Exception("404|Tài khoản không tồn tại.");
         }
 
-        var passwordHasher = new PasswordHasher();
-        if (!passwordHasher.VerifyPassword(loginDto.Password, user.Password))
+        // Verify password
+        if (!new PasswordHasher().VerifyPassword(loginDto.Password!, user.Password))
+        {
+            _loggerService.Warn($"[LoginAsync] Incorrect password for {loginDto.Email}");
             throw new Exception("401|Mật khẩu không chính xác.");
+        }
 
+        // Check if account is activated
         if (user.Status == UserStatus.Pending)
+        {
+            _loggerService.Warn($"[LoginAsync] Account {loginDto.Email} not activated.");
             throw new Exception("403|Tài khoản chưa được kích hoạt.");
+        }
 
-        _loggerService.Info($"User {loginDto.Email} authenticated. Generating tokens.");
+        _loggerService.Success($"[LoginAsync] User {loginDto.Email} authenticated successfully.");
 
+        // Generate tokens
         var accessToken = JwtUtils.GenerateJwtToken(
             user.Id,
             user.Email,
@@ -168,7 +130,9 @@ public class AuthService : IAuthService
 
         await _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveChangesAsync();
-        await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+        _loggerService.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
 
         return new LoginResponseDto
         {
@@ -177,212 +141,331 @@ public class AuthService : IAuthService
         };
     }
 
+    /// <summary>
+    /// Verifies the OTP for email registration and activates the user.
+    /// </summary>
     public async Task<bool> VerifyEmailOtpAsync(string email, string otp)
     {
         try
         {
-            // Phase 1: Validate cơ bản
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(otp))
-                return false;
+            _loggerService.Info($"[VerifyEmailOtpAsync] Verifying OTP for {email}");
 
-            // Phase 2: Lấy user
             var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null || user.IsEmailVerified)
+            if (user == null)
+            {
+                _loggerService.Warn($"[VerifyEmailOtpAsync] User {email} not found.");
                 return false;
-
-            // Phase 3: Ưu tiên kiểm tra OTP từ cache
-            var cachedOtp = await _cacheService.GetAsync<string>($"register-otp:{email}");
-            if (cachedOtp != null)
-            {
-                if (cachedOtp != otp) return false;
             }
-            else
+            if (user.IsEmailVerified)
             {
-                // Fallback: lấy từ DB nếu cache không có
-                var otpRecord = await _unitOfWork.OtpVerifications.FirstOrDefaultAsync(o =>
-                    o.Target == email && o.OtpCode == otp && o.Purpose == OtpPurpose.Register && !o.IsUsed);
-
-                if (otpRecord == null || otpRecord.ExpiredAt < DateTime.UtcNow) return false;
-
-                otpRecord.IsUsed = true;
-                await _unitOfWork.OtpVerifications.Update(otpRecord);
+                _loggerService.Warn($"[VerifyEmailOtpAsync] User {email} already verified.");
+                return false;
             }
 
-            // Phase 4: Cập nhật user
+            // Verify OTP (from cache or DB)
+            if (!await VerifyOtpAsync(email, otp, OtpPurpose.Register, "register-otp"))
+            {
+                _loggerService.Warn($"[VerifyEmailOtpAsync] Invalid or expired OTP for {email}");
+                return false;
+            }
+
+            // Activate user
             user.IsEmailVerified = true;
             user.Status = UserStatus.Active;
 
-            // Phase 5: Gửi email chúc mừng user
+            await _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _cacheService.SetAsync($"user:{email}", user, TimeSpan.FromHours(1));
+
+            // Remove OTP from cache after successful verification
+            await _cacheService.RemoveAsync($"register-otp:{email}");
+
+            // Send registration success email
             await _emailService.SendRegistrationSuccessEmailAsync(new EmailRequestDto
             {
                 To = user.Email,
                 UserName = user.FullName
             });
 
-            await _unitOfWork.Users.Update(user);
-            await _unitOfWork.SaveChangesAsync();
-
-            await _cacheService.RemoveAsync($"register-otp:{email}");
-            await _cacheService.SetAsync($"user:{email}", user, TimeSpan.FromHours(1));
-
+            _loggerService.Success($"[VerifyEmailOtpAsync] User {email} verified and activated.");
             return true;
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"VerifyEmailOtpAsync failed: {ex.Message}");
+            _loggerService.Error($"[VerifyEmailOtpAsync] failed: {ex}");
             return false;
         }
     }
 
-    public async Task<bool> ResendOtpAsync(string email) // dùng cho register
+    /// <summary>
+    /// Resends OTP for registration (with cooldown).
+    /// </summary>
+    public async Task<bool> ResendRegisterOtpAsync(string email)
     {
         try
         {
-            // Phase 1: Validate cơ bản
-            if (string.IsNullOrWhiteSpace(email)) return false;
+            _loggerService.Info($"[ResendRegisterOtpAsync] Resend OTP requested for {email}");
 
-            // Phase 2: Kiểm tra user và trạng thái
             var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null || user.IsEmailVerified)
+            if (user == null)
+            {
+                _loggerService.Warn($"[ResendRegisterOtpAsync] User {email} not found.");
                 return false;
+            }
+            if (user.IsEmailVerified)
+            {
+                _loggerService.Warn($"[ResendRegisterOtpAsync] User {email} already verified.");
+                return false;
+            }
 
-            // Phase 3: Kiểm tra cache spam
+            // Check cooldown to prevent spam
             if (await _cacheService.ExistsAsync($"otp-sent:{email}"))
+            {
+                _loggerService.Warn($"[ResendRegisterOtpAsync] Cooldown active for {email}.");
                 return false;
+            }
 
-            // Phase 4: Sinh OTP mới
-            var otpToken = OtpGenerator.GenerateToken(6, TimeSpan.FromMinutes(10));
-            var otp = new OtpVerification
-            {
-                Target = user.Email,
-                OtpCode = otpToken.Code,
-                ExpiredAt = otpToken.ExpiresAtUtc,
-                IsUsed = false,
-                Purpose = OtpPurpose.Register
-            };
+            // Generate and send new OTP
+            await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
+            await _cacheService.SetAsync($"otp-sent:{email}", true, TimeSpan.FromMinutes(1));
 
-            await _unitOfWork.OtpVerifications.AddAsync(otp);
-            await _unitOfWork.SaveChangesAsync();
-            await _cacheService.SetAsync($"register-otp:{email}", otpToken.Code, TimeSpan.FromMinutes(10));
-            await _cacheService.SetAsync($"otp-sent:{email}", true, TimeSpan.FromMinutes(1)); // cooldown 1 phút
-
-            // Phase 5: Gửi email
-            await _emailService.SendOtpVerificationEmailAsync(new EmailRequestDto
-            {
-                To = user.Email,
-                Otp = otpToken.Code,
-                UserName = user.FullName
-            });
-
+            _loggerService.Success($"[ResendRegisterOtpAsync] OTP resent to {email}.");
             return true;
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"ResendOtpAsync failed: {ex.Message}");
+            _loggerService.Error($"[ResendRegisterOtpAsync] failed: {ex}");
             return false;
         }
     }
 
-
-    public async Task<bool> SendForgotPasswordOtpRequestAsync(string email) // có thể resend otp sau 1 phút cooldown 
+    /// <summary>
+    /// Sends or resends OTP for forgot password (with cooldown).
+    /// </summary>
+    public async Task<bool> SendForgotPasswordOtpRequestAsync(string email)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(email))
-                return false;
+            _loggerService.Info($"[SendForgotPasswordOtpRequestAsync] Request for {email}");
 
             var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
-            if (user == null || !user.IsEmailVerified)
+            if (user == null)
+            {
+                _loggerService.Warn($"[SendForgotPasswordOtpRequestAsync] User {email} not found.");
                 return false;
+            }
+            if (!user.IsEmailVerified)
+            {
+                _loggerService.Warn($"[SendForgotPasswordOtpRequestAsync] User {email} not verified.");
+                return false;
+            }
 
-            // Cái này để chống spam gửi OTP
+            // Check cooldown to prevent spam
             if (await _cacheService.ExistsAsync($"forgot-otp-sent:{email}"))
+            {
+                _loggerService.Warn($"[SendForgotPasswordOtpRequestAsync] Cooldown active for {email}.");
                 return false;
+            }
 
-            var otpToken = OtpGenerator.GenerateToken(6, TimeSpan.FromMinutes(10));
-            var otp = new OtpVerification
-            {
-                Target = user.Email,
-                OtpCode = otpToken.Code,
-                ExpiredAt = otpToken.ExpiresAtUtc,
-                IsUsed = false,
-                Purpose = OtpPurpose.ForgotPassword
-            };
+            // Generate and send OTP for forgot password
+            await GenerateAndSendOtpAsync(user, OtpPurpose.ForgotPassword, "forgot-otp");
+            await _cacheService.SetAsync($"forgot-otp-sent:{email}", true, TimeSpan.FromMinutes(1));
 
-            await _unitOfWork.OtpVerifications.AddAsync(otp);
-            await _unitOfWork.SaveChangesAsync();
-            await _cacheService.SetAsync($"forgot-otp:{email}", otpToken.Code, TimeSpan.FromMinutes(10));
-            await _cacheService.SetAsync($"forgot-otp-sent:{email}", true,
-                TimeSpan.FromMinutes(1)); // cooldown 1p, sau 1p có thể resend otp
-
-            await _emailService.SendForgotPasswordOtpEmailAsync(new EmailRequestDto
-            {
-                To = user.Email,
-                Otp = otpToken.Code,
-                UserName = user.FullName
-            });
-
+            _loggerService.Success($"[SendForgotPasswordOtpRequestAsync] Forgot password OTP sent to {email}.");
             return true;
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"SendForgotPasswordOtpAsync failed: {ex.Message}");
+            _loggerService.Error($"[SendForgotPasswordOtpRequestAsync] failed: {ex}");
             return false;
         }
     }
 
-
+    /// <summary>
+    /// Resets the user's password after verifying OTP.
+    /// </summary>
     public async Task<bool> ResetPasswordAsync(string email, string otp, string newPassword)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(otp) ||
-                string.IsNullOrWhiteSpace(newPassword))
-                return false;
+            _loggerService.Info($"[ResetPasswordAsync] Password reset requested for {email}");
 
             var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
-            if (user == null || !user.IsEmailVerified)
+            if (user == null)
+            {
+                _loggerService.Warn($"[ResetPasswordAsync] User {email} not found.");
                 return false;
-
-            // Ưu tiên kiểm tra OTP từ cache
-            var cachedOtp = await _cacheService.GetAsync<string>($"forgot-otp:{email}");
-            if (cachedOtp != null)
-            {
-                if (cachedOtp != otp) return false;
             }
-            else
+            if (!user.IsEmailVerified)
             {
-                var otpRecord = await _unitOfWork.OtpVerifications.FirstOrDefaultAsync(o =>
-                    o.Target == email && o.OtpCode == otp && o.Purpose == OtpPurpose.ForgotPassword && !o.IsUsed);
-
-                if (otpRecord == null || otpRecord.ExpiredAt < DateTime.UtcNow) return false;
-
-                otpRecord.IsUsed = true;
-                await _unitOfWork.OtpVerifications.Update(otpRecord);
+                _loggerService.Warn($"[ResetPasswordAsync] User {email} not verified.");
+                return false;
             }
 
-            // Đặt lại mật khẩu
-            var passwordHasher = new PasswordHasher();
-            user.Password = passwordHasher.HashPassword(newPassword);
+            // Verify OTP (from cache or DB)
+            if (!await VerifyOtpAsync(email, otp, OtpPurpose.ForgotPassword, "forgot-otp"))
+            {
+                _loggerService.Warn($"[ResetPasswordAsync] Invalid or expired OTP for {email}");
+                return false;
+            }
+
+            // Hash and update new password
+            user.Password = new PasswordHasher().HashPassword(newPassword);
 
             await _unitOfWork.Users.Update(user);
             await _unitOfWork.SaveChangesAsync();
-
-            await _cacheService.RemoveAsync($"forgot-otp:{email}");
             await _cacheService.SetAsync($"user:{email}", user, TimeSpan.FromHours(1));
 
+            // Remove OTP from cache after successful verification
+            await _cacheService.RemoveAsync($"forgot-otp:{email}");
+
+            // Send password change notification
             await _emailService.SendPasswordChangeEmailAsync(new EmailRequestDto
             {
                 To = user.Email,
                 UserName = user.FullName
             });
 
+            _loggerService.Success($"[ResetPasswordAsync] Password reset successful for {email}.");
             return true;
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"ResetPasswordAsync failed: {ex.Message}");
+            _loggerService.Error($"[ResetPasswordAsync] failed: {ex}");
             return false;
         }
     }
+
+    // ----------------- PRIVATE HELPER METHODS -----------------
+
+    /// <summary>
+    /// Checks if a user exists in cache or DB.
+    /// </summary>
+    private async Task<bool> UserExistsAsync(string email)
+    {
+        var cacheKey = $"user:{email}";
+        var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
+        if (cachedUser != null) return true;
+
+        var existingUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
+        return existingUser != null;
+    }
+
+    /// <summary>
+    /// Gets a user by email, optionally using cache.
+    /// </summary>
+    private async Task<User?> GetUserByEmailAsync(string email, bool useCache = false)
+    {
+        if (useCache)
+        {
+            var cacheKey = $"user:{email}";
+            var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
+            if (cachedUser != null) return cachedUser;
+
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+            if (user != null)
+                await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
+            return user;
+        }
+        else
+        {
+            return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
+        }
+    }
+
+    /// <summary>
+    /// Generates an OTP, saves it to DB and cache, and sends the appropriate email.
+    /// </summary>
+    private async Task GenerateAndSendOtpAsync(User user, OtpPurpose purpose, string otpCachePrefix)
+    {
+        var otpToken = OtpGenerator.GenerateToken(6, TimeSpan.FromMinutes(10));
+        var otp = new OtpVerification
+        {
+            Target = user.Email,
+            OtpCode = otpToken.Code,
+            ExpiredAt = otpToken.ExpiresAtUtc,
+            IsUsed = false,
+            Purpose = purpose
+        };
+
+        await _unitOfWork.OtpVerifications.AddAsync(otp);
+        await _unitOfWork.SaveChangesAsync();
+        await _cacheService.SetAsync($"{otpCachePrefix}:{user.Email}", otpToken.Code, TimeSpan.FromMinutes(10));
+
+        // Send the correct email based on OTP purpose
+        if (purpose == OtpPurpose.Register)
+        {
+            await _emailService.SendOtpVerificationEmailAsync(new EmailRequestDto
+            {
+                To = user.Email,
+                Otp = otpToken.Code,
+                UserName = user.FullName
+            });
+            _loggerService.Info($"[GenerateAndSendOtpAsync] Registration OTP sent to {user.Email}");
+        }
+        else if (purpose == OtpPurpose.ForgotPassword)
+        {
+            await _emailService.SendForgotPasswordOtpEmailAsync(new EmailRequestDto
+            {
+                To = user.Email,
+                Otp = otpToken.Code,
+                UserName = user.FullName
+            });
+            _loggerService.Info($"[GenerateAndSendOtpAsync] Forgot password OTP sent to {user.Email}");
+        }
+    }
+
+    /// <summary>
+    /// Verifies the OTP from cache or DB. Removes OTP from cache after successful verification.
+    /// </summary>
+    private async Task<bool> VerifyOtpAsync(string email, string otp, OtpPurpose purpose, string otpCachePrefix)
+    {
+        var cacheKey = $"{otpCachePrefix}:{email}";
+        var cachedOtp = await _cacheService.GetAsync<string>(cacheKey);
+        if (cachedOtp != null)
+        {
+            if (cachedOtp != otp)
+            {
+                _loggerService.Warn($"[VerifyOtpAsync] OTP mismatch for {email} (purpose: {purpose})");
+                return false;
+            }
+            // Remove OTP from cache after successful verification
+            await _cacheService.RemoveAsync(cacheKey);
+            _loggerService.Info($"[VerifyOtpAsync] OTP for {email} (purpose: {purpose}) verified and removed from cache.");
+            return true;
+        }
+        else
+        {
+            // Fallback: check in DB if not found in cache
+            var otpRecord = await _unitOfWork.OtpVerifications.FirstOrDefaultAsync(o =>
+                o.Target == email && o.OtpCode == otp && o.Purpose == purpose && !o.IsUsed);
+
+            if (otpRecord == null || otpRecord.ExpiredAt < DateTime.UtcNow)
+            {
+                _loggerService.Warn($"[VerifyOtpAsync] OTP not found or expired for {email} (purpose: {purpose})");
+                return false;
+            }
+
+            otpRecord.IsUsed = true;
+            await _unitOfWork.OtpVerifications.Update(otpRecord);
+            await _unitOfWork.SaveChangesAsync();
+            _loggerService.Info($"[VerifyOtpAsync] OTP for {email} (purpose: {purpose}) verified and marked as used in DB.");
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Maps User entity to UserDto.
+    /// </summary>
+    private static UserDto ToUserDto(User user) => new()
+    {
+        UserId = user.Id,
+        FullName = user.FullName,
+        Email = user.Email,
+        DateOfBirth = user.DateOfBirth,
+        AvatarUrl = user.AvatarUrl,
+        PhoneNumber = user.Phone,
+        RoleName = user.RoleName,
+        CreatedAt = user.CreatedAt
+    };
 }
