@@ -33,56 +33,43 @@ public class AuthService : IAuthService
         _emailService = emailService;
     }
 
-    /// <summary>
-    ///     Registers a new user and sends OTP for email verification.
-    /// </summary>
     public async Task<UserDto?> RegisterUserAsync(UserRegistrationDto registrationDto)
     {
-        try
+        _loggerService.Info($"[RegisterUserAsync] Start registration for {registrationDto.Email}");
+
+        if (await UserExistsAsync(registrationDto.Email))
         {
-            _loggerService.Info($"[RegisterUserAsync] Start registration for {registrationDto.Email}");
-
-            // Check if user already exists (cache or DB)
-            if (await UserExistsAsync(registrationDto.Email))
-            {
-                _loggerService.Warn($"[RegisterUserAsync] Email {registrationDto.Email} already registered.");
-                return null;
-            }
-
-            // Hash the password
-            var hashedPassword = new PasswordHasher().HashPassword(registrationDto.Password);
-
-            // Create new user entity
-            var user = new User
-            {
-                Email = registrationDto.Email,
-                Password = hashedPassword,
-                FullName = registrationDto.FullName,
-                Phone = registrationDto.PhoneNumber,
-                DateOfBirth = registrationDto.DateOfBirth,
-                AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
-                Status = UserStatus.Pending,
-                RoleName = RoleType.Customer,
-                IsEmailVerified = false
-            };
-
-            await _unitOfWork.Users.AddAsync(user);
-            await _unitOfWork.SaveChangesAsync();
-            _loggerService.Success($"[RegisterUserAsync] User {user.Email} created successfully.");
-
-            // Generate and send OTP for registration
-            await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
-
-            _loggerService.Info($"[RegisterUserAsync] OTP sent to {user.Email} for verification.");
-
-            return ToUserDto(user);
+            _loggerService.Warn($"[RegisterUserAsync] Email {registrationDto.Email} already registered.");
+            throw ErrorHelper.Conflict("Email đã được sử dụng.");
         }
-        catch (Exception ex)
+
+        var hashedPassword = new PasswordHasher().HashPassword(registrationDto.Password);
+
+        var user = new User
         {
-            _loggerService.Error($"[RegisterUserAsync] failed: {ex}");
-            return null;
-        }
+            Email = registrationDto.Email,
+            Password = hashedPassword,
+            FullName = registrationDto.FullName,
+            Phone = registrationDto.PhoneNumber,
+            DateOfBirth = registrationDto.DateOfBirth,
+            AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
+            Status = UserStatus.Pending,
+            RoleName = RoleType.Customer,
+            IsEmailVerified = false
+        };
+
+        await _unitOfWork.Users.AddAsync(user);
+        await _unitOfWork.SaveChangesAsync();
+
+        _loggerService.Success($"[RegisterUserAsync] User {user.Email} created successfully.");
+
+        await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
+
+        _loggerService.Info($"[RegisterUserAsync] OTP sent to {user.Email} for verification.");
+
+        return ToUserDto(user);
     }
+
 
     /// <summary>
     ///     Authenticates a user and returns JWT tokens.
@@ -94,28 +81,16 @@ public class AuthService : IAuthService
         // Get user from cache or DBB
         var user = await GetUserByEmailAsync(loginDto.Email!, true);
         if (user == null)
-        {
-            _loggerService.Warn($"[LoginAsync] User {loginDto.Email} not found.");
-            throw new Exception("404|Tài khoản không tồn tại.");
-        }
+            throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
 
-        // Verify password
         if (!new PasswordHasher().VerifyPassword(loginDto.Password!, user.Password))
-        {
-            _loggerService.Warn($"[LoginAsync] Incorrect password for {loginDto.Email}");
-            throw new Exception("401|Mật khẩu không chính xác.");
-        }
+            throw ErrorHelper.Unauthorized("Mật khẩu không chính xác.");
 
-        // Check if account is activated
         if (user.Status == UserStatus.Pending)
-        {
-            _loggerService.Warn($"[LoginAsync] Account {loginDto.Email} not activated.");
-            throw new Exception("403|Tài khoản chưa được kích hoạt.");
-        }
+            throw ErrorHelper.Forbidden("Tài khoản chưa được kích hoạt.");
 
         _loggerService.Success($"[LoginAsync] User {loginDto.Email} authenticated successfully.");
 
-        // Generate tokens
         var accessToken = JwtUtils.GenerateJwtToken(
             user.Id,
             user.Email,
