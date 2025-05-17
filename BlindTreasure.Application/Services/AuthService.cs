@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.EmailDTOs;
@@ -7,6 +8,7 @@ using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 
 namespace BlindTreasure.Application.Services;
@@ -20,17 +22,15 @@ public class AuthService : IAuthService
     private readonly IEmailService _emailService;
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IBlobService _blobService;
 
-    public AuthService(
-        ILoggerService logger,
-        IUnitOfWork unitOfWork,
-        ICacheService cacheService,
-        IEmailService emailService)
+    public AuthService(ICacheService cacheService, IEmailService emailService, ILoggerService logger, IUnitOfWork unitOfWork, IBlobService blobService)
     {
-        _logger = logger;
-        _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _emailService = emailService;
+        _logger = logger;
+        _unitOfWork = unitOfWork;
+        _blobService = blobService;
     }
 
     public async Task<UserDto?> RegisterUserAsync(UserRegistrationDto registrationDto)
@@ -108,7 +108,7 @@ public class AuthService : IAuthService
         await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
 
         _logger.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
-        
+
         return new LoginResponseDto
         {
             AccessToken = accessToken,
@@ -346,12 +346,111 @@ public class AuthService : IAuthService
         return true;
     }
 
-// ----------------- PRIVATE HELPER METHODS -----------------
 
-/// <summary>
-///     Checks if a user exists in cache or DB.
-/// </summary>
-private async Task<bool> UserExistsAsync(string email)
+    public async Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto)
+    {
+        try
+        {
+            _logger.Info($"[UpdateProfileAsync] Update profile for user {userId}");
+
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+            {
+                _logger.Warn($"[UpdateProfileAsync] User {userId} not found.");
+                return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.FullName))
+                user.FullName = dto.FullName;
+            if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+                user.Phone = dto.PhoneNumber;
+            if (dto.DateOfBirth.HasValue)
+                user.DateOfBirth = dto.DateOfBirth.Value;
+            if (dto.Gender.HasValue)
+                user.Gender = dto.Gender.Value;
+
+            await _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+            await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
+
+            _logger.Success($"[UpdateProfileAsync] Profile updated for user {user.Email}");
+            return ToUserDto(user);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[UpdateProfileAsync] failed: {ex.Message}");
+            return null;
+        }
+    }
+
+
+    public async Task<UpdateAvatarResultDto?> UpdateAvatarAsync(Guid userId, IFormFile file)
+    {
+        try
+        {
+            _logger.Info($"[UpdateAvatarAsync] Update avatar for user {userId}");
+
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+            {
+                _logger.Warn($"[UpdateAvatarAsync] User {userId} not found.");
+                return null;
+            }
+
+            // Tạo tên file duy nhất
+            var fileName = $"user-avatars/{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+
+            // Upload file lên Blob Storage
+            using (var stream = file.OpenReadStream())
+            {
+                await _blobService.UploadFileAsync(fileName, stream);
+            }
+
+            // Lấy URL của file
+            var fileUrl = await _blobService.GetFileUrlAsync(fileName);
+
+            // Cập nhật đường dẫn avatar (giả sử dùng đường dẫn tĩnh)
+            user.AvatarUrl = fileUrl;
+
+            await _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+            _logger.Success($"[UpdateAvatarAsync] Avatar updated for user {user.Email}");
+
+            return new UpdateAvatarResultDto { AvatarUrl = user.AvatarUrl };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[UpdateAvatarAsync] failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<UserDto?> GetUserByIdWithCache(Guid userId)
+    {
+        _logger.Info($"[GetCurrentUserAsync] Get info for user {userId}");
+        var user = await GetUserById(userId, true);
+        if (user == null)
+        {
+            _logger.Warn($"[GetCurrentUserAsync] User {userId} not found.");
+            return null;
+        }
+        return ToUserDto(user);
+    }
+
+
+
+
+
+
+    // ----------------- PRIVATE HELPER METHODS -----------------
+
+    /// <summary>
+    ///     Checks if a user exists in cache or DB.
+    /// </summary>
+    private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);

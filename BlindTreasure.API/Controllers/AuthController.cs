@@ -5,6 +5,8 @@ using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace BlindTreasure.API.Controllers;
 
@@ -147,4 +149,67 @@ public class AuthController : ControllerBase
             return BadRequest(ApiResult.Failure("400", "OTP không hợp lệ, đã hết hạn hoặc dữ liệu không hợp lệ."));
         return Ok(ApiResult.Success("200", "Mật khẩu đã được đặt lại thành công."));
     }
+
+
+    [Authorize]
+    [HttpPut("profile")]
+    [ProducesResponseType(typeof(ApiResult<UpdateProfileDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
+    {
+        // Lấy userId từ JWT claims: ưu tiên "sub", fallback sang NameIdentifier
+        // Thật ra là nên xài claim service nhưng code thế này cũng tiện, đỡ inject tùm lum
+        var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                       ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized(ApiResult.Failure("401", "Không xác định được người dùng."));
+
+        var result = await _authService.UpdateProfileAsync(userId, dto);
+        if (result == null)
+            return BadRequest(ApiResult.Failure("400", "Không thể cập nhật thông tin."));
+        return Ok(ApiResult<UserDto>.Success(result, "200", "Cập nhật thông tin thành công."));
+    }
+
+    [Authorize]
+    [HttpPost("profile/avatar")]
+    [ProducesResponseType(typeof(ApiResult<object>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> UpdateAvatar(IFormFile file)
+    {
+        var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                   ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized(ApiResult.Failure("401", "Không xác định được người dùng."));
+
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
+
+        var result = await _authService.UpdateAvatarAsync(userId, file);
+        if (result == null)
+            return BadRequest(ApiResult.Failure("400", "Không thể cập nhật avatar."));
+
+        return Ok(ApiResult<UpdateAvatarResultDto>.Success(result, "200", "Cập nhật avatar thành công."));
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
+    public async Task<IActionResult> GetCurrentUser()
+    {
+        // Lấy userId từ service claims (ưu tiên DI, chuẩn flow của bạn)
+        var userId = _claimsService.GetCurrentUserId;
+        var result = await _authService.GetUserByIdWithCache(userId);
+        if (result == null)
+            return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
+        return Ok(ApiResult<UserDto>.Success(result, "200", "Lấy thông tin user thành công."));
+    }
+
+
+
+
+
+
 }
