@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.EmailDTOs;
@@ -44,38 +45,31 @@ public class AuthService : IAuthService
             throw ErrorHelper.Conflict("Email đã được sử dụng.");
         }
 
-            var hashedPassword = new PasswordHasher().HashPassword(registrationDto.Password);
+        var hashedPassword = new PasswordHasher().HashPassword(registrationDto.Password);
 
-            var user = new User
-            {
-                Email = registrationDto.Email,
-                Password = hashedPassword,
-                FullName = registrationDto.FullName,
-                Phone = registrationDto.PhoneNumber,
-                DateOfBirth = registrationDto.DateOfBirth,
-                AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
-                Status = UserStatus.Pending,
-                RoleName = RoleType.Customer,
-                IsEmailVerified = false
-            };
+        var user = new User
+        {
+            Email = registrationDto.Email,
+            Password = hashedPassword,
+            FullName = registrationDto.FullName,
+            Phone = registrationDto.PhoneNumber,
+            DateOfBirth = registrationDto.DateOfBirth,
+            AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
+            Status = UserStatus.Pending,
+            RoleName = RoleType.Customer,
+            IsEmailVerified = false
+        };
 
-            await _unitOfWork.Users.AddAsync(user);
-            await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.Users.AddAsync(user);
+        await _unitOfWork.SaveChangesAsync();
 
         _logger.Success($"[RegisterUserAsync] User {user.Email} created successfully.");
 
-            await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
+        await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
 
         _logger.Info($"[RegisterUserAsync] OTP sent to {user.Email} for verification.");
 
-            return ToUserDto(user);
-        }
-        catch (Exception ex)
-        {
-
-            _loggerService.Error($"[RegisterUserAsync] failed: {ex.Message}");
-            throw new Exception($"[RegisterUserAsync] failed: {ex.Message}");
-        }
+        return ToUserDto(user);
     }
 
 
@@ -86,37 +80,37 @@ public class AuthService : IAuthService
     {
         _logger.Info($"[LoginAsync] Login attempt for {loginDto.Email}");
 
-            // Get user from cache or DBB
-            var user = await GetUserByEmailAsync(loginDto.Email!, true);
-            if (user == null)
-                throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
+        // Get user from cache or DBB
+        var user = await GetUserByEmailAsync(loginDto.Email!, true);
+        if (user == null)
+            throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
 
-            if (!new PasswordHasher().VerifyPassword(loginDto.Password!, user.Password))
-                throw ErrorHelper.Unauthorized("Mật khẩu không chính xác.");
+        if (!new PasswordHasher().VerifyPassword(loginDto.Password!, user.Password))
+            throw ErrorHelper.Unauthorized("Mật khẩu không chính xác.");
 
         if (user.Status != UserStatus.Active)
             throw ErrorHelper.Forbidden("Tài khoản chưa được kích hoạt.");
 
         _logger.Success($"[LoginAsync] User {loginDto.Email} authenticated successfully.");
 
-            var accessToken = JwtUtils.GenerateJwtToken(
-                user.Id,
-                user.Email,
-                user.RoleName.ToString(),
-                configuration,
-                TimeSpan.FromMinutes(30)
-            );
+        var accessToken = JwtUtils.GenerateJwtToken(
+            user.Id,
+            user.Email,
+            user.RoleName.ToString(),
+            configuration,
+            TimeSpan.FromMinutes(30)
+        );
 
-            var refreshToken = Guid.NewGuid().ToString();
-            user.RefreshToken = refreshToken;
-            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+        var refreshToken = Guid.NewGuid().ToString();
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
 
-            await _unitOfWork.Users.Update(user);
-            await _unitOfWork.SaveChangesAsync();
-            await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+        await _unitOfWork.Users.Update(user);
+        await _unitOfWork.SaveChangesAsync();
+        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
 
         _logger.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
-        
+
         return new LoginResponseDto
         {
             AccessToken = accessToken,
@@ -354,12 +348,100 @@ public class AuthService : IAuthService
         return true;
     }
 
-// ----------------- PRIVATE HELPER METHODS -----------------
 
-/// <summary>
-///     Checks if a user exists in cache or DB.
-/// </summary>
-private async Task<bool> UserExistsAsync(string email)
+    public async Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto)
+    {
+        try
+        {
+            _logger.Info($"[UpdateProfileAsync] Update profile for user {userId}");
+
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+            {
+                _logger.Warn($"[UpdateProfileAsync] User {userId} not found.");
+                return null;
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.FullName))
+                user.FullName = dto.FullName;
+            if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+                user.Phone = dto.PhoneNumber;
+            if (dto.DateOfBirth.HasValue)
+                user.DateOfBirth = dto.DateOfBirth.Value;
+            if (dto.Gender.HasValue)
+                user.Gender = dto.Gender.Value;
+
+            await _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+            _logger.Success($"[UpdateProfileAsync] Profile updated for user {user.Email}");
+            return ToUserDto(user);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[UpdateProfileAsync] failed: {ex.Message}");
+            return null;
+        }
+    }
+
+
+    public async Task<UpdateAvatarResultDto?> UpdateAvatarAsync(Guid userId, IFormFile file)
+    {
+        try
+        {
+            _logger.Info($"[UpdateAvatarAsync] Update avatar for user {userId}");
+
+            var user = await _unitOfWork.Users.GetByIdAsync(userId);
+            if (user == null)
+            {
+                _logger.Warn($"[UpdateAvatarAsync] User {userId} not found.");
+                return null;
+            }
+
+            // Xử lý lưu file, ví dụ lưu vào wwwroot/avatars
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "avatars");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            var fileExt = Path.GetExtension(file.FileName);
+            var fileName = $"{Guid.NewGuid()}{fileExt}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // Cập nhật đường dẫn avatar (giả sử dùng đường dẫn tĩnh)
+            user.AvatarUrl = $"/avatars/{fileName}";
+
+            await _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+            await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+            _logger.Success($"[UpdateAvatarAsync] Avatar updated for user {user.Email}");
+
+            return new UpdateAvatarResultDto { AvatarUrl = user.AvatarUrl };
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[UpdateAvatarAsync] failed: {ex.Message}");
+            throw ex;
+        }
+    }
+
+
+
+
+
+
+    // ----------------- PRIVATE HELPER METHODS -----------------
+
+    /// <summary>
+    ///     Checks if a user exists in cache or DB.
+    /// </summary>
+    private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
