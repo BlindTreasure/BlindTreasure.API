@@ -6,10 +6,12 @@ namespace BlindTreasure.Application.Services;
 
 public class RedisCacheService : ICacheService
 {
+    private readonly IConnectionMultiplexer _connection;
     private readonly IDatabase _database;
 
     public RedisCacheService(IConnectionMultiplexer connection)
     {
+        _connection = connection;
         _database = connection.GetDatabase();
     }
 
@@ -34,5 +36,16 @@ public class RedisCacheService : ICacheService
     public async Task<bool> ExistsAsync(string key)
     {
         return await _database.KeyExistsAsync(key);
+    }
+
+    public async Task RemoveByPatternAsync(string pattern)
+    {
+        foreach (var endpoint in _connection.GetEndPoints())
+        {
+            var server = _connection.GetServer(endpoint);
+            var keys = server.Keys(pattern: $"{pattern}*").ToArray();
+            if (keys.Any())
+                await _database.KeyDeleteAsync(keys);
+        }
     }
 }

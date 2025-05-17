@@ -143,6 +143,48 @@ public class AuthService : IAuthService
         return true;
     }
 
+    public async Task<LoginResponseDto?> RefreshTokenAsync(TokenRefreshRequestDto refreshTokenDto,
+        IConfiguration configuration)
+    {
+        if (string.IsNullOrWhiteSpace(refreshTokenDto.RefreshToken)) throw ErrorHelper.BadRequest("Thiếu token");
+
+        var user = await _unitOfWork.Users.FirstOrDefaultAsync(u =>
+            u.RefreshToken == refreshTokenDto.RefreshToken);
+
+        if (user == null)
+            throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
+
+        if (string.IsNullOrEmpty(user.RefreshToken))
+            throw ErrorHelper.BadRequest("Người dùng đã đăng xuất trước đó.");
+
+        // Kiểm tra Refresh Token có hợp lệ không (thời gian hết hạn)
+        if (user.RefreshTokenExpiryTime < DateTime.UtcNow)
+            throw ErrorHelper.Conflict("Refresh token has expired.");
+
+        var roleName = user.RoleName.ToString();
+
+        var newAccessToken = JwtUtils.GenerateJwtToken(
+            user.Id,
+            user.Email,
+            roleName,
+            configuration,
+            TimeSpan.FromHours(1)
+        );
+
+        var newRefreshToken = Guid.NewGuid().ToString();
+        user.RefreshToken = newRefreshToken;
+        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+
+        await _unitOfWork.Users.Update(user);
+        await _unitOfWork.SaveChangesAsync();
+
+
+        return new LoginResponseDto
+        {
+            AccessToken = newAccessToken,
+            RefreshToken = newRefreshToken
+        };
+    }
 
     /// <summary>
     ///     Verifies the OTP for email registration and activates the user.
@@ -303,12 +345,12 @@ public class AuthService : IAuthService
         return true;
     }
 
-    // ----------------- PRIVATE HELPER METHODS -----------------
+// ----------------- PRIVATE HELPER METHODS -----------------
 
-    /// <summary>
-    ///     Checks if a user exists in cache or DB.
-    /// </summary>
-    private async Task<bool> UserExistsAsync(string email)
+/// <summary>
+///     Checks if a user exists in cache or DB.
+/// </summary>
+private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);

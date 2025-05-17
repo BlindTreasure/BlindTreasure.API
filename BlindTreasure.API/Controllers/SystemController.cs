@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Application.Interfaces.Commons;
+﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
 using BlindTreasure.Domain.Entities;
@@ -12,13 +13,15 @@ namespace BlindTreasure.API.Controllers;
 [Route("api/system")]
 public class SystemController : ControllerBase
 {
+    private readonly ICacheService _cacheService;
     private readonly BlindTreasureDbContext _context;
     private readonly ILoggerService _logger;
 
-    public SystemController(BlindTreasureDbContext context, ILoggerService logger)
+    public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService)
     {
         _context = context;
         _logger = logger;
+        _cacheService = cacheService;
     }
 
     [HttpPost("seed-all-data")]
@@ -173,8 +176,10 @@ public class SystemController : ControllerBase
             };
 
             foreach (var deleteFunc in tablesToDelete) await deleteFunc();
-
             await transaction.CommitAsync();
+
+            await _cacheService.RemoveByPatternAsync("user:");
+
             _logger.Success("Xóa sạch dữ liệu trong database thành công.");
         }
         catch (Exception ex)

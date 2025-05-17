@@ -80,6 +80,26 @@ public class AuthController : ControllerBase
         }
     }
 
+    [HttpPost("refresh-token")]
+    [ProducesResponseType(typeof(ApiResult<LoginResponseDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    [ProducesResponseType(typeof(ApiResult<object>), 401)]
+    [ProducesResponseType(typeof(ApiResult<object>), 500)]
+    public async Task<IActionResult> RefreshToken([FromBody] TokenRefreshRequestDto requestToken)
+    {
+        try
+        {
+            var result = await _authService.RefreshTokenAsync(requestToken, _configuration);
+            return Ok(ApiResult<object>.Success(result!, "200", "Refresh Token successfully"));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
     [HttpPost("verify-otp")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
