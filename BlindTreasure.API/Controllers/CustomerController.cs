@@ -1,8 +1,5 @@
 ﻿using BlindTreasure.Application.Interfaces;
-using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;

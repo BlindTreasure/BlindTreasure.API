@@ -2,6 +2,8 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
+using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
@@ -11,10 +13,14 @@ namespace BlindTreasure.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IClaimsService _claimsService;
+    private readonly IConfiguration _configuration;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IClaimsService claimsService, IConfiguration configuration)
     {
         _authService = authService;
+        _claimsService = claimsService;
+        _configuration = configuration;
     }
 
     [HttpPost("register")]
@@ -40,19 +46,56 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<LoginResponseDto>), 400)]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
     {
-        IConfiguration configuration = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddEnvironmentVariables()
-            .Build();
         try
         {
-            var result = await _authService.LoginAsync(dto, configuration);
+            var result = await _authService.LoginAsync(dto, _configuration);
             return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<LoginResponseDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResult<object>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    [ProducesResponseType(typeof(ApiResult<object>), 500)]
+    public async Task<IActionResult> Logout()
+    {
+        try
+        {
+            var userId = _claimsService.GetCurrentUserId;
+            var result = await _authService.LogoutAsync(userId);
+            return Ok(ApiResult<object>.Success(result!, "200", "Đăng xuất thành công. "));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    [HttpPost("refresh-token")]
+    [ProducesResponseType(typeof(ApiResult<LoginResponseDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    [ProducesResponseType(typeof(ApiResult<object>), 401)]
+    [ProducesResponseType(typeof(ApiResult<object>), 500)]
+    public async Task<IActionResult> RefreshToken([FromBody] TokenRefreshRequestDto requestToken)
+    {
+        try
+        {
+            var result = await _authService.RefreshTokenAsync(requestToken, _configuration);
+            return Ok(ApiResult<object>.Success(result!, "200", "Refresh Token successfully"));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }

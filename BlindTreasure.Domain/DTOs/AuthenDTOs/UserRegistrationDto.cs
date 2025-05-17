@@ -13,7 +13,7 @@ public class UserRegistrationDto
     [Required(ErrorMessage = "Password is required.")]
     [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters.")]
     [DataType(DataType.Password)]
-    [DefaultValue("Cubin2003@")]
+    [DefaultValue("Ccubin2003@")]
     public required string Password { get; set; }
 
     [Required(ErrorMessage = "Full name is required.")]
