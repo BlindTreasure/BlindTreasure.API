@@ -150,8 +150,11 @@ public class AuthController : ControllerBase
         return Ok(ApiResult.Success("200", "Mật khẩu đã được đặt lại thành công."));
     }
 
+
     [Authorize]
     [HttpPut("profile")]
+    [ProducesResponseType(typeof(ApiResult<UpdateProfileDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
     {
         // Lấy userId từ JWT claims: ưu tiên "sub", fallback sang NameIdentifier
@@ -170,9 +173,9 @@ public class AuthController : ControllerBase
 
     [Authorize]
     [HttpPost("profile/avatar")]
-    [ProducesResponseType(typeof(ApiResult<UpdateAvatarResultDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> UpdateAvatar([FromForm] IFormFile file)
+    public async Task<IActionResult> UpdateAvatar(IFormFile file)
     {
         var userIdClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
                    ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -189,4 +192,24 @@ public class AuthController : ControllerBase
 
         return Ok(ApiResult<UpdateAvatarResultDto>.Success(result, "200", "Cập nhật avatar thành công."));
     }
+
+    [Authorize]
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
+    public async Task<IActionResult> GetCurrentUser()
+    {
+        // Lấy userId từ service claims (ưu tiên DI, chuẩn flow của bạn)
+        var userId = _claimsService.GetCurrentUserId;
+        var result = await _authService.GetUserByIdWithCache(userId);
+        if (result == null)
+            return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
+        return Ok(ApiResult<UserDto>.Success(result, "200", "Lấy thông tin user thành công."));
+    }
+
+
+
+
+
+
 }

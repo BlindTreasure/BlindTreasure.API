@@ -22,17 +22,15 @@ public class AuthService : IAuthService
     private readonly IEmailService _emailService;
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IBlobService _blobService;
 
-    public AuthService(
-        ILoggerService logger,
-        IUnitOfWork unitOfWork,
-        ICacheService cacheService,
-        IEmailService emailService)
+    public AuthService(ICacheService cacheService, IEmailService emailService, ILoggerService logger, IUnitOfWork unitOfWork, IBlobService blobService)
     {
-        _logger = logger;
-        _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _emailService = emailService;
+        _logger = logger;
+        _unitOfWork = unitOfWork;
+        _blobService = blobService;
     }
 
     public async Task<UserDto?> RegisterUserAsync(UserRegistrationDto registrationDto)
@@ -374,6 +372,7 @@ public class AuthService : IAuthService
             await _unitOfWork.Users.Update(user);
             await _unitOfWork.SaveChangesAsync();
             await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+            await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
             _logger.Success($"[UpdateProfileAsync] Profile updated for user {user.Email}");
             return ToUserDto(user);
@@ -399,22 +398,20 @@ public class AuthService : IAuthService
                 return null;
             }
 
-            // Xử lý lưu file, ví dụ lưu vào wwwroot/avatars
-            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "avatars");
-            if (!Directory.Exists(uploadsFolder))
-                Directory.CreateDirectory(uploadsFolder);
+            // Tạo tên file duy nhất
+            var fileName = $"user-avatars/{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
 
-            var fileExt = Path.GetExtension(file.FileName);
-            var fileName = $"{Guid.NewGuid()}{fileExt}";
-            var filePath = Path.Combine(uploadsFolder, fileName);
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            // Upload file lên Blob Storage
+            using (var stream = file.OpenReadStream())
             {
-                await file.CopyToAsync(stream);
+                await _blobService.UploadFileAsync(fileName, stream);
             }
 
+            // Lấy URL của file
+            var fileUrl = await _blobService.GetFileUrlAsync(fileName);
+
             // Cập nhật đường dẫn avatar (giả sử dùng đường dẫn tĩnh)
-            user.AvatarUrl = $"/avatars/{fileName}";
+            user.AvatarUrl = fileUrl;
 
             await _unitOfWork.Users.Update(user);
             await _unitOfWork.SaveChangesAsync();
@@ -427,8 +424,20 @@ public class AuthService : IAuthService
         catch (Exception ex)
         {
             _logger.Error($"[UpdateAvatarAsync] failed: {ex.Message}");
-            throw ex;
+            return null;
         }
+    }
+
+    public async Task<UserDto?> GetUserByIdWithCache(Guid userId)
+    {
+        _logger.Info($"[GetCurrentUserAsync] Get info for user {userId}");
+        var user = await GetUserById(userId, true);
+        if (user == null)
+        {
+            _logger.Warn($"[GetCurrentUserAsync] User {userId} not found.");
+            return null;
+        }
+        return ToUserDto(user);
     }
 
 

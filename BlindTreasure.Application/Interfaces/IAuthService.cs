@@ -21,4 +21,5 @@ public interface IAuthService
     Task<bool> SendForgotPasswordOtpRequestAsync(string email);
     Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto);
     Task<UpdateAvatarResultDto?> UpdateAvatarAsync(Guid userId, IFormFile file);
+    Task<UserDto?> GetUserByIdWithCache(Guid userId);
 }
