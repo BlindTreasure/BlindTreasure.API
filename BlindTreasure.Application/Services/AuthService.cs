@@ -108,11 +108,12 @@ public class AuthService : IAuthService
         await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
 
         _logger.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
-
+        
         return new LoginResponseDto
         {
             AccessToken = accessToken,
-            RefreshToken = refreshToken
+            RefreshToken = refreshToken,
+            User = ToUserDto(user)
         };
     }
 
