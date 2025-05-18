@@ -15,5 +15,7 @@ namespace BlindTreasure.Domain.DTOs.UserDTOs
         public string? AvatarUrl { get; set; }
         public RoleType? RoleName { get; set; }
         public UserStatus? Status { get; set; }
+        public bool? Gender { get; set; }
+
     }
 }
