@@ -108,7 +108,7 @@ public class AuthService : IAuthService
         await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
 
         _logger.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
-        
+
         return new LoginResponseDto
         {
             AccessToken = accessToken,
@@ -224,92 +224,23 @@ public class AuthService : IAuthService
         return true;
     }
 
-
     /// <summary>
-    ///     Resends OTP for registration (with cooldown).
     /// </summary>
-    public async Task<bool> ResendRegisterOtpAsync(string email)
+    public async Task<bool> ResendOtpAsync(string email, OtpType type)
     {
-        try
+        switch (type)
         {
-            _logger.Info($"[ResendRegisterOtpAsync] Resend OTP requested for {email}");
+            case OtpType.Register:
+                return await ResendRegisterOtpAsync(email);
 
-            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null)
-            {
-                _logger.Warn($"[ResendRegisterOtpAsync] User {email} not found.");
-                return false;
-            }
+            case OtpType.ForgotPassword:
+                return await SendForgotPasswordOtpRequestAsync(email);
 
-            if (user.IsEmailVerified)
-            {
-                _logger.Warn($"[ResendRegisterOtpAsync] User {email} already verified.");
-                return false;
-            }
-
-            // Check cooldown to prevent spam
-            if (await _cacheService.ExistsAsync($"otp-sent:{email}"))
-            {
-                _logger.Warn($"[ResendRegisterOtpAsync] Cooldown active for {email}.");
-                return false;
-            }
-
-            // Generate and send new OTP
-            await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
-            await _cacheService.SetAsync($"otp-sent:{email}", true, TimeSpan.FromMinutes(1));
-
-            _logger.Success($"[ResendRegisterOtpAsync] OTP resent to {email}.");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"[ResendRegisterOtpAsync] failed: {ex}");
-            return false;
+            default:
+                throw ErrorHelper.BadRequest("Loại OTP không hợp lệ.");
         }
     }
 
-    /// <summary>
-    ///     Sends or resends OTP for forgot password (with cooldown).
-    /// </summary>
-    public async Task<bool> SendForgotPasswordOtpRequestAsync(string email)
-    {
-        try
-        {
-            _logger.Info($"[SendForgotPasswordOtpRequestAsync] Request for {email}");
-
-            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
-            if (user == null)
-            {
-                _logger.Warn($"[SendForgotPasswordOtpRequestAsync] User {email} not found.");
-                return false;
-            }
-
-            if (!user.IsEmailVerified)
-            {
-                _logger.Warn($"[SendForgotPasswordOtpRequestAsync] User {email} not verified.");
-                return false;
-            }
-
-            // Check cooldown to prevent spam
-            if (await _cacheService.ExistsAsync($"forgot-otp-sent:{email}"))
-            {
-                _logger.Warn($"[SendForgotPasswordOtpRequestAsync] Cooldown active for {email}.");
-                return false;
-            }
-
-            // Generate and send OTP for forgot password
-            await GenerateAndSendOtpAsync(user, OtpPurpose.ForgotPassword, "forgot-otp");
-            await _cacheService.SetAsync($"forgot-otp-sent:{email}", true, TimeSpan.FromMinutes(1));
-
-            _logger.Success($"[SendForgotPasswordOtpRequestAsync] Forgot password OTP sent to {email}.");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"[SendForgotPasswordOtpRequestAsync] failed: {ex}");
-            return false;
-        }
-    }
 
     /// <summary>
     ///     Resets the user's password after verifying OTP.
@@ -343,6 +274,48 @@ public class AuthService : IAuthService
         });
 
         _logger.Success($"[ResetPasswordAsync] Password reset successful for {email}.");
+        return true;
+    }
+
+    private async Task<bool> ResendRegisterOtpAsync(string email)
+    {
+        var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (user == null)
+            throw ErrorHelper.NotFound("Email không tồn tại trong hệ thống.");
+
+        if (user.IsDeleted || user.Status == UserStatus.Suspended)
+            throw ErrorHelper.Forbidden("Tài khoản đã bị vô hiệu hóa hoặc cấm.");
+
+        if (user.IsEmailVerified)
+            throw ErrorHelper.Conflict("Tài khoản đã xác minh, không cần gửi lại OTP.");
+
+        if (await _cacheService.ExistsAsync($"otp-sent:{email}"))
+            throw ErrorHelper.BadRequest("Bạn đang gửi OTP quá nhanh. Vui lòng thử lại sau ít phút.");
+
+        await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
+        await _cacheService.SetAsync($"otp-sent:{email}", true, TimeSpan.FromMinutes(1));
+
+        return true;
+    }
+
+    private async Task<bool> SendForgotPasswordOtpRequestAsync(string email)
+    {
+        var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+        if (user == null)
+            throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
+
+        if (user.Status == UserStatus.Suspended)
+            throw ErrorHelper.Forbidden("Tài khoản đã bị cấm.");
+
+        if (!user.IsEmailVerified)
+            throw ErrorHelper.Conflict("Email chưa được xác minh. Không thể gửi OTP quên mật khẩu.");
+
+        if (await _cacheService.ExistsAsync($"forgot-otp-sent:{email}"))
+            throw ErrorHelper.BadRequest("Bạn đang gửi OTP quá nhanh. Vui lòng thử lại sau ít phút.");
+
+        await GenerateAndSendOtpAsync(user, OtpPurpose.ForgotPassword, "forgot-otp");
+        await _cacheService.SetAsync($"forgot-otp-sent:{email}", true, TimeSpan.FromMinutes(1));
+
         return true;
     }
 

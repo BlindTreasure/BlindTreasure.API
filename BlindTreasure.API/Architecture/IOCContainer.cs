@@ -102,19 +102,19 @@ public static class IocContainer
             .AddEnvironmentVariables()
             .Build();
 
-
-        // 2. Lấy connection string tên "DefaultConnection"
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
-        // 3. Đăng ký DbContext với Npgsql
         services.AddDbContext<BlindTreasureDbContext>(options =>
-            options.UseNpgsql(connectionString,
-                sql => sql.MigrationsAssembly(typeof(BlindTreasureDbContext).Assembly.FullName)
-            )
+            options.UseNpgsql(connectionString, sql =>
+            {
+                sql.MigrationsAssembly(typeof(BlindTreasureDbContext).Assembly.FullName);
+                sql.CommandTimeout(300); // Cấu hình thời gian timeout truy vấn (tính bằng giây)
+            })
         );
 
         return services;
     }
+
 
     public static IServiceCollection SetupBusinessServicesLayer(this IServiceCollection services)
     {

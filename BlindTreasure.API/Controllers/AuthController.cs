@@ -115,27 +115,21 @@ public class AuthController : ControllerBase
     [HttpPost("resend-otp")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> ResendOtp([FromBody] ResendOtpDto dto)
+    public async Task<IActionResult> ResendOtp([FromForm] ResendOtpRequestDto dto)
     {
-        var sent = await _authService.ResendRegisterOtpAsync(dto.Email);
-        if (!sent)
-            return BadRequest(ApiResult.Failure("400",
-                "Không thể gửi lại OTP. Email không tồn tại hoặc đã được xác thực."));
-
-        return Ok(ApiResult.Success("200", "OTP đã được gửi lại thành công."));
+        try
+        {
+            var sent = await _authService.ResendOtpAsync(dto.Email, dto.Type);
+            return Ok(ApiResult<object>.Success(sent!, "200", "OTP đã được gửi thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
     }
 
-
-    [HttpPost("forgot-password")]
-    [ProducesResponseType(typeof(ApiResult<object>), 200)]
-    [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto dto)
-    {
-        var sent = await _authService.SendForgotPasswordOtpRequestAsync(dto.Email);
-        if (!sent)
-            return BadRequest(ApiResult.Failure("400", "Không thể gửi OTP. Email không hợp lệ hoặc chưa xác thực."));
-        return Ok(ApiResult.Success("200", "OTP đã được gửi đến email của bạn."));
-    }
 
     [HttpPost("reset-password")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
