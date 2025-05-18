@@ -130,7 +130,6 @@ public class AuthController : ControllerBase
         }
     }
 
-
     [HttpPost("reset-password")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]

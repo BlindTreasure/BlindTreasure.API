@@ -2,6 +2,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using BlindTreasure.API.Architecture;
+using Microsoft.AspNetCore.Diagnostics;
 using SwaggerThemes;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -66,6 +67,33 @@ catch (Exception e)
     app.Logger.LogError(e, "An problem occurred during migration!");
 }
 
+//test thử middle ware này
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        var error = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+        // Format theo ApiResult
+        var apiResult = new
+        {
+            isSuccess = false,
+            isFailure = true,
+            value = (object?)null,
+            error = new
+            {
+                code = "500",
+                message = "Đã xảy ra lỗi hệ thống.",
+                // Có thể bổ sung detail = error?.Message nếu muốn debug, nhưng production nên bỏ
+                detail = error?.Message
+            }
+        };
+
+        var result = JsonSerializer.Serialize(apiResult);
+        await context.Response.WriteAsync(result);
+    });
+});
 
 // app.UseHttpsRedirection();
 app.UseAuthentication();
