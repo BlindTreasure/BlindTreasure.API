@@ -9,6 +9,7 @@ public class UserDto
     public string? Email { get; set; }
     public string? AvatarUrl { get; set; }
     public DateTime? DateOfBirth { get; set; }
+    public bool? Gender { get; set; }
 
 
     public string? PhoneNumber { get; set; }
