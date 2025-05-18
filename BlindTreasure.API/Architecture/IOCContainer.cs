@@ -109,6 +109,11 @@ public static class IocContainer
             {
                 sql.MigrationsAssembly(typeof(BlindTreasureDbContext).Assembly.FullName);
                 sql.CommandTimeout(300); // Cấu hình thời gian timeout truy vấn (tính bằng giây)
+                sql.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(10),
+                    errorCodesToAdd: null
+                );
             })
         );
 
