@@ -107,7 +107,7 @@ public class AdminController : ControllerBase
     {
         try
         {
-            var result = await _userService.GetUserByIdAsync(userId);
+            var result = await _userService.GetUserDetailsByIdAsync(userId);
             if (result == null)
                 return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
 

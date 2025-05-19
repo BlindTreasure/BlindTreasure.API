@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
 
-[Route("api/customer")]
+[Route("api/users")]
 [ApiController]
 public class UserController : ControllerBase
 {
@@ -22,38 +22,55 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
-    ///     Cập nhật thông tin user (trừ avatar).
+    ///     Lấy thông tin user theo id.
     /// </summary>
-    [HttpPut("users/{userId}")]
-    [ProducesResponseType(typeof(ApiResult<object>), 200)]
-    [ProducesResponseType(typeof(ApiResult<object>), 404)]
-    public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] UserUpdateDto dto)
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
+    public async Task<IActionResult> GetUserProfile()
     {
-        var success = await _userService.UpdateUserAsync(userId, dto);
-        if (!success)
-            return NotFound(ApiResult.Failure("404", "Không tìm thấy user hoặc dữ liệu không hợp lệ."));
-        return Ok(ApiResult.Success("200", "Cập nhật user thành công."));
-    }
+        try
+        {
+            var userId = _claimsService.GetCurrentUserId;
+            var result = await _userService.GetUserDetailsByIdAsync(userId);
+            if (result == null)
+                return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
 
-    /// <summary>
-    ///     Cập nhật avatar cho user (admin thao tác).
-    /// </summary>
-    [HttpPost("{userId}/avatar")]
-    [ProducesResponseType(typeof(ApiResult<UpdateAvatarResultDto>), 200)]
-    [ProducesResponseType(typeof(ApiResult<object>), 404)]
-    public async Task<IActionResult> UpdateUserAvatar(Guid userId, IFormFile file)
-    {
-        if (file == null || file.Length == 0)
-            return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
-
-        var result = await _userService.UpdateUserAvatarAsync(userId, file);
-        if (result == null)
-            return NotFound(ApiResult.Failure("404", "Không tìm thấy user hoặc upload thất bại."));
-        return Ok(ApiResult<UpdateAvatarResultDto>.Success(result, "200", "Cập nhật avatar thành công."));
+            return Ok(ApiResult<UserDto>.Success(result, "200", "Lấy thông tin user thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<UserDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
     }
 
     [Authorize]
-    [HttpPost("profile/avatar")]
+    [HttpPut("me")]
+    [ProducesResponseType(typeof(ApiResult<UpdateProfileDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
+    {
+        try
+        {
+            var userId = _claimsService.GetCurrentUserId;
+            var result = await _userService.UpdateProfileAsync(userId, dto);
+            if (result == null)
+                return BadRequest(ApiResult.Failure("400", "Không thể cập nhật thông tin."));
+
+            return Ok(ApiResult<UserDto>.Success(result, "200", "Cập nhật thông tin thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<UserDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    [Authorize]
+    [HttpPut("me/avatar")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
     public async Task<IActionResult> UpdateAvatar(IFormFile file)
@@ -63,30 +80,10 @@ public class UserController : ControllerBase
         if (file == null || file.Length == 0)
             return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
 
-        var result = await _userService.UpdateAvatarAsync(userId, file);
+        var result = await _userService.UploadAvatarAsync(userId, file);
         if (result == null)
             return BadRequest(ApiResult.Failure("400", "Không thể cập nhật avatar."));
 
         return Ok(ApiResult<UpdateAvatarResultDto>.Success(result, "200", "Cập nhật avatar thành công."));
-    }
-
-    [Authorize]
-    [HttpPut("profile")]
-    [ProducesResponseType(typeof(ApiResult<UpdateProfileDto>), 200)]
-    [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
-    {
-        try
-        {
-            var userId = _claimsService.GetCurrentUserId;
-            var result = await _userService.UpdateProfileAsync(userId, dto);
-            return Ok(ApiResult<UserDto>.Success(result, "200", "Cập nhật thông tin thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<UserDto>(ex);
-            return StatusCode(statusCode, errorResponse);
-        }
     }
 }
