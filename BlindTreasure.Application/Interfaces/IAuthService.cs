@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
+using BlindTreasure.Domain.Enums;
 using Microsoft.Extensions.Configuration;
 
 namespace BlindTreasure.Application.Interfaces;
@@ -14,8 +15,7 @@ public interface IAuthService
         IConfiguration configuration);
 
     //OTP & emails
-    Task<bool> ResendRegisterOtpAsync(string email);
-    Task<bool> SendForgotPasswordOtpRequestAsync(string email);
+    Task<bool> ResendOtpAsync(string email, OtpType type);
     Task<bool> VerifyEmailOtpAsync(string email, string otp);
     Task<bool> ResetPasswordAsync(string email, string otp, string newPassword);
 }
