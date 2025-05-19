@@ -14,17 +14,18 @@ builder.Services.AddSwaggerGen();
 builder.Services.SetupIocContainer();
 builder.Configuration.AddEnvironmentVariables();
 builder.Configuration.AddJsonFile("appsettings.json", true, true);
+
 builder.Services.AddCors(options =>
 {
-    var clientUrl = builder.Configuration["ClientConfiguration:Url"];
-    options.AddPolicy("AllowSpecificOrigin", policy =>
-    {
-        policy.WithOrigins(clientUrl)
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
+    options.AddPolicy("AllowAll",
+        hehe =>
+        {
+            hehe.AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader();
+        });
 });
+
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -43,7 +44,7 @@ builder.Services.SetupRedisService(builder.Configuration);
 
 var app = builder.Build();
 
-app.UseCors("AllowSpecificOrigin");
+app.UseCors("AllowAll");
 //
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
