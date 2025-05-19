@@ -7,13 +7,12 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface IUserService
 {
+    Task<UserDto?> GetUserDetailsByIdAsync(Guid userId);
+    Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto);
+    Task<UpdateAvatarResultDto?> UploadAvatarAsync(Guid userId, IFormFile file);
+
+    //admin methods
     Task<UserDto?> CreateUserAsync(UserCreateDto dto);
     Task<UserDto?> DeleteUserAsync(Guid userId);
     Task<Pagination<UserDto>> GetAllUsersAsync(PaginationParameter param);
-    Task<UserDto?> GetUserByIdAsync(Guid userId);
-    Task<bool> UpdateUserAsync(Guid userId, UserUpdateDto dto);
-    Task<UpdateAvatarResultDto?> UpdateUserAvatarAsync(Guid userId, IFormFile file);
-
-    Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto);
-    Task<UpdateAvatarResultDto?> UpdateAvatarAsync(Guid userId, IFormFile file);
 }

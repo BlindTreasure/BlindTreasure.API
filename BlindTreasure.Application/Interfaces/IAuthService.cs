@@ -1,6 +1,5 @@
 ﻿using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
-using BlindTreasure.Domain.Enums;
 using Microsoft.Extensions.Configuration;
 
 namespace BlindTreasure.Application.Interfaces;

@@ -31,6 +31,86 @@ public class UserService : IUserService
         _blobService = blobService;
     }
 
+
+    public async Task<UserDto?> GetUserDetailsByIdAsync(Guid userId)
+    {
+        _logger.Info($"[GetUserByIdAsync] Admin requests detail for user {userId}");
+
+        var user = await GetUserById(userId, true);
+        if (user == null || user.IsDeleted)
+        {
+            _logger.Warn($"[GetUserByIdAsync] User {userId} not found or deleted.");
+            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
+        }
+
+        return ToUserDto(user);
+    }
+
+    public async Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto)
+    {
+        _logger.Info($"[UpdateProfileAsync] Update profile for user {userId}");
+
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null || user.IsDeleted)
+        {
+            _logger.Warn($"[UpdateProfileAsync] User {userId} not found.");
+            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.FullName))
+            user.FullName = dto.FullName;
+        if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+            user.Phone = dto.PhoneNumber;
+        if (dto.DateOfBirth.HasValue)
+            user.DateOfBirth = dto.DateOfBirth.Value;
+        if (dto.Gender.HasValue)
+            user.Gender = dto.Gender.Value;
+
+        await _unitOfWork.Users.Update(user);
+        await _unitOfWork.SaveChangesAsync();
+        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
+
+        _logger.Success($"[UpdateProfileAsync] Profile updated for user {user.Email}");
+        return ToUserDto(user);
+    }
+
+    public async Task<UpdateAvatarResultDto?> UploadAvatarAsync(Guid userId, IFormFile file)
+    {
+        _logger.Info($"[UpdateAvatarAsync] Update avatar for user {userId}");
+
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null || user.IsDeleted)
+        {
+            _logger.Warn($"[UpdateAvatarAsync] User {userId} not found.");
+            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
+        }
+
+        if (file == null || file.Length == 0)
+        {
+            _logger.Warn($"[UpdateAvatarAsync] Invalid file upload for user {userId}.");
+            throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
+        }
+
+        var fileName = $"user-avatars/{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+
+        using (var stream = file.OpenReadStream())
+        {
+            await _blobService.UploadFileAsync(fileName, stream);
+        }
+
+        var fileUrl = await _blobService.GetFileUrlAsync(fileName);
+        user.AvatarUrl = fileUrl;
+
+        await _unitOfWork.Users.Update(user);
+        await _unitOfWork.SaveChangesAsync();
+        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+        _logger.Success($"[UpdateAvatarAsync] Avatar updated for user {user.Email}");
+
+        return new UpdateAvatarResultDto { AvatarUrl = user.AvatarUrl };
+    }
+
     public async Task<Pagination<UserDto>> GetAllUsersAsync(PaginationParameter param)
     {
         _logger.Info($"[GetAllUsersAsync] Admin requests user list. Page: {param.PageIndex}, Size: {param.PageSize}");
@@ -57,20 +137,6 @@ public class UserService : IUserService
         var result = new Pagination<UserDto>(userDtos, count, param.PageIndex, param.PageSize);
 
         return result;
-    }
-
-    public async Task<UserDto?> GetUserByIdAsync(Guid userId)
-    {
-        _logger.Info($"[GetUserByIdAsync] Admin requests detail for user {userId}");
-
-        var user = await GetUserById(userId, true);
-        if (user == null || user.IsDeleted)
-        {
-            _logger.Warn($"[GetUserByIdAsync] User {userId} not found or deleted.");
-            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
-        }
-
-        return ToUserDto(user);
     }
 
     public async Task<UserDto?> CreateUserAsync(UserCreateDto dto)
@@ -106,71 +172,6 @@ public class UserService : IUserService
         return ToUserDto(user);
     }
 
-    public async Task<bool> UpdateUserAsync(Guid userId, UserUpdateDto dto)
-    {
-        _logger.Info($"[UpdateUserAsync] Admin updates user {userId}");
-
-        var user = await GetUserById(userId);
-        if (user == null || user.IsDeleted)
-        {
-            _logger.Warn($"[UpdateUserAsync] User {userId} not found.");
-            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(dto.FullName))
-            user.FullName = dto.FullName;
-        if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
-            user.Phone = dto.PhoneNumber;
-        if (dto.DateOfBirth.HasValue)
-            user.DateOfBirth = dto.DateOfBirth.Value;
-        if (dto.Gender.HasValue)
-            user.Gender = dto.Gender.Value;
-        if (dto.RoleName.HasValue)
-            user.RoleName = dto.RoleName.Value;
-        if (dto.Status.HasValue)
-            user.Status = dto.Status.Value;
-
-        await _unitOfWork.Users.Update(user);
-        await _unitOfWork.SaveChangesAsync();
-        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
-        await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
-
-        _logger.Success($"[UpdateUserAsync] User {user.Email} updated by admin.");
-        return true;
-    }
-
-    public async Task<UpdateAvatarResultDto?> UpdateUserAvatarAsync(Guid userId, IFormFile file)
-    {
-        _logger.Info($"[UpdateUserAvatarAsync] Admin updates avatar for user {userId}");
-
-        var user = await GetUserById(userId);
-        if (user == null || user.IsDeleted)
-        {
-            _logger.Warn($"[UpdateUserAvatarAsync] User {userId} not found.");
-            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
-        }
-
-        if (file == null || file.Length == 0) throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
-
-        var fileName = $"user-avatars/{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-        using (var stream = file.OpenReadStream())
-        {
-            await _blobService.UploadFileAsync(fileName, stream);
-        }
-
-        var fileUrl = await _blobService.GetFileUrlAsync(fileName);
-        user.AvatarUrl = fileUrl;
-
-        await _unitOfWork.Users.Update(user);
-        await _unitOfWork.SaveChangesAsync();
-        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
-        await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
-
-        _logger.Success($"[UpdateUserAvatarAsync] Avatar updated for user {user.Email} by admin.");
-        return new UpdateAvatarResultDto { AvatarUrl = user.AvatarUrl };
-    }
-
-
     public async Task<UserDto?> DeleteUserAsync(Guid userId)
     {
         _logger.Info($"[DeleteUserAsync] Admin deletes user {userId}");
@@ -193,71 +194,6 @@ public class UserService : IUserService
 
         _logger.Success($"[DeleteUserAsync] User {user.Email} deactivated by admin.");
         return userDto;
-    }
-
-    public async Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto)
-    {
-        _logger.Info($"[UpdateProfileAsync] Update profile for user {userId}");
-
-        var user = await _unitOfWork.Users.GetByIdAsync(userId);
-        if (user == null || user.IsDeleted)
-        {
-            _logger.Warn($"[UpdateProfileAsync] User {userId} not found.");
-            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(dto.FullName))
-            user.FullName = dto.FullName;
-        if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
-            user.Phone = dto.PhoneNumber;
-        if (dto.DateOfBirth.HasValue)
-            user.DateOfBirth = dto.DateOfBirth.Value;
-        if (dto.Gender.HasValue)
-            user.Gender = dto.Gender.Value;
-
-        await _unitOfWork.Users.Update(user);
-        await _unitOfWork.SaveChangesAsync();
-        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
-        await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
-
-        _logger.Success($"[UpdateProfileAsync] Profile updated for user {user.Email}");
-        return ToUserDto(user);
-    }
-
-    public async Task<UpdateAvatarResultDto?> UpdateAvatarAsync(Guid userId, IFormFile file)
-    {
-        _logger.Info($"[UpdateAvatarAsync] Update avatar for user {userId}");
-
-        var user = await _unitOfWork.Users.GetByIdAsync(userId);
-        if (user == null || user.IsDeleted)
-        {
-            _logger.Warn($"[UpdateAvatarAsync] User {userId} not found.");
-            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
-        }
-
-        if (file == null || file.Length == 0)
-        {
-            _logger.Warn($"[UpdateAvatarAsync] Invalid file upload for user {userId}.");
-            throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
-        }
-
-        var fileName = $"user-avatars/{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-
-        using (var stream = file.OpenReadStream())
-        {
-            await _blobService.UploadFileAsync(fileName, stream);
-        }
-
-        var fileUrl = await _blobService.GetFileUrlAsync(fileName);
-        user.AvatarUrl = fileUrl;
-
-        await _unitOfWork.Users.Update(user);
-        await _unitOfWork.SaveChangesAsync();
-        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
-
-        _logger.Success($"[UpdateAvatarAsync] Avatar updated for user {user.Email}");
-
-        return new UpdateAvatarResultDto { AvatarUrl = user.AvatarUrl };
     }
 
 

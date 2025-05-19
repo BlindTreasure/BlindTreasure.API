@@ -80,8 +80,8 @@ public class BlobService : IBlobService
 
     public async Task<string> GetPreviewUrlAsync(string fileName)
     {
-        var minioHost = Environment.GetEnvironmentVariable("MINIO_HOST") ??
-                        "https://minio.ae-tao-fullstack-api.site";
+        var minioHost = Environment.GetEnvironmentVariable("MINIO_ENDPOINT") ??
+                        "https://minio.fpt-devteam.fun";
         _logger.Info($"Generating preview URL for file: {fileName}");
 
         var previewUrl =
@@ -96,12 +96,14 @@ public class BlobService : IBlobService
         try
         {
             _logger.Info($"Generating presigned URL for file: {fileName}");
+
             var args = new PresignedGetObjectArgs()
                 .WithBucket(_bucketName)
                 .WithObject(fileName)
-                .WithExpiry(7 * 24 * 60 * 60); // URL expires in 7 days
+                .WithExpiry(7 * 24 * 60 * 60); // 7 ngày
 
-            var fileUrl = await GetPreviewUrlAsync(fileName);
+            var fileUrl = await _minioClient.PresignedGetObjectAsync(args);
+
             _logger.Success($"Presigned file URL generated: {fileUrl}");
             return fileUrl;
         }
