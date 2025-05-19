@@ -224,23 +224,6 @@ public class AuthService : IAuthService
         return true;
     }
 
-    /// <summary>
-    /// </summary>
-    public async Task<bool> ResendOtpAsync(string email, OtpType type)
-    {
-        switch (type)
-        {
-            case OtpType.Register:
-                return await ResendRegisterOtpAsync(email);
-
-            case OtpType.ForgotPassword:
-                return await SendForgotPasswordOtpRequestAsync(email);
-
-            default:
-                throw ErrorHelper.BadRequest("Loại OTP không hợp lệ.");
-        }
-    }
-
 
     /// <summary>
     ///     Resets the user's password after verifying OTP.
@@ -277,7 +260,7 @@ public class AuthService : IAuthService
         return true;
     }
 
-    private async Task<bool> ResendRegisterOtpAsync(string email)
+    public async Task<bool> ResendRegisterOtpAsync(string email)
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
         if (user == null)
@@ -298,7 +281,7 @@ public class AuthService : IAuthService
         return true;
     }
 
-    private async Task<bool> SendForgotPasswordOtpRequestAsync(string email)
+    public async Task<bool> SendForgotPasswordOtpRequestAsync(string email)
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
         if (user == null)
@@ -310,21 +293,28 @@ public class AuthService : IAuthService
         if (!user.IsEmailVerified)
             throw ErrorHelper.Conflict("Email chưa được xác minh. Không thể gửi OTP quên mật khẩu.");
 
-        if (await _cacheService.ExistsAsync($"forgot-otp-sent:{email}"))
-            throw ErrorHelper.BadRequest("Bạn đang gửi OTP quá nhanh. Vui lòng thử lại sau ít phút.");
+        var counterKey = $"forgot-otp-count:{email}";
+        var countValue = await _cacheService.GetAsync<int?>(counterKey) ?? 0;
 
+        if (countValue >= 3)
+            throw ErrorHelper.BadRequest("Bạn đã gửi quá nhiều OTP. Vui lòng thử lại sau 15 phút.");
+
+        // Gửi OTP
         await GenerateAndSendOtpAsync(user, OtpPurpose.ForgotPassword, "forgot-otp");
-        await _cacheService.SetAsync($"forgot-otp-sent:{email}", true, TimeSpan.FromMinutes(1));
+
+        // Tăng số lần gửi và set timeout nếu là lần đầu tiên
+        await _cacheService.SetAsync(counterKey, countValue + 1, TimeSpan.FromMinutes(15));
 
         return true;
     }
 
+
 // ----------------- PRIVATE HELPER METHODS -----------------
 
-/// <summary>
-///     Checks if a user exists in cache or DB.
-/// </summary>
-private async Task<bool> UserExistsAsync(string email)
+    /// <summary>
+    ///     Checks if a user exists in cache or DB.
+    /// </summary>
+    private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
@@ -468,6 +458,7 @@ private async Task<bool> UserExistsAsync(string email)
             Email = user.Email,
             DateOfBirth = user.DateOfBirth,
             AvatarUrl = user.AvatarUrl,
+            Status = user.Status,
             PhoneNumber = user.Phone,
             RoleName = user.RoleName,
             CreatedAt = user.CreatedAt
