@@ -15,7 +15,8 @@ public interface IAuthService
         IConfiguration configuration);
 
     //OTP & emails
-    Task<bool> ResendOtpAsync(string email, OtpType type);
+    Task<bool> ResendRegisterOtpAsync(string email);
+    Task<bool> SendForgotPasswordOtpRequestAsync(string email);
     Task<bool> VerifyEmailOtpAsync(string email, string otp);
     Task<bool> ResetPasswordAsync(string email, string otp, string newPassword);
 }
