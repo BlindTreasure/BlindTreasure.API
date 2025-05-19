@@ -260,7 +260,17 @@ public class AuthService : IAuthService
         return true;
     }
 
-    public async Task<bool> ResendRegisterOtpAsync(string email)
+    public async Task<bool> ResendOtpAsync(string email, OtpType type)
+    {
+        return type switch
+        {
+            OtpType.Register => await ResendRegisterOtpAsync(email),
+            OtpType.ForgotPassword => await SendForgotPasswordOtpRequestAsync(email),
+            _ => throw ErrorHelper.BadRequest("Loại OTP không hợp lệ.")
+        };
+    }
+
+    private async Task<bool> ResendRegisterOtpAsync(string email)
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
         if (user == null)
@@ -281,7 +291,7 @@ public class AuthService : IAuthService
         return true;
     }
 
-    public async Task<bool> SendForgotPasswordOtpRequestAsync(string email)
+    private async Task<bool> SendForgotPasswordOtpRequestAsync(string email)
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
         if (user == null)
@@ -311,10 +321,10 @@ public class AuthService : IAuthService
 
 // ----------------- PRIVATE HELPER METHODS -----------------
 
-/// <summary>
-///     Checks if a user exists in cache or DB.
-/// </summary>
-private async Task<bool> UserExistsAsync(string email)
+    /// <summary>
+    ///     Checks if a user exists in cache or DB.
+    /// </summary>
+    private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);

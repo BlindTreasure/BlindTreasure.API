@@ -115,11 +115,11 @@ public class AuthController : ControllerBase
     [HttpPost("resend-otp")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> ResendRegisterOtp([FromBody] ResendOtpDto dto)
+    public async Task<IActionResult> ResendOtp([FromForm] ResendOtpRequestDto dto)
     {
         try
         {
-            var sent = await _authService.ResendRegisterOtpAsync(dto.Email);
+            var sent = await _authService.ResendOtpAsync(dto.Email, dto.Type);
             return Ok(ApiResult<object>.Success(sent!, "200", "OTP đã được gửi thành công."));
         }
         catch (Exception ex)
@@ -129,25 +129,6 @@ public class AuthController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
-    [HttpPost("forgot-password")]
-    [ProducesResponseType(typeof(ApiResult<object>), 200)]
-    [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> SendForgotPasswordOtp([FromBody] ForgotPasswordRequestDto dto)
-    {
-        try
-        {
-            var sent = await _authService.SendForgotPasswordOtpRequestAsync(dto.Email);
-            return Ok(ApiResult<object>.Success(sent!, "200", "OTP quên mật khẩu đã được gửi thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-            return StatusCode(statusCode, errorResponse);
-        }
-    }
-
 
     [HttpPost("reset-password")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
