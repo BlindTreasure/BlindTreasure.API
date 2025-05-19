@@ -11,6 +11,7 @@ public class UserDto
     public DateTime? DateOfBirth { get; set; }
     public bool? Gender { get; set; }
 
+    public UserStatus? Status { get; set; }
 
     public string? PhoneNumber { get; set; }
     public RoleType? RoleName { get; set; }

@@ -136,57 +136,61 @@ public class SystemController : ControllerBase
 
     private async Task ClearDatabase(BlindTreasureDbContext context)
     {
-        using var transaction = await context.Database.BeginTransactionAsync();
+        var strategy = context.Database.CreateExecutionStrategy();
 
-        try
+        await strategy.ExecuteAsync(async () =>
         {
-            _logger.Info("Bắt đầu xóa dữ liệu trong database...");
+            await using var transaction = await context.Database.BeginTransactionAsync();
 
-            var tablesToDelete = new List<Func<Task>>
+            try
             {
-                // Bảng phụ thuộc trước
-                () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
-                () => context.BlindBoxItems.ExecuteDeleteAsync(),
-                () => context.CartItems.ExecuteDeleteAsync(),
-                () => context.OrderDetails.ExecuteDeleteAsync(),
-                () => context.Listings.ExecuteDeleteAsync(),
-                () => context.InventoryItems.ExecuteDeleteAsync(),
-                () => context.WishlistItems.ExecuteDeleteAsync(),
-                () => context.SupportTickets.ExecuteDeleteAsync(),
-                () => context.Reviews.ExecuteDeleteAsync(),
-                () => context.Shipments.ExecuteDeleteAsync(),
-                () => context.Transactions.ExecuteDeleteAsync(),
-                () => context.Notifications.ExecuteDeleteAsync(),
-                () => context.OtpVerifications.ExecuteDeleteAsync(),
+                _logger.Info("Bắt đầu xóa dữ liệu trong database...");
 
-                // Bảng chính
-                () => context.Wishlists.ExecuteDeleteAsync(),
-                () => context.CustomerDiscounts.ExecuteDeleteAsync(),
-                () => context.Orders.ExecuteDeleteAsync(),
-                () => context.Payments.ExecuteDeleteAsync(),
-                () => context.Promotions.ExecuteDeleteAsync(),
-                () => context.Addresses.ExecuteDeleteAsync(),
-                () => context.Products.ExecuteDeleteAsync(),
-                () => context.BlindBoxes.ExecuteDeleteAsync(),
-                () => context.Certificates.ExecuteDeleteAsync(),
-                () => context.Categories.ExecuteDeleteAsync(),
-                () => context.Sellers.ExecuteDeleteAsync(),
-                () => context.Users.ExecuteDeleteAsync(),
-                () => context.Roles.ExecuteDeleteAsync()
-            };
+                var tablesToDelete = new List<Func<Task>>
+                {
+                    () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
+                    () => context.BlindBoxItems.ExecuteDeleteAsync(),
+                    () => context.CartItems.ExecuteDeleteAsync(),
+                    () => context.OrderDetails.ExecuteDeleteAsync(),
+                    () => context.Listings.ExecuteDeleteAsync(),
+                    () => context.InventoryItems.ExecuteDeleteAsync(),
+                    () => context.WishlistItems.ExecuteDeleteAsync(),
+                    () => context.SupportTickets.ExecuteDeleteAsync(),
+                    () => context.Reviews.ExecuteDeleteAsync(),
+                    () => context.Shipments.ExecuteDeleteAsync(),
+                    () => context.Transactions.ExecuteDeleteAsync(),
+                    () => context.Notifications.ExecuteDeleteAsync(),
+                    () => context.OtpVerifications.ExecuteDeleteAsync(),
 
-            foreach (var deleteFunc in tablesToDelete) await deleteFunc();
-            await transaction.CommitAsync();
+                    () => context.Wishlists.ExecuteDeleteAsync(),
+                    () => context.CustomerDiscounts.ExecuteDeleteAsync(),
+                    () => context.Orders.ExecuteDeleteAsync(),
+                    () => context.Payments.ExecuteDeleteAsync(),
+                    () => context.Promotions.ExecuteDeleteAsync(),
+                    () => context.Addresses.ExecuteDeleteAsync(),
+                    () => context.Products.ExecuteDeleteAsync(),
+                    () => context.BlindBoxes.ExecuteDeleteAsync(),
+                    () => context.Certificates.ExecuteDeleteAsync(),
+                    () => context.Categories.ExecuteDeleteAsync(),
+                    () => context.Sellers.ExecuteDeleteAsync(),
+                    () => context.Users.ExecuteDeleteAsync(),
+                    () => context.Roles.ExecuteDeleteAsync()
+                };
 
-            await _cacheService.RemoveByPatternAsync("user:");
+                foreach (var deleteFunc in tablesToDelete) await deleteFunc();
 
-            _logger.Success("Xóa sạch dữ liệu trong database thành công.");
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.Error($"Xóa dữ liệu thất bại: {ex.Message}");
-            throw;
-        }
+                await transaction.CommitAsync();
+
+                await _cacheService.RemoveByPatternAsync("user:");
+
+                _logger.Success("Xóa sạch dữ liệu trong database thành công.");
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.Error($"Xóa dữ liệu thất bại: {ex.Message}");
+                throw;
+            }
+        });
     }
 }

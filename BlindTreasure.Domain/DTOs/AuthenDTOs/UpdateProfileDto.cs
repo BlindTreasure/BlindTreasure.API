@@ -10,5 +10,5 @@ public class UpdateProfileDto
 
 public class UpdateAvatarResultDto
 {
-    public string AvatarUrl { get; set; }
+    public string? AvatarUrl { get; set; }
 }

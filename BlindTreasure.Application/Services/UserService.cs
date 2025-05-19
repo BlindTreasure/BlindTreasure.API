@@ -53,9 +53,6 @@ public class UserService : IUserService
             .Take(param.PageSize)
             .ToListAsync();
 
-        if (users == null || !users.Any())
-            throw ErrorHelper.NotFound("Trang hiện tại không có người dùng nào.");
-
         var userDtos = users.Select(ToUserDto).ToList();
         var result = new Pagination<UserDto>(userDtos, count, param.PageIndex, param.PageSize);
 
@@ -153,10 +150,7 @@ public class UserService : IUserService
             throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
         }
 
-        if (file == null || file.Length == 0)
-        {
-            throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
-        }
+        if (file == null || file.Length == 0) throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
 
         var fileName = $"user-avatars/{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
         using (var stream = file.OpenReadStream())
@@ -177,7 +171,7 @@ public class UserService : IUserService
     }
 
 
-    public async Task<bool> DeleteUserAsync(Guid userId)
+    public async Task<UserDto?> DeleteUserAsync(Guid userId)
     {
         _logger.Info($"[DeleteUserAsync] Admin deletes user {userId}");
 
@@ -189,14 +183,16 @@ public class UserService : IUserService
         }
 
         await _unitOfWork.Users.SoftRemove(user);
-        user.Status = UserStatus.Locked;
+        user.Status = UserStatus.Suspended;
         await _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveChangesAsync();
         await _cacheService.RemoveAsync($"user:{user.Email}");
         await _cacheService.RemoveAsync($"user:{user.Id}");
 
+        var userDto = ToUserDto(user);
+
         _logger.Success($"[DeleteUserAsync] User {user.Email} deactivated by admin.");
-        return true;
+        return userDto;
     }
 
     public async Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto)
@@ -267,10 +263,10 @@ public class UserService : IUserService
 
 // ----------------- PRIVATE HELPER METHODS -----------------
 
-    /// <summary>
-    ///     Checks if a user exists in cache or DB.
-    /// </summary>
-    private async Task<bool> UserExistsAsync(string email)
+/// <summary>
+///     Checks if a user exists in cache or DB.
+/// </summary>
+private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
@@ -313,6 +309,7 @@ public class UserService : IUserService
             DateOfBirth = user.DateOfBirth,
             AvatarUrl = user.AvatarUrl,
             PhoneNumber = user.Phone,
+            Status = user.Status,
             RoleName = user.RoleName,
             Gender = user.Gender,
             CreatedAt = user.CreatedAt
