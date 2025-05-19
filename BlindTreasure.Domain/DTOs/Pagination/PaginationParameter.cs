@@ -1,4 +1,4 @@
-﻿namespace BlindTreasure.Infrastructure.Commons;
+﻿namespace BlindTreasure.Domain.DTOs.Pagination;
 
 public class PaginationParameter
 {

@@ -1,6 +1,9 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UserDTOs;
+using BlindTreasure.Domain.Enums;
+using BlindTreasure.Domain.Pagination;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +13,7 @@ namespace BlindTreasure.API.Controllers;
 
 [Route("api/admin")]
 [ApiController]
-[Authorize(Roles = "Admin")]
+//[Authorize(Roles = "Admin")]
 public class AdminController : ControllerBase
 {
     private readonly IClaimsService _claimsService;
@@ -26,7 +29,7 @@ public class AdminController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
     [ProducesResponseType(typeof(ApiResult<Pagination<UserDto>>), 200)]
-    public async Task<IActionResult> GetAllUsers([FromQuery] PaginationParameter param)
+    public async Task<IActionResult> GetAllUsers([FromQuery] UserQueryParameter param)
     {
         try
         {
@@ -75,24 +78,24 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    ///     Xóa (deactivate) user.
+    /// Cập nhật trạng thái user (ban, deactive, active lại, ...).
     /// </summary>
-    [HttpDelete("users/{userId}")]
-    [ProducesResponseType(typeof(ApiResult<object>), 200)]
-    [ProducesResponseType(typeof(ApiResult<object>), 404)]
-    public async Task<IActionResult> DeleteUser(Guid userId)
+    [HttpPut("users/{userId}/status")]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
+    public async Task<IActionResult> UpdateUserStatus(Guid userId, [FromBody] UserStatus status)
     {
         try
         {
-            var result = await _userService.DeleteUserAsync(userId);
+            var result = await _userService.UpdateUserStatusAsync(userId, status);
             if (result == null)
                 return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
-            return Ok(ApiResult<UserDto>.Success(result, "200", "Xóa user thành công."));
+            return Ok(ApiResult<UserDto>.Success(result, "200", "Cập nhật trạng thái user thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<UserDto>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
