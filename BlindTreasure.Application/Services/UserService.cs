@@ -273,6 +273,27 @@ public class UserService : IUserService
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id);
     }
 
+
+    /// <summary>
+    ///     Gets a user by id, optionally using cache.
+    /// </summary>
+    public async Task<User?> GetUserByEmail(string email, bool useCache = false)
+    {
+        if (useCache)
+        {
+            var cacheKey = $"user:{email}";
+            var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
+            if (cachedUser != null) return cachedUser;
+
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+            if (user != null)
+                await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
+            return user;
+        }
+
+        return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+    }
+
     /// <summary>
     ///     Maps User entity to UserDto.
     /// </summary>

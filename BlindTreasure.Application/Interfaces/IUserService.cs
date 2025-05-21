@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UserDTOs;
+using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Domain.Pagination;
 using BlindTreasure.Infrastructure.Commons;
@@ -18,4 +19,5 @@ public interface IUserService
     Task<UserDto?> CreateUserAsync(UserCreateDto dto);
     Task<UserDto?> UpdateUserStatusAsync(Guid userId, UserStatus newStatus);
     Task<Pagination<UserDto>> GetAllUsersAsync(UserQueryParameter param);
+    Task<User?> GetUserByEmail(string email, bool useCache = false);
 }
