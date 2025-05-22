@@ -17,7 +17,7 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}  # SSH password để đăng nhập
 
           script: |
-            cd /root/projects/blindtreasure  # Di chuyển đến thư mục chứa file docker-compose.yml trên VPS
+            cd /root/projects/blindtreasure  # Di chuyển đến thư mục chứa file docker-compose -f docker-compose.deploy.yml.yml trên VPS
 
             echo "Pulling latest Docker image..."
             docker compose pull  # Kéo image mới nhất từ Docker Hub
