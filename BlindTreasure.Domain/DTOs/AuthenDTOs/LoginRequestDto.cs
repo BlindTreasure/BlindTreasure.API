@@ -9,3 +9,11 @@ public class LoginRequestDto
 
     [DefaultValue("Ccubin2003@")] public string? Password { get; set; }
 }
+
+public class GoogleLoginRequestDto
+{
+    /// <summary>
+    /// Google ID Token trả về từ phía client (Google Sign-In).
+    /// </summary>
+    public string Token { get; set; }
+}

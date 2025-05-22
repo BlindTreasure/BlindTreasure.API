@@ -31,6 +31,7 @@ public static class IocContainer
         //Add generic repositories
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         //Add business services
+        services.AddScoped<IOAuthService,OAuthService>();
         services.SetupBusinessServicesLayer();
 
         services.SetupJwt();

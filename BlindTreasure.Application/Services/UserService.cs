@@ -2,9 +2,11 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Domain.Pagination;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
@@ -111,7 +113,7 @@ public class UserService : IUserService
         return new UpdateAvatarResultDto { AvatarUrl = user.AvatarUrl };
     }
 
-    public async Task<Pagination<UserDto>> GetAllUsersAsync(PaginationParameter param)
+    public async Task<Pagination<UserDto>> GetAllUsersAsync(UserQueryParameter param)
     {
         _logger.Info($"[GetAllUsersAsync] Admin requests user list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
@@ -121,6 +123,41 @@ public class UserService : IUserService
 
         var query = _unitOfWork.Users.GetQueryable().Where(u => !u.IsDeleted)
             .AsNoTracking();
+
+
+        // Filter
+        if (!string.IsNullOrWhiteSpace(param.Search))
+            query = query.Where(u => u.FullName.Contains(param.Search) || u.Email.Contains(param.Search));
+        if (!string.IsNullOrWhiteSpace(param.Email))
+            query = query.Where(u => u.Email.Contains(param.Email));
+        if (!string.IsNullOrWhiteSpace(param.FullName))
+            query = query.Where(u => u.FullName.Contains(param.FullName));
+        if (param.Status.HasValue)
+            query = query.Where(u => u.Status == param.Status.Value);
+        if (param.RoleName.HasValue)
+            query = query.Where(u => u.RoleName == param.RoleName.Value);
+
+        // Sort
+        if (!string.IsNullOrWhiteSpace(param.SortBy))
+        {
+            switch (param.SortBy.ToLower())
+            {
+                case "email":
+                    query = param.Desc ? query.OrderByDescending(u => u.Email) : query.OrderBy(u => u.Email);
+                    break;
+                case "fullname":
+                    query = param.Desc ? query.OrderByDescending(u => u.FullName) : query.OrderBy(u => u.FullName);
+                    break;
+                case "createdat":
+                default:
+                    query = param.Desc ? query.OrderByDescending(u => u.CreatedAt) : query.OrderBy(u => u.CreatedAt);
+                    break;
+            }
+        }
+        else
+        {
+            query = query.OrderByDescending(u => u.CreatedAt);
+        }
 
         var count = await query.CountAsync();
 
@@ -172,37 +209,41 @@ public class UserService : IUserService
         return ToUserDto(user);
     }
 
-    public async Task<UserDto?> DeleteUserAsync(Guid userId)
+    public async Task<UserDto?> UpdateUserStatusAsync(Guid userId, UserStatus newStatus)
     {
-        _logger.Info($"[DeleteUserAsync] Admin deletes user {userId}");
+        _logger.Info($"[UpdateUserStatusAsync] Admin updates status for user {userId} to {newStatus}");
 
-        var user = await GetUserById(userId);
-        if (user == null || user.IsDeleted)
+        var user = await GetUserById(userId, false);
+        if (user == null)
         {
-            _logger.Warn($"[DeleteUserAsync] User {userId} not found.");
-            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
+            _logger.Warn($"[UpdateUserStatusAsync] User {userId} not found.");
+            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại.");
         }
 
-        await _unitOfWork.Users.SoftRemove(user);
-        user.Status = UserStatus.Suspended;
+        user.Status = newStatus;
+
+        // Nếu ban/deactive thì soft remove, nếu active lại thì mở lại
+        if (newStatus == UserStatus.Suspended || newStatus == UserStatus.Locked)
+            user.IsDeleted = true;
+        else if (newStatus == UserStatus.Active)
+            user.IsDeleted = false;
+
         await _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveChangesAsync();
-        await _cacheService.RemoveAsync($"user:{user.Email}");
-        await _cacheService.RemoveAsync($"user:{user.Id}");
+        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
-        var userDto = ToUserDto(user);
-
-        _logger.Success($"[DeleteUserAsync] User {user.Email} deactivated by admin.");
-        return userDto;
+        _logger.Success($"[UpdateUserStatusAsync] User {user.Email} status updated to {newStatus} by admin.");
+        return ToUserDto(user);
     }
 
 
-// ----------------- PRIVATE HELPER METHODS -----------------
+    // ----------------- PRIVATE HELPER METHODS -----------------
 
-/// <summary>
-///     Checks if a user exists in cache or DB.
-/// </summary>
-private async Task<bool> UserExistsAsync(string email)
+    /// <summary>
+    ///     Checks if a user exists in cache or DB.
+    /// </summary>
+    private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
@@ -230,6 +271,27 @@ private async Task<bool> UserExistsAsync(string email)
         }
 
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id);
+    }
+
+
+    /// <summary>
+    ///     Gets a user by id, optionally using cache.
+    /// </summary>
+    public async Task<User?> GetUserByEmail(string email, bool useCache = false)
+    {
+        if (useCache)
+        {
+            var cacheKey = $"user:{email}";
+            var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
+            if (cachedUser != null) return cachedUser;
+
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+            if (user != null)
+                await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
+            return user;
+        }
+
+        return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
     }
 
     /// <summary>

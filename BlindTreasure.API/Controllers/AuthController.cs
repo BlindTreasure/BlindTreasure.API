@@ -15,12 +15,14 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IClaimsService _claimsService;
     private readonly IConfiguration _configuration;
+    public readonly IOAuthService _oAuthService;
 
-    public AuthController(IAuthService authService, IClaimsService claimsService, IConfiguration configuration)
+    public AuthController(IAuthService authService, IClaimsService claimsService, IConfiguration configuration, IOAuthService oAuthService)
     {
         _authService = authService;
         _claimsService = claimsService;
         _configuration = configuration;
+        _oAuthService = oAuthService;
     }
 
     [HttpPost("register")]
@@ -139,5 +141,29 @@ public class AuthController : ControllerBase
         if (!reset)
             return BadRequest(ApiResult.Failure("400", "OTP không hợp lệ, đã hết hạn hoặc dữ liệu không hợp lệ."));
         return Ok(ApiResult.Success("200", "Mật khẩu đã được đặt lại thành công."));
+    }
+
+    /// <summary>
+    /// Đăng nhập bằng Google OAuth2.
+    /// </summary>
+    [HttpPost("login-google")]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 400)]
+    public async Task<IActionResult> LoginWithGoogle([FromBody] GoogleLoginRequestDto dto)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(dto.Token))
+                return BadRequest(ApiResult.Failure("400", "Token Google không hợp lệ."));
+
+            var user = await _oAuthService.AuthenticateWithGoogle(dto.Token);
+            return Ok(ApiResult<UserDto>.Success(user, "200", "Đăng nhập Google thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<UserDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
     }
 }
