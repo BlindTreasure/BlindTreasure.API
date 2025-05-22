@@ -1,5 +1,4 @@
 ﻿using BlindTreasure.Domain.DTOs.AuthenDTOs;
-using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;

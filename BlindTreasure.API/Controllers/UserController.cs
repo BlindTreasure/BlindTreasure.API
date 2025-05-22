@@ -1,6 +1,5 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Domain.Pagination;
@@ -78,7 +77,7 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật trạng thái user (ban, deactive, active lại, ...).
+    ///     Cập nhật trạng thái user (ban, deactive, active lại, ...).
     /// </summary>
     [HttpPut("users/{userId}/status")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]

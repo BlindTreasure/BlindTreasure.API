@@ -2,7 +2,6 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
-using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -139,7 +138,6 @@ public class UserService : IUserService
 
         // Sort
         if (!string.IsNullOrWhiteSpace(param.SortBy))
-        {
             switch (param.SortBy.ToLower())
             {
                 case "email":
@@ -153,11 +151,8 @@ public class UserService : IUserService
                     query = param.Desc ? query.OrderByDescending(u => u.CreatedAt) : query.OrderBy(u => u.CreatedAt);
                     break;
             }
-        }
         else
-        {
             query = query.OrderByDescending(u => u.CreatedAt);
-        }
 
         var count = await query.CountAsync();
 
@@ -213,7 +208,7 @@ public class UserService : IUserService
     {
         _logger.Info($"[UpdateUserStatusAsync] Admin updates status for user {userId} to {newStatus}");
 
-        var user = await GetUserById(userId, false);
+        var user = await GetUserById(userId);
         if (user == null)
         {
             _logger.Warn($"[UpdateUserStatusAsync] User {userId} not found.");
@@ -235,6 +230,27 @@ public class UserService : IUserService
 
         _logger.Success($"[UpdateUserStatusAsync] User {user.Email} status updated to {newStatus} by admin.");
         return ToUserDto(user);
+    }
+
+
+    /// <summary>
+    ///     Gets a user by id, optionally using cache.
+    /// </summary>
+    public async Task<User?> GetUserByEmail(string email, bool useCache = false)
+    {
+        if (useCache)
+        {
+            var cacheKey = $"user:{email}";
+            var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
+            if (cachedUser != null) return cachedUser;
+
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+            if (user != null)
+                await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
+            return user;
+        }
+
+        return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
     }
 
 
@@ -271,27 +287,6 @@ public class UserService : IUserService
         }
 
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id);
-    }
-
-
-    /// <summary>
-    ///     Gets a user by id, optionally using cache.
-    /// </summary>
-    public async Task<User?> GetUserByEmail(string email, bool useCache = false)
-    {
-        if (useCache)
-        {
-            var cacheKey = $"user:{email}";
-            var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
-            if (cachedUser != null) return cachedUser;
-
-            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
-            if (user != null)
-                await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
-            return user;
-        }
-
-        return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
     }
 
     /// <summary>

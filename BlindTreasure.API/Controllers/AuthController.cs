@@ -17,7 +17,8 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _configuration;
     public readonly IOAuthService _oAuthService;
 
-    public AuthController(IAuthService authService, IClaimsService claimsService, IConfiguration configuration, IOAuthService oAuthService)
+    public AuthController(IAuthService authService, IClaimsService claimsService, IConfiguration configuration,
+        IOAuthService oAuthService)
     {
         _authService = authService;
         _claimsService = claimsService;
@@ -144,7 +145,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Đăng nhập bằng Google OAuth2.
+    ///     Đăng nhập bằng Google OAuth2.
     /// </summary>
     [HttpPost("login-google")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]

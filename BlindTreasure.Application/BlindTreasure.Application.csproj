@@ -7,13 +7,13 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\BlindTreasure.Infrastructure\BlindTreasure.Infrastructure.csproj" />
+        <ProjectReference Include="..\BlindTreasure.Infrastructure\BlindTreasure.Infrastructure.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
-        <PackageReference Include="Minio" Version="6.0.4" />
-        <PackageReference Include="Resend" Version="0.1.1" />
+        <PackageReference Include="Google.Apis.Auth" Version="1.69.0"/>
+        <PackageReference Include="Minio" Version="6.0.4"/>
+        <PackageReference Include="Resend" Version="0.1.1"/>
     </ItemGroup>
 
 </Project>
