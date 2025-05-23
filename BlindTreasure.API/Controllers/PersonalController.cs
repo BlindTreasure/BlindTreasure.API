@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
 
-[Route("api")]
+[Route("api/personal")]
 [ApiController]
 public class PersonalController : ControllerBase
 {

@@ -78,40 +78,50 @@ public class UserService : IUserService
 
     public async Task<UpdateAvatarResultDto?> UploadAvatarAsync(Guid userId, IFormFile file)
     {
-        _logger.Info($"[UpdateAvatarAsync] Update avatar for user {userId}");
+        _logger.Info($"[UploadAvatarAsync] Bắt đầu cập nhật avatar cho user {userId}");
 
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null || user.IsDeleted)
         {
-            _logger.Warn($"[UpdateAvatarAsync] User {userId} not found.");
-            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
+            _logger.Warn($"[UploadAvatarAsync] Không tìm thấy user {userId} hoặc đã bị xóa.");
+            throw ErrorHelper.NotFound("Người dùng không tồn tại hoặc đã bị xóa.");
         }
 
         if (file == null || file.Length == 0)
         {
-            _logger.Warn($"[UpdateAvatarAsync] Invalid file upload for user {userId}.");
+            _logger.Warn($"[UploadAvatarAsync] File avatar không hợp lệ.");
             throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
         }
 
-        var fileName = $"user-avatars/{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+        // Sinh tên file duy nhất để tránh trùng (VD: avatar_userId_timestamp.png)
+        var fileExtension = Path.GetExtension(file.FileName);
+        var fileName = $"avatars/avatar_{userId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}{fileExtension}";
 
-        using (var stream = file.OpenReadStream())
+        await using var stream = file.OpenReadStream();
+        await _blobService.UploadFileAsync(fileName, stream);
+
+        var fileUrl = await _blobService.GetPreviewUrlAsync(fileName);
+        if (string.IsNullOrEmpty(fileUrl))
         {
-            await _blobService.UploadFileAsync(fileName, stream);
+            _logger.Error($"[UploadAvatarAsync] Không thể lấy URL cho file {fileName}");
+            throw ErrorHelper.Internal("Không thể tạo URL cho ảnh đại diện.");
         }
 
-        var fileUrl = await _blobService.GetFileUrlAsync(fileName);
         user.AvatarUrl = fileUrl;
-
         await _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveChangesAsync();
+
+        // Ghi cache theo email và id
         await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
-        _logger.Success($"[UpdateAvatarAsync] Avatar updated for user {user.Email}");
+        _logger.Success($"[UploadAvatarAsync] Đã cập nhật avatar thành công cho user {user.Email}");
 
-        return new UpdateAvatarResultDto { AvatarUrl = user.AvatarUrl };
+        return new UpdateAvatarResultDto { AvatarUrl = fileUrl };
     }
 
+
+    //Admin methods
     public async Task<Pagination<UserDto>> GetAllUsersAsync(UserQueryParameter param)
     {
         _logger.Info($"[GetAllUsersAsync] Admin requests user list. Page: {param.PageIndex}, Size: {param.PageSize}");
