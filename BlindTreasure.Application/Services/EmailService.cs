@@ -38,7 +38,6 @@ public class EmailService : IEmailService
         await SendEmailAsync(request.To, "Đăng ký thành công tại BlindTreasure", html);
     }
 
-
     public async Task SendOtpVerificationEmailAsync(EmailRequestDto request)
     {
         var html = $@"

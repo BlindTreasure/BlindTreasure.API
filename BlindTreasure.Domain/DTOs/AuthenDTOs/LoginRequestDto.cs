@@ -13,7 +13,7 @@ public class LoginRequestDto
 public class GoogleLoginRequestDto
 {
     /// <summary>
-    /// Google ID Token trả về từ phía client (Google Sign-In).
+    ///     Google ID Token trả về từ phía client (Google Sign-In).
     /// </summary>
     public string Token { get; set; }
 }

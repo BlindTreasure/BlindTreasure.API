@@ -2,7 +2,6 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
-using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -79,40 +78,50 @@ public class UserService : IUserService
 
     public async Task<UpdateAvatarResultDto?> UploadAvatarAsync(Guid userId, IFormFile file)
     {
-        _logger.Info($"[UpdateAvatarAsync] Update avatar for user {userId}");
+        _logger.Info($"[UploadAvatarAsync] Bắt đầu cập nhật avatar cho user {userId}");
 
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null || user.IsDeleted)
         {
-            _logger.Warn($"[UpdateAvatarAsync] User {userId} not found.");
-            throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
+            _logger.Warn($"[UploadAvatarAsync] Không tìm thấy user {userId} hoặc đã bị xóa.");
+            throw ErrorHelper.NotFound("Người dùng không tồn tại hoặc đã bị xóa.");
         }
 
         if (file == null || file.Length == 0)
         {
-            _logger.Warn($"[UpdateAvatarAsync] Invalid file upload for user {userId}.");
+            _logger.Warn($"[UploadAvatarAsync] File avatar không hợp lệ.");
             throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
         }
 
-        var fileName = $"user-avatars/{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+        // Sinh tên file duy nhất để tránh trùng (VD: avatar_userId_timestamp.png)
+        var fileExtension = Path.GetExtension(file.FileName);
+        var fileName = $"avatars/avatar_{userId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}{fileExtension}";
 
-        using (var stream = file.OpenReadStream())
+        await using var stream = file.OpenReadStream();
+        await _blobService.UploadFileAsync(fileName, stream);
+
+        var fileUrl = await _blobService.GetPreviewUrlAsync(fileName);
+        if (string.IsNullOrEmpty(fileUrl))
         {
-            await _blobService.UploadFileAsync(fileName, stream);
+            _logger.Error($"[UploadAvatarAsync] Không thể lấy URL cho file {fileName}");
+            throw ErrorHelper.Internal("Không thể tạo URL cho ảnh đại diện.");
         }
 
-        var fileUrl = await _blobService.GetFileUrlAsync(fileName);
         user.AvatarUrl = fileUrl;
-
         await _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveChangesAsync();
+
+        // Ghi cache theo email và id
         await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
-        _logger.Success($"[UpdateAvatarAsync] Avatar updated for user {user.Email}");
+        _logger.Success($"[UploadAvatarAsync] Đã cập nhật avatar thành công cho user {user.Email}");
 
-        return new UpdateAvatarResultDto { AvatarUrl = user.AvatarUrl };
+        return new UpdateAvatarResultDto { AvatarUrl = fileUrl };
     }
 
+
+    //Admin methods
     public async Task<Pagination<UserDto>> GetAllUsersAsync(UserQueryParameter param)
     {
         _logger.Info($"[GetAllUsersAsync] Admin requests user list. Page: {param.PageIndex}, Size: {param.PageSize}");
@@ -139,7 +148,6 @@ public class UserService : IUserService
 
         // Sort
         if (!string.IsNullOrWhiteSpace(param.SortBy))
-        {
             switch (param.SortBy.ToLower())
             {
                 case "email":
@@ -153,11 +161,8 @@ public class UserService : IUserService
                     query = param.Desc ? query.OrderByDescending(u => u.CreatedAt) : query.OrderBy(u => u.CreatedAt);
                     break;
             }
-        }
         else
-        {
             query = query.OrderByDescending(u => u.CreatedAt);
-        }
 
         var count = await query.CountAsync();
 
@@ -213,7 +218,7 @@ public class UserService : IUserService
     {
         _logger.Info($"[UpdateUserStatusAsync] Admin updates status for user {userId} to {newStatus}");
 
-        var user = await GetUserById(userId, false);
+        var user = await GetUserById(userId);
         if (user == null)
         {
             _logger.Warn($"[UpdateUserStatusAsync] User {userId} not found.");
@@ -235,6 +240,27 @@ public class UserService : IUserService
 
         _logger.Success($"[UpdateUserStatusAsync] User {user.Email} status updated to {newStatus} by admin.");
         return ToUserDto(user);
+    }
+
+
+    /// <summary>
+    ///     Gets a user by id, optionally using cache.
+    /// </summary>
+    public async Task<User?> GetUserByEmail(string email, bool useCache = false)
+    {
+        if (useCache)
+        {
+            var cacheKey = $"user:{email}";
+            var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
+            if (cachedUser != null) return cachedUser;
+
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+            if (user != null)
+                await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
+            return user;
+        }
+
+        return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
     }
 
 
@@ -271,27 +297,6 @@ public class UserService : IUserService
         }
 
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id);
-    }
-
-
-    /// <summary>
-    ///     Gets a user by id, optionally using cache.
-    /// </summary>
-    public async Task<User?> GetUserByEmail(string email, bool useCache = false)
-    {
-        if (useCache)
-        {
-            var cacheKey = $"user:{email}";
-            var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
-            if (cachedUser != null) return cachedUser;
-
-            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
-            if (user != null)
-                await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
-            return user;
-        }
-
-        return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
     }
 
     /// <summary>

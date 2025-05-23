@@ -321,10 +321,10 @@ public class AuthService : IAuthService
 
 // ----------------- PRIVATE HELPER METHODS -----------------
 
-    /// <summary>
-    ///     Checks if a user exists in cache or DB.
-    /// </summary>
-    private async Task<bool> UserExistsAsync(string email)
+/// <summary>
+///     Checks if a user exists in cache or DB.
+/// </summary>
+private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);

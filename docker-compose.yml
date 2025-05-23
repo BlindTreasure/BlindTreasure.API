@@ -20,9 +20,11 @@ services:
       - JWT__Audience=BlindTreasure_Audience
       - RESEND_APITOKEN=re_gQNBXJvY_ANFdgQphKQBxdW5DNf2UG6Zk
       - RESEND_FROM=noreply@fpt-devteam.fun
-      - "MINIO_ENDPOINT=minio.fpt-devteam.fun"
-      - "MINIO_ACCESS_KEY=103.211.201.162"
-      - "MINIO_SECRET_KEY=Ccubin2003@"
+      - MINIO_ENDPOINT=103.211.201.162:9000
+      - MINIO_HOST=https://minio.fpt-devteam.fun
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+
     ports:
       - "5000:5000"
 
