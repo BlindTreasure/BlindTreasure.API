@@ -1,7 +1,6 @@
-﻿using BlindTreasure.Domain.DTOs.Pagination;
-using BlindTreasure.Domain.Enums;
+﻿using BlindTreasure.Domain.Enums;
 
-namespace BlindTreasure.Domain.Pagination;
+namespace BlindTreasure.Domain.DTOs.Pagination;
 
 /// <summary>
 ///     Tham số truy vấn phân trang và lọc user cho admin.
