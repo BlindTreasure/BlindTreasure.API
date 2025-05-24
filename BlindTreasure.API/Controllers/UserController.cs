@@ -24,7 +24,7 @@ public class UserController : ControllerBase
         _claimsService = claimsService;
     }
 
-    [HttpGet("users")]
+    [HttpGet]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
     [ProducesResponseType(typeof(ApiResult<Pagination<UserDto>>), 200)]
@@ -55,7 +55,7 @@ public class UserController : ControllerBase
     ///     Tạo user mới (admin có thể set role bất kỳ).
     /// </summary>
     // [Authorize]
-    [HttpPost("users")]
+    [HttpPost]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 400)]
     public async Task<IActionResult> CreateUser([FromBody] UserCreateDto dto)
@@ -79,7 +79,7 @@ public class UserController : ControllerBase
     /// <summary>
     ///     Cập nhật trạng thái user (ban, deactive, active lại, ...).
     /// </summary>
-    [HttpPut("users/{userId}/status")]
+    [HttpPut("/{userId}/status")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
     public async Task<IActionResult> UpdateUserStatus(Guid userId, [FromBody] UserStatus status)
@@ -102,7 +102,7 @@ public class UserController : ControllerBase
     /// <summary>
     ///     Lấy thông tin user theo id.
     /// </summary>
-    [HttpGet("users/{userId}")]
+    [HttpGet("{userId}")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
     public async Task<IActionResult> GetUserById(Guid userId)
