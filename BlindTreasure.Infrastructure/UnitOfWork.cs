@@ -10,14 +10,16 @@ public class UnitOfWork : IUnitOfWork
 
     public UnitOfWork(BlindTreasureDbContext dbContext,
         IGenericRepository<User> userRepository,
-        IGenericRepository<OtpVerification> otpVerifications)
+        IGenericRepository<OtpVerification> otpVerifications, IGenericRepository<Seller> sellers)
     {
         _dbContext = dbContext;
         Users = userRepository;
         OtpVerifications = otpVerifications;
+        Sellers = sellers;
     }
 
     public IGenericRepository<User> Users { get; }
+    public IGenericRepository<Seller> Sellers { get; }
     public IGenericRepository<OtpVerification> OtpVerifications { get; }
 
     public void Dispose()

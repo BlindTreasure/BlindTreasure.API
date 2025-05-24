@@ -7,7 +7,8 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface IAuthService
 {
-    Task<UserDto?> RegisterUserAsync(UserRegistrationDto registrationDto);
+    Task<UserDto?> RegisterCustomerAsync(UserRegistrationDto registrationDto);
+    Task<UserDto?> RegisterSellerAsync(SellerRegistrationDto dto);
     Task<LoginResponseDto?> LoginAsync(LoginRequestDto loginDto, IConfiguration configuration);
     Task<bool> LogoutAsync(Guid userId);
 
