@@ -89,7 +89,7 @@ public class UserService : IUserService
 
         if (file == null || file.Length == 0)
         {
-            _logger.Warn($"[UploadAvatarAsync] File avatar không hợp lệ.");
+            _logger.Warn("[UploadAvatarAsync] File avatar không hợp lệ.");
             throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
         }
 
@@ -156,7 +156,7 @@ public class UserService : IUserService
                 case "fullname":
                     query = param.Desc ? query.OrderByDescending(u => u.FullName) : query.OrderBy(u => u.FullName);
                     break;
-                case "createdat":
+                case "createdAt":
                 default:
                     query = param.Desc ? query.OrderByDescending(u => u.CreatedAt) : query.OrderBy(u => u.CreatedAt);
                     break;

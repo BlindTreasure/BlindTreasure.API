@@ -100,7 +100,8 @@ public class BlobService : IBlobService
         var encodedFile = Uri.EscapeDataString(fileName);
 
         // URL được định dạng đúng với API reverse proxy
-        var previewUrl = $"{minioHost}/api/v1/buckets/{_bucketName}/objects/download?preview=true&prefix={encodedFile}&version_id=null";
+        var previewUrl =
+            $"{minioHost}/api/v1/buckets/{_bucketName}/objects/download?preview=true&prefix={encodedFile}&version_id=null";
         _logger.Info($"Preview URL generated: {previewUrl}");
 
         return previewUrl;

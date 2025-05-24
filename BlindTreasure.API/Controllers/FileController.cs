@@ -15,17 +15,14 @@ public class FileController : ControllerBase
     }
 
     /// <summary>
-    /// Upload file lên MinIO.
+    ///     Upload file lên MinIO.
     /// </summary>
     /// <param name="file">File cần upload</param>
     /// <returns>URL preview hoặc lỗi</returns>
     [HttpPost("upload")]
     public async Task<IActionResult> UploadFile(IFormFile file)
     {
-        if (file == null || file.Length == 0)
-        {
-            return BadRequest("File không hợp lệ.");
-        }
+        if (file == null || file.Length == 0) return BadRequest("File không hợp lệ.");
 
         try
         {
