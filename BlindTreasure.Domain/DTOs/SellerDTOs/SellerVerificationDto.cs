@@ -1,5 +1,4 @@
-﻿
-namespace BlindTreasure.Domain.DTOs.SellerDTOs;
+﻿namespace BlindTreasure.Domain.DTOs.SellerDTOs;
 
 public class SellerVerificationDto
 {

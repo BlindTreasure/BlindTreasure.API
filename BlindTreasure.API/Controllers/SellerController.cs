@@ -11,8 +11,8 @@ namespace BlindTreasure.API.Controllers;
 [Route("api/sellers")]
 public class SellerController : ControllerBase
 {
-    private readonly ISellerService _sellerService;
     private readonly IClaimsService _claimsService;
+    private readonly ISellerService _sellerService;
 
     public SellerController(ISellerService sellerService, IClaimsService claimsService)
     {
@@ -23,7 +23,7 @@ public class SellerController : ControllerBase
     [HttpPost("document")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult), 400)]
-    public async Task<IActionResult> UploadDocument([FromForm] IFormFile file)
+    public async Task<IActionResult> UploadDocument(IFormFile file)
     {
         try
         {

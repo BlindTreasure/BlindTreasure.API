@@ -43,7 +43,7 @@ public class AuthController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
+
     [HttpPost("register-seller")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 409)]
@@ -61,7 +61,7 @@ public class AuthController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
+
     [HttpPost("login")]
     [ProducesResponseType(typeof(ApiResult<LoginResponseDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<LoginResponseDto>), 400)]

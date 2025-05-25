@@ -1,8 +1,11 @@
 ﻿using System.Text;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Services.Commons;
+using BlindTreasure.Application.Services.ThirdParty;
+using BlindTreasure.Application.Services.ThirdParty.AIModels;
 using BlindTreasure.Domain;
 using BlindTreasure.Infrastructure;
 using BlindTreasure.Infrastructure.Commons;
@@ -134,8 +137,12 @@ public static class IocContainer
         services.AddScoped<IClaimsService, ClaimsService>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IEmailService, EmailService>();
-        services.AddScoped<IBlobService, BlobService>();
         services.AddScoped<ISellerService, SellerService>();
+
+        //3rd party
+        services.AddScoped<IGptService, GptService>();
+        services.AddScoped<IGptService, GeminiService>();
+        services.AddScoped<IBlobService, BlobService>();
 
 
         services.AddHttpContextAccessor();

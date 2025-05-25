@@ -1,7 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
-using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
