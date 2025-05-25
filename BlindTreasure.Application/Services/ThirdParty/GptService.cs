@@ -1,11 +1,11 @@
-﻿using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
+﻿using BlindTreasure.Application.Interfaces.ThirdParty;
 using Microsoft.Extensions.Configuration;
 using OpenAI;
 using OpenAI.Managers;
 using OpenAI.ObjectModels;
 using OpenAI.ObjectModels.RequestModels;
 
-namespace BlindTreasure.Application.Services.ThirdParty.AIModels;
+namespace BlindTreasure.Application.Services.ThirdParty;
 
 public class GptService : IGptService
 {
@@ -32,7 +32,7 @@ public class GptService : IGptService
             Model = Models.Gpt_3_5_Turbo_16k
         });
 
-        if (completionResult.Successful) return completionResult.Choices.First().Message.Content;
+        if (completionResult.Successful) return completionResult.Choices.First().Message.Content ?? throw new InvalidOperationException();
 
         throw new Exception(completionResult.Error?.Message ?? "GPT failed");
     }
