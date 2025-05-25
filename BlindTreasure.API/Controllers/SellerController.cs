@@ -27,7 +27,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// hehe
+    /// Staff xem list của Seller cung voi status
     /// </summary>
     [HttpGet]
     [Authorize(Roles = "Staff")]
@@ -55,6 +55,30 @@ public class SellerController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Staff xem dc document cua seller
+    /// </summary>
+    // [Authorize(Roles = "Admin,Staff")]
+    [HttpGet("{sellerId}/document")]
+    [ProducesResponseType(typeof(ApiResult<string>), 200)]
+    public async Task<IActionResult> GetSellerDocument(Guid id)
+    {
+        try
+        {
+            var fileUrl = await _sellerService.GetSellerDocumentUrlAsync(id);
+            return Ok(ApiResult<string>.Success(fileUrl, "200", "Lấy tài liệu thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<string>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    /// Seller upload document files
+    /// </summary>
     [Authorize(Roles = "Seller")]
     [HttpPost("document")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
@@ -75,23 +99,9 @@ public class SellerController : ControllerBase
         }
     }
 
-    // [Authorize(Roles = "Admin,Staff")]
-    [HttpGet("{sellerId}/document")]
-    [ProducesResponseType(typeof(ApiResult<string>), 200)]
-    public async Task<IActionResult> GetSellerDocument(Guid id)
-    {
-        try
-        {
-            var fileUrl = await _sellerService.GetSellerDocumentUrlAsync(id);
-            return Ok(ApiResult<string>.Success(fileUrl, "200", "Lấy tài liệu thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<string>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
+    /// <summary>
+    /// Staff duyet seller vao he thong
+    /// </summary>
     // [Authorize(Roles = "Admin,Staff")]
     [HttpPut("{sellerId}/verify")]
     public async Task<IActionResult> VerifySeller(Guid sellerId, [FromForm] SellerVerificationDto dto)
@@ -109,5 +119,4 @@ public class SellerController : ControllerBase
             return StatusCode(status, error);
         }
     }
-    
 }
