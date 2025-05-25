@@ -15,7 +15,7 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IClaimsService _claimsService;
     private readonly IConfiguration _configuration;
-    public readonly IOAuthService _oAuthService;
+    private readonly IOAuthService _oAuthService;
 
     public AuthController(IAuthService authService, IClaimsService claimsService, IConfiguration configuration,
         IOAuthService oAuthService)
@@ -29,12 +29,30 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 409)]
-    public async Task<IActionResult> Register([FromBody] UserRegistrationDto dto)
+    public async Task<IActionResult> RegisterCustomer([FromBody] UserRegistrationDto dto)
     {
         try
         {
-            var result = await _authService.RegisterUserAsync(dto);
+            var result = await _authService.RegisterCustomerAsync(dto);
             return Ok(ApiResult<UserDto>.Success(result!, "200", "Đăng ký thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<UserDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    [HttpPost("register-seller")]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<UserDto>), 409)]
+    public async Task<IActionResult> RegisterSeller([FromBody] SellerRegistrationDto dto)
+    {
+        try
+        {
+            var result = await _authService.RegisterSellerAsync(dto);
+            return Ok(ApiResult<UserDto>.Success(result!, "200", "Đăng ký seller thành công."));
         }
         catch (Exception ex)
         {

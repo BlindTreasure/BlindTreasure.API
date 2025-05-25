@@ -80,9 +80,17 @@ public class BlindTreasureDbContext : DbContext
         modelBuilder.Entity<Role>()
             .HasAlternateKey(r => r.Type);
 
+        //enum conversion
         modelBuilder.Entity<OtpVerification>(entity =>
         {
             entity.Property(e => e.Purpose)
+                .HasConversion<string>() // enum -> string
+                .HasMaxLength(32); // giới hạn độ dài nếu cần
+        });
+
+        modelBuilder.Entity<Seller>(entity =>
+        {
+            entity.Property(e => e.Status)
                 .HasConversion<string>() // enum -> string
                 .HasMaxLength(32); // giới hạn độ dài nếu cần
         });
@@ -315,7 +323,5 @@ public class BlindTreasureDbContext : DbContext
             .WithMany(b => b.WishlistItems)
             .HasForeignKey(wi => wi.BlindBoxId)
             .OnDelete(DeleteBehavior.SetNull);
-
-        // Promotions: no relationship configuration needed
     }
 }

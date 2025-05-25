@@ -2,10 +2,10 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
-using BlindTreasure.Domain.Pagination;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;

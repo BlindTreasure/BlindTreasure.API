@@ -1,8 +1,12 @@
-﻿using System.Text;
+﻿using System.Reflection;
+using System.Text;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Services.Commons;
+using BlindTreasure.Application.Services.ThirdParty;
+using BlindTreasure.Application.Services.ThirdParty.AIModels;
 using BlindTreasure.Domain;
 using BlindTreasure.Infrastructure;
 using BlindTreasure.Infrastructure.Commons;
@@ -134,6 +138,12 @@ public static class IocContainer
         services.AddScoped<IClaimsService, ClaimsService>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<ISellerService, SellerService>();
+        services.AddScoped<ISellerVerificationService, SellerVerificationService>();
+
+        //3rd party
+        services.AddScoped<IGptService, GptService>();
+        services.AddScoped<IGptService, GeminiService>();
         services.AddScoped<IBlobService, BlobService>();
 
 
@@ -143,27 +153,31 @@ public static class IocContainer
     }
 
 
-    private static IServiceCollection SetupSwagger(this IServiceCollection services)
+    public static IServiceCollection SetupSwagger(this IServiceCollection services)
     {
         services.AddSwaggerGen(c =>
         {
-            c.UseInlineDefinitionsForEnums();
-
-            c.SwaggerDoc("v1",
-                new OpenApiInfo { Title = "BlindTreasureAPI", Version = "v1" });
-            var jwtSecurityScheme = new OpenApiSecurityScheme
+            c.SwaggerDoc("v1", new OpenApiInfo
             {
-                Name = "JWT Authentication",
-                Description = "Enter your JWT token in this field",
-                In = ParameterLocation.Header,
+                Title = "BlindTreasure API",
+                Version = "v1", 
+                Description = "API cho hệ thống thương mại điện tử BlindTreasure."
+            });
+
+            c.UseInlineDefinitionsForEnums();
+            c.UseAllOfForInheritance();
+
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Name = "Authorization",
                 Type = SecuritySchemeType.Http,
                 Scheme = "bearer",
-                BearerFormat = "JWT"
-            };
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Description = "Nhập token vào format: Bearer {your token}"
+            });
 
-            c.AddSecurityDefinition("Bearer", jwtSecurityScheme);
-
-            var securityRequirement = new OpenApiSecurityRequirement
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
             {
                 {
                     new OpenApiSecurityScheme
@@ -174,15 +188,16 @@ public static class IocContainer
                             Id = "Bearer"
                         }
                     },
-                    new string[] { }
+                    Array.Empty<string>()
                 }
-            };
+            });
 
-            c.AddSecurityRequirement(securityRequirement);
-
-            // Cấu hình Swagger để sử dụng Newtonsoft.Json
-            c.UseAllOfForInheritance();
+            // Load XML comment
+            var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+            var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+            c.IncludeXmlComments(xmlPath);
         });
+
 
         return services;
     }

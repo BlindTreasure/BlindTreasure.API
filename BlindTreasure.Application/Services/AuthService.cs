@@ -33,7 +33,7 @@ public class AuthService : IAuthService
         _emailService = emailService;
     }
 
-    public async Task<UserDto?> RegisterUserAsync(UserRegistrationDto registrationDto)
+    public async Task<UserDto?> RegisterCustomerAsync(UserRegistrationDto registrationDto)
     {
         _logger.Info($"[RegisterUserAsync] Start registration for {registrationDto.Email}");
 
@@ -66,6 +66,47 @@ public class AuthService : IAuthService
         await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
 
         _logger.Info($"[RegisterUserAsync] OTP sent to {user.Email} for verification.");
+
+        return ToUserDto(user);
+    }
+
+    public async Task<UserDto?> RegisterSellerAsync(SellerRegistrationDto dto)
+    {
+        if (await UserExistsAsync(dto.Email))
+            throw ErrorHelper.Conflict("Email đã được sử dụng.");
+
+        var hashedPassword = new PasswordHasher().HashPassword(dto.Password);
+        var user = new User
+        {
+            Email = dto.Email,
+            Password = hashedPassword,
+            FullName = dto.FullName,
+            Phone = dto.PhoneNumber,
+            DateOfBirth = dto.DateOfBirth,
+            AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
+            RoleName = RoleType.Seller,
+            Status = UserStatus.Pending,
+            IsEmailVerified = false
+        };
+
+        await _unitOfWork.Users.AddAsync(user);
+        await _unitOfWork.SaveChangesAsync();
+
+        var seller = new Seller
+        {
+            UserId = user.Id,
+            CoaDocumentUrl = dto.CoaDocumentUrl,
+            CompanyName = dto.CompanyName,
+            TaxId = dto.TaxId,
+            CompanyAddress = dto.CompanyAddress,
+            IsVerified = false,
+            Status = SellerStatus.WaitingReview
+        };
+
+        await _unitOfWork.Sellers.AddAsync(seller);
+        await _unitOfWork.SaveChangesAsync();
+
+        await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
 
         return ToUserDto(user);
     }

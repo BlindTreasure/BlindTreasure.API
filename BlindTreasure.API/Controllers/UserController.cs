@@ -1,8 +1,8 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Enums;
-using BlindTreasure.Domain.Pagination;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
