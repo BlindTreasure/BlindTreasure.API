@@ -4,31 +4,24 @@ using BlindTreasure.Infrastructure.Interfaces;
 
 namespace BlindTreasure.Infrastructure;
 
-public class UnitOfWork : IUnitOfWork
+public class UnitOfWork(
+    BlindTreasureDbContext dbContext,
+    IGenericRepository<User> userRepository,
+    IGenericRepository<OtpVerification> otpVerifications,
+    IGenericRepository<Seller> sellers)
+    : IUnitOfWork
 {
-    private readonly BlindTreasureDbContext _dbContext;
-
-    public UnitOfWork(BlindTreasureDbContext dbContext,
-        IGenericRepository<User> userRepository,
-        IGenericRepository<OtpVerification> otpVerifications, IGenericRepository<Seller> sellers)
-    {
-        _dbContext = dbContext;
-        Users = userRepository;
-        OtpVerifications = otpVerifications;
-        Sellers = sellers;
-    }
-
-    public IGenericRepository<User> Users { get; }
-    public IGenericRepository<Seller> Sellers { get; }
-    public IGenericRepository<OtpVerification> OtpVerifications { get; }
+    public IGenericRepository<User> Users { get; } = userRepository;
+    public IGenericRepository<Seller> Sellers { get; } = sellers;
+    public IGenericRepository<OtpVerification> OtpVerifications { get; } = otpVerifications;
 
     public void Dispose()
     {
-        _dbContext.Dispose();
+        dbContext.Dispose();
     }
 
     public async Task<int> SaveChangesAsync()
     {
-        return await _dbContext.SaveChangesAsync();
+        return await dbContext.SaveChangesAsync();
     }
 }

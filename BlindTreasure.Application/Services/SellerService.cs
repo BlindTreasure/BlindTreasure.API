@@ -1,8 +1,13 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.SellerDTOs;
+using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
 
@@ -46,5 +51,46 @@ public class SellerService : ISellerService
         _loggerService.Info($"[UploadSellerDocumentAsync] Seller {userId} uploaded COA document: {fileName}");
 
         return fileUrl;
+    }
+    
+    public async Task<string> GetSellerDocumentUrlAsync(Guid sellerId)
+    {
+        var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId);
+        if (seller == null)
+            throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
+
+        if (string.IsNullOrWhiteSpace(seller.CoaDocumentUrl))
+            throw ErrorHelper.NotFound("Seller chưa upload tài liệu COA.");
+
+        return seller.CoaDocumentUrl;
+    }
+
+    public async Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination)
+    {
+        var query = _unitOfWork.Sellers.GetQueryable()
+            .Where(s => !s.IsDeleted)
+            .Include(s => s.User)
+            .AsQueryable();
+
+        if (status.HasValue) query = query.Where(s => s.Status == status.Value);
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .Skip((pagination.PageIndex - 1) * pagination.PageSize)
+            .Take(pagination.PageSize)
+            .Select(s => new SellerDto
+            {
+                Id = s.Id,
+                Email = s.User.Email,
+                FullName = s.User.FullName,
+                CompanyName = s.CompanyName,
+                CoaDocumentUrl = s.CoaDocumentUrl,
+                Status = s.Status,
+                IsVerified = s.IsVerified
+            })
+            .ToListAsync();
+
+        return new Pagination<SellerDto>(items, totalCount, pagination.PageIndex, pagination.PageSize);
     }
 }

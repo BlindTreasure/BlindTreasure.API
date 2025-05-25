@@ -83,7 +83,7 @@ public class AuthService : IAuthService
             FullName = dto.FullName,
             Phone = dto.PhoneNumber,
             DateOfBirth = dto.DateOfBirth,
-            AvatarUrl = "https://img.default.com/avatar.png",
+            AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
             RoleName = RoleType.Seller,
             Status = UserStatus.Pending,
             IsEmailVerified = false
