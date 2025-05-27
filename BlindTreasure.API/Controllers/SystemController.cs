@@ -4,11 +4,13 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.API.Controllers;
 
+[Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/system")]
 public class SystemController : ControllerBase
@@ -119,7 +121,7 @@ public class SystemController : ControllerBase
             new()
             {
                 Email = "admin@gmail.com",
-                Password = passwordHasher.HashPassword("1@"),
+                Password = passwordHasher.HashPassword(".."),
                 FullName = "Admin User",
                 Phone = "0900000004",
                 Status = UserStatus.Active,
