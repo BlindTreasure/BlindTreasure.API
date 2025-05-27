@@ -27,7 +27,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Staff xem list của Seller cung voi status
+    ///     Staff xem list của Seller cung voi status
     /// </summary>
     [HttpGet]
     [Authorize(Roles = "Staff")]
@@ -56,7 +56,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Staff xem dc document cua seller
+    ///     Staff xem dc document cua seller
     /// </summary>
     // [Authorize(Roles = "Admin,Staff")]
     [HttpGet("{sellerId}/document")]
@@ -77,7 +77,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Seller upload document files
+    ///     Seller upload document files
     /// </summary>
     [Authorize(Roles = "Seller")]
     [HttpPost("document")]
@@ -100,7 +100,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Staff duyet seller vao he thong
+    ///     Staff duyet seller vao he thong
     /// </summary>
     // [Authorize(Roles = "Admin,Staff")]
     [HttpPut("{sellerId}/verify")]

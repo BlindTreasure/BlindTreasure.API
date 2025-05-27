@@ -79,13 +79,11 @@ public class BlobService : IBlobService
         }
         catch (MinioException minioEx)
         {
-            // Lỗi từ MinIO (vd: xác thực, định dạng...)
             _logger.Error($"MinIO Error during upload: {minioEx.Message}");
             throw;
         }
         catch (Exception ex)
         {
-            // Lỗi hệ thống khác
             _logger.Error($"Unexpected error during file upload: {ex.Message}");
             throw;
         }
@@ -111,7 +109,6 @@ public class BlobService : IBlobService
     {
         try
         {
-            // Tạo presigned URL, mặc định hết hạn sau 7 ngày (604800 giây)
             var args = new PresignedGetObjectArgs()
                 .WithBucket(_bucketName)
                 .WithObject(fileName)

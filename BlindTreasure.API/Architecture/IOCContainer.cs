@@ -158,7 +158,7 @@ public static class IocContainer
             c.SwaggerDoc("v1", new OpenApiInfo
             {
                 Title = "BlindTreasure API",
-                Version = "v1", 
+                Version = "v1",
                 Description = "API cho hệ thống thương mại điện tử BlindTreasure."
             });
 

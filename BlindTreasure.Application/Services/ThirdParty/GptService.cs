@@ -32,7 +32,8 @@ public class GptService : IGptService
             Model = Models.Gpt_3_5_Turbo_16k
         });
 
-        if (completionResult.Successful) return completionResult.Choices.First().Message.Content ?? throw new InvalidOperationException();
+        if (completionResult.Successful)
+            return completionResult.Choices.First().Message.Content ?? throw new InvalidOperationException();
 
         throw new Exception(completionResult.Error?.Message ?? "GPT failed");
     }
