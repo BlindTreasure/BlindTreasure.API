@@ -124,7 +124,7 @@ public class SystemController : ControllerBase
                 Password = passwordHasher.HashPassword(".."),
                 FullName = "Admin User",
                 Phone = "0900000004",
-                Status = UserStatus.Active,
+                Status = UserStatus.Active,//
                 RoleName = RoleType.Admin
             }
         };
