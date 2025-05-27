@@ -99,17 +99,17 @@ public class SellerController : ControllerBase
         }
     }
 
-    /// <summary>
-    ///     Staff duyet seller vao he thong
-    /// </summary>
-    // [Authorize(Roles = "Admin,Staff")]
     [HttpPut("{sellerId}/verify")]
     public async Task<IActionResult> VerifySeller(Guid sellerId, [FromForm] SellerVerificationDto dto)
     {
         try
         {
-            await _sellerVerificationService.VerifySellerAsync(sellerId, dto.IsApproved);
-            var msg = dto.IsApproved ? "Seller đã được xác minh." : "Seller đã bị từ chối.";
+            await _sellerVerificationService.VerifySellerAsync(sellerId, dto);
+
+            var msg = dto.IsApproved
+                ? "Seller đã được xác minh."
+                : $"Seller đã bị từ chối. Lý do: {dto.RejectReason ?? "Không có"}";
+
             return Ok(ApiResult.Success("200", msg));
         }
         catch (Exception ex)

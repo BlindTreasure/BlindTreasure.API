@@ -10,7 +10,9 @@ public class Seller : BaseEntity
     public string CoaDocumentUrl { get; set; }
     public string CompanyName { get; set; }
     public string TaxId { get; set; }
-    public string CompanyAddress { get; set; }
+    public string? CompanyAddress { get; set; }
+
+    public string? RejectReason { get; set; }
     public SellerStatus Status { get; set; }
 
     public User User { get; set; }
