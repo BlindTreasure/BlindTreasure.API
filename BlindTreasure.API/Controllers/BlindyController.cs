@@ -1,4 +1,4 @@
-﻿using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
+﻿using BlindTreasure.Application.Interfaces.ThirdParty;
 using BlindTreasure.Application.Utils;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +15,7 @@ public class BlindyController : ControllerBase
         _gptService = gptService;
     }
 
-    [HttpPost("generate")]
+    [HttpPost("ask")]
     public async Task<IActionResult> Generate([FromBody] string prompt)
     {
         try

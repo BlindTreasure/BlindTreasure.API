@@ -36,7 +36,7 @@ public class SellerService : ISellerService
         if (seller == null)
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
 
-        var fileName = $"seller-documentation/{userId}/{Guid.NewGuid()}_{file.FileName}";
+        var fileName = $"seller-documentation/{userId}-{Guid.NewGuid()}_{file.FileName}";
 
         await using var stream = file.OpenReadStream();
         await _blobService.UploadFileAsync(fileName, stream);
@@ -52,7 +52,7 @@ public class SellerService : ISellerService
 
         return fileUrl;
     }
-    
+
     public async Task<string> GetSellerDocumentUrlAsync(Guid sellerId)
     {
         var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId);

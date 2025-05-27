@@ -2,11 +2,10 @@
 using System.Text;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
-using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
+using BlindTreasure.Application.Interfaces.ThirdParty;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Services.ThirdParty;
-using BlindTreasure.Application.Services.ThirdParty.AIModels;
 using BlindTreasure.Domain;
 using BlindTreasure.Infrastructure;
 using BlindTreasure.Infrastructure.Commons;
@@ -143,7 +142,6 @@ public static class IocContainer
 
         //3rd party
         services.AddScoped<IGptService, GptService>();
-        services.AddScoped<IGptService, GeminiService>();
         services.AddScoped<IBlobService, BlobService>();
 
 
@@ -160,7 +158,7 @@ public static class IocContainer
             c.SwaggerDoc("v1", new OpenApiInfo
             {
                 Title = "BlindTreasure API",
-                Version = "v1", 
+                Version = "v1",
                 Description = "API cho hệ thống thương mại điện tử BlindTreasure."
             });
 

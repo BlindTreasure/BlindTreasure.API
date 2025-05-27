@@ -111,10 +111,6 @@ public class AuthService : IAuthService
         return ToUserDto(user);
     }
 
-
-    /// <summary>
-    ///     Authenticates a user and returns JWT tokens.
-    /// </summary>
     public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto loginDto, IConfiguration configuration)
     {
         _logger.Info($"[LoginAsync] Login attempt for {loginDto.Email}");
@@ -228,9 +224,6 @@ public class AuthService : IAuthService
         };
     }
 
-    /// <summary>
-    ///     Verifies the OTP for email registration and activates the user.
-    /// </summary>
     public async Task<bool> VerifyEmailOtpAsync(string email, string otp)
     {
         _logger.Info($"[VerifyEmailOtpAsync] Verifying OTP for {email}");
@@ -248,27 +241,42 @@ public class AuthService : IAuthService
         await _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveChangesAsync();
 
-        // ——> Xóa cache cũ rồi thiết lập lại cache user mới
+        // Xóa cache cũ rồi thiết lập lại cache user mới
         await _cacheService.RemoveAsync($"user:{email}");
         await _cacheService.SetAsync($"user:{email}", user, TimeSpan.FromHours(1));
 
         // Xóa OTP khỏi cache
         await _cacheService.RemoveAsync($"register-otp:{email}");
 
-        await _emailService.SendRegistrationSuccessEmailAsync(new EmailRequestDto
+        // Gửi email tùy role
+        switch (user.RoleName)
         {
-            To = user.Email,
-            UserName = user.FullName
-        });
+            case RoleType.Customer:
+                await _emailService.SendRegistrationSuccessEmailAsync(new EmailRequestDto
+                {
+                    To = user.Email,
+                    UserName = user.FullName
+                });
+                break;
+
+            case RoleType.Seller:
+                await _emailService.SendSellerEmailVerificationSuccessAsync(new EmailRequestDto
+                {
+                    To = user.Email,
+                    UserName = user.FullName
+                });
+                break;
+
+            default:
+                // Nếu cần, có thể log hoặc xử lý role khác
+                _logger.Warn($"[VerifyEmailOtpAsync] Role {user.RoleName} không gửi email tự động.");
+                break;
+        }
 
         _logger.Success($"[VerifyEmailOtpAsync] User {email} verified and activated.");
         return true;
     }
 
-
-    /// <summary>
-    ///     Resets the user's password after verifying OTP.
-    /// </summary>
     public async Task<bool> ResetPasswordAsync(string email, string otp, string newPassword)
     {
         _logger.Info($"[ResetPasswordAsync] Password reset requested for {email}");

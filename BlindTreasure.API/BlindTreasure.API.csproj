@@ -7,23 +7,23 @@
         <UserSecretsId>fefcd97c-3fe4-481c-9c43-621aca5875ab</UserSecretsId>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
         <DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
-		<GenerateDocumentationFile>true</GenerateDocumentationFile>
-		<NoWarn>$(NoWarn);1591</NoWarn>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);1591</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.15" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.15"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.15">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
-        <PackageReference Include="oqo0.SwaggerThemes" Version="1.4.3" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.2" />
+        <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0"/>
+        <PackageReference Include="oqo0.SwaggerThemes" Version="1.4.3"/>
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.2"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\BlindTreasure.Application\BlindTreasure.Application.csproj" />
+        <ProjectReference Include="..\BlindTreasure.Application\BlindTreasure.Application.csproj"/>
     </ItemGroup>
 
 </Project>

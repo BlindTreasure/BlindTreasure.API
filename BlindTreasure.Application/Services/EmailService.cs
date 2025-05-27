@@ -88,6 +88,59 @@ public class EmailService : IEmailService
         await SendEmailAsync(request.To, "Mật khẩu đã được thay đổi tại BlindTreasure", html);
     }
 
+    public async Task SendSellerEmailVerificationSuccessAsync(EmailRequestDto request)
+    {
+        var html = $@"
+        <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+          <body style=""font-family:Arial,sans-serif;color:#252424;padding:20px;background-color:#ebeaea;"">
+            <div style=""max-width:600px;margin:auto;background:#fff;border:1px solid #d02a2a;border-radius:6px;padding:20px;"">
+              <h1 style=""color:#d02a2a;font-size:22px;"">Xác minh email thành công</h1>
+              <p>Chào {request.UserName},</p>
+              <p>Bạn đã xác minh email thành công. Vui lòng hoàn tất việc gửi COA (Certificate of Authenticity) vào hệ thống để hoàn tất quá trình trở thành Seller chính thức.</p>
+              <p>Nếu có thắc mắc, vui lòng liên hệ đội ngũ hỗ trợ của BlindTreasure.</p>
+              <p style=""margin-top:30px;"">Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+            </div>
+          </body>
+        </html>";
+        await SendEmailAsync(request.To, "Xác minh email thành công - Hoàn thành gửi COA", html);
+    }
+
+    public async Task SendSellerApprovalSuccessAsync(EmailRequestDto request)
+    {
+        var html = $@"
+        <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+          <body style=""font-family:Arial,sans-serif;color:#252424;padding:20px;background-color:#ebeaea;"">
+            <div style=""max-width:600px;margin:auto;background:#fff;border:1px solid #d02a2a;border-radius:6px;padding:20px;"">
+              <h1 style=""color:#d02a2a;font-size:22px;"">Chúc mừng bạn đã trở thành Seller chính thức</h1>
+              <p>Chào {request.UserName},</p>
+              <p>Chúng tôi rất vui thông báo bạn đã được duyệt trở thành Seller chính thức trên BlindTreasure.</p>
+              <p>Bạn có thể bắt đầu đăng tải sản phẩm và sử dụng các tính năng Seller trên nền tảng.</p>
+              <p style=""margin-top:30px;"">Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+            </div>
+          </body>
+        </html>";
+        await SendEmailAsync(request.To, "Chúc mừng bạn đã trở thành Seller chính thức", html);
+    }
+
+    public async Task SendSellerRejectionAsync(EmailRequestDto request, string rejectReason)
+    {
+        var html = $@"
+        <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+          <body style=""font-family:Arial,sans-serif;color:#252424;padding:20px;background-color:#ebeaea;"">
+            <div style=""max-width:600px;margin:auto;background:#fff;border:1px solid #d02a2a;border-radius:6px;padding:20px;"">
+              <h1 style=""color:#d02a2a;font-size:22px;"">Thông báo từ chối duyệt Seller</h1>
+              <p>Chào {request.UserName},</p>
+              <p>Rất tiếc, đơn đăng ký Seller của bạn đã bị từ chối.</p>
+              <p><strong>Lý do:</strong> {rejectReason}</p>
+              <p>Bạn có thể chỉnh sửa và gửi lại hồ sơ hoặc liên hệ đội ngũ hỗ trợ để biết thêm chi tiết.</p>
+              <p style=""margin-top:30px;"">Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+            </div>
+          </body>
+        </html>";
+        await SendEmailAsync(request.To, "Thông báo từ chối duyệt Seller", html);
+    }
+
+
     private async Task SendEmailAsync(string to, string subject, string htmlContent)
     {
         var message = new EmailMessage
