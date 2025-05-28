@@ -61,11 +61,11 @@ public class SellerController : ControllerBase
     // [Authorize(Roles = "Admin,Staff")]
     [HttpGet("{sellerId}/document")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
-    public async Task<IActionResult> GetSellerDocument(Guid id)
+    public async Task<IActionResult> GetSellerDocument(Guid sellerId)
     {
         try
         {
-            var fileUrl = await _sellerService.GetSellerDocumentUrlAsync(id);
+            var fileUrl = await _sellerService.GetSellerDocumentUrlAsync(sellerId);
             return Ok(ApiResult<string>.Success(fileUrl, "200", "Lấy tài liệu thành công."));
         }
         catch (Exception ex)
