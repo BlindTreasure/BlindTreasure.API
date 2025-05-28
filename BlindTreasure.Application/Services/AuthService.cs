@@ -95,7 +95,7 @@ public class AuthService : IAuthService
         var seller = new Seller
         {
             UserId = user.Id,
-            CoaDocumentUrl = dto.CoaDocumentUrl,
+            CoaDocumentUrl = "Waiting for submit",
             CompanyName = dto.CompanyName,
             TaxId = dto.TaxId,
             CompanyAddress = dto.CompanyAddress,
