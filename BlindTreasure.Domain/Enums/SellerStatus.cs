@@ -2,6 +2,7 @@
 
 public enum SellerStatus
 {
+    InfoEmpty,
     WaitingReview,
     Approved,
     Rejected

@@ -10,6 +10,7 @@ public interface ISellerService
 {
     Task<string> UploadSellerDocumentAsync(Guid userId, IFormFile file);
     Task<SellerProfileDto> GetSellerProfileByIdAsync(Guid sellerId);
+    Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId);
     Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto);
     Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination);
 }

@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+// [Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/system")]
 public class SystemController : ControllerBase

@@ -25,7 +25,7 @@ public class PersonalController : ControllerBase
     }
 
     /// <summary>
-    ///     Lấy thông tin Seller theo id.
+    ///     Lấy thông tin Seller theo userId hiện tại.
     /// </summary>
     [Authorize]
     [HttpGet("me/seller-profile")]
@@ -34,8 +34,8 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var sellerId = _claimsService.GetCurrentUserId;
-            var data = await _sellerService.GetSellerProfileByIdAsync(sellerId);
+            var userId = _claimsService.GetCurrentUserId;
+            var data = await _sellerService.GetSellerProfileByUserIdAsync(userId);
             return Ok(ApiResult<object>.Success(data, "200", "Lấy thông tin của Seller thành công."));
         }
         catch (Exception ex)
@@ -45,6 +45,7 @@ public class PersonalController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
+
 
     /// <summary>
     ///     Lấy thông tin user theo id.

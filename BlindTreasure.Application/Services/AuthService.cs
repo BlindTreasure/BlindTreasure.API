@@ -101,7 +101,7 @@ public class AuthService : IAuthService
             TaxId = dto.TaxId,
             CompanyAddress = dto.CompanyAddress,
             IsVerified = false,
-            Status = SellerStatus.WaitingReview
+            Status = SellerStatus.InfoEmpty
         };
 
         await _unitOfWork.Sellers.AddAsync(seller);

@@ -64,6 +64,7 @@ public class SellerService : ISellerService
         seller.CompanyName = dto.CompanyName;
         seller.TaxId = dto.TaxId;
         seller.CompanyAddress = dto.CompanyAddress;
+        seller.Status = SellerStatus.WaitingReview;
 
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
@@ -72,7 +73,6 @@ public class SellerService : ISellerService
 
         return ToSellerDto(seller);
     }
-
 
     public async Task<string> UploadSellerDocumentAsync(Guid userId, IFormFile file)
     {
@@ -102,33 +102,17 @@ public class SellerService : ISellerService
 
     public async Task<SellerProfileDto> GetSellerProfileByIdAsync(Guid sellerId)
     {
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.Id == sellerId, s => s.User);
+        var seller = await GetSellerWithUserAsync(sellerId);
+        return ToSellerProfileDto(seller);
+    }
+    
+    public async Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId)
+    {
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);
         if (seller == null)
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
 
-        var user = seller.User;
-        if (user == null)
-            throw ErrorHelper.Internal("Dữ liệu user không hợp lệ.");
-
-        return new SellerProfileDto
-        {
-            SellerId = seller.Id,
-            UserId = user.Id,
-            FullName = user.FullName,
-            Email = user.Email,
-            PhoneNumber = user.Phone ?? string.Empty,
-            DateOfBirth = user.DateOfBirth,
-            AvatarUrl = user.AvatarUrl,
-            Status = user.Status.ToString(),
-
-            CompanyName = seller.CompanyName,
-            TaxId = seller.TaxId,
-            CompanyAddress = seller.CompanyAddress,
-            CoaDocumentUrl = seller.CoaDocumentUrl,
-            SellerStatus = seller.Status.ToString(),
-            IsVerified = seller.IsVerified,
-            RejectReason = seller.RejectReason
-        };
+        return ToSellerProfileDto(seller);
     }
 
 
@@ -155,7 +139,7 @@ public class SellerService : ISellerService
     }
 
 
-//private method
+    //private method
     private static SellerDto ToSellerDto(Seller seller)
     {
         if (seller.User == null)
@@ -175,5 +159,45 @@ public class SellerService : ISellerService
             Status = seller.Status,
             IsVerified = seller.IsVerified
         };
+    }
+
+    private static SellerProfileDto ToSellerProfileDto(Seller seller)
+    {
+        if (seller.User == null)
+            throw ErrorHelper.Internal("Dữ liệu user không hợp lệ.");
+
+        var user = seller.User;
+
+        return new SellerProfileDto
+        {
+            SellerId = seller.Id,
+            UserId = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            PhoneNumber = user.Phone ?? string.Empty,
+            DateOfBirth = user.DateOfBirth,
+            AvatarUrl = user.AvatarUrl,
+            Status = user.Status.ToString(),
+
+            CompanyName = seller.CompanyName,
+            TaxId = seller.TaxId,
+            CompanyAddress = seller.CompanyAddress,
+            CoaDocumentUrl = seller.CoaDocumentUrl,
+            SellerStatus = seller.Status.ToString(),
+            IsVerified = seller.IsVerified,
+            RejectReason = seller.RejectReason
+        };
+    }
+
+    private async Task<Seller> GetSellerWithUserAsync(Guid sellerId)
+    {
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.Id == sellerId, s => s.User);
+        if (seller == null)
+            throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
+
+        if (seller.User == null)
+            throw ErrorHelper.Internal("Dữ liệu user không hợp lệ.");
+
+        return seller;
     }
 }
