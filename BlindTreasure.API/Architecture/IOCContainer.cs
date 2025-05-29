@@ -133,6 +133,7 @@ public static class IocContainer
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ILoggerService, LoggerService>();
+        services.AddScoped<IMapperService, MapperService>();
         services.AddScoped<ICurrentTime, CurrentTime>();
         services.AddScoped<IClaimsService, ClaimsService>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
