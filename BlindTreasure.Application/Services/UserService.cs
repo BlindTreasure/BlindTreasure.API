@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
@@ -44,7 +45,7 @@ public class UserService : IUserService
             throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
         }
 
-        return ToUserDto(user);
+        return UserMapper.ToUserDto(user);
     }
 
     public async Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto)
@@ -73,7 +74,7 @@ public class UserService : IUserService
         await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
         _logger.Success($"[UpdateProfileAsync] Profile updated for user {user.Email}");
-        return ToUserDto(user);
+        return UserMapper.ToUserDto(user);
     }
 
     public async Task<UpdateAvatarResultDto?> UploadAvatarAsync(Guid userId, IFormFile file)
@@ -175,7 +176,7 @@ public class UserService : IUserService
             .Take(param.PageSize)
             .ToListAsync();
 
-        var userDtos = users.Select(ToUserDto).ToList();
+        var userDtos = users.Select(UserMapper.ToUserDto).ToList();
         var result = new Pagination<UserDto>(userDtos, count, param.PageIndex, param.PageSize);
 
         return result;
@@ -211,7 +212,7 @@ public class UserService : IUserService
         await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
         _logger.Success($"[CreateUserAsync] User {user.Email} created by admin.");
-        return ToUserDto(user);
+        return UserMapper.ToUserDto(user);
     }
 
     public async Task<UserDto?> UpdateUserStatusAsync(Guid userId, UserStatus newStatus)
@@ -239,7 +240,7 @@ public class UserService : IUserService
         await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
         _logger.Success($"[UpdateUserStatusAsync] User {user.Email} status updated to {newStatus} by admin.");
-        return ToUserDto(user);
+        return UserMapper.ToUserDto(user);
     }
 
 
@@ -299,23 +300,4 @@ public class UserService : IUserService
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id);
     }
 
-    /// <summary>
-    ///     Maps User entity to UserDto.
-    /// </summary>
-    private static UserDto ToUserDto(User user)
-    {
-        return new UserDto
-        {
-            UserId = user.Id,
-            FullName = user.FullName,
-            Email = user.Email,
-            DateOfBirth = user.DateOfBirth,
-            AvatarUrl = user.AvatarUrl,
-            PhoneNumber = user.Phone,
-            Status = user.Status,
-            RoleName = user.RoleName,
-            Gender = user.Gender,
-            CreatedAt = user.CreatedAt
-        };
-    }
 }
