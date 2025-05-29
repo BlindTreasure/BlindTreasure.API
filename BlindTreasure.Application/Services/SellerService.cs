@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
@@ -71,7 +72,7 @@ public class SellerService : ISellerService
 
         _loggerService.Info($"[UpdateSellerInfoAsync] Seller {userId} đã cập nhật thông tin.");
 
-        return ToSellerDto(seller);
+        return SellerMapper.ToSellerDto(seller);
     }
 
     public async Task<string> UploadSellerDocumentAsync(Guid userId, IFormFile file)
@@ -103,7 +104,7 @@ public class SellerService : ISellerService
     public async Task<SellerProfileDto> GetSellerProfileByIdAsync(Guid sellerId)
     {
         var seller = await GetSellerWithUserAsync(sellerId);
-        return ToSellerProfileDto(seller);
+        return SellerMapper.ToSellerProfileDto(seller);
     }
     
     public async Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId)
@@ -112,7 +113,7 @@ public class SellerService : ISellerService
         if (seller == null)
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
 
-        return ToSellerProfileDto(seller);
+        return SellerMapper.ToSellerProfileDto(seller);
     }
 
 
@@ -133,61 +134,13 @@ public class SellerService : ISellerService
             .Take(pagination.PageSize)
             .ToListAsync();
 
-        var items = sellers.Select(ToSellerDto).ToList();
+        var items = sellers.Select(SellerMapper.ToSellerDto).ToList();
 
         return new Pagination<SellerDto>(items, totalCount, pagination.PageIndex, pagination.PageSize);
     }
 
 
     //private method
-    private static SellerDto ToSellerDto(Seller seller)
-    {
-        if (seller.User == null)
-            throw ErrorHelper.Internal("Dữ liệu user không hợp lệ.");
-
-        return new SellerDto
-        {
-            Id = seller.Id,
-            Email = seller.User.Email,
-            FullName = seller.User.FullName,
-            Phone = seller.User.Phone,
-            DateOfBirth = seller.User.DateOfBirth,
-            CompanyName = seller.CompanyName,
-            TaxId = seller.TaxId,
-            CompanyAddress = seller.CompanyAddress,
-            CoaDocumentUrl = seller.CoaDocumentUrl,
-            Status = seller.Status,
-            IsVerified = seller.IsVerified
-        };
-    }
-
-    private static SellerProfileDto ToSellerProfileDto(Seller seller)
-    {
-        if (seller.User == null)
-            throw ErrorHelper.Internal("Dữ liệu user không hợp lệ.");
-
-        var user = seller.User;
-
-        return new SellerProfileDto
-        {
-            SellerId = seller.Id,
-            UserId = user.Id,
-            FullName = user.FullName,
-            Email = user.Email,
-            PhoneNumber = user.Phone ?? string.Empty,
-            DateOfBirth = user.DateOfBirth,
-            AvatarUrl = user.AvatarUrl,
-            Status = user.Status.ToString(),
-
-            CompanyName = seller.CompanyName,
-            TaxId = seller.TaxId,
-            CompanyAddress = seller.CompanyAddress,
-            CoaDocumentUrl = seller.CoaDocumentUrl,
-            SellerStatus = seller.Status.ToString(),
-            IsVerified = seller.IsVerified,
-            RejectReason = seller.RejectReason
-        };
-    }
 
     private async Task<Seller> GetSellerWithUserAsync(Guid sellerId)
     {
