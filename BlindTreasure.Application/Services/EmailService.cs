@@ -95,7 +95,7 @@ public class EmailService : IEmailService
           <body style=""font-family:Arial,sans-serif;color:#252424;padding:20px;background-color:#ebeaea;"">
             <div style=""max-width:600px;margin:auto;background:#fff;border:1px solid #d02a2a;border-radius:6px;padding:20px;"">
               <h1 style=""color:#d02a2a;font-size:22px;"">Xác minh email thành công</h1>
-              <p>Chào {request.UserName},</p>
+              <p>Chào {request.To},</p>
               <p>Bạn đã xác minh email thành công. Vui lòng hoàn tất việc gửi COA (Certificate of Authenticity) vào hệ thống để hoàn tất quá trình trở thành Seller chính thức.</p>
               <p>Nếu có thắc mắc, vui lòng liên hệ đội ngũ hỗ trợ của BlindTreasure.</p>
               <p style=""margin-top:30px;"">Trân trọng,<br/>Đội ngũ BlindTreasure</p>

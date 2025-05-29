@@ -8,8 +8,8 @@ public class Seller : BaseEntity
 
     public bool IsVerified { get; set; }
     public string CoaDocumentUrl { get; set; }
-    public string CompanyName { get; set; }
-    public string TaxId { get; set; }
+    public string? CompanyName { get; set; }
+    public string? TaxId { get; set; }
     public string? CompanyAddress { get; set; }
 
     public string? RejectReason { get; set; }

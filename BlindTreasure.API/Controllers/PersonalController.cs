@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
+using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -13,12 +14,36 @@ namespace BlindTreasure.API.Controllers;
 public class PersonalController : ControllerBase
 {
     private readonly IClaimsService _claimsService;
+    private readonly ISellerService _sellerService;
     private readonly IUserService _userService;
 
-    public PersonalController(IClaimsService claimsService, IUserService userService)
+    public PersonalController(IClaimsService claimsService, IUserService userService, ISellerService sellerService)
     {
         _claimsService = claimsService;
         _userService = userService;
+        _sellerService = sellerService;
+    }
+
+    /// <summary>
+    ///     Lấy thông tin Seller theo id.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/seller-profile")]
+    [ProducesResponseType(typeof(ApiResult<object>), 200)]
+    public async Task<IActionResult> GetSellerDetails()
+    {
+        try
+        {
+            var sellerId = _claimsService.GetCurrentUserId;
+            var data = await _sellerService.GetSellerProfileByIdAsync(sellerId);
+            return Ok(ApiResult<object>.Success(data, "200", "Lấy thông tin của Seller thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<string>(ex);
+            return StatusCode(statusCode, error);
+        }
     }
 
     /// <summary>
@@ -69,6 +94,10 @@ public class PersonalController : ControllerBase
         }
     }
 
+
+    /// <summary>
+    ///     Customer cập nhật thông tin cá nhân.
+    /// </summary>
     [Authorize]
     [HttpPut("me/avatar")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
@@ -77,7 +106,7 @@ public class PersonalController : ControllerBase
     {
         var userId = _claimsService.GetCurrentUserId;
 
-        if (file == null || file.Length == 0)
+        if (file.Length == 0)
             return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
 
         var result = await _userService.UploadAvatarAsync(userId, file);
@@ -85,5 +114,28 @@ public class PersonalController : ControllerBase
             return BadRequest(ApiResult.Failure("400", "Không thể cập nhật avatar."));
 
         return Ok(ApiResult<UpdateAvatarResultDto>.Success(result, "200", "Cập nhật avatar thành công."));
+    }
+
+    /// <summary>
+    ///     Seller cập nhật thông tin cá nhân và doanh nghiệp của mình.
+    /// </summary>
+    [Authorize(Roles = "Seller")]
+    [HttpPut("me/seller-profile")]
+    [ProducesResponseType(typeof(ApiResult<object>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> UpdateSellerProfile([FromBody] UpdateSellerInfoDto dto)
+    {
+        try
+        {
+            var userId = _claimsService.GetCurrentUserId;
+            var result = await _sellerService.UpdateSellerInfoAsync(userId, dto);
+            return Ok(ApiResult<object>.Success(result, "200", "Cập nhật hồ sơ Seller thành công."));
+        }
+        catch (Exception ex)
+        {
+            var status = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(status, error);
+        }
     }
 }

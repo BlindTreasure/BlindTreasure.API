@@ -8,7 +8,7 @@ public class SellerRegistrationDto
     [DefaultValue("trangiaphuc362003181@gmail.com")]
     public required string Email { get; set; }
 
-    [JsonIgnore] public string? Password { get; set; } = "";
+    [DefaultValue("trangiaphuc362003181")] public required string Password { get; set; }
 
     [JsonIgnore] public string? FullName { get; set; } = "";
 

@@ -30,7 +30,7 @@ public class SellerController : ControllerBase
     ///     Staff xem list của Seller cung voi status
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Staff")]
+    // [Authorize(Roles = "Staff, Admin")]
     [ProducesResponseType(typeof(ApiResult<Pagination<SellerDto>>), 200)]
     public async Task<IActionResult> GetAllSellers([FromQuery] SellerStatus? status,
         [FromQuery] PaginationParameter paging)
@@ -56,17 +56,17 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    ///     Staff xem dc document cua seller
+    ///     Staff xem dc ho so cua seller Pending
     /// </summary>
     // [Authorize(Roles = "Admin,Staff")]
-    [HttpGet("{sellerId}/document")]
+    [HttpGet("{sellerId}")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     public async Task<IActionResult> GetSellerDocument(Guid sellerId)
     {
         try
         {
-            var fileUrl = await _sellerService.GetSellerDocumentUrlAsync(sellerId);
-            return Ok(ApiResult<string>.Success(fileUrl, "200", "Lấy tài liệu thành công."));
+            var data = await _sellerService.GetSellerProfileByIdAsync(sellerId);
+            return Ok(ApiResult<object>.Success(data, "200", "Lấy thông tin của Seller thành công."));
         }
         catch (Exception ex)
         {

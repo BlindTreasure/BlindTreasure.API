@@ -20,39 +20,33 @@ public class SellerVerificationService : ISellerVerificationService
 
     public async Task<bool> VerifySellerAsync(Guid sellerId, SellerVerificationDto dto)
     {
-        var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId);
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.Id == sellerId, s => s.User);
         if (seller == null)
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
 
+        if (seller.User == null)
+            throw ErrorHelper.Internal("Không tìm thấy thông tin người dùng của seller.");
+
         seller.IsVerified = dto.IsApproved;
         seller.Status = dto.IsApproved ? SellerStatus.Approved : SellerStatus.Rejected;
-
-        if (!dto.IsApproved)
-            seller.RejectReason = dto.RejectReason;
-        else
-            seller.RejectReason = null;
+        seller.RejectReason = !dto.IsApproved ? dto.RejectReason : null;
 
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
 
         // Gửi email chúc mừng nếu được duyệt
         if (dto.IsApproved)
-        {
             await _emailService.SendSellerApprovalSuccessAsync(new EmailRequestDto
             {
                 To = seller.User.Email,
                 UserName = seller.User.FullName
             });
-        }
-        else
-        {
-            if (dto.RejectReason != null)
-                await _emailService.SendSellerRejectionAsync(new EmailRequestDto
-                {
-                    To = seller.User.Email,
-                    UserName = seller.User.FullName
-                }, dto.RejectReason);
-        }
+        else if (!string.IsNullOrWhiteSpace(dto.RejectReason))
+            await _emailService.SendSellerRejectionAsync(new EmailRequestDto
+            {
+                To = seller.User.Email,
+                UserName = seller.User.FullName
+            }, dto.RejectReason);
 
         return true;
     }

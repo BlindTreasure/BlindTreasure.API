@@ -9,6 +9,7 @@ namespace BlindTreasure.Application.Interfaces;
 public interface ISellerService
 {
     Task<string> UploadSellerDocumentAsync(Guid userId, IFormFile file);
-    Task<string> GetSellerDocumentUrlAsync(Guid sellerId);
+    Task<SellerProfileDto> GetSellerProfileByIdAsync(Guid sellerId);
+    Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto);
     Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination);
 }

@@ -76,6 +76,7 @@ public class AuthService : IAuthService
             throw ErrorHelper.Conflict("Email đã được sử dụng.");
 
         var hashedPassword = new PasswordHasher().HashPassword(dto.Password);
+
         var user = new User
         {
             Email = dto.Email,
@@ -370,10 +371,10 @@ public class AuthService : IAuthService
 
 // ----------------- PRIVATE HELPER METHODS -----------------
 
-/// <summary>
-///     Checks if a user exists in cache or DB.
-/// </summary>
-private async Task<bool> UserExistsAsync(string email)
+    /// <summary>
+    ///     Checks if a user exists in cache or DB.
+    /// </summary>
+    private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
