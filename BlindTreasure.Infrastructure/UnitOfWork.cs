@@ -8,12 +8,14 @@ public class UnitOfWork(
     BlindTreasureDbContext dbContext,
     IGenericRepository<User> userRepository,
     IGenericRepository<OtpVerification> otpVerifications,
-    IGenericRepository<Seller> sellers)
+    IGenericRepository<Seller> sellers,
+    IGenericRepository<Category> categories)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
     public IGenericRepository<Seller> Sellers { get; } = sellers;
     public IGenericRepository<OtpVerification> OtpVerifications { get; } = otpVerifications;
+    public IGenericRepository<Category> Categories { get; } = categories;
 
     public void Dispose()
     {
