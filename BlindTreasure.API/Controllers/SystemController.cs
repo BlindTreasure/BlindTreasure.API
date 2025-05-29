@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+// [Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/system")]
 public class SystemController : ControllerBase
@@ -124,7 +124,7 @@ public class SystemController : ControllerBase
                 Password = passwordHasher.HashPassword(".."),
                 FullName = "Admin User",
                 Phone = "0900000004",
-                Status = UserStatus.Active,
+                Status = UserStatus.Active, //
                 RoleName = RoleType.Admin
             }
         };
