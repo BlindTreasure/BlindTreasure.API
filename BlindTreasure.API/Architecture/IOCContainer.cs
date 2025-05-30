@@ -140,6 +140,7 @@ public static class IocContainer
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<ISellerService, SellerService>();
         services.AddScoped<ISellerVerificationService, SellerVerificationService>();
+        services.AddScoped<ICategoryService, CategoryService>();
 
         //3rd party
         services.AddScoped<IGptService, GptService>();
