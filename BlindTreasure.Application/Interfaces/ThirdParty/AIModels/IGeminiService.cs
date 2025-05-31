@@ -2,5 +2,5 @@
 
 public interface IGeminiService
 {
-    
+    Task<string> GenerateResponseAsync(string prompt);
 }

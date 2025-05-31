@@ -11,7 +11,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.SetupIocContainer();
-builder.Configuration.AddEnvironmentVariables();
+builder.Configuration
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", true, true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
+    .AddEnvironmentVariables(); // Cái này luôn phải nằm cuối
+
 builder.Configuration.AddJsonFile("appsettings.json", true, true);
 
 builder.Services.AddCors(options =>
