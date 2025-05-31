@@ -78,11 +78,24 @@ public class SellerService : ISellerService
     public async Task<string> UploadSellerDocumentAsync(Guid userId, IFormFile file)
     {
         if (file == null || file.Length == 0)
+        {
+            _loggerService.Error($"[UploadSellerDocumentAsync] User {userId} upload thất bại: file không hợp lệ.");
             throw ErrorHelper.BadRequest("File không hợp lệ.");
+        }
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null)
+        {
+            _loggerService.Error($"[UploadSellerDocumentAsync] Không tìm thấy hồ sơ seller với UserId: {userId}");
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
+        }
+
+        if (seller.Status != SellerStatus.Rejected && seller.Status != SellerStatus.WaitingReview)
+        {
+            _loggerService.Error(
+                $"[UploadSellerDocumentAsync] Seller {userId} không thể upload ở trạng thái: {seller.Status}");
+            throw ErrorHelper.BadRequest("Chỉ seller bị từ chối hoặc chờ duyệt mới được phép nộp lại tài liệu.");
+        }
 
         var fileName = $"seller-documentation/{userId}-{Guid.NewGuid()}_{file.FileName}";
 
@@ -92,14 +105,16 @@ public class SellerService : ISellerService
         var fileUrl = await _blobService.GetFileUrlAsync(fileName);
 
         seller.CoaDocumentUrl = fileUrl;
+        seller.Status = SellerStatus.WaitingReview;
 
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
 
-        _loggerService.Info($"[UploadSellerDocumentAsync] Seller {userId} uploaded COA document: {fileName}");
+        _loggerService.Info($"[UploadSellerDocumentAsync] Seller {userId} re-submitted COA document: {fileName}");
 
         return fileUrl;
     }
+
 
     public async Task<SellerProfileDto> GetSellerProfileByIdAsync(Guid sellerId)
     {
