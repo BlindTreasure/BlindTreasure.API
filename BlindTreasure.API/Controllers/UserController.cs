@@ -82,7 +82,7 @@ public class UserController : ControllerBase
     [HttpPut("/{userId}/status")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
-    public async Task<IActionResult> UpdateUserStatus(Guid userId, [FromBody] UserStatus status)
+    public async Task<IActionResult> UpdateUserStatus(Guid userId, [FromForm] UserStatus status)
     {
         try
         {

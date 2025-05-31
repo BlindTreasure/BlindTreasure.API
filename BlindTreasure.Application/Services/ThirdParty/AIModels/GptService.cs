@@ -1,11 +1,11 @@
-﻿using BlindTreasure.Application.Interfaces.ThirdParty;
+﻿using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using Microsoft.Extensions.Configuration;
 using OpenAI;
 using OpenAI.Managers;
 using OpenAI.ObjectModels;
 using OpenAI.ObjectModels.RequestModels;
 
-namespace BlindTreasure.Application.Services.ThirdParty;
+namespace BlindTreasure.Application.Services.ThirdParty.AIModels;
 
 public class GptService : IGptService
 {

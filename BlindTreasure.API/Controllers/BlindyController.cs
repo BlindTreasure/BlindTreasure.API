@@ -1,4 +1,4 @@
-﻿using BlindTreasure.Application.Interfaces.ThirdParty;
+﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,19 +8,19 @@ namespace BlindTreasure.API.Controllers;
 [Route("api/blindy")]
 public class BlindyController : ControllerBase
 {
-    private readonly IGptService _gptService;
+    private readonly IBlindyService _blindyService;
 
-    public BlindyController(IGptService gptService)
+    public BlindyController(IBlindyService blindyService)
     {
-        _gptService = gptService;
+        _blindyService = blindyService;
     }
 
-    [HttpPost("ask")]
-    public async Task<IActionResult> Generate([FromBody] string prompt)
+    [HttpPost("ask-gemini")]
+    public async Task<IActionResult> AskGemini([FromBody] string prompt)
     {
         try
         {
-            var response = await _gptService.GenerateResponseAsync(prompt);
+            var response = await _blindyService.AskGeminiAsync(prompt);
             return Ok(ApiResult<string>.Success(response));
         }
         catch (Exception ex)

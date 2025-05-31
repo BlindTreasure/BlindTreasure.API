@@ -33,6 +33,8 @@ public class AuthService : IAuthService
         _emailService = emailService;
     }
 
+    #region Authen
+
     public async Task<UserDto?> RegisterCustomerAsync(UserRegistrationDto registrationDto)
     {
         _logger.Info($"[RegisterUserAsync] Start registration for {registrationDto.Email}");
@@ -225,6 +227,10 @@ public class AuthService : IAuthService
         };
     }
 
+    #endregion
+
+    #region Otp & Emails
+
     public async Task<bool> VerifyEmailOtpAsync(string email, string otp)
     {
         _logger.Info($"[VerifyEmailOtpAsync] Verifying OTP for {email}");
@@ -368,13 +374,14 @@ public class AuthService : IAuthService
         return true;
     }
 
+    #endregion
 
-// ----------------- PRIVATE HELPER METHODS -----------------
+    #region PRIVATE HELPER METHODS
 
-/// <summary>
-///     Checks if a user exists in cache or DB.
-/// </summary>
-private async Task<bool> UserExistsAsync(string email)
+    /// <summary>
+    ///     Checks if a user exists in cache or DB.
+    /// </summary>
+    private async Task<bool> UserExistsAsync(string email)
     {
         var cacheKey = $"user:{email}";
         var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
@@ -524,4 +531,6 @@ private async Task<bool> UserExistsAsync(string email)
             CreatedAt = user.CreatedAt
         };
     }
+
+    #endregion
 }
