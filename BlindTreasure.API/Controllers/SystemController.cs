@@ -24,7 +24,6 @@ public class SystemController : ControllerBase
         _cacheService = cacheService;
     }
 
-
     [HttpPost("seed-all-data")]
     public async Task<IActionResult> SeedData()
     {
@@ -54,89 +53,15 @@ public class SystemController : ControllerBase
 
     private async Task SeedRolesAndUsers()
     {
-        // Seed Roles
-        var roles = new List<Role>
-        {
-            new()
-            {
-                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Type = RoleType.Seller,
-                Description = "Người bán chính thức"
-            },
-            new()
-            {
-                Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), Type = RoleType.Customer,
-                Description = "Khách hàng"
-            },
-            new()
-            {
-                Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), Type = RoleType.Staff,
-                Description = "Nhân viên"
-            },
-            new()
-            {
-                Id = Guid.Parse("44444444-4444-4444-4444-444444444444"), Type = RoleType.Admin,
-                Description = "Quản trị hệ thống"
-            }
-        };
+        await SeedRoles();
 
-        _logger.Info("Seeding roles...");
-        await _context.Roles.AddRangeAsync(roles);
-        await _context.SaveChangesAsync();
-        _logger.Success("Roles seeded successfully.");
-
-        // Seed Users
-        var passwordHasher = new PasswordHasher();
-        var now = DateTime.UtcNow;
-        var defaultExpire = now.AddDays(1);
-
-        var users = new List<User>
-        {
-            new()
-            {
-                Email = "seller@gmail.com",
-                Password = passwordHasher.HashPassword("1@"),
-                FullName = "Seller User",
-                Phone = "0900000001",
-                Status = UserStatus.Active,
-                RoleName = RoleType.Seller,
-                CreatedAt = DateTime.UtcNow
-            },
-            new()
-            {
-                Email = "blindtreasurefpt@gmail.com",
-                Password = passwordHasher.HashPassword("1@"),
-                FullName = "Customer User",
-                Phone = "0900000002",
-                Status = UserStatus.Active,
-                RoleName = RoleType.Customer,
-                CreatedAt = DateTime.UtcNow
-            },
-            new()
-            {
-                Email = "staff@gmail.com",
-                Password = passwordHasher.HashPassword("1@"),
-                FullName = "Staff User",
-                Phone = "0900000003",
-                Status = UserStatus.Active,
-                RoleName = RoleType.Staff,
-                CreatedAt = DateTime.UtcNow
-            },
-            new()
-            {
-                Email = "admin@gmail.com",
-                Password = passwordHasher.HashPassword("1@"),
-                FullName = "Admin User",
-                Phone = "0900000004",
-                Status = UserStatus.Active, //
-                RoleName = RoleType.Admin,
-                CreatedAt = DateTime.UtcNow
-            }
-        };
-
-        _logger.Info("Seeding users...");
+        var users = GetPredefinedUsers();
         await _context.Users.AddRangeAsync(users);
         await _context.SaveChangesAsync();
-        _logger.Success("Users seeded successfully.");
+
+        await SeedSellerForUser("trangiaphuc362003181@gmail.com");
+
+        _logger.Success("Users and seller seeded successfully.");
     }
 
     private async Task SeedCategories()
@@ -169,49 +94,49 @@ public class SystemController : ControllerBase
         // Danh sách category con
         var children = new List<Category>
         {
-            new Category
+            new()
             {
                 Name = "PopMart",
                 Description = "Đồ chơi sưu tầm thương hiệu PopMart.",
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
             },
-            new Category
+            new()
             {
                 Name = "Smiski",
                 Description = "Đồ chơi sưu tầm nhân vật Smiski phát sáng.",
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
             },
-            new Category
+            new()
             {
                 Name = "Baby Three",
                 Description = "Mẫu đồ chơi sưu tầm dòng Baby Three.",
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
             },
-            new Category
+            new()
             {
                 Name = "Marvel",
                 Description = "Mô hình nhân vật vũ trụ Marvel.",
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
             },
-            new Category
+            new()
             {
                 Name = "Gundam",
                 Description = "Mô hình robot lắp ráp dòng Gundam.",
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
             },
-            new Category
+            new()
             {
                 Name = "Adidas",
                 Description = "Giày sneaker thương hiệu Adidas.",
                 ParentId = sneaker.Id,
                 CreatedAt = now
             },
-            new Category
+            new()
             {
                 Name = "Nike",
                 Description = "Giày sneaker thương hiệu Nike.",
@@ -221,7 +146,7 @@ public class SystemController : ControllerBase
         };
 
         // Thêm vào context
-        await _context.Categories.AddRangeAsync([collectibleToys, sneaker]);
+        await _context.Categories.AddRangeAsync(collectibleToys, sneaker);
         await _context.Categories.AddRangeAsync(children);
         await _context.SaveChangesAsync();
 
@@ -229,7 +154,6 @@ public class SystemController : ControllerBase
 
         _logger.Success("[SeedCategories] Seed danh mục thành công.");
     }
-
 
     private async Task ClearDatabase(BlindTreasureDbContext context)
     {
@@ -290,4 +214,120 @@ public class SystemController : ControllerBase
             }
         });
     }
+
+    #region private methods
+
+    private async Task SeedRoles()
+    {
+        var roles = new List<Role>
+        {
+            new()
+            {
+                Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                Type = RoleType.Seller,
+                Description = "Người bán chính thức"
+            },
+            new()
+            {
+                Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                Type = RoleType.Customer,
+                Description = "Khách hàng"
+            },
+            new()
+            {
+                Id = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+                Type = RoleType.Staff,
+                Description = "Nhân viên"
+            },
+            new()
+            {
+                Id = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+                Type = RoleType.Admin,
+                Description = "Quản trị hệ thống"
+            }
+        };
+
+        _logger.Info("Seeding roles...");
+        await _context.Roles.AddRangeAsync(roles);
+        await _context.SaveChangesAsync();
+        _logger.Success("Roles seeded successfully.");
+    }
+
+    private List<User> GetPredefinedUsers()
+    {
+        var passwordHasher = new PasswordHasher();
+        var now = DateTime.UtcNow;
+
+        return new List<User>
+        {
+            new()
+            {
+                Email = "blindtreasurefpt@gmail.com",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Customer User",
+                Phone = "0900000002",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Customer,
+                CreatedAt = now
+            },
+            new()
+            {
+                Email = "staff@gmail.com",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Staff User",
+                Phone = "0900000003",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Staff,
+                CreatedAt = now
+            },
+            new()
+            {
+                Email = "admin@gmail.com",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Admin User",
+                Phone = "0900000004",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Admin,
+                CreatedAt = now
+            },
+            new()
+            {
+                Email = "trangiaphuc362003181@gmail.com",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Seller User",
+                Phone = "0900000001",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Seller,
+                CreatedAt = now
+            }
+        };
+    }
+
+    private async Task SeedSellerForUser(string sellerEmail)
+    {
+        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == sellerEmail);
+        if (sellerUser == null)
+        {
+            _logger.Error($"Không tìm thấy user với email {sellerEmail} để tạo Seller.");
+            return;
+        }
+
+        var seller = new Seller
+        {
+            UserId = sellerUser.Id,
+            IsVerified = true,
+            CoaDocumentUrl = "https://example.com/coa.pdf",
+            CompanyName = "Blind Treasure Ltd.",
+            TaxId = "987654321",
+            CompanyAddress = "District 1, HCMC",
+            Status = SellerStatus.Approved,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _context.Sellers.AddAsync(seller);
+        await _context.SaveChangesAsync();
+        _logger.Info("Seller seeded successfully.");
+    }
+
+    #endregion
 }
