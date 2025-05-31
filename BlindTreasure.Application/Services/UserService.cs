@@ -127,60 +127,67 @@ public class UserService : IUserService
     {
         _logger.Info($"[GetAllUsersAsync] Admin requests user list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
-        // Validate input
         if (param.PageIndex <= 0 || param.PageSize <= 0)
             throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
 
-        var query = _unitOfWork.Users.GetQueryable().Where(u => !u.IsDeleted)
+        var cacheKey =
+            $"user:list:search={param.Search}-status={param.Status}-role={param.RoleName}-sort={param.SortBy}-desc={param.Desc}-page={param.PageIndex}-size={param.PageSize}";
+        var cachedResult = await _cacheService.GetAsync<Pagination<UserDto>>(cacheKey);
+        if (cachedResult != null)
+        {
+            _logger.Info($"[GetAllUsersAsync] Trả kết quả từ cache: {cacheKey}");
+            return cachedResult;
+        }
+
+        var query = _unitOfWork.Users.GetQueryable()
+            .Where(u => !u.IsDeleted)
             .AsNoTracking();
 
-
-        // Filter
+        // Search filter
         if (!string.IsNullOrWhiteSpace(param.Search))
-            query = query.Where(u => u.FullName.Contains(param.Search) || u.Email.Contains(param.Search));
-        if (!string.IsNullOrWhiteSpace(param.Email))
-            query = query.Where(u => u.Email.Contains(param.Email));
-        if (!string.IsNullOrWhiteSpace(param.FullName))
-            query = query.Where(u => u.FullName.Contains(param.FullName));
+        {
+            var keyword = param.Search.Trim().ToLower();
+            query = query.Where(u =>
+                (!string.IsNullOrEmpty(u.FullName) && u.FullName.ToLower().Contains(keyword)) ||
+                (!string.IsNullOrEmpty(u.Email) && u.Email.ToLower().Contains(keyword)));
+        }
+
         if (param.Status.HasValue)
             query = query.Where(u => u.Status == param.Status.Value);
+
         if (param.RoleName.HasValue)
             query = query.Where(u => u.RoleName == param.RoleName.Value);
 
         // Sort
-        if (!string.IsNullOrWhiteSpace(param.SortBy))
-            switch (param.SortBy.ToLower())
-            {
-                case "email":
-                    query = param.Desc ? query.OrderByDescending(u => u.Email) : query.OrderBy(u => u.Email);
-                    break;
-                case "fullname":
-                    query = param.Desc ? query.OrderByDescending(u => u.FullName) : query.OrderBy(u => u.FullName);
-                    break;
-                case "createdAt":
-                default:
-                    query = param.Desc ? query.OrderByDescending(u => u.CreatedAt) : query.OrderBy(u => u.CreatedAt);
-                    break;
-            }
-        else
-            query = query.OrderByDescending(u => u.CreatedAt);
+        query = param.SortBy switch
+        {
+            UserSortField.Email => param.Desc ? query.OrderByDescending(u => u.Email) : query.OrderBy(u => u.Email),
+            UserSortField.FullName => param.Desc
+                ? query.OrderByDescending(u => u.FullName)
+                : query.OrderBy(u => u.FullName),
+            _ => param.Desc ? query.OrderByDescending(u => u.CreatedAt) : query.OrderBy(u => u.CreatedAt)
+        };
 
-        var count = await query.CountAsync();
+        var total = await query.CountAsync();
 
-        if (count == 0)
+        if (total == 0)
             throw ErrorHelper.NotFound("Không tìm thấy người dùng nào.");
 
         var users = await query
-            .OrderByDescending(u => u.CreatedAt)
             .Skip((param.PageIndex - 1) * param.PageSize)
             .Take(param.PageSize)
             .ToListAsync();
 
         var userDtos = users.Select(UserMapper.ToUserDto).ToList();
-        var result = new Pagination<UserDto>(userDtos, count, param.PageIndex, param.PageSize);
+        var result = new Pagination<UserDto>(userDtos, total, param.PageIndex, param.PageSize);
 
+        // Cache trong 5 phút
+        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(5));
+
+        _logger.Info($"[GetAllUsersAsync] Đã lưu cache: {cacheKey}");
         return result;
     }
+
 
     public async Task<UserDto?> CreateUserAsync(UserCreateDto dto)
     {
