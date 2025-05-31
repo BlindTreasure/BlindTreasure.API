@@ -26,7 +26,7 @@ public static class SellerMapper
             IsVerified = seller.IsVerified
         };
     }
-    
+
     public static SellerProfileDto ToSellerProfileDto(Seller seller)
     {
         if (seller.User == null)

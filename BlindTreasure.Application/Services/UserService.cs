@@ -299,5 +299,4 @@ public class UserService : IUserService
 
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id);
     }
-
 }

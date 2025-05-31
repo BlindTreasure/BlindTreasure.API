@@ -4,7 +4,6 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 

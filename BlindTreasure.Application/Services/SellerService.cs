@@ -106,7 +106,7 @@ public class SellerService : ISellerService
         var seller = await GetSellerWithUserAsync(sellerId);
         return SellerMapper.ToSellerProfileDto(seller);
     }
-    
+
     public async Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId)
     {
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);

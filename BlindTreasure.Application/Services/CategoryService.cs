@@ -14,10 +14,11 @@ namespace BlindTreasure.Application.Services;
 public class CategoryService : ICategoryService
 {
     private readonly ICacheService _cacheService;
+    private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IClaimsService _claimsService;
     private readonly IUserService _userService;
+
     public CategoryService(
         IUnitOfWork unitOfWork,
         ILoggerService logger,
@@ -59,7 +60,8 @@ public class CategoryService : ICategoryService
 
     public async Task<Pagination<CategoryDto>> GetAllAsync(PaginationParameter param)
     {
-        _logger.Info($"[GetAllAsync] Admin/Staff requests category list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        _logger.Info(
+            $"[GetAllAsync] Admin/Staff requests category list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         if (param.PageIndex <= 0 || param.PageSize <= 0)
             throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
@@ -96,7 +98,7 @@ public class CategoryService : ICategoryService
     {
         var userId = _claimsService.GetCurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
-        if (user == null || user.RoleName!= RoleType.Admin && user.RoleName != RoleType.Staff)
+        if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
             throw ErrorHelper.Forbidden("Bạn không có quyền tạo danh mục.");
         _logger.Info($"[CreateAsync] Admin/Staff creates category {dto.Name} by {user.FullName}");
 
@@ -111,10 +113,8 @@ public class CategoryService : ICategoryService
 
         // Validate ParentId nếu có
         if (dto.ParentId.HasValue)
-        {
             if (!await _unitOfWork.Categories.GetQueryable().AnyAsync(c => c.Id == dto.ParentId.Value))
                 throw ErrorHelper.BadRequest("ParentId không hợp lệ.");
-        }
 
         var category = new Category
         {
@@ -135,7 +135,7 @@ public class CategoryService : ICategoryService
     {
         var userId = _claimsService.GetCurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
-        if (user == null || user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff)
+        if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
             throw ErrorHelper.Forbidden("Bạn không có quyền update danh mục.");
         _logger.Info($"[UpdateAsync] Admin/Staff updates category {dto.Name} by {user.FullName}");
 
@@ -202,9 +202,7 @@ public class CategoryService : ICategoryService
         // Không xóa nếu còn sản phẩm hoặc category con
         if ((category.Products != null && category.Products.Any()) ||
             (category.Children != null && category.Children.Any()))
-        {
             throw ErrorHelper.Conflict("Không thể xóa category khi còn sản phẩm hoặc category con liên quan.");
-        }
 
         await _unitOfWork.Categories.SoftRemove(category);
         await _unitOfWork.SaveChangesAsync();
@@ -232,7 +230,7 @@ public class CategoryService : ICategoryService
 
 
     /// <summary>
-    /// Kiểm tra xem parentId có nằm trong cây con của categoryId không (để tránh vòng lặp).
+    ///     Kiểm tra xem parentId có nằm trong cây con của categoryId không (để tránh vòng lặp).
     /// </summary>
     private async Task<bool> IsDescendantAsync(Guid categoryId, Guid parentId)
     {
@@ -243,6 +241,7 @@ public class CategoryService : ICategoryService
             if (current.ParentId == categoryId) return true;
             current = await _unitOfWork.Categories.GetByIdAsync(current.ParentId.Value);
         }
+
         return false;
     }
 }
