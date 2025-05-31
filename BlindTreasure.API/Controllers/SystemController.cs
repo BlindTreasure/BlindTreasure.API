@@ -4,13 +4,11 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.API.Controllers;
 
-// [Authorize(Roles = "Admin")]
 [ApiController]
 [Route("api/system")]
 public class SystemController : ControllerBase
@@ -26,6 +24,7 @@ public class SystemController : ControllerBase
         _cacheService = cacheService;
     }
 
+
     [HttpPost("seed-all-data")]
     public async Task<IActionResult> SeedData()
     {
@@ -35,6 +34,7 @@ public class SystemController : ControllerBase
 
             // Seed data
             await SeedRolesAndUsers();
+            await SeedCategories();
             return Ok(ApiResult<object>.Success(new
             {
                 Message = "Data seeded successfully."
@@ -98,16 +98,18 @@ public class SystemController : ControllerBase
                 FullName = "Seller User",
                 Phone = "0900000001",
                 Status = UserStatus.Active,
-                RoleName = RoleType.Seller
+                RoleName = RoleType.Seller,
+                CreatedAt = DateTime.UtcNow
             },
             new()
             {
-                Email = "a@gmail.com",
+                Email = "blindtreasurefpt@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
                 FullName = "Customer User",
                 Phone = "0900000002",
                 Status = UserStatus.Active,
-                RoleName = RoleType.Customer
+                RoleName = RoleType.Customer,
+                CreatedAt = DateTime.UtcNow
             },
             new()
             {
@@ -116,16 +118,18 @@ public class SystemController : ControllerBase
                 FullName = "Staff User",
                 Phone = "0900000003",
                 Status = UserStatus.Active,
-                RoleName = RoleType.Staff
+                RoleName = RoleType.Staff,
+                CreatedAt = DateTime.UtcNow
             },
             new()
             {
                 Email = "admin@gmail.com",
-                Password = passwordHasher.HashPassword(".."),
+                Password = passwordHasher.HashPassword("1@"),
                 FullName = "Admin User",
                 Phone = "0900000004",
                 Status = UserStatus.Active, //
-                RoleName = RoleType.Admin
+                RoleName = RoleType.Admin,
+                CreatedAt = DateTime.UtcNow
             }
         };
 
@@ -133,6 +137,97 @@ public class SystemController : ControllerBase
         await _context.Users.AddRangeAsync(users);
         await _context.SaveChangesAsync();
         _logger.Success("Users seeded successfully.");
+    }
+
+    private async Task SeedCategories()
+    {
+        if (_context.Categories.Any())
+        {
+            _logger.Info("[SeedCategories] Đã tồn tại danh mục. Bỏ qua seed.");
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+
+        // Danh sách category cha
+        var collectibleToys = new Category
+        {
+            Id = Guid.NewGuid(),
+            Name = "Collectible Toys",
+            Description = "Danh mục đồ chơi sưu tầm, thiết kế đặc biệt và giới hạn.",
+            CreatedAt = now
+        };
+
+        var sneaker = new Category
+        {
+            Id = Guid.NewGuid(),
+            Name = "Sneaker",
+            Description = "Danh mục giày sneaker thời trang.",
+            CreatedAt = now
+        };
+
+        // Danh sách category con
+        var children = new List<Category>
+        {
+            new Category
+            {
+                Name = "PopMart",
+                Description = "Đồ chơi sưu tầm thương hiệu PopMart.",
+                ParentId = collectibleToys.Id,
+                CreatedAt = now
+            },
+            new Category
+            {
+                Name = "Smiski",
+                Description = "Đồ chơi sưu tầm nhân vật Smiski phát sáng.",
+                ParentId = collectibleToys.Id,
+                CreatedAt = now
+            },
+            new Category
+            {
+                Name = "Baby Three",
+                Description = "Mẫu đồ chơi sưu tầm dòng Baby Three.",
+                ParentId = collectibleToys.Id,
+                CreatedAt = now
+            },
+            new Category
+            {
+                Name = "Marvel",
+                Description = "Mô hình nhân vật vũ trụ Marvel.",
+                ParentId = collectibleToys.Id,
+                CreatedAt = now
+            },
+            new Category
+            {
+                Name = "Gundam",
+                Description = "Mô hình robot lắp ráp dòng Gundam.",
+                ParentId = collectibleToys.Id,
+                CreatedAt = now
+            },
+            new Category
+            {
+                Name = "Adidas",
+                Description = "Giày sneaker thương hiệu Adidas.",
+                ParentId = sneaker.Id,
+                CreatedAt = now
+            },
+            new Category
+            {
+                Name = "Nike",
+                Description = "Giày sneaker thương hiệu Nike.",
+                ParentId = sneaker.Id,
+                CreatedAt = now
+            }
+        };
+
+        // Thêm vào context
+        await _context.Categories.AddRangeAsync([collectibleToys, sneaker]);
+        await _context.Categories.AddRangeAsync(children);
+        await _context.SaveChangesAsync();
+
+        await _cacheService.RemoveByPatternAsync("category:all");
+
+        _logger.Success("[SeedCategories] Seed danh mục thành công.");
     }
 
 
