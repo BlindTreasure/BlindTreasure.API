@@ -5,7 +5,9 @@
 
 # dotenv files
 .env
+# Local appsettings (nơi có thể chứa API key)
 appsettings.Development.json
+
 # User-specific files
 *.rsuser
 *.suo

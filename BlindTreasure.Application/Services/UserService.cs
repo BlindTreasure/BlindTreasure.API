@@ -130,20 +130,11 @@ public class UserService : IUserService
         if (param.PageIndex <= 0 || param.PageSize <= 0)
             throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
 
-        var cacheKey =
-            $"user:list:search={param.Search}-status={param.Status}-role={param.RoleName}-sort={param.SortBy}-desc={param.Desc}-page={param.PageIndex}-size={param.PageSize}";
-        var cachedResult = await _cacheService.GetAsync<Pagination<UserDto>>(cacheKey);
-        if (cachedResult != null)
-        {
-            _logger.Info($"[GetAllUsersAsync] Trả kết quả từ cache: {cacheKey}");
-            return cachedResult;
-        }
-
         var query = _unitOfWork.Users.GetQueryable()
             .Where(u => !u.IsDeleted)
             .AsNoTracking();
 
-        // Search filter
+        // Search by FullName or Email
         if (!string.IsNullOrWhiteSpace(param.Search))
         {
             var keyword = param.Search.Trim().ToLower();
@@ -158,7 +149,7 @@ public class UserService : IUserService
         if (param.RoleName.HasValue)
             query = query.Where(u => u.RoleName == param.RoleName.Value);
 
-        // Sort
+        // Apply sorting based on enum
         query = param.SortBy switch
         {
             UserSortField.Email => param.Desc ? query.OrderByDescending(u => u.Email) : query.OrderBy(u => u.Email),
@@ -179,13 +170,8 @@ public class UserService : IUserService
             .ToListAsync();
 
         var userDtos = users.Select(UserMapper.ToUserDto).ToList();
-        var result = new Pagination<UserDto>(userDtos, total, param.PageIndex, param.PageSize);
 
-        // Cache trong 5 phút
-        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(5));
-
-        _logger.Info($"[GetAllUsersAsync] Đã lưu cache: {cacheKey}");
-        return result;
+        return new Pagination<UserDto>(userDtos, total, param.PageIndex, param.PageSize);
     }
 
 

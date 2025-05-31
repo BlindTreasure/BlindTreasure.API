@@ -1,4 +1,4 @@
-﻿namespace BlindTreasure.Application.Interfaces.ThirdParty;
+﻿namespace BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 
 public interface IGeminiService
 {

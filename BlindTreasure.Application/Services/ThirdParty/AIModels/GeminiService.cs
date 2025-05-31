@@ -1,6 +1,9 @@
-﻿HEADERnamespace a;
+﻿
+using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 
-public class GeminiService
+namespace BlindTreasure.Application.Services.ThirdParty.AIModels;
+
+public class GeminiService  : IGeminiService
 {
     
 }

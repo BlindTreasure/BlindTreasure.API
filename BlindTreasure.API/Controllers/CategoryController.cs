@@ -3,13 +3,11 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CategoryDtos;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Infrastructure.Commons;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
 
-/// <summary>
-///     Quản lý danh mục sản phẩm. Chỉ Admin/Staff có quyền thao tác.
-/// </summary>
 [ApiController]
 [Route("api/categories")]
 // [Authorize(Roles = "Admin,Staff")]
@@ -25,9 +23,6 @@ public class CategoryController : ControllerBase
     /// <summary>
     ///     Lấy danh sách danh mục (có phân trang).
     /// </summary>
-    /// <remarks>
-    ///     Chỉ Admin/Staff được phép truy cập.
-    /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResult<Pagination<CategoryDto>>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 404)]
@@ -78,6 +73,7 @@ public class CategoryController : ControllerBase
     ///     Tạo mới một danh mục sản phẩm.
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 409)]
@@ -100,6 +96,7 @@ public class CategoryController : ControllerBase
     ///     Cập nhật thông tin một danh mục.
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 404)]
@@ -123,6 +120,7 @@ public class CategoryController : ControllerBase
     ///     Xóa một danh mục sản phẩm.
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 404)]

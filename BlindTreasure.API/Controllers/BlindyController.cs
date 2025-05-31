@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Application.Interfaces.ThirdParty;
+using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using BlindTreasure.Application.Utils;
 using Microsoft.AspNetCore.Mvc;
 
