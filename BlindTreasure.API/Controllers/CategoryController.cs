@@ -3,7 +3,6 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CategoryDtos;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Infrastructure.Commons;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
@@ -13,7 +12,7 @@ namespace BlindTreasure.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/categories")]
-[Authorize(Roles = "Admin,Staff")]
+// [Authorize(Roles = "Admin,Staff")]
 public class CategoryController : ControllerBase
 {
     private readonly ICategoryService _categoryService;
@@ -29,8 +28,6 @@ public class CategoryController : ControllerBase
     /// <remarks>
     ///     Chỉ Admin/Staff được phép truy cập.
     /// </remarks>
-    /// <param name="param">Thông tin phân trang</param>
-    /// <returns>Danh sách category</returns>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResult<Pagination<CategoryDto>>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 404)]
@@ -59,8 +56,6 @@ public class CategoryController : ControllerBase
     /// <summary>
     ///     Lấy thông tin chi tiết một danh mục theo Id.
     /// </summary>
-    /// <param name="id">Id của category</param>
-    /// <returns>Thông tin category</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 404)]
@@ -82,11 +77,6 @@ public class CategoryController : ControllerBase
     /// <summary>
     ///     Tạo mới một danh mục sản phẩm.
     /// </summary>
-    /// <remarks>
-    ///     Tên danh mục phải duy nhất. ParentId có thể null (danh mục gốc).
-    /// </remarks>
-    /// <param name="dto">Thông tin tạo mới</param>
-    /// <returns>Category vừa tạo</returns>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]
@@ -109,12 +99,6 @@ public class CategoryController : ControllerBase
     /// <summary>
     ///     Cập nhật thông tin một danh mục.
     /// </summary>
-    /// <remarks>
-    ///     Không được tạo vòng lặp khi cập nhật ParentId. Tên phải duy nhất.
-    /// </remarks>
-    /// <param name="id">Id của category</param>
-    /// <param name="dto">Thông tin cập nhật</param>
-    /// <returns>Category đã cập nhật</returns>
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]
@@ -138,11 +122,6 @@ public class CategoryController : ControllerBase
     /// <summary>
     ///     Xóa một danh mục sản phẩm.
     /// </summary>
-    /// <remarks>
-    ///     Không được xóa nếu còn sản phẩm hoặc category con liên quan.
-    /// </remarks>
-    /// <param name="id">Id của category</param>
-    /// <returns>CategoryDto với trạng thái isDeleted đã cập nhật</returns>
     [HttpDelete("{id}")]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]

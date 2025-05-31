@@ -137,38 +137,38 @@ public class CategoryService : ICategoryService
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
             throw ErrorHelper.Forbidden("Bạn không có quyền update danh mục.");
-        _logger.Info($"[UpdateAsync] Admin/Staff updates category {dto.Name} by {user.FullName}");
+        _logger.Info($"[UpdateAsync] Admin/Staff updates category {dto.Name ?? "(no name change)"} by {user.FullName}");
 
         var category = await _unitOfWork.Categories.GetQueryable()
             .Include(c => c.Children)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (category == null)
-        {
-            _logger.Warn($"[UpdateAsync] Category {id} not found.");
             throw ErrorHelper.NotFound("Không tìm thấy category.");
+
+        if (!string.IsNullOrWhiteSpace(dto.Name))
+        {
+            var exists = await _unitOfWork.Categories.GetQueryable()
+                .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower() && c.Id != id);
+            if (exists)
+                throw ErrorHelper.Conflict("Tên danh mục đã tồn tại trong hệ thống.");
+
+            category.Name = dto.Name.Trim();
         }
 
-        // Validate tên duy nhất (trừ chính nó)
-        var exists = await _unitOfWork.Categories.GetQueryable()
-            .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower() && c.Id != id);
-        if (exists)
-            throw ErrorHelper.Conflict("Tên danh mục đã tồn tại trong hệ thống.");
+        if (!string.IsNullOrWhiteSpace(dto.Description)) category.Description = dto.Description.Trim();
 
-        // Validate ParentId không trùng chính nó và không nằm trong cây con
+        // Validate ParentId nếu có
         if (dto.ParentId.HasValue)
         {
             if (dto.ParentId.Value == id)
                 throw ErrorHelper.BadRequest("ParentId không được trùng với chính nó.");
 
-            // Kiểm tra vòng lặp: ParentId không nằm trong cây con của chính nó
             if (await IsDescendantAsync(id, dto.ParentId.Value))
                 throw ErrorHelper.BadRequest("Không được tạo vòng lặp phân cấp category.");
-        }
 
-        category.Name = dto.Name.Trim();
-        category.Description = dto.Description.Trim();
-        category.ParentId = dto.ParentId;
+            category.ParentId = dto.ParentId;
+        }
 
         await _unitOfWork.Categories.Update(category);
         await _unitOfWork.SaveChangesAsync();
@@ -178,6 +178,7 @@ public class CategoryService : ICategoryService
         _logger.Success($"[UpdateAsync] Category {id} updated.");
         return ToCategoryDto(category);
     }
+
 
     public async Task<CategoryDto> DeleteAsync(Guid id)
     {
