@@ -76,10 +76,15 @@ public class ProductService : IProductService
     {
         var userId = _claimsService.GetCurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
-        if (seller == null || !seller.IsVerified)
-            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
-        _logger.Info($"[GetAllAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        if (userId != Guid.Empty || seller != null)
+        {
+            if (seller == null || !seller.IsVerified)
+                throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+
+            _logger.Info($"[GetAllAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        }
+     
 
         if (param.PageIndex <= 0 || param.PageSize <= 0)
             throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
