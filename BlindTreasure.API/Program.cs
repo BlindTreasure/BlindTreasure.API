@@ -3,6 +3,7 @@ using BlindTreasure.API.Architecture;
 using BlindTreasure.API.ChatHub;
 using Microsoft.AspNetCore.Diagnostics;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using SwaggerThemes;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -37,6 +38,7 @@ builder.Services.AddControllers()
     {
         options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
         options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
+        options.SerializerSettings.Converters.Add(new StringEnumConverter());
     });
 
 
