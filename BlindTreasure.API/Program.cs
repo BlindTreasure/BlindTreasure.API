@@ -46,7 +46,7 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.SetupRedisService(builder.Configuration);
-    
+
 var app = builder.Build();
 
 app.UseCors("AllowAll");
@@ -102,7 +102,9 @@ app.UseExceptionHandler(errorApp =>
 
 app.UseRouting();
 app.MapControllers();
-app.MapHub<CustomerChatHub>("/hubs/customer-chat");
+app.MapHub<UserChatHub>("/hubs/user-chat");
+app.MapHub<SellerChatHub>("/hubs/seller-chat");
+app.MapHub<StaffChatHub>("/hubs/staff-chat");
 
 app.UseAuthentication();
 app.UseAuthorization();

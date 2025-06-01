@@ -199,8 +199,8 @@ public class ProductService : IProductService
         return _mapper.Map<Product, ProductDto>(product);
     }
 
-    // ----------------- PRIVATE HELPER METHODS -----------------
 
+    #region PRIVATE HELPER METHODS
     private async Task<Guid> GetSellerIdByUserId(Guid userId)
     {
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
@@ -240,4 +240,5 @@ public class ProductService : IProductService
         if (!categoryExists)
             throw ErrorHelper.BadRequest("Danh mục sản phẩm không hợp lệ.");
     }
+    #endregion
 }
