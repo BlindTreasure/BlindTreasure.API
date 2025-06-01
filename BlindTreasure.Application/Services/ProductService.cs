@@ -137,6 +137,7 @@ public class ProductService : IProductService
         await ValidateProductDto(dto);
 
         var product = _mapper.Map<ProductCreateDto, Product>(dto);
+        product.ImageUrl = "";
         product.SellerId = seller.Id;
         product.CreatedAt = DateTime.UtcNow;
         product.CreatedBy = userId;
