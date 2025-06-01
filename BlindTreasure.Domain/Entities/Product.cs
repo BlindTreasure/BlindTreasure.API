@@ -20,6 +20,7 @@ public class Product : BaseEntity
     public string ImageUrl { get; set; }
     public string Status { get; set; }
 
+    //new 
     public decimal? Height { get; set; } // cm 
     public string? Material { get; set; }
     public ProductSaleType? ProductType { get; set; }

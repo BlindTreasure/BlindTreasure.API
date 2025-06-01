@@ -94,7 +94,7 @@ public class BlindTreasureDbContext : DbContext
                 .HasConversion<string>() // enum -> string
                 .HasMaxLength(32); // giới hạn độ dài nếu cần
         });
-        
+
         modelBuilder.Entity<Product>()
             .Property(p => p.ProductType)
             .HasConversion<string>()

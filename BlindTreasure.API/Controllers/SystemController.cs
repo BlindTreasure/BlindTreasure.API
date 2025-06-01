@@ -268,7 +268,7 @@ public class SystemController : ControllerBase
                 Phone = "0900000002",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Customer,
-                CreatedAt = now
+                CreatedAt = now,
             },
             new()
             {

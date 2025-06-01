@@ -201,6 +201,7 @@ public class ProductService : IProductService
 
 
     #region PRIVATE HELPER METHODS
+
     private async Task<Guid> GetSellerIdByUserId(Guid userId)
     {
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
@@ -240,5 +241,6 @@ public class ProductService : IProductService
         if (!categoryExists)
             throw ErrorHelper.BadRequest("Danh mục sản phẩm không hợp lệ.");
     }
+
     #endregion
 }

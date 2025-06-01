@@ -17,7 +17,7 @@ public class BlindyService : IBlindyService
 
 
     /// <summary>
-    /// HÀM NÀY ĐỂ STAFF GỌI CHO AI PHÂN TÍCH HỆ THỐNG
+    ///     HÀM NÀY ĐỂ STAFF GỌI CHO AI PHÂN TÍCH HỆ THỐNG
     /// </summary>
     public async Task<string> AnalyzeUsersWithAi()
     {

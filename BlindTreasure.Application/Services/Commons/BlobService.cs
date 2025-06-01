@@ -4,7 +4,7 @@ using Minio;
 using Minio.DataModel.Args;
 using Minio.Exceptions;
 
-namespace BlindTreasure.Application.Services;
+namespace BlindTreasure.Application.Services.Commons;
 
 public class BlobService : IBlobService
 {

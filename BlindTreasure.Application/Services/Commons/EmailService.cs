@@ -3,7 +3,7 @@ using BlindTreasure.Domain.DTOs.EmailDTOs;
 using Microsoft.Extensions.Configuration;
 using Resend;
 
-namespace BlindTreasure.Application.Services;
+namespace BlindTreasure.Application.Services.Commons;
 
 /// <summary>
 ///     primary color for email templates:

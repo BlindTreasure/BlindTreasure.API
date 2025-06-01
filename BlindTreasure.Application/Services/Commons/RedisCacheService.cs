@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 using StackExchange.Redis;
 using JsonException = System.Text.Json.JsonException;
 
-namespace BlindTreasure.Application.Services;
+namespace BlindTreasure.Application.Services.Commons;
 
 public class RedisCacheService : ICacheService
 {
