@@ -149,6 +149,7 @@ public static class IocContainer
         services.AddScoped<IBlobService, BlobService>();
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IBlindyService, BlindyService>();
+        services.AddSignalR().AddJsonProtocol();
 
 
         services.AddHttpContextAccessor();
