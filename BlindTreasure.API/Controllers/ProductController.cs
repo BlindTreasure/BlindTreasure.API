@@ -25,7 +25,7 @@ public class ProductController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(ApiResult<Pagination<ProductDto>>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 404)]
-    public async Task<IActionResult> GetAll([FromQuery] PaginationParameter param)
+    public async Task<IActionResult> GetAll([FromQuery] ProductQueryParameter param)
     {
         try
         {
@@ -75,11 +75,11 @@ public class ProductController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
-    public async Task<IActionResult> Create([FromBody] ProductCreateDto dto)
+    public async Task<IActionResult> Create([FromForm] ProductCreateDto dto, IFormFile productImageUrl)
     {
         try
         {
-            var result = await _productService.CreateAsync(dto);
+            var result = await _productService.CreateAsync(dto, productImageUrl);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Tạo sản phẩm thành công."));
         }
         catch (Exception ex)
@@ -129,6 +129,33 @@ public class ProductController : ControllerBase
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<ProductDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+    /// <summary>
+    /// Cập nhật ảnh sản phẩm.
+    /// </summary>
+    [HttpPut("{id}/image")]
+    [ProducesResponseType(typeof(ApiResult<string>), 200)]
+    [ProducesResponseType(typeof(ApiResult<string>), 400)]
+    [ProducesResponseType(typeof(ApiResult<string>), 404)]
+    public async Task<IActionResult> UpdateProductImage(Guid id, IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
+
+        try
+        {
+            var imageUrl = await _productService.UploadProductImageAsync(id, file);
+            if (string.IsNullOrEmpty(imageUrl))
+                return BadRequest(ApiResult.Failure("400", "Không thể cập nhật ảnh sản phẩm."));
+
+            return Ok(ApiResult<string>.Success(imageUrl, "200", "Cập nhật ảnh sản phẩm thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<string>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }

@@ -26,7 +26,7 @@ public class CategoryController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(ApiResult<Pagination<CategoryDto>>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 404)]
-    public async Task<IActionResult> GetAll([FromQuery] PaginationParameter param)
+    public async Task<IActionResult> GetAll([FromQuery] CategoryQueryParameter param)
     {
         try
         {

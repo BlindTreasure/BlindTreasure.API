@@ -1,0 +1,32 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BlindTreasure.Domain.DTOs.Pagination
+{
+    public class CategoryQueryParameter : PaginationParameter
+    {
+        /// <summary>
+        ///     Tìm kiếm theo tên danh mục.
+        /// </summary>
+        public string? Search { get; set; }
+
+        /// <summary>
+        ///     Sắp xếp theo trường nào. Mặc định: CreatedAt.
+        /// </summary>
+        public CategorySortField SortBy { get; set; } = CategorySortField.CreatedAt;
+
+        /// <summary>
+        ///     Sắp xếp giảm dần (true) hay tăng dần (false).
+        /// </summary>
+        public bool Desc { get; set; } = true;
+    }
+
+    public enum CategorySortField
+    {
+        CreatedAt,
+        Name
+    }
+}
