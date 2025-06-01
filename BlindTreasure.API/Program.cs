@@ -1,5 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using BlindTreasure.API.Architecture;
+using BlindTreasure.API.ChatHub;
 using Microsoft.AspNetCore.Diagnostics;
 using Newtonsoft.Json;
 using SwaggerThemes;
@@ -45,7 +46,7 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.SetupRedisService(builder.Configuration);
-
+    
 var app = builder.Build();
 
 app.UseCors("AllowAll");
@@ -90,7 +91,6 @@ app.UseExceptionHandler(errorApp =>
             {
                 code = "500",
                 message = "Đã xảy ra lỗi hệ thống.",
-                // Có thể bổ sung detail = error?.Message nếu muốn debug, nhưng production nên bỏ
                 detail = error?.Message
             }
         };
@@ -100,9 +100,12 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
-// app.UseHttpsRedirection();
+app.UseRouting();
+app.MapControllers();
+app.MapHub<CustomerChatHub>("/hubs/customer-chat");
+
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapControllers();
+
 
 app.Run();
