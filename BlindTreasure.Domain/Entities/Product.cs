@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.Entities;
 
 public class Product : BaseEntity
 {
@@ -18,7 +20,12 @@ public class Product : BaseEntity
     public string ImageUrl { get; set; }
     public string Status { get; set; }
 
-    // 1-n → Certificates, BlindBoxItems, CartItems, OrderDetails, WishlistItems, Reviews
+    public decimal? Height { get; set; } // cm 
+    public string? Material { get; set; }
+    public ProductSaleType? ProductType { get; set; }
+    public string? Brand { get; set; }
+
+    // Navigation
     public ICollection<Certificate> Certificates { get; set; }
     public ICollection<BlindBoxItem> BlindBoxItems { get; set; }
     public ICollection<InventoryItem> InventoryItems { get; set; }
