@@ -1,9 +1,9 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using BlindTreasure.API.Architecture;
 using Microsoft.AspNetCore.Diagnostics;
+using Newtonsoft.Json;
 using SwaggerThemes;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,12 +32,12 @@ builder.Services.AddCors(options =>
 
 
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>
+    .AddNewtonsoftJson(options =>
     {
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
+        options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
     });
+
 
 // Tắt việc map claim mặc định
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
