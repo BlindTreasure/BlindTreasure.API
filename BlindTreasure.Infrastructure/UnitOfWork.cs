@@ -10,7 +10,7 @@ public class UnitOfWork(
     IGenericRepository<OtpVerification> otpVerifications,
     IGenericRepository<Seller> sellers,
     IGenericRepository<Category> categories,
-     IGenericRepository<Product> products)
+    IGenericRepository<Product> products)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;

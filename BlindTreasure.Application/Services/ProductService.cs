@@ -13,10 +13,10 @@ namespace BlindTreasure.Application.Services;
 public class ProductService : IProductService
 {
     private readonly ICacheService _cacheService;
-    private readonly ILoggerService _logger;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IClaimsService _claimsService;
+    private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
+    private readonly IUnitOfWork _unitOfWork;
 
     public ProductService(
         IUnitOfWork unitOfWork,
@@ -72,7 +72,8 @@ public class ProductService : IProductService
         if (seller == null || !seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
-        _logger.Info($"[GetAllAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        _logger.Info(
+            $"[GetAllAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         if (param.PageIndex <= 0 || param.PageSize <= 0)
             throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
