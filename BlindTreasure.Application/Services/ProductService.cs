@@ -49,8 +49,8 @@ public class ProductService : IProductService
             _logger.Info($"[GetByIdAsync] Cache hit for product {id}");
             if (cached.IsDeleted)
                 throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
-            if (cached.SellerId != await GetSellerIdByUserId(userId))
-                throw ErrorHelper.Forbidden("Không được phép xem sản phẩm của Seller khác.");
+            //if (cached.SellerId != await GetSellerIdByUserId(userId))
+            //    throw ErrorHelper.Forbidden("Không được phép xem sản phẩm của Seller khác.");
             return _mapper.Map<Product, ProductDto>(cached);
         }
 
@@ -141,11 +141,28 @@ public class ProductService : IProductService
 
         await ValidateProductDto(dto);
 
-        var product = _mapper.Map<ProductCreateDto, Product>(dto);
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            IsDeleted = false,
+            Seller = seller
+        };
+        product.Name = dto.Name.Trim();
+        product.Description = dto.Description.Trim();
+        product.CategoryId = dto.CategoryId;
+        product.Price = dto.Price;
+        product.Stock = dto.Stock;
+        product.Height = dto.Height;
+        product.Material = dto.Material;
+        product.ProductType = dto.ProductType;
+        product.Brand = dto.Brand;
+        // Mặc định ảnh sản phẩm là rỗng khi tạo mới
+
         product.ImageUrl = "";
         product.SellerId = seller.Id;
         product.CreatedAt = DateTime.UtcNow;
         product.CreatedBy = userId;
+        product.Status= dto.Status.ToString() ; // Mặc định là Active khi tạo mới
 
         await _unitOfWork.Products.AddAsync(product);
         await _unitOfWork.SaveChangesAsync();
@@ -161,7 +178,7 @@ public class ProductService : IProductService
         return _mapper.Map<Product, ProductDto>(product);
     }
 
-    public async Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto)
+    public async Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto, IFormFile productImageUrl)
     {
         var userId = _claimsService.GetCurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(id);
@@ -171,8 +188,8 @@ public class ProductService : IProductService
             throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
         }
 
-        if (product.SellerId != await GetSellerIdByUserId(userId))
-            throw ErrorHelper.Forbidden("Không được phép thao tác sản phẩm của Seller khác.");
+        //if (product.SellerId != await GetSellerIdByUserId(userId))
+        //    throw ErrorHelper.Forbidden("Không được phép thao tác sản phẩm của Seller khác.");
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null || !seller.IsVerified)
@@ -183,16 +200,26 @@ public class ProductService : IProductService
         await ValidateProductDto(dto);
 
         // Map các trường update
-        var updated = _mapper.Map<ProductUpdateDto, Product>(dto);
-        product.Name = updated.Name;
-        product.Description = updated.Description;
-        product.CategoryId = updated.CategoryId;
-        product.Price = updated.Price;
-        product.Stock = updated.Stock;
-        product.Status = updated.Status;
-        product.ImageUrl = updated.ImageUrl;
+        
+        product.Name = dto.Name;
+        product.Description = dto.Description;
+        product.CategoryId = dto.CategoryId;
+        product.Price = dto.Price;
+        product.Stock = dto.Stock;
+        product.Status = dto.Status.ToString();
         product.UpdatedAt = DateTime.UtcNow;
         product.UpdatedBy = userId;
+        product.Height = dto.Height;
+        product.Material = dto.Material;
+        product.ProductType = dto.ProductType;
+        product.Brand = dto.Brand;
+
+
+        if (productImageUrl != null && productImageUrl.Length > 0)
+        {
+            var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
+
+        }
 
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
@@ -213,8 +240,8 @@ public class ProductService : IProductService
             throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
         }
 
-        if (product.SellerId != await GetSellerIdByUserId(userId))
-            throw ErrorHelper.Forbidden("Không được phép thao tác sản phẩm của Seller khác.");
+        //if (product.SellerId != await GetSellerIdByUserId(userId))
+        //    throw ErrorHelper.Forbidden("Không được phép thao tác sản phẩm của Seller khác.");
 
         product.IsDeleted = true;
         product.DeletedAt = DateTime.UtcNow;

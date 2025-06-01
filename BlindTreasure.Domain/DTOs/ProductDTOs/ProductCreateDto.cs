@@ -17,7 +17,7 @@ public class ProductCreateDto
 
     [Required] [Range(0, int.MaxValue)] public int Stock { get; set; }
 
-    [Required] [MaxLength(50)] public string Status { get; set; }
+    [Required] public ProductStatus Status { get; set; }
 
 
     public decimal? Height { get; set; } // cm 

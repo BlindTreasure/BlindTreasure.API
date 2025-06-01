@@ -75,7 +75,7 @@ public class ProductController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
-    public async Task<IActionResult> Create([FromForm] ProductCreateDto dto, IFormFile productImageUrl)
+    public async Task<IActionResult> Create([FromForm] ProductCreateDto dto, IFormFile? productImageUrl)
     {
         try
         {
@@ -97,11 +97,11 @@ public class ProductController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
-    public async Task<IActionResult> Update(Guid id, [FromBody] ProductUpdateDto dto)
+    public async Task<IActionResult> Update(Guid id, [FromForm] ProductUpdateDto dto, IFormFile? productImageUrl)
     {
         try
         {
-            var result = await _productService.UpdateAsync(id, dto);
+            var result = await _productService.UpdateAsync(id, dto, productImageUrl);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Cập nhật sản phẩm thành công."));
         }
         catch (Exception ex)
@@ -139,7 +139,7 @@ public class ProductController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult<string>), 400)]
     [ProducesResponseType(typeof(ApiResult<string>), 404)]
-    public async Task<IActionResult> UpdateProductImage(Guid id, IFormFile file)
+    public async Task<IActionResult> UpdateProductImage(Guid id, IFormFile? file)
     {
         if (file == null || file.Length == 0)
             return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
