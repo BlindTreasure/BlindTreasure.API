@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using BlindTreasure.Domain.Enums;
+using System.ComponentModel.DataAnnotations;
 
 namespace BlindTreasure.Domain.DTOs.ProductDTOs;
 
@@ -18,5 +19,9 @@ public class ProductCreateDto
 
     [Required] [MaxLength(50)] public string Status { get; set; }
 
-    public string ImageUrl { get; set; }
+
+    public decimal? Height { get; set; } // cm 
+    public string? Material { get; set; }
+    public ProductSaleType? ProductType { get; set; }
+    public string? Brand { get; set; }
 }

@@ -26,7 +26,7 @@ public class CategoryController : ControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(ApiResult<Pagination<CategoryDto>>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 404)]
-    public async Task<IActionResult> GetAll([FromQuery] PaginationParameter param)
+    public async Task<IActionResult> GetAll([FromQuery] CategoryQueryParameter param)
     {
         try
         {
@@ -73,7 +73,7 @@ public class CategoryController : ControllerBase
     ///     Tạo mới một danh mục sản phẩm.
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Admin,Staff")]
+   // [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 409)]

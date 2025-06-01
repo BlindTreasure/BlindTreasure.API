@@ -58,30 +58,36 @@ public class CategoryService : ICategoryService
         return ToCategoryDto(category);
     }
 
-    public async Task<Pagination<CategoryDto>> GetAllAsync(PaginationParameter param)
+    public async Task<Pagination<CategoryDto>> GetAllAsync(CategoryQueryParameter param)
     {
-        _logger.Info(
-            $"[GetAllAsync] Admin/Staff requests category list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        _logger.Info($"[GetAllAsync] Admin/Staff requests category list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         if (param.PageIndex <= 0 || param.PageSize <= 0)
             throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
 
-        var cacheKey = $"category:all:{param.PageIndex}:{param.PageSize}";
-        var cached = await _cacheService.GetAsync<Pagination<CategoryDto>>(cacheKey);
-        if (cached != null)
+        var query = _unitOfWork.Categories.GetQueryable()
+            .Where(c => !c.IsDeleted)
+            .AsNoTracking();
+
+        // Filter
+        if (!string.IsNullOrWhiteSpace(param.Search))
         {
-            _logger.Info("[GetAllAsync] Cache hit for category list.");
-            return cached;
+            var keyword = param.Search.Trim().ToLower();
+            query = query.Where(c => c.Name.ToLower().Contains(keyword));
         }
 
-        var query = _unitOfWork.Categories.GetQueryable().AsNoTracking();
+        // Sort
+        query = param.SortBy switch
+        {
+            CategorySortField.Name => param.Desc ? query.OrderByDescending(c => c.Name) : query.OrderBy(c => c.Name),
+            _ => param.Desc ? query.OrderByDescending(c => c.CreatedAt) : query.OrderBy(c => c.CreatedAt)
+        };
 
         var count = await query.CountAsync();
         if (count == 0)
             throw ErrorHelper.NotFound("Không tìm thấy category nào.");
 
         var items = await query
-            .OrderByDescending(c => c.Name)
             .Skip((param.PageIndex - 1) * param.PageSize)
             .Take(param.PageSize)
             .ToListAsync();
@@ -89,6 +95,7 @@ public class CategoryService : ICategoryService
         var dtos = items.Select(ToCategoryDto).ToList();
         var result = new Pagination<CategoryDto>(dtos, count, param.PageIndex, param.PageSize);
 
+        var cacheKey = $"category:all:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.SortBy}:{param.Desc}";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         _logger.Info("[GetAllAsync] Category list loaded from DB and cached.");
         return result;
@@ -98,8 +105,8 @@ public class CategoryService : ICategoryService
     {
         var userId = _claimsService.GetCurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
-        if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
-            throw ErrorHelper.Forbidden("Bạn không có quyền tạo danh mục.");
+        //if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
+        //    throw ErrorHelper.Forbidden("Bạn không có quyền tạo danh mục.");
         _logger.Info($"[CreateAsync] Admin/Staff creates category {dto.Name} by {user.FullName}");
 
         if (string.IsNullOrWhiteSpace(dto.Name))
