@@ -9,13 +9,15 @@ public class UnitOfWork(
     IGenericRepository<User> userRepository,
     IGenericRepository<OtpVerification> otpVerifications,
     IGenericRepository<Seller> sellers,
-    IGenericRepository<Category> categories)
+    IGenericRepository<Category> categories,
+     IGenericRepository<Product> products)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
     public IGenericRepository<Seller> Sellers { get; } = sellers;
     public IGenericRepository<OtpVerification> OtpVerifications { get; } = otpVerifications;
     public IGenericRepository<Category> Categories { get; } = categories;
+    public IGenericRepository<Product> Products { get; } = products;
 
     public void Dispose()
     {
