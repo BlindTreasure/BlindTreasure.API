@@ -15,15 +15,17 @@ public class DataAnalyzerService : IDataAnalyzerService
         _unitOfWork = unitOfWork;
     }
 
+    
     public async Task<List<UserDto>> GetUsersForAiAnalysisAsync()
     {
         var users = await _unitOfWork.Users.GetQueryable()
             .Where(u => !u.IsDeleted)
             .OrderByDescending(u => u.CreatedAt)
-            .Take(100) // Giới hạn số lượng user cho AI phân tích, tránh quá nhiều data
+            .Take(20) 
             .ToListAsync();
         var userDtos = users.Select(UserMapper.ToUserDto).ToList();
 
         return userDtos;
     }
+    //
 }
