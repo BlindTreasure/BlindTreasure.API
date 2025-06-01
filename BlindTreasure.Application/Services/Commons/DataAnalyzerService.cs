@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Domain.DTOs.UserDTOs;
+using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -27,5 +28,17 @@ public class DataAnalyzerService : IDataAnalyzerService
 
         return userDtos;
     }
-    //
+    public async Task<List<Product>> GetProductsAiAnalysisAsync()
+    {
+        var products = await _unitOfWork.Products.GetQueryable()
+            .Where(p => !p.IsDeleted)
+            .Include(p => p.Seller)
+            .Include(p => p.Category)
+            .Include(p => p.Certificates)
+            .Include(p => p.InventoryItems)
+            .Include(p => p.Reviews)
+            .ToListAsync();
+
+        return products;
+    }
 }
