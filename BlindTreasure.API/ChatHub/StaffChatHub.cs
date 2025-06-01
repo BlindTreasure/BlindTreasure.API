@@ -16,7 +16,6 @@ public class StaffChatHub : Hub
         var normalized = message.Trim().ToLower();
 
         if (_blindyService is BlindyService impl)
-        {
             switch (normalized)
             {
                 case "/analyze_users":
@@ -43,10 +42,8 @@ public class StaffChatHub : Hub
                         sentAt = DateTime.UtcNow
                     });
                     return;
-
                 // mở rộng các lệnh khác tại đây
             }
-        }
 
         // Nếu không phải lệnh → xử lý như chat thông thường
         var reply = await _blindyService.AskStaffAsync(message);
@@ -57,5 +54,4 @@ public class StaffChatHub : Hub
             sentAt = DateTime.UtcNow
         });
     }
-
 }

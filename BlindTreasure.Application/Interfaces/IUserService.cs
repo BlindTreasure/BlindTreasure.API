@@ -21,5 +21,4 @@ public interface IUserService
     Task<User?> GetUserByEmail(string email, bool useCache = false);
 
     //AI analysis
-    Task<List<UserDto>> GetUsersForAiAnalysisAsync();
 }

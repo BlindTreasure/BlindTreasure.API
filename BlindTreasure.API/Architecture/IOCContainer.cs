@@ -142,11 +142,13 @@ public static class IocContainer
         services.AddScoped<ISellerVerificationService, SellerVerificationService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IDataAnalyzerService, DataAnalyzerService>();
 
         //3rd party
         services.AddHttpClient();
         services.AddScoped<IGptService, GptService>();
         services.AddScoped<IBlobService, BlobService>();
+        services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IBlindyService, BlindyService>();
         services.AddSignalR().AddJsonProtocol();
