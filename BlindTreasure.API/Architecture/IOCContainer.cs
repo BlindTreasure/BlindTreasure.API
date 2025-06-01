@@ -141,6 +141,7 @@ public static class IocContainer
         services.AddScoped<ISellerService, SellerService>();
         services.AddScoped<ISellerVerificationService, SellerVerificationService>();
         services.AddScoped<ICategoryService, CategoryService>();
+        services.AddScoped<IProductService, ProductService>();
 
         //3rd party
         services.AddHttpClient();

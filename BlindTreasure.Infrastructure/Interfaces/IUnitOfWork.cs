@@ -8,6 +8,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<Seller> Sellers { get; }
     IGenericRepository<OtpVerification> OtpVerifications { get; }
     IGenericRepository<Category> Categories { get; }
+    IGenericRepository<Product> Products { get; }
 
     Task<int> SaveChangesAsync();
 }
