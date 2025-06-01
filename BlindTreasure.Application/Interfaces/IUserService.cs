@@ -19,4 +19,7 @@ public interface IUserService
     Task<UserDto?> UpdateUserStatusAsync(Guid userId, UserStatus newStatus);
     Task<Pagination<UserDto>> GetAllUsersAsync(UserQueryParameter param);
     Task<User?> GetUserByEmail(string email, bool useCache = false);
+
+    //AI analysis
+    Task<List<UserDto>> GetUsersForAiAnalysisAsync();
 }

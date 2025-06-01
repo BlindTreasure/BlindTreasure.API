@@ -257,6 +257,18 @@ public class UserService : IUserService
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
     }
 
+    //AI analysis
+    public async Task<List<UserDto>> GetUsersForAiAnalysisAsync()
+    {
+        var users = await _unitOfWork.Users.GetQueryable()
+            .Where(u => !u.IsDeleted)
+            .OrderByDescending(u => u.CreatedAt)
+            .Take(100) // Giới hạn số lượng user cho AI phân tích, tránh quá nhiều data
+            .ToListAsync();
+        var userDtos = users.Select(UserMapper.ToUserDto).ToList();
+
+        return userDtos;
+    }
 
     // ----------------- PRIVATE HELPER METHODS -----------------
 

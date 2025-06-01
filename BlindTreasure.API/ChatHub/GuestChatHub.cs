@@ -1,20 +1,18 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 
-namespace BlindTreasure.API.ChatHub;
-
-public class CustomerChatHub : Hub
+public class GuestChatHub : Hub
 {
     private readonly IBlindyService _blindyService;
 
-    public CustomerChatHub(IBlindyService blindyService)
+    public GuestChatHub(IBlindyService blindyService)
     {
         _blindyService = blindyService;
     }
 
     public async Task SendMessage(string userId, string message)
     {
-        var reply = await _blindyService.AskCustomerAsync(message);
+        var reply = await _blindyService.AskGuestAsync(message);
 
         await Clients.Caller.SendAsync("ReceiveMessage", new
         {

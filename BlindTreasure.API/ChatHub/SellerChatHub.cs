@@ -3,18 +3,18 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace BlindTreasure.API.ChatHub;
 
-public class CustomerChatHub : Hub
+public class SellerChatHub : Hub
 {
     private readonly IBlindyService _blindyService;
 
-    public CustomerChatHub(IBlindyService blindyService)
+    public SellerChatHub(IBlindyService blindyService)
     {
         _blindyService = blindyService;
     }
 
     public async Task SendMessage(string userId, string message)
     {
-        var reply = await _blindyService.AskCustomerAsync(message);
+        var reply = await _blindyService.AskSellerAsync(message);
 
         await Clients.Caller.SendAsync("ReceiveMessage", new
         {
