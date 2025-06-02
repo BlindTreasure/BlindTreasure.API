@@ -133,10 +133,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric");
 
-                    b.Property<string>("ProbabilityConfig")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("ReleaseDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -192,9 +188,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsSecret")
-                        .HasColumnType("boolean");
-
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
@@ -203,20 +196,14 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<string>("Rarity")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Sku")
-                        .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uuid");
-
-                    b.Property<decimal>("Weight")
-                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
