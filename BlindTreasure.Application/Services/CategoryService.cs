@@ -62,9 +62,6 @@ public class CategoryService : ICategoryService
     {
         _logger.Info($"[GetAllAsync] Admin/Staff requests category list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
-        if (param.PageIndex <= 0 || param.PageSize <= 0)
-            throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
-
         var query = _unitOfWork.Categories.GetQueryable()
             .Where(c => !c.IsDeleted)
             .AsNoTracking();
@@ -76,26 +73,30 @@ public class CategoryService : ICategoryService
             query = query.Where(c => c.Name.ToLower().Contains(keyword));
         }
 
-        // Sort
-        query = param.SortBy switch
-        {
-            CategorySortField.Name => param.Desc ? query.OrderByDescending(c => c.Name) : query.OrderBy(c => c.Name),
-            _ => param.Desc ? query.OrderByDescending(c => c.CreatedAt) : query.OrderBy(c => c.CreatedAt)
-        };
+        // Sort: UpdatedAt desc, CreatedAt desc
+        query = query.OrderByDescending(c => c.UpdatedAt ?? c.CreatedAt);
 
         var count = await query.CountAsync();
         if (count == 0)
-            throw ErrorHelper.NotFound("Không tìm thấy category nào.");
+           _logger.Info("Không tìm thấy category nào.");
 
-        var items = await query
-            .Skip((param.PageIndex - 1) * param.PageSize)
-            .Take(param.PageSize)
-            .ToListAsync();
+        List<Category> items;
+        if (param.PageIndex == 0)
+        {
+            items = await query.ToListAsync();
+        }
+        else
+        {
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+        }
 
         var dtos = items.Select(ToCategoryDto).ToList();
         var result = new Pagination<CategoryDto>(dtos, count, param.PageIndex, param.PageSize);
 
-        var cacheKey = $"category:all:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.SortBy}:{param.Desc}";
+        var cacheKey = $"category:all:{param.PageIndex}:{param.PageSize}:{param.Search}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         _logger.Info("[GetAllAsync] Category list loaded from DB and cached.");
         return result;

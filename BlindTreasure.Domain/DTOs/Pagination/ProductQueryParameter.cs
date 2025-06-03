@@ -23,9 +23,12 @@ namespace BlindTreasure.Domain.DTOs.Pagination
         /// </summary>
         public string? Status { get; set; }
 
+        public Guid? SellerId { get; set; }
+
         /// <summary>
         ///     Sắp xếp theo trường nào. Mặc định: CreatedAt.
         /// </summary>
+        /// 
         public ProductSortField SortBy { get; set; } = ProductSortField.CreatedAt;
 
         /// <summary>

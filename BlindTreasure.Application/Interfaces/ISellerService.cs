@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
@@ -13,4 +14,6 @@ public interface ISellerService
     Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId);
     Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto);
     Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination);
+    Task<ProductDto?> GetByIdAsync(Guid id, Guid userId);
+    Task<Pagination<ProductDto>> GetAllAsync(ProductQueryParameter param, Guid userId);
 }

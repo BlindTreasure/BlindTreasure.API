@@ -127,14 +127,11 @@ public class UserService : IUserService
     {
         _logger.Info($"[GetAllUsersAsync] Admin requests user list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
-        if (param.PageIndex <= 0 || param.PageSize <= 0)
-            throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
-
         var query = _unitOfWork.Users.GetQueryable()
             .Where(u => !u.IsDeleted)
             .AsNoTracking();
 
-        // Search by FullName or Email
+        // Filter
         if (!string.IsNullOrWhiteSpace(param.Search))
         {
             var keyword = param.Search.Trim().ToLower();
@@ -142,35 +139,32 @@ public class UserService : IUserService
                 (!string.IsNullOrEmpty(u.FullName) && u.FullName.ToLower().Contains(keyword)) ||
                 (!string.IsNullOrEmpty(u.Email) && u.Email.ToLower().Contains(keyword)));
         }
-
         if (param.Status.HasValue)
             query = query.Where(u => u.Status == param.Status.Value);
-
         if (param.RoleName.HasValue)
             query = query.Where(u => u.RoleName == param.RoleName.Value);
 
-        // Apply sorting based on enum
-        query = param.SortBy switch
-        {
-            UserSortField.Email => param.Desc ? query.OrderByDescending(u => u.Email) : query.OrderBy(u => u.Email),
-            UserSortField.FullName => param.Desc
-                ? query.OrderByDescending(u => u.FullName)
-                : query.OrderBy(u => u.FullName),
-            _ => param.Desc ? query.OrderByDescending(u => u.CreatedAt) : query.OrderBy(u => u.CreatedAt)
-        };
+        // Sort: UpdatedAt desc, CreatedAt desc
+        query = query.OrderByDescending(u => u.UpdatedAt ?? u.CreatedAt);
 
         var total = await query.CountAsync();
-
         if (total == 0)
             throw ErrorHelper.NotFound("Không tìm thấy người dùng nào.");
 
-        var users = await query
-            .Skip((param.PageIndex - 1) * param.PageSize)
-            .Take(param.PageSize)
-            .ToListAsync();
+        List<User> users;
+        if (param.PageIndex == 0)
+        {
+            users = await query.ToListAsync();
+        }
+        else
+        {
+            users = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+        }
 
         var userDtos = users.Select(UserMapper.ToUserDto).ToList();
-
         return new Pagination<UserDto>(userDtos, total, param.PageIndex, param.PageSize);
     }
 

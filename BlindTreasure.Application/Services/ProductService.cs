@@ -74,23 +74,10 @@ public class ProductService : IProductService
 
     public async Task<Pagination<ProductDto>> GetAllAsync(ProductQueryParameter param)
     {
-        var userId = _claimsService.GetCurrentUserId;
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
-
-        if (userId != Guid.Empty || seller != null)
-        {
-            if (seller == null || !seller.IsVerified)
-                throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
-
-            _logger.Info($"[GetAllAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
-        }
-     
-
-        if (param.PageIndex <= 0 || param.PageSize <= 0)
-            throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
+        _logger.Info($"[GetAllAsync] Public requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.Products.GetQueryable()
-            .Where(p => !p.IsDeleted && p.SellerId == seller.Id)
+            .Where(p => !p.IsDeleted)
             .AsNoTracking();
 
         // Filter
@@ -103,29 +90,31 @@ public class ProductService : IProductService
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
         if (!string.IsNullOrWhiteSpace(param.Status))
             query = query.Where(p => p.Status == param.Status);
+        if (param.SellerId.HasValue)
+            query = query.Where(p => p.SellerId == param.SellerId.Value);
 
-        // Sort
-        query = param.SortBy switch
-        {
-            ProductSortField.Name => param.Desc ? query.OrderByDescending(p => p.Name) : query.OrderBy(p => p.Name),
-            ProductSortField.Price => param.Desc ? query.OrderByDescending(p => p.Price) : query.OrderBy(p => p.Price),
-            ProductSortField.Stock => param.Desc ? query.OrderByDescending(p => p.Stock) : query.OrderBy(p => p.Stock),
-            _ => param.Desc ? query.OrderByDescending(p => p.CreatedAt) : query.OrderBy(p => p.CreatedAt)
-        };
+        // Sort: UpdatedAt desc, CreatedAt desc
+        query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
 
         var count = await query.CountAsync();
-        if (count == 0)
-            _logger.Info("[GetAllAsync] This user dont have any products");
 
-        var items = await query
-            .Skip((param.PageIndex - 1) * param.PageSize)
-            .Take(param.PageSize)
-            .ToListAsync();
+        List<Product> items;
+        if (param.PageIndex == 0)
+        {
+            items = await query.ToListAsync();
+        }
+        else
+        {
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+        }
 
         var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
         var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
 
-        var cacheKey = $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.Status}:{param.SortBy}:{param.Desc}";
+        var cacheKey = $"product:all:public:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.Status}:{param.SellerId}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         _logger.Info("[GetAllAsync] Product list loaded from DB and cached.");
         return result;
@@ -304,9 +293,8 @@ public class ProductService : IProductService
     #region PRIVATE HELPER METHODS
     private async Task<Guid> GetSellerIdByUserId(Guid userId)
     {
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.Id == userId);
-        var sellerUserId = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.Id == userId);
-        if (seller == null && sellerUserId == null)
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null )
             throw ErrorHelper.Forbidden("Không tìm thấy seller.");
         return seller.Id;
     }
