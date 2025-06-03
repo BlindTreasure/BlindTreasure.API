@@ -71,7 +71,7 @@ public class ProductController : ControllerBase
     }
 
     /// <summary>
-    ///     đăng ký sản phẩm mới cho seller, có field user id 
+    ///     đăng ký sản phẩm mới cho seller, có field user id
     /// </summary>
     [HttpPost]
     [Authorize]
@@ -136,8 +136,9 @@ public class ProductController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
     /// <summary>
-    /// Cập nhật ảnh sản phẩm.
+    ///     Cập nhật ảnh sản phẩm.
     /// </summary>
     [HttpPut("{id}/image")]
     [Authorize]

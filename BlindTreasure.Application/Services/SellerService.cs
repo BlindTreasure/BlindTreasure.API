@@ -17,15 +17,17 @@ namespace BlindTreasure.Application.Services;
 public class SellerService : ISellerService
 {
     private readonly IBlobService _blobService;
+    private readonly ICacheService _cacheService;
+    private readonly IClaimsService _claimsService;
     private readonly IEmailService _emailService;
     private readonly ILoggerService _loggerService;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ICacheService _cacheService;
     private readonly IMapperService _mapper;
-    private readonly IClaimsService _claimsService;
     private readonly IProductService _productService;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public SellerService(IBlobService blobService, IEmailService emailService, ILoggerService loggerService, IUnitOfWork unitOfWork, ICacheService cacheService, IMapperService mapper, IClaimsService claimsService, IProductService productService)
+    public SellerService(IBlobService blobService, IEmailService emailService, ILoggerService loggerService,
+        IUnitOfWork unitOfWork, ICacheService cacheService, IMapperService mapper, IClaimsService claimsService,
+        IProductService productService)
     {
         _blobService = blobService;
         _emailService = emailService;
@@ -143,9 +145,9 @@ public class SellerService : ISellerService
     public async Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination)
     {
         var query = _unitOfWork.Sellers.GetQueryable()
-        .Where(s => !s.IsDeleted)
-        .Include(s => s.User)
-        .AsQueryable();
+            .Where(s => !s.IsDeleted)
+            .Include(s => s.User)
+            .AsQueryable();
 
         if (status.HasValue)
             query = query.Where(s => s.Status == status.Value);
@@ -157,29 +159,26 @@ public class SellerService : ISellerService
 
         List<Seller> sellers;
         if (pagination.PageIndex == 0)
-        {
             sellers = await query.ToListAsync();
-        }
         else
-        {
             sellers = await query
                 .Skip((pagination.PageIndex - 1) * pagination.PageSize)
                 .Take(pagination.PageSize)
                 .ToListAsync();
-        }
 
         var items = sellers.Select(SellerMapper.ToSellerDto).ToList();
 
         return new Pagination<SellerDto>(items, totalCount, pagination.PageIndex, pagination.PageSize);
     }
 
-    public async Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param,  Guid userId)
+    public async Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param, Guid userId)
     {
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null || !seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
-        _loggerService.Info($"[GetAllAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        _loggerService.Info(
+            $"[GetAllAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.Products.GetQueryable()
             .Where(p => !p.IsDeleted && p.SellerId == seller.Id)
@@ -191,6 +190,7 @@ public class SellerService : ISellerService
             var keyword = param.Search.Trim().ToLower();
             query = query.Where(p => p.Name.ToLower().Contains(keyword));
         }
+
         if (param.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
         if (param.ProductStatus.HasValue)
@@ -205,21 +205,18 @@ public class SellerService : ISellerService
 
         List<Product> items;
         if (param.PageIndex == 0)
-        {
             items = await query.ToListAsync();
-        }
         else
-        {
             items = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-        }
 
         var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
         var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
 
-        var cacheKey = $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:UpdatedAtDesc";
+        var cacheKey =
+            $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         _loggerService.Info("[GetAllAsync] Product list loaded from DB and cached.");
         return result;
@@ -235,7 +232,7 @@ public class SellerService : ISellerService
             if (cached.IsDeleted)
                 throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
             var checkSeller = await GetSellerWithUserAsync(userId);
-            if (cached.SellerId != checkSeller.Id )
+            if (cached.SellerId != checkSeller.Id)
                 throw ErrorHelper.Forbidden("Không được phép xem sản phẩm của Seller khác.");
             return _mapper.Map<Product, ProductDto>(cached);
         }
@@ -250,7 +247,6 @@ public class SellerService : ISellerService
             throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
         }
 
-       
 
         await _cacheService.SetAsync(cacheKey, product, TimeSpan.FromHours(1));
         _loggerService.Info($"[GetByIdAsync] Product {id} loaded from DB and cached.");
@@ -258,22 +254,15 @@ public class SellerService : ISellerService
     }
 
     /// <summary>
-    /// Seller tạo sản phẩm mới (chỉ cho phép tạo sản phẩm cho chính mình).
+    ///     Seller tạo sản phẩm mới (chỉ cho phép tạo sản phẩm cho chính mình).
     /// </summary>
     public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto, IFormFile? productImageUrl)
     {
         var userId = _claimsService.GetCurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
-        if (seller == null )
-        {
-            throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");    
-        }
+        if (seller == null) throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
 
-        if (!seller.IsVerified)
-        {
-            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
-        }
-
+        if (!seller.IsVerified) throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
 
         var newProduct = _mapper.Map<ProductSellerCreateDto, ProductCreateDto>(dto);
@@ -284,7 +273,7 @@ public class SellerService : ISellerService
     }
 
     /// <summary>
-    /// Seller cập nhật sản phẩm (chỉ cho phép cập nhật sản phẩm của chính mình).
+    ///     Seller cập nhật sản phẩm (chỉ cho phép cập nhật sản phẩm của chính mình).
     /// </summary>
     public async Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto, IFormFile? productImageUrl)
     {
@@ -305,7 +294,7 @@ public class SellerService : ISellerService
     }
 
     /// <summary>
-    /// Seller xóa mềm sản phẩm (chỉ cho phép xóa sản phẩm của chính mình).
+    ///     Seller xóa mềm sản phẩm (chỉ cho phép xóa sản phẩm của chính mình).
     /// </summary>
     public async Task<ProductDto> DeleteProductAsync(Guid productId)
     {
@@ -326,7 +315,6 @@ public class SellerService : ISellerService
     }
 
 
-
     //private method
 
     private async Task<Seller> GetSellerWithUserAsync(Guid sellerId)
@@ -340,6 +328,4 @@ public class SellerService : ISellerService
 
         return seller;
     }
-
-    
 }

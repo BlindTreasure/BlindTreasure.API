@@ -1,9 +1,9 @@
-﻿using BlindTreasure.Domain.Enums;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.DTOs.ProductDTOs;
 
-public class ProductUpdateDto 
+public class ProductUpdateDto
 {
     [Required] [MaxLength(100)] public string Name { get; set; }
 
@@ -23,6 +23,4 @@ public class ProductUpdateDto
     public string? Material { get; set; }
     public ProductSaleType? ProductType { get; set; }
     public string? Brand { get; set; }
-
 }
-

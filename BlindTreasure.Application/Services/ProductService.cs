@@ -1,7 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.Entities;
@@ -15,12 +14,12 @@ namespace BlindTreasure.Application.Services;
 
 public class ProductService : IProductService
 {
+    private readonly IBlobService _blobService;
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IBlobService _blobService;
 
 
     public ProductService(
@@ -40,7 +39,7 @@ public class ProductService : IProductService
     }
 
     /// <summary>
-    /// API dùng chung cho mọi role: lấy chi tiết sản phẩm theo Id (không ràng buộc seller).
+    ///     API dùng chung cho mọi role: lấy chi tiết sản phẩm theo Id (không ràng buộc seller).
     /// </summary>
     public async Task<ProductDto?> GetByIdAsync(Guid id)
     {
@@ -83,6 +82,7 @@ public class ProductService : IProductService
             var keyword = param.Search.Trim().ToLower();
             query = query.Where(p => p.Name.ToLower().Contains(keyword));
         }
+
         if (param.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
         if (param.ProductStatus.HasValue)
@@ -97,21 +97,18 @@ public class ProductService : IProductService
 
         List<Product> items;
         if (param.PageIndex == 0)
-        {
             items = await query.ToListAsync();
-        }
         else
-        {
             items = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-        }
 
         var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
         var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
 
-        var cacheKey = $"product:all:public:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:{param.SellerId}:UpdatedAtDesc";
+        var cacheKey =
+            $"product:all:public:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:{param.SellerId}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         _logger.Info("[GetAllAsync] Product list loaded from DB and cached.");
         return result;
@@ -120,7 +117,7 @@ public class ProductService : IProductService
     public async Task<ProductDto> CreateAsync(ProductCreateDto dto, IFormFile? productImageUrl)
     {
         var userId = _claimsService.GetCurrentUserId;
-        var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId, x=> x.User);
+        var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId, x => x.User);
         if (seller == null || !seller.IsVerified || seller.Status != SellerStatus.Approved)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
         _logger.Info($"[CreateAsync] Seller {userId} creates product {dto.Name}");
@@ -148,7 +145,7 @@ public class ProductService : IProductService
         product.SellerId = seller.Id;
         product.CreatedAt = DateTime.UtcNow;
         product.CreatedBy = userId;
-        product.Status= dto.Status.ToString() ; // Mặc định là Active khi tạo mới
+        product.Status = dto.Status.ToString(); // Mặc định là Active khi tạo mới
 
         await _unitOfWork.Products.AddAsync(product);
         await _unitOfWork.SaveChangesAsync();
@@ -156,7 +153,6 @@ public class ProductService : IProductService
         if (productImageUrl != null && productImageUrl.Length > 0)
         {
             var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
-
         }
 
         await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
@@ -186,7 +182,7 @@ public class ProductService : IProductService
         await ValidateProductDto(dto);
 
         // Map các trường update
-        
+
         product.Name = dto.Name;
         product.Description = dto.Description;
         product.CategoryId = dto.CategoryId;
@@ -204,7 +200,6 @@ public class ProductService : IProductService
         if (productImageUrl != null && productImageUrl.Length > 0)
         {
             var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
-
         }
 
         await _unitOfWork.Products.Update(product);
@@ -281,7 +276,8 @@ public class ProductService : IProductService
         await _cacheService.SetAsync($"product:{product.Id}", product, TimeSpan.FromHours(1));
         await _cacheService.SetAsync($"user:{product.Id}", product, TimeSpan.FromHours(1));
 
-        _logger.Success($"[UploadAvatarAsync] Đã cập nhật image thành công cho product {product.Id} tên {product.Name}");
+        _logger.Success(
+            $"[UploadAvatarAsync] Đã cập nhật image thành công cho product {product.Id} tên {product.Name}");
 
         return fileUrl;
     }
@@ -320,5 +316,6 @@ public class ProductService : IProductService
         if (!categoryExists)
             throw ErrorHelper.BadRequest("Danh mục sản phẩm không hợp lệ.");
     }
+
     #endregion
 }
