@@ -134,7 +134,7 @@ public class CategoryService : ICategoryService
         await _unitOfWork.Categories.AddAsync(category);
         await _unitOfWork.SaveChangesAsync();
 
-        await _cacheService.RemoveByPatternAsync("category:all");
+        await RemoveCategoryCacheAsync(category.Id);
         _logger.Success($"[CreateAsync] Category {category.Name} created.");
         return ToCategoryDto(category);
     }
@@ -154,9 +154,10 @@ public class CategoryService : ICategoryService
         if (category == null)
             throw ErrorHelper.NotFound("Không tìm thấy category.");
 
+        // Chỉ cập nhật trường có giá trị khác null
         if (!string.IsNullOrWhiteSpace(dto.Name))
         {
-            var exists = await _unitOfWork.Categories.GetQueryable().Where(x=> x.IsDeleted==false)
+            var exists = await _unitOfWork.Categories.GetQueryable().Where(x => x.IsDeleted == false)
                 .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower() && c.Id != id);
             if (exists)
                 throw ErrorHelper.Conflict("Tên danh mục đã tồn tại trong hệ thống.");
@@ -164,9 +165,9 @@ public class CategoryService : ICategoryService
             category.Name = dto.Name.Trim();
         }
 
-        if (!string.IsNullOrWhiteSpace(dto.Description)) category.Description = dto.Description.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.Description))
+            category.Description = dto.Description.Trim();
 
-        // Validate ParentId nếu có
         if (dto.ParentId.HasValue)
         {
             if (dto.ParentId.Value == id)
@@ -178,11 +179,14 @@ public class CategoryService : ICategoryService
             category.ParentId = dto.ParentId;
         }
 
+        category.UpdatedAt = DateTime.UtcNow;
+        category.UpdatedBy = userId;
+
         await _unitOfWork.Categories.Update(category);
         await _unitOfWork.SaveChangesAsync();
 
-        await _cacheService.RemoveAsync($"category:{id}");
-        await _cacheService.RemoveByPatternAsync("category:all");
+        await RemoveCategoryCacheAsync(id);
+
         _logger.Success($"[UpdateAsync] Category {id} updated.");
         return ToCategoryDto(category);
     }
@@ -252,5 +256,11 @@ public class CategoryService : ICategoryService
         }
 
         return false;
+    }
+
+    private async Task RemoveCategoryCacheAsync(Guid categoryId)
+    {
+        await _cacheService.RemoveAsync($"category:{categoryId}");
+        await _cacheService.RemoveByPatternAsync("category:all");
     }
 }

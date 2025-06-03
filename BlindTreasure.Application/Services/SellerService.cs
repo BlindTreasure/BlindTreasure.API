@@ -25,7 +25,15 @@ public class SellerService : ISellerService
     private readonly IClaimsService _claimsService;
     private readonly IProductService _productService;
 
-    public SellerService(IBlobService blobService, IEmailService emailService, ILoggerService loggerService, IUnitOfWork unitOfWork, ICacheService cacheService, IMapperService mapper, IClaimsService claimsService, IProductService productService)
+    public SellerService(
+        IBlobService blobService,
+        IEmailService emailService,
+        ILoggerService loggerService,
+        IUnitOfWork unitOfWork,
+        ICacheService cacheService,
+        IMapperService mapper,
+        IClaimsService claimsService,
+        IProductService productService)
     {
         _blobService = blobService;
         _emailService = emailService;
@@ -37,71 +45,77 @@ public class SellerService : ISellerService
         _productService = productService;
     }
 
+    private async Task RemoveSellerCacheAsync(Guid sellerId, Guid userId)
+    {
+        await _cacheService.RemoveAsync($"seller:{sellerId}");
+        await _cacheService.RemoveAsync($"seller:user:{userId}");
+    }
+
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.FullName))
-            throw ErrorHelper.BadRequest("Họ tên không được để trống.");
-
-        if (string.IsNullOrWhiteSpace(dto.PhoneNumber))
-            throw ErrorHelper.BadRequest("Số điện thoại không được để trống.");
-
-        if (dto.DateOfBirth == default)
-            throw ErrorHelper.BadRequest("Ngày sinh không hợp lệ.");
-
-        if (string.IsNullOrWhiteSpace(dto.CompanyName))
-            throw ErrorHelper.BadRequest("Tên công ty không được để trống.");
-
-        if (string.IsNullOrWhiteSpace(dto.TaxId))
-            throw ErrorHelper.BadRequest("Mã số thuế không được để trống.");
-
-        if (string.IsNullOrWhiteSpace(dto.CompanyAddress))
-            throw ErrorHelper.BadRequest("Địa chỉ công ty không được để trống.");
+        _loggerService.Info($"[UpdateSellerInfoAsync] Seller {userId} yêu cầu cập nhật thông tin.");
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);
         if (seller == null)
+        {
+            _loggerService.Warn($"[UpdateSellerInfoAsync] Seller {userId} không tồn tại.");
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
+        }
 
         if (seller.User == null)
+        {
+            _loggerService.Error($"[UpdateSellerInfoAsync] Seller {userId} không có thông tin user.");
             throw ErrorHelper.Internal("Dữ liệu user không hợp lệ.");
+        }
 
-        // Cập nhật User
-        seller.User.FullName = dto.FullName;
-        seller.User.Phone = dto.PhoneNumber;
-        seller.User.DateOfBirth = dto.DateOfBirth;
+        // Chỉ cập nhật trường có giá trị khác null
+        if (!string.IsNullOrWhiteSpace(dto.FullName))
+            seller.User.FullName = dto.FullName.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+            seller.User.Phone = dto.PhoneNumber.Trim();
+        if (dto.DateOfBirth.HasValue)
+            seller.User.DateOfBirth = dto.DateOfBirth.Value;
+        if (!string.IsNullOrWhiteSpace(dto.CompanyName))
+            seller.CompanyName = dto.CompanyName.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.TaxId))
+            seller.TaxId = dto.TaxId.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.CompanyAddress))
+            seller.CompanyAddress = dto.CompanyAddress.Trim();
 
-        // Cập nhật Seller
-        seller.CompanyName = dto.CompanyName;
-        seller.TaxId = dto.TaxId;
-        seller.CompanyAddress = dto.CompanyAddress;
         seller.Status = SellerStatus.WaitingReview;
 
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
 
-        _loggerService.Info($"[UpdateSellerInfoAsync] Seller {userId} đã cập nhật thông tin.");
+        // Xóa cache trước khi set lại
+        await RemoveSellerCacheAsync(seller.Id, userId);
+        await _cacheService.SetAsync($"seller:{seller.Id}", seller, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync($"seller:user:{userId}", seller, TimeSpan.FromHours(1));
 
+        _loggerService.Success($"[UpdateSellerInfoAsync] Seller {userId} đã cập nhật thông tin thành công.");
         return SellerMapper.ToSellerDto(seller);
     }
 
     public async Task<string> UploadSellerDocumentAsync(Guid userId, IFormFile file)
     {
+        _loggerService.Info($"[UploadSellerDocumentAsync] Seller {userId} upload tài liệu xác minh.");
+
         if (file == null || file.Length == 0)
         {
-            _loggerService.Error($"[UploadSellerDocumentAsync] User {userId} upload thất bại: file không hợp lệ.");
+            _loggerService.Warn($"[UploadSellerDocumentAsync] File không hợp lệ.");
             throw ErrorHelper.BadRequest("File không hợp lệ.");
         }
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null)
         {
-            _loggerService.Error($"[UploadSellerDocumentAsync] Không tìm thấy hồ sơ seller với UserId: {userId}");
+            _loggerService.Warn($"[UploadSellerDocumentAsync] Không tìm thấy seller với UserId: {userId}");
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
         }
 
         if (seller.Status != SellerStatus.Rejected && seller.Status != SellerStatus.WaitingReview)
         {
-            _loggerService.Error(
-                $"[UploadSellerDocumentAsync] Seller {userId} không thể upload ở trạng thái: {seller.Status}");
+            _loggerService.Warn($"[UploadSellerDocumentAsync] Seller {userId} không thể upload ở trạng thái: {seller.Status}");
             throw ErrorHelper.BadRequest("Chỉ seller bị từ chối hoặc chờ duyệt mới được phép nộp lại tài liệu.");
         }
 
@@ -118,34 +132,60 @@ public class SellerService : ISellerService
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
 
-        _loggerService.Info($"[UploadSellerDocumentAsync] Seller {userId} re-submitted COA document: {fileName}");
+        // Cập nhật cache
+        await _cacheService.SetAsync($"seller:{seller.Id}", seller, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync($"seller:user:{userId}", seller, TimeSpan.FromHours(1));
 
+        _loggerService.Success($"[UploadSellerDocumentAsync] Seller {userId} đã upload tài liệu thành công.");
         return fileUrl;
     }
 
-
     public async Task<SellerProfileDto> GetSellerProfileByIdAsync(Guid sellerId)
     {
+        var cacheKey = $"seller:{sellerId}";
+        var cached = await _cacheService.GetAsync<Seller>(cacheKey);
+        if (cached != null)
+        {
+            _loggerService.Info($"[GetSellerProfileByIdAsync] Cache hit for seller {sellerId}");
+            return SellerMapper.ToSellerProfileDto(cached);
+        }
+
         var seller = await GetSellerWithUserAsync(sellerId);
+        await _cacheService.SetAsync(cacheKey, seller, TimeSpan.FromHours(1));
+        _loggerService.Info($"[GetSellerProfileByIdAsync] Seller {sellerId} loaded from DB and cached.");
         return SellerMapper.ToSellerProfileDto(seller);
     }
 
     public async Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId)
     {
+        var cacheKey = $"seller:user:{userId}";
+        var cached = await _cacheService.GetAsync<Seller>(cacheKey);
+        if (cached != null)
+        {
+            _loggerService.Info($"[GetSellerProfileByUserIdAsync] Cache hit for seller user {userId}");
+            return SellerMapper.ToSellerProfileDto(cached);
+        }
+
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);
         if (seller == null)
+        {
+            _loggerService.Warn($"[GetSellerProfileByUserIdAsync] Seller user {userId} không tồn tại.");
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
+        }
 
+        await _cacheService.SetAsync(cacheKey, seller, TimeSpan.FromHours(1));
+        _loggerService.Info($"[GetSellerProfileByUserIdAsync] Seller user {userId} loaded from DB and cached.");
         return SellerMapper.ToSellerProfileDto(seller);
     }
 
-
     public async Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination)
     {
+        _loggerService.Info($"[GetAllSellersAsync] Lấy danh sách seller. Page: {pagination.PageIndex}, Size: {pagination.PageSize}");
+
         var query = _unitOfWork.Sellers.GetQueryable()
-        .Where(s => !s.IsDeleted)
-        .Include(s => s.User)
-        .AsQueryable();
+            .Where(s => !s.IsDeleted)
+            .Include(s => s.User)
+            .AsQueryable();
 
         if (status.HasValue)
             query = query.Where(s => s.Status == status.Value);
@@ -170,22 +210,22 @@ public class SellerService : ISellerService
 
         var items = sellers.Select(SellerMapper.ToSellerDto).ToList();
 
+        // Không cache toàn bộ danh sách vì có thể rất lớn, chỉ cache từng seller riêng lẻ
         return new Pagination<SellerDto>(items, totalCount, pagination.PageIndex, pagination.PageSize);
     }
 
-    public async Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param,  Guid userId)
+    public async Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param, Guid userId)
     {
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null || !seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
-        _loggerService.Info($"[GetAllAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        _loggerService.Info($"[GetAllProductsAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.Products.GetQueryable()
             .Where(p => !p.IsDeleted && p.SellerId == seller.Id)
             .AsNoTracking();
 
-        // Filter
         if (!string.IsNullOrWhiteSpace(param.Search))
         {
             var keyword = param.Search.Trim().ToLower();
@@ -196,12 +236,11 @@ public class SellerService : ISellerService
         if (param.ProductStatus.HasValue)
             query = query.Where(p => p.Status == param.ProductStatus.ToString());
 
-        // Sort: UpdatedAt desc, CreatedAt desc
         query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
 
         var count = await query.CountAsync();
         if (count == 0)
-            _loggerService.Info("[GetAllAsync] This user don't have any products");
+            _loggerService.Info("[GetAllProductsAsync] Seller không có sản phẩm nào.");
 
         List<Product> items;
         if (param.PageIndex == 0)
@@ -221,7 +260,7 @@ public class SellerService : ISellerService
 
         var cacheKey = $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
-        _loggerService.Info("[GetAllAsync] Product list loaded from DB and cached.");
+        _loggerService.Info("[GetAllProductsAsync] Product list loaded from DB and cached.");
         return result;
     }
 
@@ -231,11 +270,11 @@ public class SellerService : ISellerService
         var cached = await _cacheService.GetAsync<Product>(cacheKey);
         if (cached != null)
         {
-            _loggerService.Info($"[GetByIdAsync] Cache hit for product {id}");
+            _loggerService.Info($"[GetProductByIdAsync] Cache hit for product {id}");
             if (cached.IsDeleted)
                 throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
             var checkSeller = await GetSellerWithUserAsync(userId);
-            if (cached.SellerId != checkSeller.Id )
+            if (cached.SellerId != checkSeller.Id)
                 throw ErrorHelper.Forbidden("Không được phép xem sản phẩm của Seller khác.");
             return _mapper.Map<Product, ProductDto>(cached);
         }
@@ -246,46 +285,36 @@ public class SellerService : ISellerService
 
         if (product == null || product.IsDeleted)
         {
-            _loggerService.Warn($"[GetByIdAsync] Product {id} not found or deleted.");
+            _loggerService.Warn($"[GetProductByIdAsync] Product {id} not found or deleted.");
             throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
         }
 
-       
-
         await _cacheService.SetAsync(cacheKey, product, TimeSpan.FromHours(1));
-        _loggerService.Info($"[GetByIdAsync] Product {id} loaded from DB and cached.");
+        _loggerService.Info($"[GetProductByIdAsync] Product {id} loaded from DB and cached.");
         return _mapper.Map<Product, ProductDto>(product);
     }
 
-    /// <summary>
-    /// Seller tạo sản phẩm mới (chỉ cho phép tạo sản phẩm cho chính mình).
-    /// </summary>
     public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto, IFormFile? productImageUrl)
     {
         var userId = _claimsService.GetCurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
-        if (seller == null )
-        {
-            throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");    
-        }
-
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
         if (!seller.IsVerified)
-        {
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
-        }
-
-
 
         var newProduct = _mapper.Map<ProductSellerCreateDto, ProductCreateDto>(dto);
-        newProduct.SellerId = seller.Id; // Gán SellerId từ seller hiện tại
+        newProduct.SellerId = seller.Id;
 
-        // Gọi ProductService để tạo sản phẩm
-        return await _productService.CreateAsync(newProduct, productImageUrl);
+        var result = await _productService.CreateAsync(newProduct, productImageUrl);
+
+        // Xóa cache danh sách sản phẩm của seller để đảm bảo dữ liệu mới nhất
+        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
+
+        _loggerService.Success($"[CreateProductAsync] Seller {seller.Id} đã tạo sản phẩm mới.");
+        return result;
     }
 
-    /// <summary>
-    /// Seller cập nhật sản phẩm (chỉ cho phép cập nhật sản phẩm của chính mình).
-    /// </summary>
     public async Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto, IFormFile? productImageUrl)
     {
         var userId = _claimsService.GetCurrentUserId;
@@ -293,20 +322,21 @@ public class SellerService : ISellerService
         if (seller == null || !seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
-        // Kiểm tra sản phẩm có thuộc seller này không
         var product = await _unitOfWork.Products.GetByIdAsync(productId);
         if (product == null || product.IsDeleted)
             throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
         if (product.SellerId != seller.Id)
             throw ErrorHelper.Forbidden("Bạn chỉ được phép cập nhật sản phẩm của chính mình.");
 
-        // Gọi ProductService để cập nhật sản phẩm
-        return await _productService.UpdateAsync(productId, dto, productImageUrl);
+        var result = await _productService.UpdateAsync(productId, dto, productImageUrl);
+
+        // Xóa cache danh sách sản phẩm của seller để đảm bảo dữ liệu mới nhất
+        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
+
+        _loggerService.Success($"[UpdateProductAsync] Seller {seller.Id} đã cập nhật sản phẩm {productId}.");
+        return result;
     }
 
-    /// <summary>
-    /// Seller xóa mềm sản phẩm (chỉ cho phép xóa sản phẩm của chính mình).
-    /// </summary>
     public async Task<ProductDto> DeleteProductAsync(Guid productId)
     {
         var userId = _claimsService.GetCurrentUserId;
@@ -314,32 +344,54 @@ public class SellerService : ISellerService
         if (seller == null || !seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
-        // Kiểm tra sản phẩm có thuộc seller này không
         var product = await _unitOfWork.Products.GetByIdAsync(productId);
         if (product == null || product.IsDeleted)
             throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
         if (product.SellerId != seller.Id)
             throw ErrorHelper.Forbidden("Bạn chỉ được phép xóa sản phẩm của chính mình.");
 
-        // Gọi ProductService để xóa sản phẩm
-        return await _productService.DeleteAsync(productId);
+        var result = await _productService.DeleteAsync(productId);
+
+        // Xóa cache danh sách sản phẩm của seller để đảm bảo dữ liệu mới nhất
+        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
+
+        _loggerService.Success($"[DeleteProductAsync] Seller {seller.Id} đã xóa sản phẩm {productId}.");
+        return result;
     }
 
-
-
-    //private method
+    // ----------------- PRIVATE HELPER METHODS -----------------
 
     private async Task<Seller> GetSellerWithUserAsync(Guid sellerId)
     {
         var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId, x => x.User);
         if (seller == null)
+        {
+            _loggerService.Warn($"[GetSellerWithUserAsync] Seller {sellerId} không tồn tại.");
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
+        }
 
         if (seller.User == null)
+        {
+            _loggerService.Error($"[GetSellerWithUserAsync] Seller {sellerId} không có thông tin user.");
             throw ErrorHelper.Internal("Dữ liệu user không hợp lệ.");
+        }
 
         return seller;
     }
 
-    
+    private static void ValidateSellerInfoDto(UpdateSellerInfoDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.FullName))
+            throw ErrorHelper.BadRequest("Họ tên không được để trống.");
+        if (string.IsNullOrWhiteSpace(dto.PhoneNumber))
+            throw ErrorHelper.BadRequest("Số điện thoại không được để trống.");
+        if (dto.DateOfBirth == default)
+            throw ErrorHelper.BadRequest("Ngày sinh không hợp lệ.");
+        if (string.IsNullOrWhiteSpace(dto.CompanyName))
+            throw ErrorHelper.BadRequest("Tên công ty không được để trống.");
+        if (string.IsNullOrWhiteSpace(dto.TaxId))
+            throw ErrorHelper.BadRequest("Mã số thuế không được để trống.");
+        if (string.IsNullOrWhiteSpace(dto.CompanyAddress))
+            throw ErrorHelper.BadRequest("Địa chỉ công ty không được để trống.");
+    }
 }
