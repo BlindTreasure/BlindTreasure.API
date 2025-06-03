@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
 
-[Route("api/personal")]
+[Route("api/me")]
 [ApiController]
 public class PersonalController : ControllerBase
 {
@@ -25,10 +25,10 @@ public class PersonalController : ControllerBase
     }
 
     /// <summary>
-    ///     Lấy thông tin Seller theo userId hiện tại.
+    ///     Lấy thông tin Seller theo userId login hiện tại.
     /// </summary>
     [Authorize]
-    [HttpGet("me/seller-profile")]
+    [HttpGet("seller-profile")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     public async Task<IActionResult> GetSellerDetails()
     {
@@ -48,9 +48,9 @@ public class PersonalController : ControllerBase
 
 
     /// <summary>
-    ///     Lấy thông tin user theo id.
+    ///     Lấy thông tin profile cá nhân user theo id đang login.
     /// </summary>
-    [HttpGet("me")]
+    [HttpGet()]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
     public async Task<IActionResult> GetUserProfile()
@@ -73,7 +73,7 @@ public class PersonalController : ControllerBase
     }
 
     [Authorize]
-    [HttpPut("me")]
+    [HttpPut()]
     [ProducesResponseType(typeof(ApiResult<UpdateProfileDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
@@ -100,7 +100,7 @@ public class PersonalController : ControllerBase
     ///     Customer cập nhật thông tin cá nhân.
     /// </summary>
     [Authorize]
-    [HttpPut("me/avatar")]
+    [HttpPut("avatar")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
     public async Task<IActionResult> UpdateAvatar(IFormFile file)
@@ -121,7 +121,7 @@ public class PersonalController : ControllerBase
     ///     Seller cập nhật thông tin cá nhân và doanh nghiệp của mình.
     /// </summary>
     [Authorize(Roles = "Seller")]
-    [HttpPut("me/seller-profile")]
+    [HttpPut("seller-profile")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
     public async Task<IActionResult> UpdateSellerProfile([FromBody] UpdateSellerInfoDto dto)

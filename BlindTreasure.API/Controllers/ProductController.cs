@@ -3,6 +3,7 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Infrastructure.Commons;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
@@ -20,7 +21,7 @@ public class ProductController : ControllerBase
 
 
     /// <summary>
-    ///     Lấy danh sách sản phẩm của Seller (có phân trang).
+    ///     Lấy danh sách sản phẩm dùng chung mọi role (có phân trang).
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResult<Pagination<ProductDto>>), 200)]
@@ -49,7 +50,7 @@ public class ProductController : ControllerBase
 
 
     /// <summary>
-    ///     Lấy chi tiết sản phẩm theo Id.
+    ///     Lấy chi tiết sản phẩm theo Id dùng chung cho mọi role.
     /// </summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
@@ -70,9 +71,10 @@ public class ProductController : ControllerBase
     }
 
     /// <summary>
-    ///     đăngg ký sản phẩm mới.
+    ///     đăng ký sản phẩm mới cho seller, có field user id 
     /// </summary>
     [HttpPost]
+    [Authorize]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
     public async Task<IActionResult> Create([FromForm] ProductCreateDto dto, IFormFile? productImageUrl)
@@ -91,9 +93,10 @@ public class ProductController : ControllerBase
     }
 
     // <summary>
-    /// Cập nhật sản phẩm.
+    /// Cập nhật sản phẩm  dùng cho các role quản trị như admin, staff (seller).
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
@@ -113,9 +116,10 @@ public class ProductController : ControllerBase
     }
 
     /// <summary>
-    ///     Xóa mềm sản phẩm.
+    ///     Xóa mềm sản phẩm dùng cho các role quản trị như admin, staff (seller).
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
     public async Task<IActionResult> Delete(Guid id)
@@ -136,6 +140,7 @@ public class ProductController : ControllerBase
     /// Cập nhật ảnh sản phẩm.
     /// </summary>
     [HttpPut("{id}/image")]
+    [Authorize]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult<string>), 400)]
     [ProducesResponseType(typeof(ApiResult<string>), 404)]

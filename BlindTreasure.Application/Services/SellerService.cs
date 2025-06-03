@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -19,14 +20,21 @@ public class SellerService : ISellerService
     private readonly IEmailService _emailService;
     private readonly ILoggerService _loggerService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cacheService;
+    private readonly IMapperService _mapper;
+    private readonly IClaimsService _claimsService;
+    private readonly IProductService _productService;
 
-    public SellerService(IUnitOfWork unitOfWork, ILoggerService loggerService, IEmailService emailService,
-        IBlobService blobService)
+    public SellerService(IBlobService blobService, IEmailService emailService, ILoggerService loggerService, IUnitOfWork unitOfWork, ICacheService cacheService, IMapperService mapper, IClaimsService claimsService, IProductService productService)
     {
-        _unitOfWork = unitOfWork;
-        _loggerService = loggerService;
-        _emailService = emailService;
         _blobService = blobService;
+        _emailService = emailService;
+        _loggerService = loggerService;
+        _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
+        _mapper = mapper;
+        _claimsService = claimsService;
+        _productService = productService;
     }
 
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
@@ -135,31 +143,195 @@ public class SellerService : ISellerService
     public async Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination)
     {
         var query = _unitOfWork.Sellers.GetQueryable()
-            .Where(s => !s.IsDeleted)
-            .Include(s => s.User)
-            .AsQueryable();
+        .Where(s => !s.IsDeleted)
+        .Include(s => s.User)
+        .AsQueryable();
 
         if (status.HasValue)
             query = query.Where(s => s.Status == status.Value);
 
+        // Sort mặc định: UpdatedAt desc, CreatedAt desc
+        query = query.OrderByDescending(s => s.UpdatedAt ?? s.CreatedAt);
+
         var totalCount = await query.CountAsync();
 
-        var sellers = await query
-            .Skip((pagination.PageIndex - 1) * pagination.PageSize)
-            .Take(pagination.PageSize)
-            .ToListAsync();
+        List<Seller> sellers;
+        if (pagination.PageIndex == 0)
+        {
+            sellers = await query.ToListAsync();
+        }
+        else
+        {
+            sellers = await query
+                .Skip((pagination.PageIndex - 1) * pagination.PageSize)
+                .Take(pagination.PageSize)
+                .ToListAsync();
+        }
 
         var items = sellers.Select(SellerMapper.ToSellerDto).ToList();
 
         return new Pagination<SellerDto>(items, totalCount, pagination.PageIndex, pagination.PageSize);
     }
 
+    public async Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param,  Guid userId)
+    {
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null || !seller.IsVerified)
+            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+
+        _loggerService.Info($"[GetAllAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
+
+        var query = _unitOfWork.Products.GetQueryable()
+            .Where(p => !p.IsDeleted && p.SellerId == seller.Id)
+            .AsNoTracking();
+
+        // Filter
+        if (!string.IsNullOrWhiteSpace(param.Search))
+        {
+            var keyword = param.Search.Trim().ToLower();
+            query = query.Where(p => p.Name.ToLower().Contains(keyword));
+        }
+        if (param.CategoryId.HasValue)
+            query = query.Where(p => p.CategoryId == param.CategoryId.Value);
+        if (param.ProductStatus.HasValue)
+            query = query.Where(p => p.Status == param.ProductStatus.ToString());
+
+        // Sort: UpdatedAt desc, CreatedAt desc
+        query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
+
+        var count = await query.CountAsync();
+        if (count == 0)
+            _loggerService.Info("[GetAllAsync] This user don't have any products");
+
+        List<Product> items;
+        if (param.PageIndex == 0)
+        {
+            items = await query.ToListAsync();
+        }
+        else
+        {
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+        }
+
+        var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
+        var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
+
+        var cacheKey = $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:UpdatedAtDesc";
+        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
+        _loggerService.Info("[GetAllAsync] Product list loaded from DB and cached.");
+        return result;
+    }
+
+    public async Task<ProductDto?> GetProductByIdAsync(Guid id, Guid userId)
+    {
+        var cacheKey = $"product:{id}";
+        var cached = await _cacheService.GetAsync<Product>(cacheKey);
+        if (cached != null)
+        {
+            _loggerService.Info($"[GetByIdAsync] Cache hit for product {id}");
+            if (cached.IsDeleted)
+                throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+            var checkSeller = await GetSellerWithUserAsync(userId);
+            if (cached.SellerId != checkSeller.Id )
+                throw ErrorHelper.Forbidden("Không được phép xem sản phẩm của Seller khác.");
+            return _mapper.Map<Product, ProductDto>(cached);
+        }
+
+        var product = await _unitOfWork.Products.GetQueryable()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (product == null || product.IsDeleted)
+        {
+            _loggerService.Warn($"[GetByIdAsync] Product {id} not found or deleted.");
+            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+        }
+
+       
+
+        await _cacheService.SetAsync(cacheKey, product, TimeSpan.FromHours(1));
+        _loggerService.Info($"[GetByIdAsync] Product {id} loaded from DB and cached.");
+        return _mapper.Map<Product, ProductDto>(product);
+    }
+
+    /// <summary>
+    /// Seller tạo sản phẩm mới (chỉ cho phép tạo sản phẩm cho chính mình).
+    /// </summary>
+    public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto, IFormFile? productImageUrl)
+    {
+        var userId = _claimsService.GetCurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null )
+        {
+            throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");    
+        }
+
+        if (!seller.IsVerified)
+        {
+            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+        }
+
+
+
+        var newProduct = _mapper.Map<ProductSellerCreateDto, ProductCreateDto>(dto);
+        newProduct.SellerId = seller.Id; // Gán SellerId từ seller hiện tại
+
+        // Gọi ProductService để tạo sản phẩm
+        return await _productService.CreateAsync(newProduct, productImageUrl);
+    }
+
+    /// <summary>
+    /// Seller cập nhật sản phẩm (chỉ cho phép cập nhật sản phẩm của chính mình).
+    /// </summary>
+    public async Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto, IFormFile? productImageUrl)
+    {
+        var userId = _claimsService.GetCurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null || !seller.IsVerified)
+            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+
+        // Kiểm tra sản phẩm có thuộc seller này không
+        var product = await _unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null || product.IsDeleted)
+            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+        if (product.SellerId != seller.Id)
+            throw ErrorHelper.Forbidden("Bạn chỉ được phép cập nhật sản phẩm của chính mình.");
+
+        // Gọi ProductService để cập nhật sản phẩm
+        return await _productService.UpdateAsync(productId, dto, productImageUrl);
+    }
+
+    /// <summary>
+    /// Seller xóa mềm sản phẩm (chỉ cho phép xóa sản phẩm của chính mình).
+    /// </summary>
+    public async Task<ProductDto> DeleteProductAsync(Guid productId)
+    {
+        var userId = _claimsService.GetCurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null || !seller.IsVerified)
+            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+
+        // Kiểm tra sản phẩm có thuộc seller này không
+        var product = await _unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null || product.IsDeleted)
+            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+        if (product.SellerId != seller.Id)
+            throw ErrorHelper.Forbidden("Bạn chỉ được phép xóa sản phẩm của chính mình.");
+
+        // Gọi ProductService để xóa sản phẩm
+        return await _productService.DeleteAsync(productId);
+    }
+
+
 
     //private method
 
     private async Task<Seller> GetSellerWithUserAsync(Guid sellerId)
     {
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.Id == sellerId, s => s.User);
+        var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId, x => x.User);
         if (seller == null)
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
 
@@ -168,4 +340,6 @@ public class SellerService : ISellerService
 
         return seller;
     }
+
+    
 }
