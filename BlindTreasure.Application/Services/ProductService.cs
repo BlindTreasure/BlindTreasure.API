@@ -120,7 +120,7 @@ public class ProductService : IProductService
     public async Task<ProductDto> CreateAsync(ProductCreateDto dto, IFormFile? productImageUrl)
     {
         var userId = _claimsService.GetCurrentUserId;
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId, x=> x.User);
         if (seller == null || !seller.IsVerified || seller.Status != SellerStatus.Approved)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
         _logger.Info($"[CreateAsync] Seller {userId} creates product {dto.Name}");
@@ -288,13 +288,6 @@ public class ProductService : IProductService
 
 
     #region PRIVATE HELPER METHODS
-    private async Task<Guid> GetSellerIdByUserId(Guid userId)
-    {
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
-        if (seller == null )
-            throw ErrorHelper.Forbidden("Không tìm thấy seller.");
-        return seller.Id;
-    }
 
     private async Task ValidateProductDto(ProductCreateDto dto)
     {

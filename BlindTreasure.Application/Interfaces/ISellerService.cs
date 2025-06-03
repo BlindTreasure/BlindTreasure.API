@@ -16,4 +16,7 @@ public interface ISellerService
     Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination);
     Task<ProductDto?> GetProductByIdAsync(Guid id, Guid userId);
     Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param, Guid userId);
+    Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto, IFormFile? productImageUrl);
+    Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto, IFormFile? productImageUrl);
+    Task<ProductDto> DeleteProductAsync(Guid productId);
 }

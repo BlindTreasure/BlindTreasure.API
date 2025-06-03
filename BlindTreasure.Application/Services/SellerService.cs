@@ -22,8 +22,10 @@ public class SellerService : ISellerService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
     private readonly IMapperService _mapper;
+    private readonly IClaimsService _claimsService;
+    private readonly IProductService _productService;
 
-    public SellerService(IBlobService blobService, IEmailService emailService, ILoggerService loggerService, IUnitOfWork unitOfWork, ICacheService cacheService, IMapperService mapper)
+    public SellerService(IBlobService blobService, IEmailService emailService, ILoggerService loggerService, IUnitOfWork unitOfWork, ICacheService cacheService, IMapperService mapper, IClaimsService claimsService, IProductService productService)
     {
         _blobService = blobService;
         _emailService = emailService;
@@ -31,6 +33,8 @@ public class SellerService : ISellerService
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _mapper = mapper;
+        _claimsService = claimsService;
+        _productService = productService;
     }
 
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
@@ -139,19 +143,30 @@ public class SellerService : ISellerService
     public async Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination)
     {
         var query = _unitOfWork.Sellers.GetQueryable()
-            .Where(s => !s.IsDeleted)
-            .Include(s => s.User)
-            .AsQueryable();
+        .Where(s => !s.IsDeleted)
+        .Include(s => s.User)
+        .AsQueryable();
 
         if (status.HasValue)
             query = query.Where(s => s.Status == status.Value);
 
+        // Sort mặc định: UpdatedAt desc, CreatedAt desc
+        query = query.OrderByDescending(s => s.UpdatedAt ?? s.CreatedAt);
+
         var totalCount = await query.CountAsync();
 
-        var sellers = await query
-            .Skip((pagination.PageIndex - 1) * pagination.PageSize)
-            .Take(pagination.PageSize)
-            .ToListAsync();
+        List<Seller> sellers;
+        if (pagination.PageIndex == 0)
+        {
+            sellers = await query.ToListAsync();
+        }
+        else
+        {
+            sellers = await query
+                .Skip((pagination.PageIndex - 1) * pagination.PageSize)
+                .Take(pagination.PageSize)
+                .ToListAsync();
+        }
 
         var items = sellers.Select(SellerMapper.ToSellerDto).ToList();
 
@@ -242,12 +257,81 @@ public class SellerService : ISellerService
         return _mapper.Map<Product, ProductDto>(product);
     }
 
+    /// <summary>
+    /// Seller tạo sản phẩm mới (chỉ cho phép tạo sản phẩm cho chính mình).
+    /// </summary>
+    public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto, IFormFile? productImageUrl)
+    {
+        var userId = _claimsService.GetCurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null )
+        {
+            throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");    
+        }
+
+        if (!seller.IsVerified)
+        {
+            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+        }
+
+
+
+        var newProduct = _mapper.Map<ProductSellerCreateDto, ProductCreateDto>(dto);
+        newProduct.SellerId = seller.Id; // Gán SellerId từ seller hiện tại
+
+        // Gọi ProductService để tạo sản phẩm
+        return await _productService.CreateAsync(newProduct, productImageUrl);
+    }
+
+    /// <summary>
+    /// Seller cập nhật sản phẩm (chỉ cho phép cập nhật sản phẩm của chính mình).
+    /// </summary>
+    public async Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto, IFormFile? productImageUrl)
+    {
+        var userId = _claimsService.GetCurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null || !seller.IsVerified)
+            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+
+        // Kiểm tra sản phẩm có thuộc seller này không
+        var product = await _unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null || product.IsDeleted)
+            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+        if (product.SellerId != seller.Id)
+            throw ErrorHelper.Forbidden("Bạn chỉ được phép cập nhật sản phẩm của chính mình.");
+
+        // Gọi ProductService để cập nhật sản phẩm
+        return await _productService.UpdateAsync(productId, dto, productImageUrl);
+    }
+
+    /// <summary>
+    /// Seller xóa mềm sản phẩm (chỉ cho phép xóa sản phẩm của chính mình).
+    /// </summary>
+    public async Task<ProductDto> DeleteProductAsync(Guid productId)
+    {
+        var userId = _claimsService.GetCurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null || !seller.IsVerified)
+            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+
+        // Kiểm tra sản phẩm có thuộc seller này không
+        var product = await _unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null || product.IsDeleted)
+            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+        if (product.SellerId != seller.Id)
+            throw ErrorHelper.Forbidden("Bạn chỉ được phép xóa sản phẩm của chính mình.");
+
+        // Gọi ProductService để xóa sản phẩm
+        return await _productService.DeleteAsync(productId);
+    }
+
+
 
     //private method
 
     private async Task<Seller> GetSellerWithUserAsync(Guid sellerId)
     {
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.Id == sellerId, s => s.User);
+        var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId, x => x.User);
         if (seller == null)
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
 
@@ -256,4 +340,6 @@ public class SellerService : ISellerService
 
         return seller;
     }
+
+    
 }

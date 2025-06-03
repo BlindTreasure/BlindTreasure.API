@@ -149,7 +149,7 @@ public class UserService : IUserService
 
         var total = await query.CountAsync();
         if (total == 0)
-            throw ErrorHelper.NotFound("Không tìm thấy người dùng nào.");
+            _logger.Info("Không tìm thấy người dùng nào.");
 
         List<User> users;
         if (param.PageIndex == 0)
