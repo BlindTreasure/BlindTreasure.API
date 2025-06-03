@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250527082210_add-rejectReason")]
-    partial class addrejectReason
+    [Migration("20250602065403_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -136,10 +136,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric");
 
-                    b.Property<string>("ProbabilityConfig")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("ReleaseDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -195,9 +191,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsSecret")
-                        .HasColumnType("boolean");
-
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
@@ -206,20 +199,14 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<string>("Rarity")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Sku")
-                        .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uuid");
-
-                    b.Property<decimal>("Weight")
-                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -910,6 +897,9 @@ namespace BlindTreasure.Domain.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Brand")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid");
 
@@ -929,6 +919,9 @@ namespace BlindTreasure.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<decimal?>("Height")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("ImageUrl")
                         .IsRequired()
                         .HasColumnType("text");
@@ -936,12 +929,19 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Material")
+                        .HasColumnType("text");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric");
+
+                    b.Property<string>("ProductType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<Guid>("SellerId")
                         .HasColumnType("uuid");
@@ -1140,7 +1140,6 @@ namespace BlindTreasure.Domain.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("CompanyName")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1170,7 +1169,6 @@ namespace BlindTreasure.Domain.Migrations
                         .HasColumnType("character varying(32)");
 
                     b.Property<string>("TaxId")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")

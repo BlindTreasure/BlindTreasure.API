@@ -99,6 +99,11 @@ public class BlindTreasureDbContext : DbContext
             .Property(p => p.ProductType)
             .HasConversion<string>()
             .HasMaxLength(32); // nếu cần giới hạn
+        
+        modelBuilder.Entity<BlindBoxItem>()
+            .Property(p => p.Rarity)
+            .HasConversion<string>()
+            .HasMaxLength(32); // nếu cần giới hạn
 
 
         // User ↔ Seller (1-1)
