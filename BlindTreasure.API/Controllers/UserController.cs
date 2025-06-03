@@ -77,7 +77,6 @@ public class UserController : ControllerBase
     }
 
     /// <summary>
-    ///     Cập nhật trạng thái user (ban, deactive, active lại, ...).
     /// </summary>
     [HttpPut("{userId}/status")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
