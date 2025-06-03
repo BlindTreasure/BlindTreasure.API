@@ -71,7 +71,7 @@ public class ProductController : ControllerBase
     }
 
     /// <summary>
-    ///     đăng ký sản phẩm mới cho seller.
+    ///     đăng ký sản phẩm mới cho seller, có field user id 
     /// </summary>
     [HttpPost]
     [Authorize]
