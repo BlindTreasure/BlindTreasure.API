@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BlindTreasure.Domain.DTOs.Pagination
 {
-    public class ProductQueryParameter : PaginationParameter
+    public class SellerProductQueryParameter
     {
         /// <summary>
         ///     Tìm kiếm theo tên sản phẩm.
@@ -21,9 +21,8 @@ namespace BlindTreasure.Domain.DTOs.Pagination
         /// <summary>
         ///     Lọc theo trạng thái sản phẩm.
         /// </summary>
-        public ProductStatus? ProductStatus { get; set; }
+        public string? Status { get; set; }
 
-        public Guid? SellerId { get; set; }
 
         /// <summary>
         ///     Sắp xếp theo trường nào. Mặc định: CreatedAt.
@@ -35,13 +34,5 @@ namespace BlindTreasure.Domain.DTOs.Pagination
         ///     Sắp xếp giảm dần (true) hay tăng dần (false).
         /// </summary>
         public bool Desc { get; set; } = true;
-    }
-
-    public enum ProductSortField
-    {
-        CreatedAt,
-        Name,
-        Price,
-        Stock
     }
 }

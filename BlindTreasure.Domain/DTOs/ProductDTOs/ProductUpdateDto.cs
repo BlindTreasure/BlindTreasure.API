@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace BlindTreasure.Domain.DTOs.ProductDTOs;
 
-public class ProductUpdateDto
+public class ProductUpdateDto 
 {
     [Required] [MaxLength(100)] public string Name { get; set; }
 
@@ -25,3 +25,4 @@ public class ProductUpdateDto
     public string? Brand { get; set; }
 
 }
+
