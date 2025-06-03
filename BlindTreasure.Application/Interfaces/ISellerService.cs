@@ -14,6 +14,6 @@ public interface ISellerService
     Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId);
     Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto);
     Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination);
-    Task<ProductDto?> GetByIdAsync(Guid id, Guid userId);
-    Task<Pagination<ProductDto>> GetAllAsync(ProductQueryParameter param, Guid userId);
+    Task<ProductDto?> GetProductByIdAsync(Guid id, Guid userId);
+    Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param, Guid userId);
 }

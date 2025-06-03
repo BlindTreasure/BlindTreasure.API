@@ -39,9 +39,11 @@ public class ProductService : IProductService
         _blobService = blobService;
     }
 
+    /// <summary>
+    /// API dùng chung cho mọi role: lấy chi tiết sản phẩm theo Id (không ràng buộc seller).
+    /// </summary>
     public async Task<ProductDto?> GetByIdAsync(Guid id)
     {
-        var userId = _claimsService.GetCurrentUserId;
         var cacheKey = $"product:{id}";
         var cached = await _cacheService.GetAsync<Product>(cacheKey);
         if (cached != null)
@@ -49,8 +51,6 @@ public class ProductService : IProductService
             _logger.Info($"[GetByIdAsync] Cache hit for product {id}");
             if (cached.IsDeleted)
                 throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
-            //if (cached.SellerId != await GetSellerIdByUserId(userId))
-            //    throw ErrorHelper.Forbidden("Không được phép xem sản phẩm của Seller khác.");
             return _mapper.Map<Product, ProductDto>(cached);
         }
 
@@ -63,9 +63,6 @@ public class ProductService : IProductService
             _logger.Warn($"[GetByIdAsync] Product {id} not found or deleted.");
             throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
         }
-
-        if (product.SellerId != await GetSellerIdByUserId(userId))
-            throw ErrorHelper.Forbidden("Không được phép xem sản phẩm của Seller khác.");
 
         await _cacheService.SetAsync(cacheKey, product, TimeSpan.FromHours(1));
         _logger.Info($"[GetByIdAsync] Product {id} loaded from DB and cached.");
@@ -88,8 +85,8 @@ public class ProductService : IProductService
         }
         if (param.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
-        if (!string.IsNullOrWhiteSpace(param.Status))
-            query = query.Where(p => p.Status == param.Status);
+        if (param.ProductStatus.HasValue)
+            query = query.Where(p => p.Status == param.ProductStatus.ToString());
         if (param.SellerId.HasValue)
             query = query.Where(p => p.SellerId == param.SellerId.Value);
 
@@ -114,7 +111,7 @@ public class ProductService : IProductService
         var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
         var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
 
-        var cacheKey = $"product:all:public:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.Status}:{param.SellerId}:UpdatedAtDesc";
+        var cacheKey = $"product:all:public:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:{param.SellerId}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         _logger.Info("[GetAllAsync] Product list loaded from DB and cached.");
         return result;
@@ -180,9 +177,9 @@ public class ProductService : IProductService
         //if (product.SellerId != await GetSellerIdByUserId(userId))
         //    throw ErrorHelper.Forbidden("Không được phép thao tác sản phẩm của Seller khác.");
 
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
-        if (seller == null || !seller.IsVerified)
-            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+        //var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        //if (seller == null || !seller.IsVerified)
+        //    throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
         _logger.Info($"[UpdateAsync] Seller {userId} updates product {product.Name}");
 
@@ -214,8 +211,8 @@ public class ProductService : IProductService
         await _unitOfWork.SaveChangesAsync();
 
         await _cacheService.RemoveAsync($"product:{id}");
-        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
-        _logger.Success($"[UpdateAsync] Product {id} updated by seller {userId}");
+        await _cacheService.RemoveByPatternAsync($"product:all:{userId}");
+        _logger.Success($"[UpdateAsync] Product {id} updated by user {userId}");
         return _mapper.Map<Product, ProductDto>(product);
     }
 
@@ -241,7 +238,7 @@ public class ProductService : IProductService
 
         await _cacheService.RemoveAsync($"product:{id}");
         await _cacheService.RemoveByPatternAsync($"product:all:{product.SellerId}");
-        _logger.Success($"[DeleteAsync] Product {id} soft deleted by seller {userId}");
+        _logger.Success($"[DeleteAsync] Product {id} soft deleted by user {userId}");
         return _mapper.Map<Product, ProductDto>(product);
     }
 
@@ -284,7 +281,7 @@ public class ProductService : IProductService
         await _cacheService.SetAsync($"product:{product.Id}", product, TimeSpan.FromHours(1));
         await _cacheService.SetAsync($"user:{product.Id}", product, TimeSpan.FromHours(1));
 
-        _logger.Success($"[UploadAvatarAsync] Đã cập nhật avatar thành công cho user {product.Id} && {product.Name}");
+        _logger.Success($"[UploadAvatarAsync] Đã cập nhật image thành công cho product {product.Id} tên {product.Name}");
 
         return fileUrl;
     }

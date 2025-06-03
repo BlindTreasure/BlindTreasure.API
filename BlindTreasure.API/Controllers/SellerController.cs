@@ -1,6 +1,8 @@
 ﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
@@ -117,6 +119,62 @@ public class SellerController : ControllerBase
             var status = ExceptionUtils.ExtractStatusCode(ex);
             var error = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(status, error);
+        }
+    }
+
+    /// <summary>
+    ///     Lấy danh sách sản phẩm của Seller (có phân trang).
+    /// </summary>
+    [HttpGet("products")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResult<Pagination<ProductDto>>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 404)]
+    public async Task<IActionResult> GetAll([FromQuery] ProductQueryParameter param)
+    {
+        try
+        {
+            var userId = _claimsService.GetCurrentUserId;
+
+            var result = await _sellerService.GetAllProductsAsync(param, userId);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách sản phẩm thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+
+    /// <summary>
+    ///     Lấy chi tiết sản phẩm theo Id seller.
+    /// </summary>
+    [HttpGet("products/{id}")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        try
+        {
+            var userId = _claimsService.GetCurrentUserId;
+
+            var result = await _sellerService.GetProductByIdAsync(id,userId);
+            return Ok(ApiResult<ProductDto>.Success(result, "200", "Lấy thông tin sản phẩm thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ProductDto>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
 }

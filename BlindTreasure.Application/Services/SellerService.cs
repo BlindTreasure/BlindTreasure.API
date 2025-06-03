@@ -158,7 +158,7 @@ public class SellerService : ISellerService
         return new Pagination<SellerDto>(items, totalCount, pagination.PageIndex, pagination.PageSize);
     }
 
-    public async Task<Pagination<ProductDto>> GetAllAsync(ProductQueryParameter param,  Guid userId)
+    public async Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param,  Guid userId)
     {
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null || !seller.IsVerified)
@@ -178,8 +178,8 @@ public class SellerService : ISellerService
         }
         if (param.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
-        if (!string.IsNullOrWhiteSpace(param.Status))
-            query = query.Where(p => p.Status == param.Status);
+        if (param.ProductStatus.HasValue)
+            query = query.Where(p => p.Status == param.ProductStatus.ToString());
 
         // Sort: UpdatedAt desc, CreatedAt desc
         query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
@@ -204,13 +204,13 @@ public class SellerService : ISellerService
         var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
         var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
 
-        var cacheKey = $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.Status}:UpdatedAtDesc";
+        var cacheKey = $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         _loggerService.Info("[GetAllAsync] Product list loaded from DB and cached.");
         return result;
     }
 
-    public async Task<ProductDto?> GetByIdAsync(Guid id, Guid userId)
+    public async Task<ProductDto?> GetProductByIdAsync(Guid id, Guid userId)
     {
         var cacheKey = $"product:{id}";
         var cached = await _cacheService.GetAsync<Product>(cacheKey);

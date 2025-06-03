@@ -114,7 +114,7 @@ public class CategoryService : ICategoryService
             throw ErrorHelper.BadRequest("Tên category không được để trống.");
 
         // Validate tên duy nhất
-        var exists = await _unitOfWork.Categories.GetQueryable()
+        var exists = await _unitOfWork.Categories.GetQueryable().Where(x => x.IsDeleted == false)
             .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower());
         if (exists)
             throw ErrorHelper.Conflict("Tên danh mục đã tồn tại trong hệ thống.");
@@ -156,7 +156,7 @@ public class CategoryService : ICategoryService
 
         if (!string.IsNullOrWhiteSpace(dto.Name))
         {
-            var exists = await _unitOfWork.Categories.GetQueryable()
+            var exists = await _unitOfWork.Categories.GetQueryable().Where(x=> x.IsDeleted==false)
                 .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower() && c.Id != id);
             if (exists)
                 throw ErrorHelper.Conflict("Tên danh mục đã tồn tại trong hệ thống.");

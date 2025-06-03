@@ -6,5 +6,6 @@ using System.Threading.Tasks;
 
 public enum ProductStatus
 {
-    Active
+    Active,
+    InActive
 }
