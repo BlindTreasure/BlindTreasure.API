@@ -184,11 +184,11 @@ public class SellerController : ControllerBase
     [Authorize]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
-    public async Task<IActionResult> CreateProduct([FromForm] ProductSellerCreateDto dto, IFormFile? productImageUrl)
+    public async Task<IActionResult> CreateProduct([FromForm] ProductSellerCreateDto dto)
     {
         try
         {
-            var result = await _sellerService.CreateProductAsync(dto, productImageUrl);
+            var result = await _sellerService.CreateProductAsync(dto);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Tạo sản phẩm thành công."));
         }
         catch (Exception ex)

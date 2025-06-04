@@ -256,7 +256,7 @@ public class SellerService : ISellerService
     /// <summary>
     ///     Seller tạo sản phẩm mới (chỉ cho phép tạo sản phẩm cho chính mình).
     /// </summary>
-    public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto, IFormFile? productImageUrl)
+    public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto)
     {
         var userId = _claimsService.GetCurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
@@ -269,7 +269,7 @@ public class SellerService : ISellerService
         newProduct.SellerId = seller.Id; // Gán SellerId từ seller hiện tại
 
         // Gọi ProductService để tạo sản phẩm
-        return await _productService.CreateAsync(newProduct, productImageUrl);
+        return await _productService.CreateAsync(newProduct);
     }
 
     /// <summary>
