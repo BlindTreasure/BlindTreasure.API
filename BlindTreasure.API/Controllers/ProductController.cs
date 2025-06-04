@@ -71,7 +71,7 @@ public class ProductController : ControllerBase
     }
 
     /// <summary>
-    ///     đăng ký sản phẩm mới cho seller, có field user id
+    ///     đăng ký sản phẩm mới cho seller, có field user id. Dùng cho các role quản trị
     /// </summary>
     [HttpPost]
     [Authorize]
@@ -138,7 +138,7 @@ public class ProductController : ControllerBase
     }
 
     /// <summary>
-    ///     Cập nhật ảnh sản phẩm.
+    /// Cập nhật ảnh sản phẩm. Backup
     /// </summary>
     [HttpPut("{id}/image")]
     [Authorize]
