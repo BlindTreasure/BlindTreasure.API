@@ -2,7 +2,6 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UserDTOs;
-using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -81,11 +80,11 @@ public class UserController : ControllerBase
     [HttpPut("{userId}/status")]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
-    public async Task<IActionResult> UpdateUserStatus(Guid userId, [FromForm] UserStatus status)
+    public async Task<IActionResult> UpdateUserStatus(Guid userId, [FromBody] UpdateUserStatusDto dto)
     {
         try
         {
-            var result = await _userService.UpdateUserStatusAsync(userId, status);
+            var result = await _userService.UpdateUserStatusAsync(userId, dto.Status, dto.Reason);
             if (result == null)
                 return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
             return Ok(ApiResult<UserDto>.Success(result, "200", "Cập nhật trạng thái user thành công."));

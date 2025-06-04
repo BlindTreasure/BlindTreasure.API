@@ -22,8 +22,7 @@ public class ProductSellerCreateDto
     [DefaultValue("Mô hình robot cao cấp, phiên bản giới hạn.")]
     public string Description { get; set; }
 
-    [Required]
-    public Guid CategoryId { get; set; }
+    [Required] public Guid CategoryId { get; set; }
 
     [Required]
     [Range(0.01, double.MaxValue)]
@@ -39,17 +38,14 @@ public class ProductSellerCreateDto
     [DefaultValue(ProductStatus.Active)]
     public ProductStatus Status { get; set; }
 
-    [DefaultValue(15.5)]
-    public decimal? Height { get; set; }
+    [DefaultValue(15.5)] public decimal? Height { get; set; }
 
-    [DefaultValue("Nhựa ABS cao cấp")]
-    public string? Material { get; set; }
+    [DefaultValue("Nhựa ABS cao cấp")] public string? Material { get; set; }
 
     [DefaultValue(ProductSaleType.DirectSale)]
     public ProductSaleType? ProductType { get; set; }
 
-    [DefaultValue("Bandai")]
-    public string? Brand { get; set; }
+    [DefaultValue("Bandai")] public string? Brand { get; set; }
 
     [MaxLength(6, ErrorMessage = "Tối đa 6 ảnh.")]
     public List<IFormFile>? Images { get; set; }
