@@ -75,7 +75,7 @@ public class BlindBoxesController : ControllerBase
     [HttpPost("{id}/items")]
     [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
     [ProducesResponseType(400)]
-    public async Task<ActionResult<BlindBoxDetailDto>> AddItems(Guid id, [FromBody] List<BlindBoxItemDto> items)
+    public async Task<ActionResult<BlindBoxDetailDto>> AddItems(Guid id, [FromForm] List<BlindBoxItemDto> items)
     {
         try
         {
