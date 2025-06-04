@@ -1,4 +1,6 @@
-﻿public class CreateBlindBoxDto
+﻿namespace BlindTreasure.Domain.DTOs.BlindBoxDTOs;
+
+public class CreateBlindBoxDto
 {
     public string Name { get; set; }
     public decimal Price { get; set; }

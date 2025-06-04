@@ -1,5 +1,9 @@
-﻿public enum ProductStatus
+﻿namespace BlindTreasure.Domain.Enums;
+
+public enum ProductStatus
 {
-    Active,
-    InActive
+    New,         
+    Active,      
+    OutOfStock,  
+    InActive,     
 }

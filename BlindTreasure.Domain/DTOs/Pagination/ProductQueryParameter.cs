@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.DTOs.Pagination;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.DTOs.Pagination;
 
 public class ProductQueryParameter : PaginationParameter
 {

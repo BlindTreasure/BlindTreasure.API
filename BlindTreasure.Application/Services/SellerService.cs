@@ -231,7 +231,7 @@ public class SellerService : ISellerService
         if (param.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
         if (param.ProductStatus.HasValue)
-            query = query.Where(p => p.Status == param.ProductStatus.ToString());
+            query = query.Where(p => p.Status == param.ProductStatus);
 
         query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
 
