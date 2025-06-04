@@ -122,7 +122,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    ///     Lấy danh sách sản phẩm của Seller (có phân trang).
+    ///     Lấy danh sách sản phẩm của Seller đang truy cập(có phân trang).
     /// </summary>
     [HttpGet("products")]
     [Authorize]
@@ -154,7 +154,7 @@ public class SellerController : ControllerBase
 
 
     /// <summary>
-    ///     Lấy chi tiết sản phẩm theo Id seller.
+    ///     Lấy chi tiết sản phẩm bằng id, cho phép sản phẩm của Seller đang truy cập.
     /// </summary>
     [HttpGet("products/{id}")]
     [Authorize]
@@ -178,7 +178,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    ///     Seller tạo sản phẩm mới.
+    /// Seller tạo sản phẩm mới của riêng họ, không tương tác với sp seller khác.
     /// </summary>
     [HttpPost("products")]
     [Authorize]
@@ -200,7 +200,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    ///     Seller cập nhật sản phẩm.
+    /// Seller cập nhật sản phẩm củ riêng họ
     /// </summary>
     [HttpPut("products/{id}")]
     [Authorize]
@@ -223,7 +223,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    ///     Seller xóa mềm sản phẩm.
+    /// Seller xóa mềm sản phẩm của riêng họ, không tương tác với sp seller khác.
     /// </summary>
     [HttpDelete("products/{id}")]
     [Authorize]
