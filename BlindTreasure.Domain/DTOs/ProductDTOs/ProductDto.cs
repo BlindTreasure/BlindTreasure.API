@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.DTOs.ProductDTOs;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.DTOs.ProductDTOs;
 
 public class ProductDto
 {
@@ -10,7 +12,7 @@ public class ProductDto
     public int Stock { get; set; }
     public double Height { get; set; }
     public string? Material { get; set; }
-    public string? ProductType { get; set; }
+    public ProductSaleType? ProductType { get; set; }
     public string? Brand { get; set; }
 
     public string? Status { get; set; }

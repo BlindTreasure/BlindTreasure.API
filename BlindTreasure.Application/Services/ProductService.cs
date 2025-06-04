@@ -86,7 +86,7 @@ public class ProductService : IProductService
         if (param.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
         if (param.ProductStatus.HasValue)
-            query = query.Where(p => p.Status == param.ProductStatus.ToString());
+            query = query.Where(p => p.Status == param.ProductStatus);
         if (param.SellerId.HasValue)
             query = query.Where(p => p.SellerId == param.SellerId.Value);
 
@@ -143,7 +143,7 @@ public class ProductService : IProductService
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId,
             IsDeleted = false,
-            Status = dto.Status.ToString()
+            Status = dto.Status
         };
 
         await _unitOfWork.Products.AddAsync(product);
@@ -237,7 +237,7 @@ public class ProductService : IProductService
         //if (product.SellerId != await GetSellerIdByUserId(userId))
         //    throw ErrorHelper.Forbidden("Không được phép thao tác sản phẩm của Seller khác.");
 
-        product.Status = ProductStatus.InActive.ToString(); // Đặt trạng thái là Deleted
+        product.Status = ProductStatus.InActive; // Đặt trạng thái là Deleted
         product.IsDeleted = true;
         product.DeletedAt = DateTime.UtcNow;
         product.DeletedBy = userId;

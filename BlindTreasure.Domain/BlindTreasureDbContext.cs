@@ -108,6 +108,11 @@ public class BlindTreasureDbContext : DbContext
             .HasConversion<string>()
             .HasMaxLength(32); // nếu cần giới hạn
 
+        
+        modelBuilder.Entity<Product>()
+            .Property(p => p.Status)
+            .HasConversion<string>()
+            .HasMaxLength(32); // nếu cần giới hạn
         #endregion
 
 

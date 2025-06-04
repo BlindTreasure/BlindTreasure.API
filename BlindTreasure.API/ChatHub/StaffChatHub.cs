@@ -2,6 +2,8 @@
 using BlindTreasure.Application.Services;
 using Microsoft.AspNetCore.SignalR;
 
+namespace BlindTreasure.API.ChatHub;
+
 public class StaffChatHub : Hub
 {
     private readonly IBlindyService _blindyService;
