@@ -7,7 +7,7 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface IProductService
 {
-    Task<ProductDto> CreateAsync(ProductSellerCreateDto dto);
+    Task<ProductDto> CreateAsync(ProductCreateDto dto);
     Task<ProductDto> DeleteAsync(Guid id);
     Task<Pagination<ProductDto>> GetAllAsync(ProductQueryParameter param);
     Task<ProductDto?> GetByIdAsync(Guid id);

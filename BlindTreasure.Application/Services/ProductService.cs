@@ -114,16 +114,16 @@ public class ProductService : IProductService
         return result;
     }
 
-    public async Task<ProductDto> CreateAsync(ProductSellerCreateDto dto)
+    public async Task<ProductDto> CreateAsync(ProductCreateDto dto)
     {
-        var userId = _claimsService.GetCurrentUserId;
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);
+         var userId = _claimsService.GetCurrentUserId; // cái này chỉ để check là ai đang login, không phải sellerId 
+        var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId);
         if (seller == null || !seller.IsVerified || seller.Status != SellerStatus.Approved)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
         _logger.Info($"[CreateAsync] Seller {userId} tạo sản phẩm mới: {dto.Name}");
 
-        await ValidateProductDto((ProductCreateDto)dto);
+        await ValidateProductDto(dto); // Removed cast to (ProductCreateDto)
 
         var product = new Product
         {

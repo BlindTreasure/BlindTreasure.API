@@ -290,15 +290,15 @@ public class SellerService : ISellerService
 
     public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto)
     {
-        var userId = _claimsService.GetCurrentUserId;
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        var userId = _claimsService.GetCurrentUserId; // chỗ này là lấy user id của seller là người đang login
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId); // seller id ở day86
         if (seller == null)
             throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
         if (!seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
         var newProduct = _mapper.Map<ProductSellerCreateDto, ProductCreateDto>(dto);
-        newProduct.SellerId = seller.Id;
+        newProduct.SellerId = seller.Id; // GÁN SELLER ID VÀO DTO ĐỂ NÉM QUA PRODUCT SERVICE ĐỂ TẠO
 
         var result = await _productService.CreateAsync(newProduct);
 
