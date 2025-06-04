@@ -92,7 +92,7 @@ public class BlindBoxService : IBlindBoxService
 
         var releaseDateUtc = DateTime.SpecifyKind(dto.ReleaseDate, DateTimeKind.Utc);
 
-        
+
         var blindBox = new BlindBox
         {
             Id = Guid.NewGuid(),
@@ -162,7 +162,7 @@ public class BlindBoxService : IBlindBoxService
             Rarity = i.Rarity,
             IsActive = true,
             CreatedAt = now,
-            CreatedBy = currentUserId
+            CreatedBy = currentUserId,
         }).ToList();
 
         await _unitOfWork.BlindBoxItems.AddRangeAsync(entities);
@@ -170,6 +170,7 @@ public class BlindBoxService : IBlindBoxService
 
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
+
 
     public async Task<bool> SubmitBlindBoxAsync(Guid blindBoxId)
     {
@@ -185,8 +186,12 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.BadRequest("Phải có ít nhất 1 item trong Blind Box");
 
         var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
-        if (totalDropRate < 100)
-            throw ErrorHelper.BadRequest("Tổng DropRate chưa đủ 100%");
+        if (totalDropRate != 100)
+            throw ErrorHelper.BadRequest("Tổng DropRate phải bằng 100%.");
+
+        var itemCount = blindBox.BlindBoxItems.Count;
+        if (itemCount != 6 && itemCount != 12)
+            throw ErrorHelper.BadRequest("Blind Box phải có đủ 6 hoặc 12 item để gửi duyệt.");
 
         blindBox.UpdatedAt = _time.GetCurrentTime();
         blindBox.Status = BlindBoxStatus.PendingApproval;
