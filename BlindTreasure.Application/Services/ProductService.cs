@@ -209,23 +209,11 @@ public class ProductService : IProductService
         if (dto.Brand != null)
             product.Brand = dto.Brand;
 
-        await ValidateProductDto(dto);
-
-        // Map các trường update
-        
-        product.Name = dto.Name;
-        product.Description = dto.Description;
-        product.CategoryId = dto.CategoryId;
-        product.Price = dto.Price;
-        product.Stock = dto.Stock;
-        product.Status = dto.Status.ToString();
-        product.UpdatedAt = DateTime.UtcNow;
-        product.UpdatedBy = userId;
-
-        if (productImageUrl.Length > 0)
-        {
-            var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
-        }
+       
+        //if (productImageUrl.Length > 0)
+        //{
+        //    var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
+        //}
 
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();

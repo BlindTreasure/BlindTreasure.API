@@ -166,7 +166,7 @@ namespace BlindTreaure.UnitTest.Services
             _mapperMock.Setup(x => x.Map<Product, ProductDto>(It.IsAny<Product>())).Returns(productDto);
 
             // Act
-            var result = await _productService.CreateAsync(dto, null);
+            var result = await _productService.CreateAsync(dto);
 
             // Assert
             result.Should().NotBeNull();
@@ -188,7 +188,7 @@ namespace BlindTreaure.UnitTest.Services
                 .ReturnsAsync(seller);
 
             // Act
-            Func<Task> act = async () => await _productService.CreateAsync(dto, null);
+            Func<Task> act = async () => await _productService.CreateAsync(dto);
 
             // Assert
             await act.Should().ThrowAsync<Exception>()

@@ -288,7 +288,7 @@ public class SellerService : ISellerService
         return _mapper.Map<Product, ProductDto>(product);
     }
 
-    public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto, IFormFile? productImageUrl)
+    public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto)
     {
         var userId = _claimsService.GetCurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
@@ -300,7 +300,7 @@ public class SellerService : ISellerService
         var newProduct = _mapper.Map<ProductSellerCreateDto, ProductCreateDto>(dto);
         newProduct.SellerId = seller.Id;
 
-        var result = await _productService.CreateAsync(newProduct, productImageUrl);
+        var result = await _productService.CreateAsync(newProduct);
 
         // Xóa cache danh sách sản phẩm của seller để đảm bảo dữ liệu mới nhất
         await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
