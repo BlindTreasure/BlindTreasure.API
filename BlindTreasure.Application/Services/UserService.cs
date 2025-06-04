@@ -213,7 +213,7 @@ public class UserService : IUserService
         user.Status = newStatus;
         user.Reason = reason; // Gán lý do
 
-    // Nếu ban/deactive thì soft remove, nếu active lại thì mở lại
+        // Nếu ban/deactive thì soft remove, nếu active lại thì mở lại
         if (newStatus == UserStatus.Suspended || newStatus == UserStatus.Locked)
             user.IsDeleted = true;
         else if (newStatus == UserStatus.Active)

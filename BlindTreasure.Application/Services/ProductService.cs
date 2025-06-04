@@ -116,7 +116,7 @@ public class ProductService : IProductService
 
     public async Task<ProductDto> CreateAsync(ProductCreateDto dto)
     {
-         var userId = _claimsService.GetCurrentUserId; // cái này chỉ để check là ai đang login, không phải sellerId 
+        var userId = _claimsService.GetCurrentUserId; // cái này chỉ để check là ai đang login, không phải sellerId 
         var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId);
         if (seller == null || !seller.IsVerified || seller.Status != SellerStatus.Approved)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
@@ -209,7 +209,7 @@ public class ProductService : IProductService
         if (dto.Brand != null)
             product.Brand = dto.Brand;
 
-       
+
         //if (productImageUrl.Length > 0)
         //{
         //    var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
