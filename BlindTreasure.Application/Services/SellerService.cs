@@ -45,12 +45,6 @@ public class SellerService : ISellerService
         _productService = productService;
     }
 
-    private async Task RemoveSellerCacheAsync(Guid sellerId, Guid userId)
-    {
-        await _cacheService.RemoveAsync($"seller:{sellerId}");
-        await _cacheService.RemoveAsync($"seller:user:{userId}");
-    }
-
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
     {
         _loggerService.Info($"[UpdateSellerInfoAsync] Seller {userId} yêu cầu cập nhật thông tin.");
@@ -102,7 +96,7 @@ public class SellerService : ISellerService
 
         if (file == null || file.Length == 0)
         {
-            _loggerService.Warn($"[UploadSellerDocumentAsync] File không hợp lệ.");
+            _loggerService.Warn("[UploadSellerDocumentAsync] File không hợp lệ.");
             throw ErrorHelper.BadRequest("File không hợp lệ.");
         }
 
@@ -115,7 +109,8 @@ public class SellerService : ISellerService
 
         if (seller.Status != SellerStatus.Rejected && seller.Status != SellerStatus.WaitingReview)
         {
-            _loggerService.Warn($"[UploadSellerDocumentAsync] Seller {userId} không thể upload ở trạng thái: {seller.Status}");
+            _loggerService.Warn(
+                $"[UploadSellerDocumentAsync] Seller {userId} không thể upload ở trạng thái: {seller.Status}");
             throw ErrorHelper.BadRequest("Chỉ seller bị từ chối hoặc chờ duyệt mới được phép nộp lại tài liệu.");
         }
 
@@ -180,7 +175,8 @@ public class SellerService : ISellerService
 
     public async Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination)
     {
-        _loggerService.Info($"[GetAllSellersAsync] Lấy danh sách seller. Page: {pagination.PageIndex}, Size: {pagination.PageSize}");
+        _loggerService.Info(
+            $"[GetAllSellersAsync] Lấy danh sách seller. Page: {pagination.PageIndex}, Size: {pagination.PageSize}");
 
         var query = _unitOfWork.Sellers.GetQueryable()
             .Where(s => !s.IsDeleted)
@@ -216,7 +212,8 @@ public class SellerService : ISellerService
         if (seller == null || !seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
-        _loggerService.Info($"[GetAllProductsAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        _loggerService.Info(
+            $"[GetAllProductsAsync] Seller {userId} requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.Products.GetQueryable()
             .Where(p => !p.IsDeleted && p.SellerId == seller.Id)
@@ -351,6 +348,12 @@ public class SellerService : ISellerService
 
         _loggerService.Success($"[DeleteProductAsync] Seller {seller.Id} đã xóa sản phẩm {productId}.");
         return result;
+    }
+
+    private async Task RemoveSellerCacheAsync(Guid sellerId, Guid userId)
+    {
+        await _cacheService.RemoveAsync($"seller:{sellerId}");
+        await _cacheService.RemoveAsync($"seller:user:{userId}");
     }
 
     // ----------------- PRIVATE HELPER METHODS -----------------

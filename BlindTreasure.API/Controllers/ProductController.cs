@@ -138,7 +138,7 @@ public class ProductController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật ảnh sản phẩm. Backup
+    ///     Cập nhật ảnh sản phẩm. Backup
     /// </summary>
     [HttpPut("{id}/image")]
     [Authorize]

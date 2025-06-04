@@ -2,8 +2,8 @@
 
 public enum ProductStatus
 {
-    New,         
-    Active,      
-    OutOfStock,  
-    InActive,     
+    New,
+    Active,
+    OutOfStock,
+    InActive
 }
