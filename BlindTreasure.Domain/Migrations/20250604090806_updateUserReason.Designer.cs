@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250602065403_Initial")]
-    partial class Initial
+    [Migration("20250604090806_updateUserReason")]
+    partial class updateUserReason
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -144,6 +144,11 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<Guid>("SellerId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<int>("TotalQuantity")
                         .HasColumnType("integer");
@@ -922,8 +927,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<decimal?>("Height")
                         .HasColumnType("numeric");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
+                    b.Property<string>("ImageUrls")
                         .HasColumnType("text");
 
                     b.Property<bool>("IsDeleted")
@@ -1421,6 +1425,10 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("Phone")
                         .HasMaxLength(15)
                         .HasColumnType("character varying(15)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<string>("RefreshToken")
                         .HasMaxLength(128)

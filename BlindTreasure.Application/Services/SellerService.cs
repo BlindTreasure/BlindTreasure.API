@@ -17,13 +17,13 @@ namespace BlindTreasure.Application.Services;
 public class SellerService : ISellerService
 {
     private readonly IBlobService _blobService;
+    private readonly ICacheService _cacheService;
+    private readonly IClaimsService _claimsService;
     private readonly IEmailService _emailService;
     private readonly ILoggerService _loggerService;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ICacheService _cacheService;
     private readonly IMapperService _mapper;
-    private readonly IClaimsService _claimsService;
     private readonly IProductService _productService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public SellerService(
         IBlobService blobService,
@@ -197,16 +197,12 @@ public class SellerService : ISellerService
 
         List<Seller> sellers;
         if (pagination.PageIndex == 0)
-        {
             sellers = await query.ToListAsync();
-        }
         else
-        {
             sellers = await query
                 .Skip((pagination.PageIndex - 1) * pagination.PageSize)
                 .Take(pagination.PageSize)
                 .ToListAsync();
-        }
 
         var items = sellers.Select(SellerMapper.ToSellerDto).ToList();
 
@@ -231,6 +227,7 @@ public class SellerService : ISellerService
             var keyword = param.Search.Trim().ToLower();
             query = query.Where(p => p.Name.ToLower().Contains(keyword));
         }
+
         if (param.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
         if (param.ProductStatus.HasValue)
@@ -244,21 +241,18 @@ public class SellerService : ISellerService
 
         List<Product> items;
         if (param.PageIndex == 0)
-        {
             items = await query.ToListAsync();
-        }
         else
-        {
             items = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-        }
 
         var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
         var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
 
-        var cacheKey = $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:UpdatedAtDesc";
+        var cacheKey =
+            $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         _loggerService.Info("[GetAllProductsAsync] Product list loaded from DB and cached.");
         return result;

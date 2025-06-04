@@ -1,9 +1,9 @@
-﻿using BlindTreasure.Domain.Enums;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.DTOs.ProductDTOs;
 
-public class ProductUpdateDto 
+public class ProductUpdateDto
 {
     public string? Name { get; set; }
     public string? Description { get; set; }

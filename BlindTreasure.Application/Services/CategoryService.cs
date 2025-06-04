@@ -60,7 +60,8 @@ public class CategoryService : ICategoryService
 
     public async Task<Pagination<CategoryDto>> GetAllAsync(CategoryQueryParameter param)
     {
-        _logger.Info($"[GetAllAsync] Admin/Staff requests category list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        _logger.Info(
+            $"[GetAllAsync] Admin/Staff requests category list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.Categories.GetQueryable()
             .Where(c => !c.IsDeleted)
@@ -78,20 +79,16 @@ public class CategoryService : ICategoryService
 
         var count = await query.CountAsync();
         if (count == 0)
-           _logger.Info("Không tìm thấy category nào.");
+            _logger.Info("Không tìm thấy category nào.");
 
         List<Category> items;
         if (param.PageIndex == 0)
-        {
             items = await query.ToListAsync();
-        }
         else
-        {
             items = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-        }
 
         var dtos = items.Select(ToCategoryDto).ToList();
         var result = new Pagination<CategoryDto>(dtos, count, param.PageIndex, param.PageSize);

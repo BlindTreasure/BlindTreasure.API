@@ -1,7 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.Entities;
@@ -15,12 +14,12 @@ namespace BlindTreasure.Application.Services;
 
 public class ProductService : IProductService
 {
+    private readonly IBlobService _blobService;
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IBlobService _blobService;
 
 
     public ProductService(
@@ -40,7 +39,7 @@ public class ProductService : IProductService
     }
 
     /// <summary>
-    /// API dùng chung cho mọi role: lấy chi tiết sản phẩm theo Id (không ràng buộc seller).
+    ///     API dùng chung cho mọi role: lấy chi tiết sản phẩm theo Id (không ràng buộc seller).
     /// </summary>
     public async Task<ProductDto?> GetByIdAsync(Guid id)
     {
@@ -83,6 +82,7 @@ public class ProductService : IProductService
             var keyword = param.Search.Trim().ToLower();
             query = query.Where(p => p.Name.ToLower().Contains(keyword));
         }
+
         if (param.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
         if (param.ProductStatus.HasValue)
@@ -97,74 +97,85 @@ public class ProductService : IProductService
 
         List<Product> items;
         if (param.PageIndex == 0)
-        {
             items = await query.ToListAsync();
-        }
         else
-        {
             items = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-        }
 
         var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
         var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
 
-        var cacheKey = $"product:all:public:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:{param.SellerId}:UpdatedAtDesc";
+        var cacheKey =
+            $"product:all:public:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:{param.SellerId}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         _logger.Info("[GetAllAsync] Product list loaded from DB and cached.");
         return result;
     }
 
-    public async Task<ProductDto> CreateAsync(ProductCreateDto dto, IFormFile? productImageUrl)
+    public async Task<ProductDto> CreateAsync(ProductSellerCreateDto dto)
     {
         var userId = _claimsService.GetCurrentUserId;
-        var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId, x=> x.User);
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);
         if (seller == null || !seller.IsVerified || seller.Status != SellerStatus.Approved)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
-        _logger.Info($"[CreateAsync] Seller {userId} creates product {dto.Name}");
 
-        await ValidateProductDto(dto);
+        _logger.Info($"[CreateAsync] Seller {userId} tạo sản phẩm mới: {dto.Name}");
+
+        await ValidateProductDto((ProductCreateDto)dto);
 
         var product = new Product
         {
             Id = Guid.NewGuid(),
+            Name = dto.Name.Trim(),
+            Description = dto.Description.Trim(),
+            CategoryId = dto.CategoryId,
+            Price = dto.Price,
+            Stock = dto.Stock,
+            Height = dto.Height,
+            Material = dto.Material,
+            ProductType = dto.ProductType,
+            Brand = dto.Brand,
+            ImageUrls = new List<string>(),
+            SellerId = seller.Id,
+            Seller = seller,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = userId,
             IsDeleted = false,
-            Seller = seller
+            Status = dto.Status.ToString()
         };
-        product.Name = dto.Name.Trim();
-        product.Description = dto.Description.Trim();
-        product.CategoryId = dto.CategoryId;
-        product.Price = dto.Price;
-        product.Stock = dto.Stock;
-        product.Height = dto.Height;
-        product.Material = dto.Material;
-        product.ProductType = dto.ProductType;
-        product.Brand = dto.Brand;
-        // Mặc định ảnh sản phẩm là rỗng khi tạo mới
-
-        product.ImageUrl = "";
-        product.SellerId = seller.Id;
-        product.CreatedAt = DateTime.UtcNow;
-        product.CreatedBy = userId;
-        product.Status= dto.Status.ToString() ; // Mặc định là Active khi tạo mới
 
         await _unitOfWork.Products.AddAsync(product);
         await _unitOfWork.SaveChangesAsync();
 
-        if (productImageUrl != null && productImageUrl.Length > 0)
+        if (dto.Images is { Count: > 0 })
         {
-            var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
+            var uploadedUrls = new List<string>();
 
+            foreach (var image in dto.Images.Where(img => img.Length > 0).Take(6))
+            {
+                var imageUrl = await UploadProductImageAsync(product.Id, image);
+                if (!string.IsNullOrEmpty(imageUrl))
+                    uploadedUrls.Add(imageUrl);
+            }
+
+            if (uploadedUrls.Count > 0)
+            {
+                // Ghi đè toàn bộ danh sách ảnh, không cộng dồn
+                product.ImageUrls = uploadedUrls.Distinct().ToList();
+                await _unitOfWork.Products.Update(product);
+                await _unitOfWork.SaveChangesAsync();
+            }
         }
 
         await RemoveProductCacheAsync(product.Id, seller.Id);
-        _logger.Success($"[CreateAsync] Product {product.Name} created by seller {userId}");
+        _logger.Success($"[CreateAsync] Đã tạo sản phẩm {product.Name} với {product.ImageUrls.Count} ảnh.");
+
         return _mapper.Map<Product, ProductDto>(product);
     }
 
-    public async Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto, IFormFile? productImageUrl)
+    public async Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto, IFormFile productImageUrl)
     {
         var userId = _claimsService.GetCurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(id);
@@ -198,10 +209,20 @@ public class ProductService : IProductService
         if (dto.Brand != null)
             product.Brand = dto.Brand;
 
+        await ValidateProductDto(dto);
+
+        // Map các trường update
+        
+        product.Name = dto.Name;
+        product.Description = dto.Description;
+        product.CategoryId = dto.CategoryId;
+        product.Price = dto.Price;
+        product.Stock = dto.Stock;
+        product.Status = dto.Status.ToString();
         product.UpdatedAt = DateTime.UtcNow;
         product.UpdatedBy = userId;
 
-        if (productImageUrl != null && productImageUrl.Length > 0)
+        if (productImageUrl.Length > 0)
         {
             var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
         }
@@ -261,7 +282,8 @@ public class ProductService : IProductService
 
         // Sinh tên file duy nhất để tránh trùng (VD: avatar_userId_timestamp.png)
         var fileExtension = Path.GetExtension(file.FileName);
-        var fileName = $"avatars/avatar_product_{productId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}{fileExtension}";
+        var fileName =
+            $"products/product_thumbnails{productId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}{fileExtension}";
 
         await using var stream = file.OpenReadStream();
         await _blobService.UploadFileAsync(fileName, stream);
@@ -273,7 +295,9 @@ public class ProductService : IProductService
             throw ErrorHelper.Internal("Không thể tạo URL cho ảnh đại diện.");
         }
 
-        product.ImageUrl = fileUrl;
+        product.ImageUrls ??= [];
+        product.ImageUrls.Add(fileUrl);
+
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
 
@@ -281,7 +305,8 @@ public class ProductService : IProductService
         await _cacheService.SetAsync($"product:{product.Id}", product, TimeSpan.FromHours(1));
         await _cacheService.SetAsync($"user:{product.Id}", product, TimeSpan.FromHours(1));
 
-        _logger.Success($"[UploadAvatarAsync] Đã cập nhật image thành công cho product {product.Id} tên {product.Name}");
+        _logger.Success(
+            $"[UploadAvatarAsync] Đã cập nhật image thành công cho product {product.Id} tên {product.Name}");
 
         return fileUrl;
     }

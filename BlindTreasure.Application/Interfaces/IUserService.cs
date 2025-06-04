@@ -16,7 +16,7 @@ public interface IUserService
 
     //admin methods
     Task<UserDto?> CreateUserAsync(UserCreateDto dto);
-    Task<UserDto?> UpdateUserStatusAsync(Guid userId, UserStatus newStatus);
+    Task<UserDto?> UpdateUserStatusAsync(Guid userId, UserStatus newStatus, string? reason = null);
     Task<Pagination<UserDto>> GetAllUsersAsync(UserQueryParameter param);
     Task<User?> GetUserByEmail(string email, bool useCache = false);
 

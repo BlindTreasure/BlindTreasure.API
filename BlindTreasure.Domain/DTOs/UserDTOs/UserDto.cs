@@ -15,5 +15,6 @@ public class UserDto
 
     public string? PhoneNumber { get; set; }
     public RoleType? RoleName { get; set; }
+    public string? Reason { get; set; }
     public DateTime CreatedAt { get; set; }
 }

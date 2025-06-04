@@ -139,6 +139,7 @@ public class UserService : IUserService
                 (!string.IsNullOrEmpty(u.FullName) && u.FullName.ToLower().Contains(keyword)) ||
                 (!string.IsNullOrEmpty(u.Email) && u.Email.ToLower().Contains(keyword)));
         }
+
         if (param.Status.HasValue)
             query = query.Where(u => u.Status == param.Status.Value);
         if (param.RoleName.HasValue)
@@ -153,16 +154,12 @@ public class UserService : IUserService
 
         List<User> users;
         if (param.PageIndex == 0)
-        {
             users = await query.ToListAsync();
-        }
         else
-        {
             users = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-        }
 
         var userDtos = users.Select(UserMapper.ToUserDto).ToList();
         return new Pagination<UserDto>(userDtos, total, param.PageIndex, param.PageSize);
@@ -202,7 +199,7 @@ public class UserService : IUserService
         return UserMapper.ToUserDto(user);
     }
 
-    public async Task<UserDto?> UpdateUserStatusAsync(Guid userId, UserStatus newStatus)
+    public async Task<UserDto?> UpdateUserStatusAsync(Guid userId, UserStatus newStatus, string? reason = null)
     {
         _logger.Info($"[UpdateUserStatusAsync] Admin updates status for user {userId} to {newStatus}");
 
@@ -214,8 +211,9 @@ public class UserService : IUserService
         }
 
         user.Status = newStatus;
+        user.Reason = reason; // Gán lý do
 
-        // Nếu ban/deactive thì soft remove, nếu active lại thì mở lại
+// Nếu ban/deactive thì soft remove, nếu active lại thì mở lại
         if (newStatus == UserStatus.Suspended || newStatus == UserStatus.Locked)
             user.IsDeleted = true;
         else if (newStatus == UserStatus.Active)

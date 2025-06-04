@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.Entities;
 
 public class BlindBox : BaseEntity
 {
@@ -12,6 +14,7 @@ public class BlindBox : BaseEntity
 
     public bool HasSecretItem { get; set; }
     public decimal SecretProbability { get; set; } = 0.05m; // mặc định 5%
+    public BlindBoxStatus Status { get; set; }
 
     public string ImageUrl { get; set; }
     public DateTime ReleaseDate { get; set; }

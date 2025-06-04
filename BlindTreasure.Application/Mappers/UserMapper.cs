@@ -17,6 +17,7 @@ public static class UserMapper
             PhoneNumber = user.Phone,
             Status = user.Status,
             RoleName = user.RoleName,
+            Reason = user.Reason,
             Gender = user.Gender,
             CreatedAt = user.CreatedAt
         };

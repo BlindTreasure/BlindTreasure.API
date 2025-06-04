@@ -482,7 +482,7 @@ namespace BlindTreasure.Domain.Migrations
                     CategoryId = table.Column<Guid>(type: "uuid", nullable: false),
                     Price = table.Column<decimal>(type: "numeric", nullable: false),
                     Stock = table.Column<int>(type: "integer", nullable: false),
-                    ImageUrl = table.Column<string>(type: "text", nullable: false),
+                    ImageUrls = table.Column<string>(type: "text", nullable: true),
                     Status = table.Column<string>(type: "text", nullable: false),
                     Height = table.Column<decimal>(type: "numeric", nullable: true),
                     Material = table.Column<string>(type: "text", nullable: true),

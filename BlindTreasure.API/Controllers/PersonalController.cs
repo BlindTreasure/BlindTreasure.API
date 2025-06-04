@@ -50,7 +50,7 @@ public class PersonalController : ControllerBase
     /// <summary>
     ///     Lấy thông tin profile cá nhân user theo id đang login.
     /// </summary>
-    [HttpGet()]
+    [HttpGet]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<UserDto>), 404)]
     public async Task<IActionResult> GetUserProfile()
@@ -73,7 +73,7 @@ public class PersonalController : ControllerBase
     }
 
     [Authorize]
-    [HttpPut()]
+    [HttpPut]
     [ProducesResponseType(typeof(ApiResult<UpdateProfileDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
