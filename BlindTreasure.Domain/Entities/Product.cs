@@ -17,7 +17,7 @@ public class Product : BaseEntity
 
     public decimal Price { get; set; }
     public int Stock { get; set; }
-    public string ImageUrl { get; set; }
+    public List<string> ImageUrls { get; set; } = new(); // new: khởi tạo mặc định tránh null
     public string Status { get; set; }
 
     public decimal? Height { get; set; } // cm 

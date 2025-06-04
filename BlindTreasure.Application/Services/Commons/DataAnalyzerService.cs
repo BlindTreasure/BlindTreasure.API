@@ -16,18 +16,19 @@ public class DataAnalyzerService : IDataAnalyzerService
         _unitOfWork = unitOfWork;
     }
 
-    
+
     public async Task<List<UserDto>> GetUsersForAiAnalysisAsync()
     {
         var users = await _unitOfWork.Users.GetQueryable()
             .Where(u => !u.IsDeleted)
             .OrderByDescending(u => u.CreatedAt)
-            .Take(20) 
+            .Take(20)
             .ToListAsync();
         var userDtos = users.Select(UserMapper.ToUserDto).ToList();
 
         return userDtos;
     }
+
     public async Task<List<Product>> GetProductsAiAnalysisAsync()
     {
         var products = await _unitOfWork.Products.GetQueryable()

@@ -94,12 +94,19 @@ public class BlindTreasureDbContext : DbContext
                 .HasConversion<string>() // enum -> string
                 .HasMaxLength(32); // giới hạn độ dài nếu cần
         });
-        
+
         modelBuilder.Entity<Product>()
             .Property(p => p.ProductType)
             .HasConversion<string>()
             .HasMaxLength(32); // nếu cần giới hạn
-        
+
+        modelBuilder.Entity<Product>()
+            .Property(p => p.ImageUrls)
+            .HasConversion(
+                v => string.Join(";", v),
+                v => v.Split(";", StringSplitOptions.RemoveEmptyEntries).ToList()
+            ).IsRequired(false);
+
         modelBuilder.Entity<BlindBoxItem>()
             .Property(p => p.Rarity)
             .HasConversion<string>()

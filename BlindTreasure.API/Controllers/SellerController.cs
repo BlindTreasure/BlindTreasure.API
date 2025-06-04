@@ -1,5 +1,4 @@
 ﻿using BlindTreasure.Application.Interfaces;
-using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
@@ -167,7 +166,7 @@ public class SellerController : ControllerBase
         {
             var userId = _claimsService.GetCurrentUserId;
 
-            var result = await _sellerService.GetProductByIdAsync(id,userId);
+            var result = await _sellerService.GetProductByIdAsync(id, userId);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Lấy thông tin sản phẩm thành công."));
         }
         catch (Exception ex)
@@ -179,17 +178,17 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Seller tạo sản phẩm mới.
+    ///     Seller tạo sản phẩm mới.
     /// </summary>
     [HttpPost("products")]
-    [Authorize()]
+    [Authorize]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
-    public async Task<IActionResult> CreateProduct([FromForm] ProductSellerCreateDto dto, IFormFile? productImageUrl)
+    public async Task<IActionResult> CreateProduct([FromForm] ProductSellerCreateDto dto)
     {
         try
         {
-            var result = await _sellerService.CreateProductAsync(dto, productImageUrl);
+            var result = await _sellerService.CreateProductAsync(dto);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Tạo sản phẩm thành công."));
         }
         catch (Exception ex)
@@ -201,10 +200,10 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Seller cập nhật sản phẩm.
+    ///     Seller cập nhật sản phẩm.
     /// </summary>
     [HttpPut("products/{id}")]
-    [Authorize()]
+    [Authorize]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
@@ -224,10 +223,10 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Seller xóa mềm sản phẩm.
+    ///     Seller xóa mềm sản phẩm.
     /// </summary>
     [HttpDelete("products/{id}")]
-    [Authorize()]
+    [Authorize]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
     public async Task<IActionResult> DeleteProduct(Guid id)

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250602065403_Initial")]
+    [Migration("20250604041332_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -922,8 +922,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<decimal?>("Height")
                         .HasColumnType("numeric");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
+                    b.Property<string>("ImageUrls")
                         .HasColumnType("text");
 
                     b.Property<bool>("IsDeleted")

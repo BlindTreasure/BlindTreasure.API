@@ -1,21 +1,18 @@
-﻿using BlindTreasure.API.Architecture;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json.Serialization;
+using BlindTreasure.API.Architecture;
 using BlindTreasure.API.ChatHub;
 using Microsoft.AspNetCore.Diagnostics;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using SwaggerThemes;
-using System.IdentityModel.Tokens.Jwt;
-using System.Text.Json.Serialization;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    }); 
+    .AddJsonOptions(options => { options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()); });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.SetupIocContainer();
 builder.Configuration

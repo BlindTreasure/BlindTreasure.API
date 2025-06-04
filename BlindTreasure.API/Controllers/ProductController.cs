@@ -71,17 +71,17 @@ public class ProductController : ControllerBase
     }
 
     /// <summary>
-    ///     đăng ký sản phẩm mới cho seller, có field user id 
+    ///     đăng ký sản phẩm mới cho seller, có field user id
     /// </summary>
     [HttpPost]
     [Authorize]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
-    public async Task<IActionResult> Create([FromForm] ProductCreateDto dto, IFormFile? productImageUrl)
+    public async Task<IActionResult> Create([FromForm] ProductCreateDto dto)
     {
         try
         {
-            var result = await _productService.CreateAsync(dto, productImageUrl);
+            var result = await _productService.CreateAsync(dto);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Tạo sản phẩm thành công."));
         }
         catch (Exception ex)
@@ -136,8 +136,9 @@ public class ProductController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
     /// <summary>
-    /// Cập nhật ảnh sản phẩm.
+    ///     Cập nhật ảnh sản phẩm.
     /// </summary>
     [HttpPut("{id}/image")]
     [Authorize]

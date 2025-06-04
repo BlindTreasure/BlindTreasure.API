@@ -919,8 +919,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<decimal?>("Height")
                         .HasColumnType("numeric");
 
-                    b.Property<string>("ImageUrl")
-                        .IsRequired()
+                    b.Property<string>("ImageUrls")
                         .HasColumnType("text");
 
                     b.Property<bool>("IsDeleted")
