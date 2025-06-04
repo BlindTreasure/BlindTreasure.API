@@ -29,6 +29,8 @@ public class User : BaseEntity
 
     [MaxLength(512)] public string? AvatarUrl { get; set; }
 
+    [MaxLength(512)] public string? Reason { get; set; }
+
     // Relationships
     public Seller Seller { get; set; }
 

@@ -9,6 +9,8 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<OtpVerification> OtpVerifications { get; }
     IGenericRepository<Category> Categories { get; }
     IGenericRepository<Product> Products { get; }
+    IGenericRepository<BlindBox> BlindBoxes { get; }
+    IGenericRepository<BlindBoxItem> BlindBoxItems { get; }
 
     Task<int> SaveChangesAsync();
 }

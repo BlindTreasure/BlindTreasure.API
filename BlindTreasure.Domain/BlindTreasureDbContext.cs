@@ -80,10 +80,18 @@ public class BlindTreasureDbContext : DbContext
         modelBuilder.Entity<Role>()
             .HasAlternateKey(r => r.Type);
 
-        //enum conversion
+        #region MyRegion
+
         modelBuilder.Entity<OtpVerification>(entity =>
         {
             entity.Property(e => e.Purpose)
+                .HasConversion<string>() // enum -> string
+                .HasMaxLength(32); // giới hạn độ dài nếu cần
+        });
+
+        modelBuilder.Entity<BlindBox>(entity =>
+        {
+            entity.Property(e => e.Status)
                 .HasConversion<string>() // enum -> string
                 .HasMaxLength(32); // giới hạn độ dài nếu cần
         });
@@ -99,6 +107,9 @@ public class BlindTreasureDbContext : DbContext
             .Property(p => p.ProductType)
             .HasConversion<string>()
             .HasMaxLength(32); // nếu cần giới hạn
+
+        #endregion
+
 
         modelBuilder.Entity<Product>()
             .Property(p => p.ImageUrls)
