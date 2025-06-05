@@ -15,7 +15,7 @@ public class ProductDto
     public ProductSaleType? ProductType { get; set; }
     public string? Brand { get; set; }
 
-    public string? Status { get; set; }
+    public ProductStatus Status { get; set; }
 
     public List<string> ImageUrls { get; set; } = new(); // Danh sách ảnh
 

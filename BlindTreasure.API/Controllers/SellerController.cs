@@ -179,7 +179,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Seller tạo sản phẩm mới của riêng họ, không tương tác với sp seller khác.
+    ///     Seller tạo sản phẩm mới của riêng họ, không tương tác với sp seller khác.
     /// </summary>
     [HttpPost("products")]
     [Authorize]
@@ -201,7 +201,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Seller cập nhật sản phẩm củ riêng họ
+    ///     Seller cập nhật sản phẩm củ riêng họ
     /// </summary>
     [HttpPut("products/{id}")]
     [Authorize]
@@ -224,7 +224,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    /// Seller xóa mềm sản phẩm của riêng họ, không tương tác với sp seller khác.
+    ///     Seller xóa mềm sản phẩm của riêng họ, không tương tác với sp seller khác.
     /// </summary>
     [HttpDelete("products/{id}")]
     [Authorize]
