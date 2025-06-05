@@ -23,7 +23,7 @@ public class BlindBoxesController : ControllerBase
     /// </summary>
     /// <param name="boxId">Id của Blind Box</param>
     /// <returns>Thông tin chi tiết Blind Box cùng danh sách item</returns>
-    [HttpGet("{boxId}")]
+    [HttpGet("{id}")]
     [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
     [ProducesResponseType(404)]
     public async Task<ActionResult<BlindBoxDetailDto>> GetById(Guid boxId)
@@ -75,7 +75,7 @@ public class BlindBoxesController : ControllerBase
     [HttpPost("{id}/items")]
     [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
     [ProducesResponseType(400)]
-    public async Task<ActionResult<BlindBoxDetailDto>> AddItems(Guid id, [FromForm] List<BlindBoxItemDto> items)
+    public async Task<ActionResult<BlindBoxDetailDto>> AddItems(Guid id, [FromBody] List<BlindBoxItemDto> items)
     {
         try
         {
