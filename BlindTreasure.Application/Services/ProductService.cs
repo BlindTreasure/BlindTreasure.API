@@ -118,7 +118,9 @@ public class ProductService : IProductService
     {
         var userId = _claimsService.GetCurrentUserId; // cái này chỉ để check là ai đang login, không phải sellerId 
         var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId);
-        if (seller == null || !seller.IsVerified || seller.Status != SellerStatus.Approved)
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
+        if (!seller.IsVerified || seller.Status != SellerStatus.Approved)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
 
         _logger.Info($"[CreateAsync] Seller {userId} tạo sản phẩm mới: {dto.Name}");
@@ -127,7 +129,6 @@ public class ProductService : IProductService
 
         var product = new Product
         {
-            Id = Guid.NewGuid(),
             Name = dto.Name.Trim(),
             Description = dto.Description.Trim(),
             CategoryId = dto.CategoryId,
@@ -146,7 +147,7 @@ public class ProductService : IProductService
             Status = dto.Status
         };
 
-        await _unitOfWork.Products.AddAsync(product);
+        var result = await _unitOfWork.Products.AddAsync(product); // tracking entity nè bro, savechange xong phải xài thằng này
         await _unitOfWork.SaveChangesAsync();
 
         if (dto.Images is { Count: > 0 })
@@ -155,7 +156,7 @@ public class ProductService : IProductService
 
             foreach (var image in dto.Images.Where(img => img.Length > 0).Take(6))
             {
-                var imageUrl = await UploadProductImageAsync(product.Id, image);
+                var imageUrl = await UploadProductImageAsync(result.Id, image);
                 if (!string.IsNullOrEmpty(imageUrl))
                     uploadedUrls.Add(imageUrl);
             }
@@ -163,16 +164,16 @@ public class ProductService : IProductService
             if (uploadedUrls.Count > 0)
             {
                 // Ghi đè toàn bộ danh sách ảnh, không cộng dồn
-                product.ImageUrls = uploadedUrls.Distinct().ToList();
-                await _unitOfWork.Products.Update(product);
+                result.ImageUrls = uploadedUrls.Distinct().ToList();
+                await _unitOfWork.Products.Update(result);
                 await _unitOfWork.SaveChangesAsync();
             }
         }
 
-        await RemoveProductCacheAsync(product.Id, seller.Id);
-        _logger.Success($"[CreateAsync] Đã tạo sản phẩm {product.Name} với {product.ImageUrls.Count} ảnh.");
+        await RemoveProductCacheAsync(result.Id, seller.Id);
+        _logger.Success($"[CreateAsync] Đã tạo sản phẩm {result.Name} với {result.ImageUrls.Count} ảnh.");
 
-        return _mapper.Map<Product, ProductDto>(product);
+        return _mapper.Map<Product, ProductDto>(result);
     }
 
     public async Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto)
