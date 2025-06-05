@@ -175,7 +175,7 @@ public class ProductService : IProductService
         return _mapper.Map<Product, ProductDto>(product);
     }
 
-    public async Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto, IFormFile productImageUrl)
+    public async Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto)
     {
         var userId = _claimsService.GetCurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(id);
@@ -208,6 +208,10 @@ public class ProductService : IProductService
             product.ProductType = dto.ProductType.Value;
         if (dto.Brand != null)
             product.Brand = dto.Brand;
+        if (dto.ProductStatus.HasValue)
+        {
+            product.Status = dto.ProductStatus.Value;
+        }
 
 
         //if (productImageUrl.Length > 0)
@@ -298,6 +302,50 @@ public class ProductService : IProductService
 
         return fileUrl;
     }
+
+    public async Task<ProductDto> UpdateProductImagesAsync(Guid productId, List<IFormFile> images)
+    {
+        var userId = _claimsService.GetCurrentUserId;
+        var product = await _unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null || product.IsDeleted)
+            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+
+        // Xóa ảnh cũ trên MinIO (nếu cần)
+        if (product.ImageUrls != null && product.ImageUrls.Count > 0)
+        {
+            foreach (var url in product.ImageUrls)
+            {
+                var fileName = ExtractFileNameFromUrl(url);
+                if (!string.IsNullOrEmpty(fileName))
+                    await _blobService.DeleteFileAsync(fileName);
+            }
+        }
+
+        var uploadedUrls = new List<string>();
+        foreach (var image in images.Where(img => img.Length > 0).Take(6))
+        {
+            var imageUrl = await UploadProductImageAsync(product.Id, image);
+            if (!string.IsNullOrEmpty(imageUrl))
+                uploadedUrls.Add(imageUrl);
+        }
+
+        product.ImageUrls = uploadedUrls;
+        await _unitOfWork.Products.Update(product);
+        await _unitOfWork.SaveChangesAsync();
+        await RemoveProductCacheAsync(product.Id, product.SellerId);
+
+        return _mapper.Map<Product, ProductDto>(product);
+    }
+
+    // Helper để lấy fileName từ URL
+    private string ExtractFileNameFromUrl(string url)
+    {
+        var uri = new Uri(url);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var prefix = query.Get("prefix");
+        return prefix != null ? Uri.UnescapeDataString(prefix) : null;
+    }
+
 
 
     #region PRIVATE HELPER METHODS

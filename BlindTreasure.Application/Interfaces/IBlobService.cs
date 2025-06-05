@@ -7,4 +7,5 @@ public interface IBlobService
     Task<string> GetPreviewUrlAsync(string fileName);
 
     Task<string> GetFileUrlAsync(string fileName);
+    Task DeleteFileAsync(string fileName);
 }
