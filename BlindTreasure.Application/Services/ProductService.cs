@@ -220,10 +220,13 @@ public class ProductService : IProductService
         //    var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
         //}
 
+
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
 
-        await RemoveProductCacheAsync(id, product.SellerId);
+        var result = await _unitOfWork.Products.GetByIdAsync(id);
+
+        //await RemoveProductCacheAsync(id, product.SellerId);
 
         _logger.Success($"[UpdateAsync] Product {id} updated by user {userId}");
         return _mapper.Map<Product, ProductDto>(product);
@@ -388,6 +391,8 @@ public class ProductService : IProductService
         await _cacheService.RemoveAsync($"product:{productId}");
         await _cacheService.RemoveByPatternAsync($"product:all:{sellerId}");
     }
+
+
 
     #endregion
 }
