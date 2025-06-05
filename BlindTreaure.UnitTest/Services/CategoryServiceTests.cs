@@ -108,7 +108,7 @@ public class CategoryServiceTests
         var dto = new CategoryCreateDto { Name = "NewCat", Description = "Desc" };
         var category = new Category { Id = Guid.NewGuid(), Name = dto.Name, Description = dto.Description };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(userId)).ReturnsAsync(userDto);
         _categoryRepoMock.Setup(x => x.GetQueryable()).Returns(new List<Category>().AsQueryable());
         _categoryRepoMock.Setup(x => x.AddAsync(It.IsAny<Category>())).ReturnsAsync(category);
@@ -131,7 +131,7 @@ public class CategoryServiceTests
         var dto = new CategoryCreateDto { Name = "DupCat", Description = "Desc" };
         var categories = new List<Category> { new() { Name = dto.Name, IsDeleted = false } };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(userId)).ReturnsAsync(userDto);
         _categoryRepoMock.Setup(x => x.GetQueryable()).Returns(categories.AsQueryable());
 
@@ -148,7 +148,7 @@ public class CategoryServiceTests
         var category = new Category { Id = id, Name = "Old", Description = "OldDesc", IsDeleted = false };
         var dto = new CategoryUpdateDto { Name = "NewName", Description = "NewDesc" };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(userId)).ReturnsAsync(userDto);
         _categoryRepoMock.Setup(x => x.GetQueryable()).Returns(new List<Category> { category }.AsQueryable());
         _unitOfWorkMock.Setup(x => x.Categories.Update(category)).ReturnsAsync(true);
@@ -172,7 +172,7 @@ public class CategoryServiceTests
             { UserId = userId, FullName = "Admin", RoleName = RoleType.Admin, Email = "admin@example.com" };
         var dto = new CategoryUpdateDto { Name = "NewName" };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(userId)).ReturnsAsync(userDto);
         _categoryRepoMock.Setup(x => x.GetQueryable()).Returns(new List<Category>().AsQueryable());
 
@@ -191,7 +191,7 @@ public class CategoryServiceTests
             Id = id, Name = "Cat", IsDeleted = false, Products = new List<Product>(), Children = new List<Category>()
         };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(userId)).ReturnsAsync(userDto);
         _categoryRepoMock.Setup(x => x.GetQueryable()).Returns(new List<Category> { category }.AsQueryable());
         _unitOfWorkMock.Setup(x => x.Categories.SoftRemove(category))
@@ -223,7 +223,7 @@ public class CategoryServiceTests
             Children = new List<Category>()
         };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(userId)).ReturnsAsync(userDto);
         _categoryRepoMock.Setup(x => x.GetQueryable()).Returns(new List<Category> { category }.AsQueryable());
 

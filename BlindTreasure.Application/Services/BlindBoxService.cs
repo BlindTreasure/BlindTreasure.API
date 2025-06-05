@@ -121,7 +121,7 @@ public class BlindBoxService : IBlindBoxService
         if (dto.ImageFile == null || dto.ImageFile.Length == 0)
             throw ErrorHelper.BadRequest("Ảnh đại diện Blind Box là bắt buộc.");
 
-        var currentUserId = _claimsService.GetCurrentUserId;
+        var currentUserId = _claimsService.CurrentUserId;
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
             s.UserId == currentUserId && !s.IsDeleted && s.Status == SellerStatus.Approved);
@@ -176,7 +176,7 @@ public class BlindBoxService : IBlindBoxService
         if (blindBox == null)
             throw ErrorHelper.NotFound("Blind Box không tồn tại.");
 
-        var currentUserId = _claimsService.GetCurrentUserId;
+        var currentUserId = _claimsService.CurrentUserId;
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(x =>
             x.Id == blindBox.SellerId && x.UserId == currentUserId && !x.IsDeleted);

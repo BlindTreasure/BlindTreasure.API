@@ -1,11 +1,13 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Text.Json.Serialization;
-using BlindTreasure.API.Architecture;
+﻿using BlindTreasure.API.Architecture;
 using BlindTreasure.API.ChatHub;
+using BlindTreasure.Domain.DTOs.StripeDTOs;
 using Microsoft.AspNetCore.Diagnostics;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Stripe;
 using SwaggerThemes;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json.Serialization;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,6 +48,29 @@ builder.Services.AddControllers()
 
 // Tắt việc map claim mặc định
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
+#region STRIPE CONNECT SETUP
+
+//Set Stripe API key
+builder.Services.Configure<StripeSettings>(builder.Configuration.GetSection("Stripe"));
+StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
+var appInfo = new AppInfo { Name = "BlindTreasure", Version = "v1" };
+StripeConfiguration.AppInfo = appInfo;
+builder.Services.AddHttpClient("Stripe");
+
+builder.Services.AddTransient<IStripeClient, StripeClient>(s =>
+{
+    var clientFactory = s.GetRequiredService<IHttpClientFactory>();
+
+    var sysHttpClient = new SystemNetHttpClient(
+       httpClient: clientFactory.CreateClient("Stripe"),
+       maxNetworkRetries: StripeConfiguration.MaxNetworkRetries,
+       appInfo: appInfo,
+       enableTelemetry: StripeConfiguration.EnableTelemetry);
+
+    return new StripeClient(apiKey: StripeConfiguration.ApiKey, httpClient: sysHttpClient);
+});
+#endregion
 
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 builder.Services.AddEndpointsApiExplorer();

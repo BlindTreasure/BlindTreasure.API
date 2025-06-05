@@ -89,7 +89,7 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var userId = _claimsService.GetCurrentUserId;
+            var userId = _claimsService.CurrentUserId;
             var result = await _authService.LogoutAsync(userId);
             return Ok(ApiResult<object>.Success(result!, "200", "Đăng xuất thành công. "));
         }
