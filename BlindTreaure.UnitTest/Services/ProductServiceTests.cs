@@ -212,7 +212,7 @@ namespace BlindTreaure.UnitTest.Services
             _mapperMock.Setup(x => x.Map<Product, ProductDto>(product)).Returns(productDto);
 
             // Act
-            var result = await _productService.UpdateAsync(id, dto, null);
+            var result = await _productService.UpdateAsync(id, dto);
 
             // Assert
             result.Should().NotBeNull();
@@ -232,7 +232,7 @@ namespace BlindTreaure.UnitTest.Services
             _productRepoMock.Setup(x => x.GetByIdAsync(id)).ReturnsAsync((Product)null!);
 
             // Act
-            Func<Task> act = async () => await _productService.UpdateAsync(id, dto, null);
+            Func<Task> act = async () => await _productService.UpdateAsync(id, dto);
 
             // Assert
             await act.Should().ThrowAsync<Exception>()

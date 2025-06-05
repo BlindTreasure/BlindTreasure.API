@@ -125,6 +125,31 @@ public class BlobService : IBlobService
         }
     }
 
+    public async Task DeleteFileAsync(string fileName)
+    {
+        _logger.Info($"Deleting file: {fileName}");
+
+        try
+        {
+            var removeObjectArgs = new RemoveObjectArgs()
+                .WithBucket(_bucketName)
+                .WithObject(fileName);
+
+            await _minioClient.RemoveObjectAsync(removeObjectArgs);
+            _logger.Success($"File '{fileName}' deleted successfully.");
+        }
+        catch (MinioException minioEx)
+        {
+            _logger.Error($"MinIO Error during delete: {minioEx.Message}");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Unexpected error during file delete: {ex.Message}");
+            throw;
+        }
+    }
+
     private string GetContentType(string fileName)
     {
         _logger.Info($"Determining content type for file: {fileName}");
@@ -139,4 +164,6 @@ public class BlobService : IBlobService
             _ => "application/octet-stream" // fallback nếu định dạng không rõ
         };
     }
+
+
 }

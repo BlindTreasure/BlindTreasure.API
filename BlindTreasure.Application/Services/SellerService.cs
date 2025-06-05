@@ -309,7 +309,7 @@ public class SellerService : ISellerService
         return result;
     }
 
-    public async Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto, IFormFile? productImageUrl)
+    public async Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto)
     {
         var userId = _claimsService.GetCurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
@@ -322,7 +322,7 @@ public class SellerService : ISellerService
         if (product.SellerId != seller.Id)
             throw ErrorHelper.Forbidden("Bạn chỉ được phép cập nhật sản phẩm của chính mình.");
 
-        var result = await _productService.UpdateAsync(productId, dto, productImageUrl);
+        var result = await _productService.UpdateAsync(productId, dto);
 
         // Xóa cache danh sách sản phẩm của seller để đảm bảo dữ liệu mới nhất
         await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
@@ -351,6 +351,28 @@ public class SellerService : ISellerService
 
         _loggerService.Success($"[DeleteProductAsync] Seller {seller.Id} đã xóa sản phẩm {productId}.");
         return result;
+    }
+
+
+
+    public async Task<ProductDto> UpdateSellerProductImagesAsync(Guid productId, List<IFormFile> images)
+    {
+        var userId = _claimsService.GetCurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null || !seller.IsVerified)
+            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+
+        var product = await _unitOfWork.Products.GetByIdAsync(productId);
+        if (product == null || product.IsDeleted)
+            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+        if (product.SellerId != seller.Id)
+            throw ErrorHelper.Forbidden("Bạn chỉ được phép xóa sản phẩm của chính mình.");
+
+
+        var result = await _productService.UpdateProductImagesAsync(productId,images);
+
+        return result;
+
     }
 
     // ----------------- PRIVATE HELPER METHODS -----------------

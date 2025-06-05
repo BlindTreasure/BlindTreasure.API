@@ -11,6 +11,7 @@ public interface IProductService
     Task<ProductDto> DeleteAsync(Guid id);
     Task<Pagination<ProductDto>> GetAllAsync(ProductQueryParameter param);
     Task<ProductDto?> GetByIdAsync(Guid id);
-    Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto, IFormFile productImageUrl);
+    Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto);
+    Task<ProductDto> UpdateProductImagesAsync(Guid productId, List<IFormFile> images);
     Task<string?> UploadProductImageAsync(Guid productId, IFormFile file);
 }

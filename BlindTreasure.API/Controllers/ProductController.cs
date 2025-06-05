@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -100,11 +101,11 @@ public class ProductController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
-    public async Task<IActionResult> Update(Guid id, [FromForm] ProductUpdateDto dto, IFormFile? productImageUrl)
+    public async Task<IActionResult> Update(Guid id, ProductUpdateDto dto)
     {
         try
         {
-            var result = await _productService.UpdateAsync(id, dto, productImageUrl);
+            var result = await _productService.UpdateAsync(id, dto);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Cập nhật sản phẩm thành công."));
         }
         catch (Exception ex)
@@ -137,32 +138,59 @@ public class ProductController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Cập nhật ảnh sản phẩm. Backup
+
+    // <summary>
+    /// Update ảnh bằng phương pháp ghi đè hoàn toàn bằng list truyền vào, nếu có thay đổi hãy truyền cả ảnh cũ lẫn mới vào
     /// </summary>
-    [HttpPut("{id}/image")]
+    [HttpPut("{id}/images")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResult<string>), 200)]
-    [ProducesResponseType(typeof(ApiResult<string>), 400)]
-    [ProducesResponseType(typeof(ApiResult<string>), 404)]
-    public async Task<IActionResult> UpdateProductImage(Guid id, IFormFile? file)
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
+    public async Task<IActionResult> UpdateProductImages(Guid id, [FromForm] List<IFormFile> images)
     {
-        if (file == null || file.Length == 0)
-            return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
+        if (images == null || images.Count == 0)
+            return BadRequest(ApiResult.Failure("400", "Danh sách ảnh không hợp lệ."));
 
         try
         {
-            var imageUrl = await _productService.UploadProductImageAsync(id, file);
-            if (string.IsNullOrEmpty(imageUrl))
-                return BadRequest(ApiResult.Failure("400", "Không thể cập nhật ảnh sản phẩm."));
-
-            return Ok(ApiResult<string>.Success(imageUrl, "200", "Cập nhật ảnh sản phẩm thành công."));
+            var result = await _productService.UpdateProductImagesAsync(id, images);
+            return Ok(ApiResult<ProductDto>.Success(result, "200", "Cập nhật danh sách ảnh thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<string>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ProductDto>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
+
+
+    [HttpPut("{id}/status")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
+    public async Task<IActionResult> UpdateProductStatus(Guid id,  ProductStatus productStatus)
+    {
+        try
+        {
+            var dto = new ProductUpdateDto
+            {
+                ProductStatus = productStatus
+            };
+
+            var result = await _productService.UpdateAsync(id, dto);
+            return Ok(ApiResult<ProductDto>.Success(result, "200", "Cập nhật trạng thái sản phẩm thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ProductDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+
+
 }
