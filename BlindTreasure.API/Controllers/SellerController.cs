@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
@@ -207,11 +208,11 @@ public class SellerController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
-    public async Task<IActionResult> UpdateProduct(Guid id, [FromForm] ProductUpdateDto dto, IFormFile? productImageUrl)
+    public async Task<IActionResult> UpdateProduct(Guid id,  ProductUpdateDto dto)
     {
         try
         {
-            var result = await _sellerService.UpdateProductAsync(id, dto, productImageUrl);
+            var result = await _sellerService.UpdateProductAsync(id, dto);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Cập nhật sản phẩm thành công."));
         }
         catch (Exception ex)
@@ -235,6 +236,32 @@ public class SellerController : ControllerBase
         {
             var result = await _sellerService.DeleteProductAsync(id);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Xóa sản phẩm thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ProductDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    // <summary>
+    /// Update ảnh bằng phương pháp ghi đè hoàn toàn bằng list truyền vào, nếu có thay đổi hãy truyền cả ảnh cũ lẫn mới vào
+    /// </summary>
+    [HttpPut("products/{id}/images")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
+    [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
+    public async Task<IActionResult> UpdateProductImages(Guid id, [FromForm] List<IFormFile> images)
+    {
+        if (images == null || images.Count == 0)
+            return BadRequest(ApiResult.Failure("400", "Danh sách ảnh không hợp lệ."));
+
+        try
+        {
+            var result = await _sellerService.UpdateSellerProductImagesAsync(id, images);
+            return Ok(ApiResult<ProductDto>.Success(result, "200", "Cập nhật danh sách ảnh thành công."));
         }
         catch (Exception ex)
         {

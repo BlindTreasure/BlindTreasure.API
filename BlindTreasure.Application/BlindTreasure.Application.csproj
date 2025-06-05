@@ -7,16 +7,22 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\BlindTreasure.Infrastructure\BlindTreasure.Infrastructure.csproj"/>
+      <Compile Remove="Services\NewFolder\**" />
+      <EmbeddedResource Remove="Services\NewFolder\**" />
+      <None Remove="Services\NewFolder\**" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Betalgo.OpenAI" Version="8.7.2"/>
-        <PackageReference Include="Google.Apis.Auth" Version="1.69.0"/>
-        <PackageReference Include="Minio" Version="6.0.4"/>
-        <PackageReference Include="Resend" Version="0.1.1"/>
-        <PackageReference Include="RestSharp" Version="112.1.0"/>
-        <PackageReference Include="System.Text.Json" Version="9.0.5"/>
+        <ProjectReference Include="..\BlindTreasure.Infrastructure\BlindTreasure.Infrastructure.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Betalgo.OpenAI" Version="8.7.2" />
+        <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+        <PackageReference Include="Minio" Version="6.0.4" />
+        <PackageReference Include="Resend" Version="0.1.1" />
+        <PackageReference Include="RestSharp" Version="112.1.0" />
+        <PackageReference Include="System.Text.Json" Version="9.0.5" />
     </ItemGroup>
 
 </Project>
