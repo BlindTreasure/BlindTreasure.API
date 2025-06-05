@@ -287,7 +287,7 @@ public class SellerService : ISellerService
 
     public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto)
     {
-        var userId = _claimsService.GetCurrentUserId; // chỗ này là lấy user id của seller là người đang login
+        var userId = _claimsService.CurrentUserId; // chỗ này là lấy user id của seller là người đang login
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId); // seller id ở day86
         if (seller == null)
             throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
@@ -305,7 +305,7 @@ public class SellerService : ISellerService
 
     public async Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null || !seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
@@ -327,7 +327,7 @@ public class SellerService : ISellerService
 
     public async Task<ProductDto> DeleteProductAsync(Guid productId)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null || !seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
@@ -351,7 +351,7 @@ public class SellerService : ISellerService
 
     public async Task<ProductDto> UpdateSellerProductImagesAsync(Guid productId, List<IFormFile> images)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null || !seller.IsVerified)
             throw ErrorHelper.Forbidden("Seller chưa được xác minh.");

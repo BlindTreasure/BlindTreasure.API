@@ -34,7 +34,7 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var userId = _claimsService.GetCurrentUserId;
+            var userId = _claimsService.CurrentUserId;
             var data = await _sellerService.GetSellerProfileByUserIdAsync(userId);
             return Ok(ApiResult<object>.Success(data, "200", "Lấy thông tin của Seller thành công."));
         }
@@ -57,7 +57,7 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var userId = _claimsService.GetCurrentUserId;
+            var userId = _claimsService.CurrentUserId;
             var result = await _userService.GetUserDetailsByIdAsync(userId);
             if (result == null)
                 return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
@@ -80,7 +80,7 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var userId = _claimsService.GetCurrentUserId;
+            var userId = _claimsService.CurrentUserId;
             var result = await _userService.UpdateProfileAsync(userId, dto);
             if (result == null)
                 return BadRequest(ApiResult.Failure("400", "Không thể cập nhật thông tin."));
@@ -105,7 +105,7 @@ public class PersonalController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
     public async Task<IActionResult> UpdateAvatar(IFormFile file)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
 
         if (file.Length == 0)
             return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
@@ -128,7 +128,7 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var userId = _claimsService.GetCurrentUserId;
+            var userId = _claimsService.CurrentUserId;
             var result = await _sellerService.UpdateSellerInfoAsync(userId, dto);
             return Ok(ApiResult<object>.Success(result, "200", "Cập nhật hồ sơ Seller thành công."));
         }

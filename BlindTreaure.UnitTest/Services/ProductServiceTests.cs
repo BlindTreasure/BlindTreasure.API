@@ -151,7 +151,7 @@ public class ProductServiceTests
         var product = new Product { Id = Guid.NewGuid(), SellerId = sellerId };
         var productDto = new ProductDto { Id = product.Id };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _sellerRepoMock.Setup(x => x.GetByIdAsync(sellerId, It.IsAny<Expression<Func<Seller, object>>[]>()))
             .ReturnsAsync(seller);
         _productRepoMock.Setup(x => x.AddAsync(It.IsAny<Product>())).ReturnsAsync(product);
@@ -176,7 +176,7 @@ public class ProductServiceTests
         var seller = new Seller { Id = sellerId, IsVerified = false, Status = SellerStatus.WaitingReview };
         var dto = new ProductCreateDto { SellerId = sellerId };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _sellerRepoMock.Setup(x => x.GetByIdAsync(sellerId, It.IsAny<Expression<Func<Seller, object>>[]>()))
             .ReturnsAsync(seller);
 
@@ -198,7 +198,7 @@ public class ProductServiceTests
         var dto = new ProductUpdateDto { Name = "Updated", Description = "Desc" };
         var productDto = new ProductDto { Id = id };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _productRepoMock.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(product);
         _unitOfWorkMock.Setup(x => x.Products.Update(product)).ReturnsAsync(true);
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync()).ReturnsAsync(1);
@@ -221,7 +221,7 @@ public class ProductServiceTests
         var userId = Guid.NewGuid();
         var dto = new ProductUpdateDto();
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _productRepoMock.Setup(x => x.GetByIdAsync(id)).ReturnsAsync((Product)null!);
 
             // Act
@@ -241,7 +241,7 @@ public class ProductServiceTests
         var product = new Product { Id = id, IsDeleted = false, SellerId = Guid.NewGuid() };
         var productDto = new ProductDto { Id = id };
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _productRepoMock.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(product);
         _unitOfWorkMock.Setup(x => x.Products.Update(product)).ReturnsAsync(true);
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync()).ReturnsAsync(1);
@@ -264,7 +264,7 @@ public class ProductServiceTests
         var id = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
-        _claimsServiceMock.Setup(x => x.GetCurrentUserId).Returns(userId);
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _productRepoMock.Setup(x => x.GetByIdAsync(id)).ReturnsAsync((Product)null!);
 
         // Act

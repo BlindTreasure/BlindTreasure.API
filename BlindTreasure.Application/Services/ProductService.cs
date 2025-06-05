@@ -116,7 +116,7 @@ public class ProductService : IProductService
 
     public async Task<ProductDto> CreateAsync(ProductCreateDto dto)
     {
-        var userId = _claimsService.GetCurrentUserId; // cái này chỉ để check là ai đang login, không phải sellerId 
+        var userId = _claimsService.CurrentUserId; // cái này chỉ để check là ai đang login, không phải sellerId 
         var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId);
         if (seller == null)
             throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
@@ -178,7 +178,7 @@ public class ProductService : IProductService
 
     public async Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(id);
         if (product == null || product.IsDeleted)
         {
@@ -234,7 +234,7 @@ public class ProductService : IProductService
 
     public async Task<ProductDto> DeleteAsync(Guid id)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(id);
         if (product == null || product.IsDeleted)
         {
@@ -309,7 +309,7 @@ public class ProductService : IProductService
 
     public async Task<ProductDto> UpdateProductImagesAsync(Guid productId, List<IFormFile> images)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(productId);
         if (product == null || product.IsDeleted)
             throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
