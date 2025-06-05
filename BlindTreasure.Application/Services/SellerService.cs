@@ -291,9 +291,6 @@ public class SellerService : ISellerService
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId); // seller id ở day86
         if (seller == null)
             throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
-        if (!seller.IsVerified)
-            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
-
         var newProduct = _mapper.Map<ProductSellerCreateDto, ProductCreateDto>(dto);
         newProduct.SellerId = seller.Id; // GÁN SELLER ID VÀO DTO ĐỂ NÉM QUA PRODUCT SERVICE ĐỂ TẠO
 
