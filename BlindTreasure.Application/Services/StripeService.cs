@@ -35,7 +35,7 @@ namespace BlindTreasure.Application.Services
 
             // Create the login link for the connected account
             // Optionally, you can provide additional options (like redirect URL) if needed.
-            var loginLink = await loginLinkService.CreateAsync(seller.StripeAccountId);
+            var loginLink = await loginLinkService.CreateAsync(seller.Id.ToString());
             return loginLink.Url;
         }
 
