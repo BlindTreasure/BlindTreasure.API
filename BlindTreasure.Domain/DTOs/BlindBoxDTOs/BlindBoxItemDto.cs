@@ -1,17 +1,18 @@
-﻿using BlindTreasure.Domain.Enums;
+﻿using System.ComponentModel;
+using System.Text.Json.Serialization;
+using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 
 public class BlindBoxItemDto
 {
     public Guid ProductId { get; set; }
-
-    // Bỏ ProductName, backend sẽ lấy dựa vào ProductId
+    [JsonIgnore]
      public string? ProductName { get; set; }
-
+    [DefaultValue("10")]
     public int Quantity { get; set; }
+    [DefaultValue("10.0")]
     public decimal DropRate { get; set; }
+    [DefaultValue("Common")]
     public BlindBoxRarity Rarity { get; set; }
-
-    public bool IsSecret { get; set; }  // Thêm trường này để detect secret item
 }

@@ -123,7 +123,7 @@ public class ProductService : IProductService
 
         _logger.Info($"[CreateAsync] Seller {userId} tạo sản phẩm mới: {dto.Name}");
 
-        await ValidateProductDto(dto); // Removed cast to (ProductCreateDto)
+        await ValidateProductDto(dto); 
 
         var product = new Product
         {

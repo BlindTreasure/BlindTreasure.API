@@ -2,8 +2,10 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,6 +27,53 @@ public class BlindBoxService : IBlindBoxService
         _time = time;
         _mapperService = mapperService;
         _blobService = blobService;
+    }
+
+    public async Task<Pagination<BlindBoxDetailDto>> GetAllBlindBoxesAsync(BlindBoxQueryParameter param)
+    {
+        if (param == null)
+            throw ErrorHelper.BadRequest("Tham số truy vấn không được để trống.");
+
+        if (param.PageIndex < 1)
+            throw ErrorHelper.BadRequest("PageIndex phải lớn hơn hoặc bằng 1.");
+
+        if (param.PageSize <= 0)
+            throw ErrorHelper.BadRequest("PageSize phải lớn hơn 0.");
+
+        var query = _unitOfWork.BlindBoxes.GetQueryable()
+            .Where(b => !b.IsDeleted);
+
+        // Có thể thêm filter theo param, ví dụ tên, trạng thái nếu mở rộng sau
+
+        var totalCount = await query.CountAsync();
+
+        if (totalCount == 0)
+            throw ErrorHelper.NotFound("Không tìm thấy Blind Box nào.");
+
+        var blindBoxes = await query
+            .OrderByDescending(b => b.CreatedAt)
+            .Skip((param.PageIndex - 1) * param.PageSize)
+            .Take(param.PageSize)
+            .Include(b => b.BlindBoxItems)
+            .ThenInclude(item => item.Product) // Đảm bảo Include Product để lấy tên
+            .ToListAsync();
+
+        var dtos = blindBoxes.Select(b =>
+        {
+            var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(b);
+            dto.Items = b.BlindBoxItems?.Select(item => new BlindBoxItemDto
+            {
+                ProductId = item.ProductId,
+                Quantity = item.Quantity,
+                ProductName = item.Product?.Name ?? string.Empty,
+                DropRate = item.DropRate,
+                Rarity = item.Rarity
+            }).ToList() ?? new List<BlindBoxItemDto>();
+
+            return dto;
+        }).ToList();
+
+        return new Pagination<BlindBoxDetailDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
 
     public async Task<BlindBoxDetailDto> GetBlindBoxByIdAsync(Guid blindBoxId)
@@ -125,7 +174,7 @@ public class BlindBoxService : IBlindBoxService
         );
 
         if (blindBox == null)
-            throw ErrorHelper.NotFound("Blind Box không tồn tại");
+            throw ErrorHelper.NotFound("Blind Box không tồn tại.");
 
         var currentUserId = _claimsService.GetCurrentUserId;
 
@@ -133,22 +182,9 @@ public class BlindBoxService : IBlindBoxService
             x.Id == blindBox.SellerId && x.UserId == currentUserId && !x.IsDeleted);
 
         if (seller == null)
-            throw ErrorHelper.Forbidden("Không có quyền chỉnh sửa Blind Box này");
+            throw ErrorHelper.Forbidden("Không có quyền chỉnh sửa Blind Box này.");
 
-        var productIds = items.Select(i => i.ProductId).ToList();
-
-        var products = await _unitOfWork.Products.GetAllAsync(p =>
-            productIds.Contains(p.Id) &&
-            p.SellerId == seller.Id &&
-            p.Stock > 0 &&
-            !p.IsDeleted);
-
-        if (products.Count != items.Count)
-            throw ErrorHelper.BadRequest("Một hoặc nhiều sản phẩm không hợp lệ hoặc đã hết hàng");
-
-        var dropRateTotal = items.Sum(i => i.DropRate);
-        if (dropRateTotal <= 0)
-            throw ErrorHelper.BadRequest("Tổng DropRate phải lớn hơn 0");
+        await ValidateBlindBoxItemsAsync(blindBox, seller, items);
 
         var now = _time.GetCurrentTime();
 
@@ -162,7 +198,7 @@ public class BlindBoxService : IBlindBoxService
             Rarity = i.Rarity,
             IsActive = true,
             CreatedAt = now,
-            CreatedBy = currentUserId,
+            CreatedBy = currentUserId
         }).ToList();
 
         await _unitOfWork.BlindBoxItems.AddRangeAsync(entities);
@@ -170,7 +206,6 @@ public class BlindBoxService : IBlindBoxService
 
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
-
 
     public async Task<bool> SubmitBlindBoxAsync(Guid blindBoxId)
     {
@@ -200,5 +235,66 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.SaveChangesAsync();
 
         return true;
+    }
+
+
+    /// <summary>
+    /// 1. Danh sách item không được để trống.
+    /// 2. Mỗi sản phẩm phải thuộc Seller hiện tại và còn hàng (Stock > 0, chưa bị xoá).
+    /// 3. Số lượng (quantity) của mỗi item không được vượt quá tồn kho (Stock) của sản phẩm tương ứng.
+    /// 4. Blind Box phải có ít nhất 1 item loại Secret.
+    /// 5. Nếu có item loại Secret thì DropRate cố định là 5% (frontend không được nhập).
+    /// 6. Nếu Blind Box không hỗ trợ Secret nhưng có item Secret thì sẽ báo lỗi.
+    /// 7. Tổng DropRate của các item (trừ Secret) phải nhỏ hơn 100%.
+    /// </summary>
+    private async Task ValidateBlindBoxItemsAsync(BlindBox blindBox, Seller seller, List<BlindBoxItemDto> items)
+    {
+        if (items == null || items.Count == 0)
+            throw ErrorHelper.BadRequest("Danh sách item không được để trống.");
+
+        var productIds = items.Select(i => i.ProductId).ToList();
+
+        var products = await _unitOfWork.Products.GetAllAsync(p =>
+            productIds.Contains(p.Id) &&
+            p.SellerId == seller.Id &&
+            p.Stock > 0 &&
+            !p.IsDeleted);
+
+        if (products.Count != items.Count)
+            throw ErrorHelper.BadRequest("Một hoặc nhiều sản phẩm không hợp lệ hoặc đã hết hàng.");
+
+        // Validate số lượng
+        foreach (var item in items)
+        {
+            var product = products.First(p => p.Id == item.ProductId);
+            if (item.Quantity > product.Stock)
+                throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' vượt quá số lượng tồn kho.");
+        }
+
+        // Validate DropRate và xử lý Secret
+        decimal totalDropRate = 0;
+        bool hasSecret = false;
+
+        foreach (var item in items)
+        {
+            if (item.Rarity == BlindBoxRarity.Secret)
+            {
+                if (!blindBox.HasSecretItem)
+                    throw ErrorHelper.BadRequest("Blind Box không hỗ trợ Secret item.");
+
+                item.DropRate = 5m; // ép cứng drop rate cho Secret
+                hasSecret = true;
+            }
+            else
+            {
+                totalDropRate += item.DropRate;
+            }
+        }
+
+        if (!hasSecret)
+            throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item loại Secret.");
+
+        if (totalDropRate >= 100)
+            throw ErrorHelper.BadRequest("Tổng DropRate của item (trừ Secret) phải nhỏ hơn 100%.");
     }
 }

@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.DTOs.BlindBoxDTOs;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 
 public class BlindBoxDetailDto
 {
@@ -10,10 +12,10 @@ public class BlindBoxDetailDto
     public string ImageUrl { get; set; }
     public DateTime ReleaseDate { get; set; }
 
-    public string Status { get; set; } // ví dụ: Draft, PendingApproval, Approved...
+    public BlindBoxStatus Status { get; set; } // ví dụ: Draft, PendingApproval, Approved...
 
     public bool HasSecretItem { get; set; }
     public decimal SecretProbability { get; set; }
 
-    public List<BlindBoxItemDto> Items { get; set; }
+    public List<BlindBoxItemDto>? Items { get; set; }
 }
