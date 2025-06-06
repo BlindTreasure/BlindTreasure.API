@@ -3,7 +3,7 @@
 public class CategoryQueryParameter : PaginationParameter
 {
     /// <summary>
-    ///     Tìm kiếm theo tên danh mục.
+    /// Tìm kiếm theo tên danh mục. (sử dụng param: SearchName)
     /// </summary>
     public string? Search { get; set; }
 
