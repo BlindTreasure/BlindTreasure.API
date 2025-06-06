@@ -18,19 +18,21 @@ public class CategoryService : ICategoryService
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserService _userService;
+    private readonly IBlobService _blobService;
 
     public CategoryService(
         IUnitOfWork unitOfWork,
         ILoggerService logger,
         ICacheService cacheService,
         IClaimsService claimsService,
-        IUserService userService)
+        IUserService userService, IBlobService blobService)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
         _cacheService = cacheService;
         _claimsService = claimsService;
         _userService = userService;
+        _blobService = blobService;
     }
 
     public async Task<CategoryDto?> GetByIdAsync(Guid id)
@@ -58,46 +60,45 @@ public class CategoryService : ICategoryService
         return ToCategoryDto(category);
     }
 
+
     public async Task<Pagination<CategoryDto>> GetAllAsync(CategoryQueryParameter param)
     {
         _logger.Info(
             $"[GetAllAsync] Admin/Staff requests category list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
+        if (param.PageIndex <= 0 || param.PageSize <= 0)
+            throw ErrorHelper.BadRequest("Thông số phân trang không hợp lệ. PageIndex và PageSize phải lớn hơn 0.");
+
         var query = _unitOfWork.Categories.GetQueryable()
+            .Include(c => c.Children.Where(ch => !ch.IsDeleted))
             .Where(c => !c.IsDeleted)
             .AsNoTracking();
 
-        // Filter
-        if (!string.IsNullOrWhiteSpace(param.Search))
+        var keyword = param.Search?.Trim().ToLower();
+        if (!string.IsNullOrEmpty(keyword))
         {
-            var keyword = param.Search.Trim().ToLower();
             query = query.Where(c => c.Name.ToLower().Contains(keyword));
         }
 
-        // Sort: UpdatedAt desc, CreatedAt desc
         query = query.OrderByDescending(c => c.UpdatedAt ?? c.CreatedAt);
 
         var count = await query.CountAsync();
-        if (count == 0)
-            _logger.Info("Không tìm thấy category nào.");
 
-        List<Category> items;
-        if (param.PageIndex == 0)
-            items = await query.ToListAsync();
-        else
-            items = await query
-                .Skip((param.PageIndex - 1) * param.PageSize)
-                .Take(param.PageSize)
-                .ToListAsync();
+        var items = await query
+            .Skip((param.PageIndex - 1) * param.PageSize)
+            .Take(param.PageSize)
+            .ToListAsync();
 
         var dtos = items.Select(ToCategoryDto).ToList();
         var result = new Pagination<CategoryDto>(dtos, count, param.PageIndex, param.PageSize);
 
         var cacheKey = $"category:all:{param.PageIndex}:{param.PageSize}:{param.Search}:UpdatedAtDesc";
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
+
         _logger.Info("[GetAllAsync] Category list loaded from DB and cached.");
         return result;
     }
+
 
     public async Task<CategoryDto> CreateAsync(CategoryCreateDto dto)
     {
@@ -105,7 +106,7 @@ public class CategoryService : ICategoryService
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         //if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
         //    throw ErrorHelper.Forbidden("Bạn không có quyền tạo danh mục.");
-        _logger.Info($"[CreateAsync] Admin/Staff creates category {dto.Name} by {user.FullName}");
+        _logger.Info($"[CreateAsync] Admin/Staff creates category {dto.Name} by {user?.FullName}");
 
         if (string.IsNullOrWhiteSpace(dto.Name))
             throw ErrorHelper.BadRequest("Tên category không được để trống.");
@@ -124,9 +125,16 @@ public class CategoryService : ICategoryService
         var category = new Category
         {
             Name = dto.Name.Trim(),
-            Description = dto.Description.Trim(),
+            Description = dto.Description?.Trim() ?? string.Empty,
             ParentId = dto.ParentId
         };
+
+        if (dto.ImageFile != null)
+        {
+            var fileName = $"category-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
+            await _blobService.UploadFileAsync(fileName, dto.ImageFile.OpenReadStream());
+            category.ImageUrl = await _blobService.GetFileUrlAsync(fileName);
+        }
 
         await _unitOfWork.Categories.AddAsync(category);
         await _unitOfWork.SaveChangesAsync();
@@ -176,6 +184,21 @@ public class CategoryService : ICategoryService
             category.ParentId = dto.ParentId;
         }
 
+        if (dto.ImageFile != null)
+        {
+            // Optionally: Xóa ảnh cũ
+            if (!string.IsNullOrEmpty(category.ImageUrl))
+            {
+                var oldFileName = Path.GetFileName(new Uri(category.ImageUrl).LocalPath);
+                await _blobService.DeleteFileAsync($"category-thumbnails/{oldFileName}");
+            }
+
+            var fileName = $"category/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
+            await _blobService.UploadFileAsync(fileName, dto.ImageFile.OpenReadStream());
+            category.ImageUrl = await _blobService.GetFileUrlAsync(fileName);
+        }
+
+
         category.UpdatedAt = DateTime.UtcNow;
         category.UpdatedBy = userId;
 
@@ -187,7 +210,6 @@ public class CategoryService : ICategoryService
         _logger.Success($"[UpdateAsync] Category {id} updated.");
         return ToCategoryDto(category);
     }
-
 
     public async Task<CategoryDto> DeleteAsync(Guid id)
     {
@@ -234,7 +256,14 @@ public class CategoryService : ICategoryService
             Description = category.Description,
             ParentId = category.ParentId,
             CreatedAt = category.CreatedAt,
-            IsDeleted = category.IsDeleted
+            IsDeleted = category.IsDeleted,
+            ImageUrl = category.ImageUrl,
+            Children = category.Children != null
+                ? category.Children
+                    .Where(c => !c.IsDeleted)
+                    .Select(ToCategoryDto)
+                    .ToList()
+                : new List<CategoryDto>()
         };
     }
 
