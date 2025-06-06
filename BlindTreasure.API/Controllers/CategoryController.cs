@@ -73,11 +73,11 @@ public class CategoryController : ControllerBase
     ///     Tạo mới một danh mục sản phẩm.
     /// </summary>
     [HttpPost]
-    // [Authorize(Roles = "Admin,Staff")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 409)]
-    public async Task<IActionResult> Create([FromBody] CategoryCreateDto dto)
+    public async Task<IActionResult> Create([FromForm] CategoryCreateDto dto)
     {
         try
         {
@@ -101,7 +101,7 @@ public class CategoryController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 404)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 409)]
-    public async Task<IActionResult> Update(Guid id, [FromBody] CategoryUpdateDto dto)
+    public async Task<IActionResult> Update(Guid id, [FromForm] CategoryUpdateDto dto)
     {
         try
         {

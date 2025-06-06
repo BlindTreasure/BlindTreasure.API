@@ -8,6 +8,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Moq;
+using OpenAI.Interfaces;
 
 namespace BlindTreaure.UnitTest.Services;
 
@@ -20,9 +21,11 @@ public class CategoryServiceTests
     private readonly Mock<ILoggerService> _loggerMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IUserService> _userServiceMock;
+    private readonly Mock<IBlobService> _blobServiceMock;
 
-    public CategoryServiceTests()
+    public CategoryServiceTests(Mock<IBlobService> blobServiceMock)
     {
+        _blobServiceMock = blobServiceMock;
         _cacheServiceMock = new Mock<ICacheService>();
         _claimsServiceMock = new Mock<IClaimsService>();
         _loggerMock = new Mock<ILoggerService>();
@@ -37,7 +40,8 @@ public class CategoryServiceTests
             _loggerMock.Object,
             _cacheServiceMock.Object,
             _claimsServiceMock.Object,
-            _userServiceMock.Object
+            _userServiceMock.Object,
+            _blobServiceMock.Object
         );
     }
 
