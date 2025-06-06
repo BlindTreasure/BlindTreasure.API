@@ -73,7 +73,7 @@ public class CategoryController : ControllerBase
     ///     Tạo mới một danh mục sản phẩm.
     /// </summary>
     [HttpPost]
-    // [Authorize(Roles = "Admin,Staff")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<CategoryDto>), 409)]

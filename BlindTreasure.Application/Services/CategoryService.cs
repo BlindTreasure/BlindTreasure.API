@@ -104,20 +104,16 @@ public class CategoryService : ICategoryService
     {
         var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
-        //if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
-        //    throw ErrorHelper.Forbidden("Bạn không có quyền tạo danh mục.");
         _logger.Info($"[CreateAsync] Admin/Staff creates category {dto.Name} by {user?.FullName}");
 
         if (string.IsNullOrWhiteSpace(dto.Name))
             throw ErrorHelper.BadRequest("Tên category không được để trống.");
 
-        // Validate tên duy nhất
-        var exists = await _unitOfWork.Categories.GetQueryable().Where(x => x.IsDeleted == false)
+        var exists = await _unitOfWork.Categories.GetQueryable().Where(x => !x.IsDeleted)
             .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower());
         if (exists)
             throw ErrorHelper.Conflict("Tên danh mục đã tồn tại trong hệ thống.");
 
-        // Validate ParentId nếu có
         if (dto.ParentId.HasValue)
             if (!await _unitOfWork.Categories.GetQueryable().AnyAsync(c => c.Id == dto.ParentId.Value))
                 throw ErrorHelper.BadRequest("ParentId không hợp lệ.");
@@ -131,9 +127,21 @@ public class CategoryService : ICategoryService
 
         if (dto.ImageFile != null)
         {
-            var fileName = $"category-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
-            await _blobService.UploadFileAsync(fileName, dto.ImageFile.OpenReadStream());
-            category.ImageUrl = await _blobService.GetFileUrlAsync(fileName);
+            try
+            {
+                var fileName = $"category-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
+                _logger.Info($"[CreateAsync] Uploading image {fileName}");
+
+                await _blobService.UploadFileAsync(fileName, dto.ImageFile.OpenReadStream());
+                category.ImageUrl = await _blobService.GetPreviewUrlAsync(fileName);
+
+                _logger.Info($"[CreateAsync] Image uploaded and preview URL: {category.ImageUrl}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"[CreateAsync] Upload image failed: {ex.Message}");
+                throw ErrorHelper.Internal("Lỗi khi upload ảnh category.");
+            }
         }
 
         await _unitOfWork.Categories.AddAsync(category);
@@ -150,6 +158,7 @@ public class CategoryService : ICategoryService
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
             throw ErrorHelper.Forbidden("Bạn không có quyền update danh mục.");
+
         _logger.Info($"[UpdateAsync] Admin/Staff updates category {dto.Name ?? "(no name change)"} by {user.FullName}");
 
         var category = await _unitOfWork.Categories.GetQueryable()
@@ -159,10 +168,9 @@ public class CategoryService : ICategoryService
         if (category == null)
             throw ErrorHelper.NotFound("Không tìm thấy category.");
 
-        // Chỉ cập nhật trường có giá trị khác null
         if (!string.IsNullOrWhiteSpace(dto.Name))
         {
-            var exists = await _unitOfWork.Categories.GetQueryable().Where(x => x.IsDeleted == false)
+            var exists = await _unitOfWork.Categories.GetQueryable().Where(x => !x.IsDeleted)
                 .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower() && c.Id != id);
             if (exists)
                 throw ErrorHelper.Conflict("Tên danh mục đã tồn tại trong hệ thống.");
@@ -186,18 +194,30 @@ public class CategoryService : ICategoryService
 
         if (dto.ImageFile != null)
         {
-            // Optionally: Xóa ảnh cũ
-            if (!string.IsNullOrEmpty(category.ImageUrl))
+            try
             {
-                var oldFileName = Path.GetFileName(new Uri(category.ImageUrl).LocalPath);
-                await _blobService.DeleteFileAsync($"category-thumbnails/{oldFileName}");
+                if (!string.IsNullOrWhiteSpace(category.ImageUrl))
+                {
+                    var oldFileName = Path.GetFileName(new Uri(category.ImageUrl).LocalPath);
+                    _logger.Info($"[UpdateAsync] Deleting old image: {oldFileName}");
+
+                    await _blobService.DeleteFileAsync($"category-thumbnails/{oldFileName}");
+                }
+
+                var newFileName = $"category-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
+                _logger.Info($"[UpdateAsync] Uploading new image {newFileName}");
+
+                await _blobService.UploadFileAsync(newFileName, dto.ImageFile.OpenReadStream());
+                category.ImageUrl = await _blobService.GetPreviewUrlAsync(newFileName);
+
+                _logger.Info($"[UpdateAsync] Image uploaded and preview URL: {category.ImageUrl}");
             }
-
-            var fileName = $"category/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
-            await _blobService.UploadFileAsync(fileName, dto.ImageFile.OpenReadStream());
-            category.ImageUrl = await _blobService.GetFileUrlAsync(fileName);
+            catch (Exception ex)
+            {
+                _logger.Error($"[UpdateAsync] Upload image failed: {ex.Message}");
+                throw ErrorHelper.Internal("Lỗi khi cập nhật ảnh category.");
+            }
         }
-
 
         category.UpdatedAt = DateTime.UtcNow;
         category.UpdatedBy = userId;
@@ -206,7 +226,6 @@ public class CategoryService : ICategoryService
         await _unitOfWork.SaveChangesAsync();
 
         await RemoveCategoryCacheAsync(id);
-
         _logger.Success($"[UpdateAsync] Category {id} updated.");
         return ToCategoryDto(category);
     }
