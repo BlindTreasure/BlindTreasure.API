@@ -16,14 +16,14 @@ public class ClaimsService : IClaimsService
 
         var extractedId = AuthenTools.GetCurrentUserId(identity);
         if (Guid.TryParse(extractedId, out var parsedId))
-            GetCurrentUserId = parsedId;
+            CurrentUserId = parsedId;
         else
-            GetCurrentUserId = Guid.Empty;
+            CurrentUserId = Guid.Empty;
 
         IpAddress = httpContextAccessor?.HttpContext?.Connection?.RemoteIpAddress?.ToString();
     }
 
-    public Guid GetCurrentUserId { get; }
+    public Guid CurrentUserId { get; }
 
     public string? IpAddress { get; }
 }

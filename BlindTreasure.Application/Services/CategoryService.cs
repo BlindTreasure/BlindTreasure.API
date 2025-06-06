@@ -101,7 +101,7 @@ public class CategoryService : ICategoryService
 
     public async Task<CategoryDto> CreateAsync(CategoryCreateDto dto)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         //if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
         //    throw ErrorHelper.Forbidden("Bạn không có quyền tạo danh mục.");
@@ -138,7 +138,7 @@ public class CategoryService : ICategoryService
 
     public async Task<CategoryDto> UpdateAsync(Guid id, CategoryUpdateDto dto)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
             throw ErrorHelper.Forbidden("Bạn không có quyền update danh mục.");
@@ -191,7 +191,7 @@ public class CategoryService : ICategoryService
 
     public async Task<CategoryDto> DeleteAsync(Guid id)
     {
-        var userId = _claimsService.GetCurrentUserId;
+        var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
             throw ErrorHelper.Forbidden("Bạn không có quyền xóa danh mục.");

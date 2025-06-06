@@ -89,7 +89,7 @@ public class SellerController : ControllerBase
     {
         try
         {
-            var userId = _claimsService.GetCurrentUserId;
+            var userId = _claimsService.CurrentUserId;
             var fileUrl = await _sellerService.UploadSellerDocumentAsync(userId, file);
             return Ok(ApiResult<string>.Success(fileUrl, "200", "Tải tài liệu thành công, chờ xác minh."));
         }
@@ -133,7 +133,7 @@ public class SellerController : ControllerBase
     {
         try
         {
-            var userId = _claimsService.GetCurrentUserId;
+            var userId = _claimsService.CurrentUserId;
 
             var result = await _sellerService.GetAllProductsAsync(param, userId);
             return Ok(ApiResult<object>.Success(new
@@ -165,7 +165,7 @@ public class SellerController : ControllerBase
     {
         try
         {
-            var userId = _claimsService.GetCurrentUserId;
+            var userId = _claimsService.CurrentUserId;
 
             var result = await _sellerService.GetProductByIdAsync(id, userId);
             return Ok(ApiResult<ProductDto>.Success(result, "200", "Lấy thông tin sản phẩm thành công."));
