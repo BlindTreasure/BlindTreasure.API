@@ -8,6 +8,7 @@ using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace BlindTreasure.Application.Services;
 
@@ -208,12 +209,13 @@ public class BlindBoxService : IBlindBoxService
             CreatedBy = currentUserId
         };
 
-        await _unitOfWork.BlindBoxes.AddAsync(blindBox);
+        var result = await _unitOfWork.BlindBoxes.AddAsync(blindBox);
         await _unitOfWork.SaveChangesAsync();
 
         await RemoveBlindBoxCacheAsync(blindBox.Id);
         _logger.Success($"[CreateBlindBoxAsync] Blind box {blindBox.Name} created by user {currentUserId}.");
-        return await GetBlindBoxByIdAsync(blindBox.Id);
+        var mappingResult = _mapperService.Map<BlindBox, BlindBoxDetailDto>(result);
+        return mappingResult;
     }
 
     public async Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemDto> items)
