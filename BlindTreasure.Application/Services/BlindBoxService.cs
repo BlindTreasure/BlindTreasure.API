@@ -243,28 +243,51 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.Forbidden("Không có quyền chỉnh sửa Blind Box này.");
         }
 
+        // Validate logic (dropRate, số lượng tồn kho, secret logic)
         await ValidateBlindBoxItemsAsync(blindBox, seller, items);
 
-        var now = _time.GetCurrentTime();
+        // Lấy toàn bộ product liên quan để xử lý cập nhật tồn kho
+        var productIds = items.Select(i => i.ProductId).ToList();
+        var products = await _unitOfWork.Products.GetAllAsync(p =>
+            productIds.Contains(p.Id) &&
+            p.SellerId == seller.Id &&
+            !p.IsDeleted);
 
-        var entities = items.Select(i => new BlindBoxItem
+        // Chuẩn bị entity item + trừ stock tương ứng
+        var now = _time.GetCurrentTime();
+        var entities = new List<BlindBoxItem>();
+
+        foreach (var item in items)
         {
-            Id = Guid.NewGuid(),
-            BlindBoxId = blindBoxId,
-            ProductId = i.ProductId,
-            Quantity = i.Quantity,
-            DropRate = i.DropRate,
-            Rarity = i.Rarity,
-            IsActive = true,
-            CreatedAt = now,
-            CreatedBy = currentUserId
-        }).ToList();
+            var product = products.First(p => p.Id == item.ProductId);
+
+            if (item.Quantity > product.Stock)
+                throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho.");
+
+            // Trừ tồn kho
+            product.Stock -= item.Quantity;
+
+            entities.Add(new BlindBoxItem
+            {
+                Id = Guid.NewGuid(),
+                BlindBoxId = blindBoxId,
+                ProductId = item.ProductId,
+                Quantity = item.Quantity,
+                DropRate = item.DropRate,
+                Rarity = item.Rarity,
+                IsActive = true,
+                CreatedAt = now,
+                CreatedBy = currentUserId
+            });
+        }
 
         await _unitOfWork.BlindBoxItems.AddRangeAsync(entities);
+        await _unitOfWork.Products.UpdateRange(products);
         await _unitOfWork.SaveChangesAsync();
 
         await RemoveBlindBoxCacheAsync(blindBoxId);
-        _logger.Success($"[AddItemsToBlindBoxAsync] Added {entities.Count} items to Blind Box {blindBoxId}.");
+        _logger.Success(
+            $"[AddItemsToBlindBoxAsync] Added {entities.Count} items to Blind Box {blindBoxId} and deducted stock.");
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
 
