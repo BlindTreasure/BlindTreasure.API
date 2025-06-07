@@ -266,12 +266,7 @@ public class CategoryService : ICategoryService
 
         _logger.Info($"[DeleteAsync] Admin/Staff deletes category {id} by {user.FullName}");
 
-        // Không xóa nếu còn sản phẩm hoặc category con chưa bị xóa
-        if ((category.Products != null && category.Products.Any()) ||
-            (category.Children != null && category.Children.Any(c => !c.IsDeleted)))
-        {
-            throw ErrorHelper.Conflict("Không thể xóa category khi còn sản phẩm hoặc category con liên quan.");
-        }
+
 
         await _unitOfWork.Categories.SoftRemove(category);
         await _unitOfWork.SaveChangesAsync();
