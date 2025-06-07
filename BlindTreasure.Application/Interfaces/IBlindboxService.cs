@@ -13,6 +13,6 @@ public interface IBlindBoxService
     Task<BlindBoxDetailDto> SubmitBlindBoxAsync(Guid blindBoxId);
 
     Task<List<BlindBoxDetailDto>> GetPendingApprovalBlindBoxesAsync();
-    Task<BlindBoxDetailDto> ApproveBlindBoxAsync(Guid blindBoxId);
-    Task<BlindBoxDetailDto> RejectBlindBoxAsync(Guid blindBoxId, string reason);
+    Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null);
+    
 }

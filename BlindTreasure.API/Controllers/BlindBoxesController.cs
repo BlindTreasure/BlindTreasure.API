@@ -168,51 +168,28 @@ public class BlindBoxesController : ControllerBase
     }
 
     /// <summary>
-    ///     [Staff] Phê duyệt Blind Box sau khi xác minh tỉ lệ drop-rate hợp lệ
+    /// [Staff] Duyệt hoặc từ chối Blind Box (chỉ áp dụng cho trạng thái DRAFT)
     /// </summary>
-    /// <param name="id">Id của Blind Box</param>
-    /// <returns>Kết quả thành công (true/false)</returns>
-    [HttpPost("{id}/approve")]
+    /// <param name="id">ID của Blind Box</param>
+    /// <param name="request">Yêu cầu duyệt hoặc từ chối</param>
+    /// <returns>Chi tiết Blind Box sau khi xử lý</returns>
+    [HttpPost("{id}/review")]
     [Authorize(Roles = "Staff")]
-    [ProducesResponseType(typeof(bool), 200)]
+    [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
     [ProducesResponseType(400)]
-    public async Task<ActionResult<bool>> Approve(Guid id)
+    public async Task<ActionResult<BlindBoxDetailDto>> Review(Guid id, [FromBody] BlindBoxReviewRequest request)
     {
         try
         {
-            var result = await _blindBoxService.ApproveBlindBoxAsync(id);
-            return Ok(ApiResult<object>.Success(result!, "200", "Phê duyệt Blind Box thành công."));
+            var result = await _blindBoxService.ReviewBlindBoxAsync(id, request.Approve, request.RejectReason);
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", request.Approve ? "Phê duyệt thành công." : "Từ chối thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<bool>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<BlindBoxDetailDto>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
 
-    /// <summary>
-    ///     [Staff] Từ chối Blind Box và ghi lý do từ chối
-    /// </summary>
-    /// <param name="id">Id của Blind Box</param>
-    /// <param name="reason">Lý do từ chối</param>
-    /// <returns>Kết quả thành công (true/false)</returns>
-    [HttpPost("{id}/reject")]
-    [Authorize(Roles = "Staff")]
-    [ProducesResponseType(typeof(bool), 200)]
-    [ProducesResponseType(400)]
-    public async Task<ActionResult<bool>> Reject(Guid id, [FromBody] string reason)
-    {
-        try
-        {
-            var result = await _blindBoxService.RejectBlindBoxAsync(id, reason);
-            return Ok(ApiResult<object>.Success(result!, "200", "Từ chối Blind Box thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<bool>(ex);
-            return StatusCode(statusCode, errorResponse);
-        }
-    }
 }

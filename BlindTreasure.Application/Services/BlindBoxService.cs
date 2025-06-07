@@ -354,99 +354,91 @@ public class BlindBoxService : IBlindBoxService
         }).ToList();
     }
 
-    public async Task<BlindBoxDetailDto> ApproveBlindBoxAsync(Guid blindBoxId)
+    public async Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
-            b => b.Id == blindBoxId && b.Status == BlindBoxStatus.PendingApproval && !b.IsDeleted,
+            b => b.Id == blindBoxId && b.Status == BlindBoxStatus.Draft && !b.IsDeleted,
             b => b.BlindBoxItems,
             b => b.Seller
         );
 
         if (blindBox == null)
-            throw ErrorHelper.NotFound("Blind Box không tồn tại hoặc không hợp lệ.");
-
-        if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
-            throw ErrorHelper.BadRequest("Blind Box không chứa item nào.");
-
-        var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
-        if (totalDropRate != 100)
-            throw ErrorHelper.BadRequest("Tổng DropRate phải bằng 100%.");
+            throw ErrorHelper.NotFound("Blind Box không tồn tại hoặc không ở trạng thái chờ duyệt.");
 
         var currentUserId = _claimsService.CurrentUserId;
         var now = _time.GetCurrentTime();
 
-        blindBox.Status = BlindBoxStatus.Approved;
-        blindBox.UpdatedAt = now;
-        blindBox.UpdatedBy = currentUserId;
-
-        await _unitOfWork.BlindBoxes.Update(blindBox);
-
-        var configs = blindBox.BlindBoxItems.Select(item => new ProbabilityConfig
+        if (approve)
         {
-            Id = Guid.NewGuid(),
-            BlindBoxItemId = item.Id,
-            Probability = item.DropRate,
-            EffectiveFrom = now,
-            EffectiveTo = blindBox.ReleaseDate,
-            ApprovedBy = currentUserId,
-            ApprovedAt = now,
-            CreatedAt = now,
-            CreatedBy = currentUserId
-        }).ToList();
+            if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
+                throw ErrorHelper.BadRequest("Blind Box không chứa item nào.");
 
-        await _unitOfWork.ProbabilityConfigs.AddRangeAsync(configs);
+            var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
+            if (totalDropRate != 100)
+                throw ErrorHelper.BadRequest("Tổng DropRate phải bằng 100%.");
+
+            blindBox.Status = BlindBoxStatus.Approved;
+            blindBox.UpdatedAt = now;
+            blindBox.UpdatedBy = currentUserId;
+
+            await _unitOfWork.BlindBoxes.Update(blindBox);
+
+            var configs = blindBox.BlindBoxItems.Select(item => new ProbabilityConfig
+            {
+                Id = Guid.NewGuid(),
+                BlindBoxItemId = item.Id,
+                Probability = item.DropRate,
+                EffectiveFrom = now,
+                EffectiveTo = blindBox.ReleaseDate,
+                ApprovedBy = currentUserId,
+                ApprovedAt = now,
+                CreatedAt = now,
+                CreatedBy = currentUserId
+            }).ToList();
+
+            await _unitOfWork.ProbabilityConfigs.AddRangeAsync(configs);
+
+            var sellerUser =
+                await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId && !u.IsDeleted);
+            if (sellerUser != null)
+            {
+                await _emailService.SendBlindBoxApprovedAsync(
+                    sellerUser.Email!,
+                    sellerUser.FullName ?? "Seller",
+                    blindBox.Name
+                );
+            }
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(rejectReason))
+                throw ErrorHelper.BadRequest("Lý do từ chối là bắt buộc.");
+
+            blindBox.Status = BlindBoxStatus.Rejected;
+            blindBox.RejectReason = rejectReason.Trim();
+            blindBox.UpdatedAt = now;
+            blindBox.UpdatedBy = currentUserId;
+
+            await _unitOfWork.BlindBoxes.Update(blindBox);
+
+            var sellerUser =
+                await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId && !u.IsDeleted);
+            if (sellerUser != null)
+            {
+                await _emailService.SendBlindBoxRejectedAsync(
+                    sellerUser.Email!,
+                    sellerUser.FullName ?? "Seller",
+                    blindBox.Name,
+                    rejectReason
+                );
+            }
+        }
+
         await _unitOfWork.SaveChangesAsync();
-
-        // Lấy thông tin seller user để gửi email
-        var sellerUser =
-            await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId && !u.IsDeleted);
-        if (sellerUser != null)
-            await _emailService.SendBlindBoxApprovedAsync(
-                sellerUser.Email!,
-                sellerUser.FullName ?? "Seller",
-                blindBox.Name
-            );
-
         await RemoveBlindBoxCacheAsync(blindBox.Id);
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
-    public async Task<BlindBoxDetailDto> RejectBlindBoxAsync(Guid blindBoxId, string reason)
-    {
-        if (string.IsNullOrWhiteSpace(reason))
-            throw ErrorHelper.BadRequest("Lý do từ chối không được để trống.");
-
-        var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
-            b => b.Id == blindBoxId && b.Status == BlindBoxStatus.PendingApproval && !b.IsDeleted,
-            b => b.Seller
-        );
-
-        if (blindBox == null)
-            throw ErrorHelper.NotFound("Blind Box không hợp lệ hoặc không tồn tại.");
-
-        var currentUserId = _claimsService.CurrentUserId;
-
-        blindBox.Status = BlindBoxStatus.Rejected;
-        blindBox.RejectReason = reason.Trim();
-        blindBox.UpdatedAt = _time.GetCurrentTime();
-        blindBox.UpdatedBy = currentUserId;
-
-        await _unitOfWork.BlindBoxes.Update(blindBox);
-        await _unitOfWork.SaveChangesAsync();
-
-        var sellerUser =
-            await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId && !u.IsDeleted);
-        if (sellerUser != null)
-            await _emailService.SendBlindBoxRejectedAsync(
-                sellerUser.Email!,
-                sellerUser.FullName ?? "Seller",
-                blindBox.Name,
-                reason
-            );
-
-        await RemoveBlindBoxCacheAsync(blindBox.Id);
-        return await GetBlindBoxByIdAsync(blindBox.Id);
-    }
 
     /// <summary>
     ///     1. Danh sách item không được để trống.
