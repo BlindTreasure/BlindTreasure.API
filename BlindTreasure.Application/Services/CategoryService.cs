@@ -174,6 +174,7 @@ public class CategoryService : ICategoryService
         if (category == null)
             throw ErrorHelper.NotFound("Không tìm thấy category.");
 
+        // Tên mới
         if (!string.IsNullOrWhiteSpace(dto.Name))
         {
             var exists = await _unitOfWork.Categories.GetQueryable().Where(x => !x.IsDeleted)
@@ -184,9 +185,14 @@ public class CategoryService : ICategoryService
             category.Name = dto.Name.Trim();
         }
 
+        // Mô tả
         if (!string.IsNullOrWhiteSpace(dto.Description))
             category.Description = dto.Description.Trim();
 
+        // Xác định có đang chuyển từ cha thành con không
+        bool isBecomingChild = category.ParentId == null && dto.ParentId.HasValue;
+
+        // Cập nhật ParentId
         if (dto.ParentId.HasValue)
         {
             if (dto.ParentId.Value == id)
@@ -196,8 +202,31 @@ public class CategoryService : ICategoryService
                 throw ErrorHelper.BadRequest("Không được tạo vòng lặp phân cấp category.");
 
             category.ParentId = dto.ParentId;
+
+            // Nếu chuyển từ cha thành con thì xóa ảnh và ảnh trên server
+            if (isBecomingChild && !string.IsNullOrWhiteSpace(category.ImageUrl))
+            {
+                try
+                {
+                    var oldFileName = Path.GetFileName(new Uri(category.ImageUrl).LocalPath);
+                    _logger.Info($"[UpdateAsync] Deleting image due to parent assignment: {oldFileName}");
+
+                    await _blobService.DeleteFileAsync($"category-thumbnails/{oldFileName}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"[UpdateAsync] Failed to delete image during demotion to child: {ex.Message}");
+                }
+
+                category.ImageUrl = null;
+            }
+        }
+        else
+        {
+            category.ParentId = null;
         }
 
+        // Upload ảnh mới nếu có
         if (dto.ImageFile != null)
         {
             if (category.ParentId != null)
@@ -205,6 +234,7 @@ public class CategoryService : ICategoryService
 
             try
             {
+                // Xóa ảnh cũ nếu có
                 if (!string.IsNullOrWhiteSpace(category.ImageUrl))
                 {
                     var oldFileName = Path.GetFileName(new Uri(category.ImageUrl).LocalPath);
@@ -213,6 +243,7 @@ public class CategoryService : ICategoryService
                     await _blobService.DeleteFileAsync($"category-thumbnails/{oldFileName}");
                 }
 
+                // Upload ảnh mới
                 var newFileName = $"category-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
                 _logger.Info($"[UpdateAsync] Uploading new image {newFileName}");
 
@@ -228,6 +259,7 @@ public class CategoryService : ICategoryService
             }
         }
 
+        // Audit
         category.UpdatedAt = DateTime.UtcNow;
         category.UpdatedBy = userId;
 
@@ -236,8 +268,10 @@ public class CategoryService : ICategoryService
 
         await RemoveCategoryCacheAsync(id);
         _logger.Success($"[UpdateAsync] Category {id} updated.");
+
         return ToCategoryDto(category);
     }
+
 
     public async Task<CategoryDto> DeleteAsync(Guid id)
     {

@@ -61,7 +61,7 @@ public class SystemController : ControllerBase
         await _context.Users.AddRangeAsync(users);
         await _context.SaveChangesAsync();
 
-        await SeedSellerForUser("trangiaphuc362003181@gmail.com");
+        await SeedSellerForUser("blindtreasurefpt@gmail.com");
 
         _logger.Success("Users and seller seeded successfully.");
     }
@@ -164,10 +164,10 @@ public class SystemController : ControllerBase
 
     private async Task SeedProducts()
     {
-        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "trangiaphuc362003181@gmail.com");
+        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
         if (sellerUser == null)
         {
-            _logger.Error("Không tìm thấy user Seller với email trangiaphuc362003181@gmail.com để tạo product.");
+            _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo product.");
             return;
         }
 
@@ -259,17 +259,17 @@ public class SystemController : ControllerBase
                         new Product
                         {
                             Id = Guid.NewGuid(),
-                            Name = "Porker",
-                            Description = "Đồ chơi Baby Three phiên bản A, chất liệu an toàn.",
+                            Name = "Búp Bê Baby Three V3 Check Card Blindbox Thỏ Màu Hồng",
+                            Description = "Búp Bê Baby Three V3 Check Card Blindbox Thỏ Màu Hồng là món đồ chơi giải trí được nhiều bạn trẻ yêu thích và săn đón hiện nay. Món đồ chơi này được lấy hình tượng từ nhân vật hoạt hình quen thuộc trong cuộc sống với thiết kế kiểu dáng đáng yêu, ngộ nghĩnh và có chút cá tính. Với chất liệu bền đẹp cùng tính ứng dụng cao, búp bê Baby Three luôn nhận được sự yêu thích của người dùng. ",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
-                            Price = 400000,
+                            Price = 990000,
                             Stock = 40,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
                             {
-                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2Fporker.webp&version_id=null"
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Check%20Card%20Blindbox%20Th%E1%BB%8F%20M%C3%A0u%20H%E1%BB%93ng.png&version_id=null"
                             },
                             Brand = "Baby Three",
                             Material = "PVC",
@@ -279,8 +279,8 @@ public class SystemController : ControllerBase
                         new Product
                         {
                             Id = Guid.NewGuid(),
-                            Name = "Rabbit",
-                            Description = "Búp bê Baby Three bằng vải mềm mại, thân thiện với trẻ em.",
+                            Name = "Búp Bê Baby Three V3 Vinyl Plush Dinosaur Màu Xanh Lá",
+                            Description = "Búp Bê Baby Three V3 Vinyl Plush Dinosaur Màu Xanh Lá là món đồ chơi giải trí được nhiều bạn trẻ yêu thích và săn đón hiện nay. Vinyl Plush Dinosaur được lấy hình tượng từ chú khủng long xanh lạ mắt, thiết kế với kiểu dáng đáng yêu, ngộ nghĩnh và có chút cá tính. Với chất liệu bền đẹp cùng tính ứng dụng cao, búp bê Baby Three luôn nhận được sự yêu thích của người dùng. ",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 550000,
@@ -289,7 +289,10 @@ public class SystemController : ControllerBase
                             CreatedAt = now,
                             ImageUrls = new List<string>
                             {
-                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2Frabbit.webp&version_id=null"
+                                //image 1
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Vinyl%20Plush%20Dinosaur%20M%C3%A0u%20Xanh%20L%C3%A1%2Fbup-be-baby-three-v3-vinyl-plush-dinosaur-mau-xanh-la-66f4e3b343e26-26092024113147.png&version_id=null",
+                                //image 2
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Vinyl%20Plush%20Dinosaur%20M%C3%A0u%20Xanh%20L%C3%A1%2Fbup-be-baby-three-v3-vinyl-plush-dinosaur-mau-xanh-la-66f4e3b346bef-26092024113147.png&version_id=null"
                             },
                             Brand = "Baby Three",
                             Material = "Fabric",
@@ -299,17 +302,17 @@ public class SystemController : ControllerBase
                         new Product
                         {
                             Id = Guid.NewGuid(),
-                            Name = "Búp Bê Baby Three V3 Vinyl Plush Dinosaur Màu Xanh Lá\n",
-                            Description = "Phiên bản sưu tầm Baby Three giới hạn số lượng.",
+                            Name = "Búp Bê Baby Three Chinese Zodiac Plush Doll Blind Box Mặt Dâu Màu Hồng",
+                            Description = "Búp Bê Baby Three Chinese Zodiac Plush Doll Blind Box Mặt Dâu Màu Hồng là món đồ chơi giải trí được nhiều bạn trẻ yêu thích và săn đón hiện nay. Zodiac Plush Doll Mặt Dâu được lấy hình tượng từ nhân vật hoạt hình quen thuộc trong cuộc sống với thiết kế kiểu dáng đáng yêu, ngộ nghĩnh và có chút cá tính. Với chất liệu bền đẹp cùng tính ứng dụng cao, búp bê Baby Three luôn nhận được sự yêu thích của người dùng. ",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
-                            Price = 700000,
+                            Price = 1190000,
                             Stock = 10,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
                             {
-                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Vinyl%20Plush%20Dinosaur%20M%C3%A0u%20Xanh%20L%C3%A1.webp&version_id=null"
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20Chinese%20Zodiac%20Plush%20Doll%20Blind%20Box%20M%E1%BA%B7t%20D%C3%A2u%20M%C3%A0u%20H%E1%BB%93ng.png&version_id=null"
                             },
                             Brand = "Baby Three",
                             Material = "PVC",
@@ -674,9 +677,9 @@ public class SystemController : ControllerBase
         {
             new()
             {
-                Email = "blindtreasurefpt@gmail.com",
+                Email = "trangiaphuc362003181@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
-                FullName = "Customer User",
+                FullName = "Trần Gia Phúc",
                 Phone = "0900000002",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Customer,
@@ -686,7 +689,7 @@ public class SystemController : ControllerBase
             {
                 Email = "staff@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
-                FullName = "Staff User",
+                FullName = "Nhân viên năng suất ",
                 Phone = "0900000003",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Staff,
@@ -696,7 +699,7 @@ public class SystemController : ControllerBase
             {
                 Email = "admin@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
-                FullName = "Admin User",
+                FullName = "Admin Đẹp Trai ",
                 Phone = "0900000004",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Admin,
@@ -704,9 +707,9 @@ public class SystemController : ControllerBase
             },
             new()
             {
-                Email = "trangiaphuc362003181@gmail.com",
+                Email = "blindtreasurefpt@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
-                FullName = "Seller User",
+                FullName = "Official Brand Seller",
                 Phone = "0900000001",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
