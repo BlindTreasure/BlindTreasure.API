@@ -47,7 +47,9 @@ public class CategoryService : ICategoryService
 
         var category = await _unitOfWork.Categories.GetQueryable()
             .Include(c => c.Parent)
+            .Include(c => c.Children.Where(ch => !ch.IsDeleted)) 
             .FirstOrDefaultAsync(c => c.Id == id);
+
 
         if (category == null)
         {
@@ -134,6 +136,9 @@ public class CategoryService : ICategoryService
 
         if (dto.ImageFile != null)
         {
+            if (dto.ParentId != null)
+                throw ErrorHelper.BadRequest("Chỉ category cấp cha (không có ParentId) mới được phép upload ảnh.");
+
             try
             {
                 var fileName = $"category-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
@@ -150,6 +155,7 @@ public class CategoryService : ICategoryService
                 throw ErrorHelper.Internal("Lỗi khi upload ảnh category.");
             }
         }
+
 
         await _unitOfWork.Categories.AddAsync(category);
         await _unitOfWork.SaveChangesAsync();
@@ -201,6 +207,9 @@ public class CategoryService : ICategoryService
 
         if (dto.ImageFile != null)
         {
+            if (category.ParentId != null)
+                throw ErrorHelper.BadRequest("Chỉ category cấp cha (không có ParentId) mới được phép cập nhật ảnh.");
+
             try
             {
                 if (!string.IsNullOrWhiteSpace(category.ImageUrl))
