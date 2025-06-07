@@ -171,7 +171,7 @@ public class ProductController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
-    public async Task<IActionResult> UpdateProductStatus(Guid id,  ProductStatus productStatus)
+    public async Task<IActionResult> UpdateProductStatus(Guid id, ProductStatus productStatus)
     {
         try
         {
@@ -190,7 +190,4 @@ public class ProductController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
-
-
 }

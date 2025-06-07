@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.API.Controllers;
+
 [ApiController]
 [Route("api/system")]
 public class SystemController : ControllerBase
@@ -82,7 +83,8 @@ public class SystemController : ControllerBase
             Id = Guid.NewGuid(),
             Name = "Collectible Toys",
             Description = "Danh mục đồ chơi sưu tầm, thiết kế đặc biệt và giới hạn.",
-            ImageUrl = "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=category-thumbnails%2FCollectible%20Toys.png&version_id=null",
+            ImageUrl =
+                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=category-thumbnails%2FCollectible%20Toys.png&version_id=null",
             CreatedAt = now
         };
 
@@ -91,7 +93,8 @@ public class SystemController : ControllerBase
             Id = Guid.NewGuid(),
             Name = "Sneaker",
             Description = "Danh mục giày sneaker thời trang.",
-            ImageUrl = "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=category-thumbnails%2Fsneakers.png&version_id=null",
+            ImageUrl =
+                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=category-thumbnails%2Fsneakers.png&version_id=null",
             CreatedAt = now
         };
 
@@ -118,7 +121,7 @@ public class SystemController : ControllerBase
                 Description = "Mẫu đồ chơi sưu tầm dòng Baby Three.",
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
-            },
+            }
             // new()
             // {
             //     Name = "Marvel",
@@ -198,7 +201,10 @@ public class SystemController : ControllerBase
                             Stock = 50,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
-                            ImageUrls = new List<string> { "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FBaby%20Molly%20Funny%20Raining%20Day%20Figure.jpg&version_id=null" },
+                            ImageUrls = new List<string>
+                            {
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FBaby%20Molly%20Funny%20Raining%20Day%20Figure.jpg&version_id=null"
+                            },
                             Brand = "PopMart",
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
@@ -215,7 +221,10 @@ public class SystemController : ControllerBase
                             Stock = 30,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
-                            ImageUrls = new List<string> { "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FHand%20in%20Hand%20Series%20Figures.jpg&version_id=null" },
+                            ImageUrls = new List<string>
+                            {
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FHand%20in%20Hand%20Series%20Figures.jpg&version_id=null"
+                            },
                             Brand = "PopMart",
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
@@ -232,7 +241,10 @@ public class SystemController : ControllerBase
                             Stock = 70,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
-                            ImageUrls = new List<string> { "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FCHAKA%20Candle%20Whisper%20Series%20Figures.jpg&version_id=null" },
+                            ImageUrls = new List<string>
+                            {
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FCHAKA%20Candle%20Whisper%20Series%20Figures.jpg&version_id=null"
+                            },
                             Brand = "PopMart",
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
@@ -255,7 +267,10 @@ public class SystemController : ControllerBase
                             Stock = 40,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
-                            ImageUrls = new List<string> { "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2Fporker.webp&version_id=null" },
+                            ImageUrls = new List<string>
+                            {
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2Fporker.webp&version_id=null"
+                            },
                             Brand = "Baby Three",
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
@@ -272,7 +287,10 @@ public class SystemController : ControllerBase
                             Stock = 25,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
-                            ImageUrls = new List<string> { "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2Frabbit.webp&version_id=null" },
+                            ImageUrls = new List<string>
+                            {
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2Frabbit.webp&version_id=null"
+                            },
                             Brand = "Baby Three",
                             Material = "Fabric",
                             ProductType = ProductSaleType.DirectSale,
@@ -289,7 +307,10 @@ public class SystemController : ControllerBase
                             Stock = 10,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
-                            ImageUrls = new List<string> { "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Vinyl%20Plush%20Dinosaur%20M%C3%A0u%20Xanh%20L%C3%A1.webp&version_id=null" },
+                            ImageUrls = new List<string>
+                            {
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Vinyl%20Plush%20Dinosaur%20M%C3%A0u%20Xanh%20L%C3%A1.webp&version_id=null"
+                            },
                             Brand = "Baby Three",
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,

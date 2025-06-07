@@ -151,6 +151,50 @@ public class EmailService : IEmailService
     }
 
 
+    public async Task SendBlindBoxApprovedAsync(string toEmail, string userName, string boxName)
+    {
+        var html = $@"
+    <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+      <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
+        <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #d02a2a;border-radius:8px;"">
+          <div style=""background-color:#d02a2a;padding:16px 24px;"">
+            <h1 style=""color:#ffffff;font-size:20px;margin:0;"">Blind Box của bạn đã được duyệt</h1>
+          </div>
+          <div style=""padding:24px;"">
+            <p>Chào {userName},</p>
+            <p>Blind Box <strong>{boxName}</strong> của bạn đã được phê duyệt thành công và sẽ hiển thị trên nền tảng vào ngày phát hành.</p>
+            <p>Chúc bạn bán hàng thành công.</p>
+            <p style=""margin-top:24px;"">Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+          </div>
+        </div>
+      </body>
+    </html>";
+        await SendEmailAsync(toEmail, $"Blind Box {boxName} đã được phê duyệt", html);
+    }
+
+    public async Task SendBlindBoxRejectedAsync(string toEmail, string userName, string boxName, string reason)
+    {
+        var html = $@"
+    <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+      <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
+        <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #d02a2a;border-radius:8px;"">
+          <div style=""background-color:#d02a2a;padding:16px 24px;"">
+            <h1 style=""color:#ffffff;font-size:20px;margin:0;"">Blind Box bị từ chối</h1>
+          </div>
+          <div style=""padding:24px;"">
+            <p>Chào {userName},</p>
+            <p>Blind Box <strong>{boxName}</strong> của bạn đã bị từ chối.</p>
+            <p><strong>Lý do:</strong> {reason}</p>
+            <p>Vui lòng chỉnh sửa và gửi lại để được xét duyệt.</p>
+            <p style=""margin-top:24px;"">Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+          </div>
+        </div>
+      </body>
+    </html>";
+        await SendEmailAsync(toEmail, $"Blind Box {boxName} bị từ chối", html);
+    }
+
+
     private async Task SendEmailAsync(string to, string subject, string htmlContent)
     {
         var message = new EmailMessage

@@ -8,23 +8,18 @@ public class CreateBlindBoxDto
     [DefaultValue("Hộp blindbox cho GunDam")]
     public required string Name { get; set; }
 
-    [DefaultValue(100000)]
-    public decimal Price { get; set; }
+    [DefaultValue(100000)] public decimal Price { get; set; }
 
-    [DefaultValue(100)]
-    public int TotalQuantity { get; set; }
+    [DefaultValue(100)] public int TotalQuantity { get; set; }
 
     [DefaultValue(typeof(DateTime), "2025-07-01T00:00:00")]
     public DateTime ReleaseDate { get; set; }
 
-    [DefaultValue("Mô tả cho blind box")]
-    public required string Description { get; set; }
+    [DefaultValue("Mô tả cho blind box")] public required string Description { get; set; }
 
     public required IFormFile ImageFile { get; set; }
 
-    [DefaultValue(false)]
-    public bool HasSecretItem { get; set; } = false;
+    [DefaultValue(false)] public bool HasSecretItem { get; set; } = false;
 
-    [DefaultValue(0.05)]
-    public decimal SecretProbability { get; set; } = 0.05m;
+    [DefaultValue(0.05)] public decimal SecretProbability { get; set; } = 0.05m;
 }

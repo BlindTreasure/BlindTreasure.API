@@ -13,12 +13,12 @@ namespace BlindTreasure.Application.Services;
 
 public class CategoryService : ICategoryService
 {
+    private readonly IBlobService _blobService;
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserService _userService;
-    private readonly IBlobService _blobService;
 
     public CategoryService(
         IUnitOfWork unitOfWork,
@@ -47,7 +47,7 @@ public class CategoryService : ICategoryService
 
         var category = await _unitOfWork.Categories.GetQueryable()
             .Include(c => c.Parent)
-            .Include(c => c.Children.Where(ch => !ch.IsDeleted)) 
+            .Include(c => c.Children.Where(ch => !ch.IsDeleted))
             .FirstOrDefaultAsync(c => c.Id == id);
 
 
@@ -74,10 +74,7 @@ public class CategoryService : ICategoryService
             .AsNoTracking();
 
         var keyword = param.Search?.Trim().ToLower();
-        if (!string.IsNullOrEmpty(keyword))
-        {
-            query = query.Where(c => c.Name.ToLower().Contains(keyword));
-        }
+        if (!string.IsNullOrEmpty(keyword)) query = query.Where(c => c.Name.ToLower().Contains(keyword));
 
         query = ApplySort(query, param);
 
@@ -85,17 +82,13 @@ public class CategoryService : ICategoryService
 
         List<Category> items;
         if (param.PageIndex == 0)
-        {
             // Trả về toàn bộ danh sách
             items = await query.ToListAsync();
-        }
         else
-        {
             items = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-        }
 
         var dtos = items.Select(ToCategoryDto).ToList();
         var result = new Pagination<CategoryDto>(dtos, count, param.PageIndex, param.PageSize);
@@ -269,9 +262,7 @@ public class CategoryService : ICategoryService
         // Không xóa nếu còn sản phẩm hoặc category con chưa bị xóa
         if ((category.Products != null && category.Products.Any()) ||
             (category.Children != null && category.Children.Any(c => !c.IsDeleted)))
-        {
             throw ErrorHelper.Conflict("Không thể xóa category khi còn sản phẩm hoặc category con liên quan.");
-        }
 
         await _unitOfWork.Categories.SoftRemove(category);
         await _unitOfWork.SaveChangesAsync();

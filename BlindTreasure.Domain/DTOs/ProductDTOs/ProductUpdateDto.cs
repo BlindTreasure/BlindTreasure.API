@@ -1,7 +1,6 @@
-﻿using BlindTreasure.Domain.Enums;
+﻿using System.Text.Json.Serialization;
+using BlindTreasure.Domain.Enums;
 using Microsoft.AspNetCore.Http;
-using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 
 namespace BlindTreasure.Domain.DTOs.ProductDTOs;
 
@@ -19,9 +18,8 @@ public class ProductUpdateDto
     public string? Material { get; set; }
     public ProductSaleType? ProductType { get; set; }
     public string? Brand { get; set; }
-    [JsonIgnore]
 
-    public ProductStatus? ProductStatus { get; set; }
+    [JsonIgnore] public ProductStatus? ProductStatus { get; set; }
 }
 
 public class ProductUpdateImagesDto
@@ -29,4 +27,3 @@ public class ProductUpdateImagesDto
     // Danh sách file ảnh mới, giữ đúng thứ tự index
     public List<IFormFile> Images { get; set; } = new();
 }
-

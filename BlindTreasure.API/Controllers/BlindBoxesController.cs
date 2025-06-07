@@ -20,8 +20,8 @@ public class BlindBoxesController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách tất cả Blind Box của seller hiện tại (phân trang)
-    /// Search là search by name
+    ///     Lấy danh sách tất cả Blind Box của seller hiện tại (phân trang)
+    ///     Search là search by name
     /// </summary>
     /// <param name="param">Tham số phân trang (PageIndex, PageSize)</param>
     /// <returns>Danh sách BlindBox phân trang</returns>
@@ -49,16 +49,16 @@ public class BlindBoxesController : ControllerBase
     /// <summary>
     ///     Lấy chi tiết Blind Box theo Id
     /// </summary>
-    /// <param name="boxId">Id của Blind Box</param>
+    /// <param name="id">Id của Blind Box</param>
     /// <returns>Thông tin chi tiết Blind Box cùng danh sách item</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<BlindBoxDetailDto>> GetById(Guid boxId)
+    public async Task<ActionResult<BlindBoxDetailDto>> GetById(Guid id)
     {
         try
         {
-            var result = await _blindBoxService.GetBlindBoxByIdAsync(boxId);
+            var result = await _blindBoxService.GetBlindBoxByIdAsync(id);
             return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Lấy thông tin Blind Box thành công."));
         }
         catch (Exception ex)
@@ -70,7 +70,7 @@ public class BlindBoxesController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo mới Blind Box kèm upload ảnh đại diện
+    ///     Tạo mới Blind Box kèm upload ảnh đại diện
     /// </summary>
     /// <param name="dto">Dữ liệu Blind Box kèm file ảnh</param>
     /// <returns>Thông tin chi tiết Blind Box vừa tạo</returns>
@@ -142,9 +142,9 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
+
     /// <summary>
-    /// [Staff] Lấy danh sách Blind Box đang ở trạng thái chờ duyệt (PendingApproval)
+    ///     [Staff] Lấy danh sách Blind Box đang ở trạng thái chờ duyệt (PendingApproval)
     /// </summary>
     /// <returns>Danh sách Blind Box kèm item và tỷ lệ</returns>
     [HttpGet("pending-approval")]
@@ -156,7 +156,8 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.GetPendingApprovalBlindBoxesAsync();
-            return Ok(ApiResult<List<BlindBoxDetailDto>>.Success(result, "200", "Lấy danh sách Blind Box chờ duyệt thành công."));
+            return Ok(ApiResult<List<BlindBoxDetailDto>>.Success(result, "200",
+                "Lấy danh sách Blind Box chờ duyệt thành công."));
         }
         catch (Exception ex)
         {
@@ -167,7 +168,7 @@ public class BlindBoxesController : ControllerBase
     }
 
     /// <summary>
-    /// [Staff] Phê duyệt Blind Box sau khi xác minh tỉ lệ drop-rate hợp lệ
+    ///     [Staff] Phê duyệt Blind Box sau khi xác minh tỉ lệ drop-rate hợp lệ
     /// </summary>
     /// <param name="id">Id của Blind Box</param>
     /// <returns>Kết quả thành công (true/false)</returns>
@@ -191,7 +192,7 @@ public class BlindBoxesController : ControllerBase
     }
 
     /// <summary>
-    /// [Staff] Từ chối Blind Box và ghi lý do từ chối
+    ///     [Staff] Từ chối Blind Box và ghi lý do từ chối
     /// </summary>
     /// <param name="id">Id của Blind Box</param>
     /// <param name="reason">Lý do từ chối</param>
@@ -214,5 +215,4 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
 }
