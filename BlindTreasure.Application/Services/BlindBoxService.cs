@@ -13,52 +13,87 @@ namespace BlindTreasure.Application.Services;
 
 public class BlindBoxService : IBlindBoxService
 {
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IClaimsService _claimsService;
     private readonly IMapperService _mapperService;
     private readonly ICurrentTime _time;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IBlobService _blobService;
+    private readonly ICacheService _cacheService;
+    private readonly ILoggerService _logger;
 
-    public BlindBoxService(IUnitOfWork unitOfWork, IClaimsService claimsService, ICurrentTime time,
-        IMapperService mapperService, IBlobService blobService)
+    public BlindBoxService(
+        IUnitOfWork unitOfWork,
+        IClaimsService claimsService,
+        ICurrentTime time,
+        IMapperService mapperService,
+        IBlobService blobService,
+        ICacheService cacheService,
+        ILoggerService logger)
     {
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
         _time = time;
         _mapperService = mapperService;
         _blobService = blobService;
+        _cacheService = cacheService;
+        _logger = logger;
     }
 
     public async Task<Pagination<BlindBoxDetailDto>> GetAllBlindBoxesAsync(BlindBoxQueryParameter param)
     {
-        if (param == null)
-            throw ErrorHelper.BadRequest("Tham số truy vấn không được để trống.");
-
-        if (param.PageIndex < 1)
-            throw ErrorHelper.BadRequest("PageIndex phải lớn hơn hoặc bằng 1.");
-
-        if (param.PageSize <= 0)
-            throw ErrorHelper.BadRequest("PageSize phải lớn hơn 0.");
+        _logger.Info($"[GetAllBlindBoxesAsync] Public requests blind box list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.BlindBoxes.GetQueryable()
             .Where(b => !b.IsDeleted);
 
-        // Có thể thêm filter theo param, ví dụ tên, trạng thái nếu mở rộng sau
+        // Filter
+        var keyword = param.Search?.Trim().ToLower();
+        if (!string.IsNullOrEmpty(keyword))
+            query = query.Where(b => b.Name.ToLower().Contains(keyword));
 
-        var totalCount = await query.CountAsync();
+        if (param.SellerId.HasValue)
+            query = query.Where(b => b.SellerId == param.SellerId.Value);
 
-        if (totalCount == 0)
-            throw ErrorHelper.NotFound("Không tìm thấy Blind Box nào.");
+        if (param.Status.HasValue)
+            query = query.Where(b => b.Status == param.Status.Value);
 
-        var blindBoxes = await query
-            .OrderByDescending(b => b.CreatedAt)
-            .Skip((param.PageIndex - 1) * param.PageSize)
-            .Take(param.PageSize)
-            .Include(b => b.BlindBoxItems)
-            .ThenInclude(item => item.Product) // Đảm bảo Include Product để lấy tên
-            .ToListAsync();
+        if (param.MinPrice.HasValue)
+            query = query.Where(b => b.Price >= param.MinPrice.Value);
 
-        var dtos = blindBoxes.Select(b =>
+        if (param.MaxPrice.HasValue)
+            query = query.Where(b => b.Price <= param.MaxPrice.Value);
+
+        if (param.ReleaseDateFrom.HasValue)
+            query = query.Where(b => b.ReleaseDate >= param.ReleaseDateFrom.Value);
+
+        if (param.ReleaseDateTo.HasValue)
+            query = query.Where(b => b.ReleaseDate <= param.ReleaseDateTo.Value);
+
+        // Sort: UpdatedAt desc, CreatedAt desc
+        query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
+
+        var count = await query.CountAsync();
+
+        List<BlindBox> items;
+        if (param.PageIndex == 0)
+        {
+            // Trả về toàn bộ danh sách
+            items = await query
+                .Include(b => b.BlindBoxItems)
+                .ThenInclude(item => item.Product)
+                .ToListAsync();
+        }
+        else
+        {
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .Include(b => b.BlindBoxItems)
+                .ThenInclude(item => item.Product)
+                .ToListAsync();
+        }
+
+        var dtos = items.Select(b =>
         {
             var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(b);
             dto.Items = b.BlindBoxItems?.Select(item => new BlindBoxItemDto
@@ -69,15 +104,25 @@ public class BlindBoxService : IBlindBoxService
                 DropRate = item.DropRate,
                 Rarity = item.Rarity
             }).ToList() ?? new List<BlindBoxItemDto>();
-
             return dto;
         }).ToList();
 
-        return new Pagination<BlindBoxDetailDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+        var result = new Pagination<BlindBoxDetailDto>(dtos, count, param.PageIndex, param.PageSize);
+
+        _logger.Info("[GetAllBlindBoxesAsync] Blind box list loaded from DB.");
+        return result;
     }
 
     public async Task<BlindBoxDetailDto> GetBlindBoxByIdAsync(Guid blindBoxId)
     {
+        var cacheKey = $"blindbox:{blindBoxId}";
+        var cached = await _cacheService.GetAsync<BlindBoxDetailDto>(cacheKey);
+        if (cached != null)
+        {
+            _logger.Info($"[GetBlindBoxByIdAsync] Cache hit for blind box {blindBoxId}");
+            return cached;
+        }
+
         var blindBox = await _unitOfWork.BlindBoxes.GetQueryable()
             .Where(x => x.Id == blindBoxId && !x.IsDeleted)
             .Include(b => b.BlindBoxItems)
@@ -85,24 +130,31 @@ public class BlindBoxService : IBlindBoxService
             .FirstOrDefaultAsync();
 
         if (blindBox == null)
+        {
+            _logger.Warn($"[GetBlindBoxByIdAsync] Blind Box {blindBoxId} not found.");
             throw ErrorHelper.NotFound("Blind Box không tồn tại");
+        }
 
         var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
-
         result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
         {
             ProductId = item.ProductId,
-            ProductName = item.Product?.Name ?? "",
+            ProductName = item.Product?.Name ?? string.Empty,
             DropRate = item.DropRate,
             Quantity = item.Quantity,
             Rarity = item.Rarity
         }).ToList();
 
+        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromHours(1));
+        _logger.Info($"[GetBlindBoxByIdAsync] Blind box {blindBoxId} loaded from DB and cached.");
         return result;
     }
 
     public async Task<BlindBoxDetailDto> CreateBlindBoxAsync(CreateBlindBoxDto dto)
     {
+        var currentUserId = _claimsService.CurrentUserId;
+        _logger.Info($"[CreateBlindBoxAsync] User {currentUserId} requests to create blind box: {dto?.Name}");
+
         if (dto == null)
             throw ErrorHelper.BadRequest("Dữ liệu Blind Box không được để trống.");
 
@@ -120,8 +172,6 @@ public class BlindBoxService : IBlindBoxService
 
         if (dto.ImageFile == null || dto.ImageFile.Length == 0)
             throw ErrorHelper.BadRequest("Ảnh đại diện Blind Box là bắt buộc.");
-
-        var currentUserId = _claimsService.CurrentUserId;
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
             s.UserId == currentUserId && !s.IsDeleted && s.Status == SellerStatus.Approved);
@@ -141,7 +191,6 @@ public class BlindBoxService : IBlindBoxService
 
         var releaseDateUtc = DateTime.SpecifyKind(dto.ReleaseDate, DateTimeKind.Utc);
 
-
         var blindBox = new BlindBox
         {
             Id = Guid.NewGuid(),
@@ -159,10 +208,11 @@ public class BlindBoxService : IBlindBoxService
             CreatedBy = currentUserId
         };
 
-
         await _unitOfWork.BlindBoxes.AddAsync(blindBox);
         await _unitOfWork.SaveChangesAsync();
 
+        await RemoveBlindBoxCacheAsync(blindBox.Id);
+        _logger.Success($"[CreateBlindBoxAsync] Blind box {blindBox.Name} created by user {currentUserId}.");
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
@@ -174,7 +224,10 @@ public class BlindBoxService : IBlindBoxService
         );
 
         if (blindBox == null)
+        {
+            _logger.Warn($"[AddItemsToBlindBoxAsync] Blind Box {blindBoxId} not found.");
             throw ErrorHelper.NotFound("Blind Box không tồn tại.");
+        }
 
         var currentUserId = _claimsService.CurrentUserId;
 
@@ -182,7 +235,10 @@ public class BlindBoxService : IBlindBoxService
             x.Id == blindBox.SellerId && x.UserId == currentUserId && !x.IsDeleted);
 
         if (seller == null)
+        {
+            _logger.Warn($"[AddItemsToBlindBoxAsync] User {currentUserId} has no permission for Blind Box {blindBoxId}.");
             throw ErrorHelper.Forbidden("Không có quyền chỉnh sửa Blind Box này.");
+        }
 
         await ValidateBlindBoxItemsAsync(blindBox, seller, items);
 
@@ -204,18 +260,23 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.BlindBoxItems.AddRangeAsync(entities);
         await _unitOfWork.SaveChangesAsync();
 
+        await RemoveBlindBoxCacheAsync(blindBoxId);
+        _logger.Success($"[AddItemsToBlindBoxAsync] Added {entities.Count} items to Blind Box {blindBoxId}.");
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
 
     public async Task<bool> SubmitBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
-            x => x.Id == blindBoxId && !x.IsDeleted,
-            b => b.BlindBoxItems
-        );
+             x => x.Id == blindBoxId && !x.IsDeleted,
+             b => b.BlindBoxItems
+         );
 
         if (blindBox == null)
+        {
+            _logger.Warn($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} not found.");
             throw ErrorHelper.NotFound("Blind Box không tồn tại");
+        }
 
         if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
             throw ErrorHelper.BadRequest("Phải có ít nhất 1 item trong Blind Box");
@@ -234,6 +295,8 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
 
+        await RemoveBlindBoxCacheAsync(blindBoxId);
+        _logger.Success($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} submitted for approval.");
         return true;
     }
 
@@ -296,5 +359,15 @@ public class BlindBoxService : IBlindBoxService
 
         if (totalDropRate >= 100)
             throw ErrorHelper.BadRequest("Tổng DropRate của item (trừ Secret) phải nhỏ hơn 100%.");
+    }
+
+
+    /// <summary>
+    /// Xóa cache liên quan đến BlindBox (theo id và theo list).
+    /// </summary>
+    private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId)
+    {
+        await _cacheService.RemoveAsync($"blindbox:{blindBoxId}");
+        await _cacheService.RemoveByPatternAsync("blindbox:all");
     }
 }
