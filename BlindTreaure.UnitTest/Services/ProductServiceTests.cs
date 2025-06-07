@@ -204,8 +204,8 @@ public class ProductServiceTests
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync()).ReturnsAsync(1);
         _mapperMock.Setup(x => x.Map<Product, ProductDto>(product)).Returns(productDto);
 
-            // Act
-            var result = await _productService.UpdateAsync(id, dto);
+        // Act
+        var result = await _productService.UpdateAsync(id, dto);
 
         // Assert
         result.Should().NotBeNull();
@@ -224,8 +224,8 @@ public class ProductServiceTests
         _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _productRepoMock.Setup(x => x.GetByIdAsync(id)).ReturnsAsync((Product)null!);
 
-            // Act
-            Func<Task> act = async () => await _productService.UpdateAsync(id, dto);
+        // Act
+        Func<Task> act = async () => await _productService.UpdateAsync(id, dto);
 
         // Assert
         await act.Should().ThrowAsync<Exception>()

@@ -17,7 +17,7 @@ public class ProductDto
 
     public ProductStatus Status { get; set; }
 
-    public List<string>? ImageUrls { get; set; } 
+    public List<string>? ImageUrls { get; set; }
 
     public Guid SellerId { get; set; }
     public bool IsDeleted { get; set; }

@@ -40,4 +40,7 @@ public interface IEmailService
     ///     kèm theo lý do từ chối do staff hoặc admin cung cấp.
     /// </summary>
     Task SendSellerRejectionAsync(EmailRequestDto request, string rejectReason);
+
+    Task SendBlindBoxApprovedAsync(string toEmail, string userName, string boxName);
+    Task SendBlindBoxRejectedAsync(string toEmail, string userName, string boxName, string reason);
 }

@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Web;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
@@ -210,10 +211,7 @@ public class ProductService : IProductService
             product.ProductType = dto.ProductType.Value;
         if (dto.Brand != null)
             product.Brand = dto.Brand;
-        if (dto.ProductStatus.HasValue)
-        {
-            product.Status = dto.ProductStatus.Value;
-        }
+        if (dto.ProductStatus.HasValue) product.Status = dto.ProductStatus.Value;
 
 
         //if (productImageUrl.Length > 0)
@@ -314,14 +312,12 @@ public class ProductService : IProductService
 
         // Xóa ảnh cũ trên MinIO (nếu cần)
         if (product.ImageUrls != null && product.ImageUrls.Count > 0)
-        {
             foreach (var url in product.ImageUrls)
             {
                 var fileName = ExtractFileNameFromUrl(url);
                 if (!string.IsNullOrEmpty(fileName))
                     await _blobService.DeleteFileAsync(fileName);
             }
-        }
 
         var uploadedUrls = new List<string>();
         foreach (var image in images.Where(img => img.Length > 0).Take(6))
@@ -343,7 +339,7 @@ public class ProductService : IProductService
     private string ExtractFileNameFromUrl(string url)
     {
         var uri = new Uri(url);
-        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var query = HttpUtility.ParseQueryString(uri.Query);
         var prefix = query.Get("prefix");
         return prefix != null ? Uri.UnescapeDataString(prefix) : null;
     }

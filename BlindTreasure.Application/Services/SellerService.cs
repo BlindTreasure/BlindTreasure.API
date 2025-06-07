@@ -348,7 +348,6 @@ public class SellerService : ISellerService
     }
 
 
-
     public async Task<ProductDto> UpdateSellerProductImagesAsync(Guid productId, List<IFormFile> images)
     {
         var userId = _claimsService.CurrentUserId;
@@ -363,10 +362,9 @@ public class SellerService : ISellerService
             throw ErrorHelper.Forbidden("Bạn chỉ được phép xóa sản phẩm của chính mình.");
 
 
-        var result = await _productService.UpdateProductImagesAsync(productId,images);
+        var result = await _productService.UpdateProductImagesAsync(productId, images);
 
         return result;
-
     }
 
     private async Task RemoveSellerCacheAsync(Guid sellerId, Guid userId)

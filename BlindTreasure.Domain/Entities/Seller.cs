@@ -13,6 +13,7 @@ public class Seller : BaseEntity
     public string? CompanyAddress { get; set; }
 
     public string? RejectReason { get; set; }
+
     public SellerStatus Status { get; set; }
     //public string? StripeAccountId { get; set; }
 

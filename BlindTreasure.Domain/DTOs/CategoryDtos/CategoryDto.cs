@@ -12,5 +12,4 @@ public class CategoryDto
     // Audit fields
     public DateTime? CreatedAt { get; set; }
     public List<CategoryDto> Children { get; set; } = new();
-
 }

@@ -164,6 +164,4 @@ public class BlobService : IBlobService
             _ => "application/octet-stream" // fallback nếu định dạng không rõ
         };
     }
-
-
 }

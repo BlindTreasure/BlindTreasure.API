@@ -1,5 +1,4 @@
 ﻿using BlindTreasure.Application.Interfaces;
-using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
@@ -208,7 +207,7 @@ public class SellerController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<ProductDto>), 404)]
-    public async Task<IActionResult> UpdateProduct(Guid id,  ProductUpdateDto dto)
+    public async Task<IActionResult> UpdateProduct(Guid id, ProductUpdateDto dto)
     {
         try
         {

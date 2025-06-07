@@ -1,4 +1,6 @@
-﻿using BlindTreasure.API.Architecture;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json.Serialization;
+using BlindTreasure.API.Architecture;
 using BlindTreasure.API.ChatHub;
 using BlindTreasure.Domain.DTOs.StripeDTOs;
 using Microsoft.AspNetCore.Diagnostics;
@@ -6,8 +8,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Stripe;
 using SwaggerThemes;
-using System.IdentityModel.Tokens.Jwt;
-using System.Text.Json.Serialization;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -63,13 +63,14 @@ builder.Services.AddTransient<IStripeClient, StripeClient>(s =>
     var clientFactory = s.GetRequiredService<IHttpClientFactory>();
 
     var sysHttpClient = new SystemNetHttpClient(
-       httpClient: clientFactory.CreateClient("Stripe"),
-       maxNetworkRetries: StripeConfiguration.MaxNetworkRetries,
-       appInfo: appInfo,
-       enableTelemetry: StripeConfiguration.EnableTelemetry);
+        clientFactory.CreateClient("Stripe"),
+        StripeConfiguration.MaxNetworkRetries,
+        appInfo,
+        StripeConfiguration.EnableTelemetry);
 
-    return new StripeClient(apiKey: StripeConfiguration.ApiKey, httpClient: sysHttpClient);
+    return new StripeClient(StripeConfiguration.ApiKey, httpClient: sysHttpClient);
 });
+
 #endregion
 
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
