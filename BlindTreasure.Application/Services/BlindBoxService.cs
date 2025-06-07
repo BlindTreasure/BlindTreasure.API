@@ -186,7 +186,7 @@ public class BlindBoxService : IBlindBoxService
         await _blobService.UploadFileAsync(fileName, stream);
 
         // Lấy link file đã upload
-        string imageUrl = await _blobService.GetFileUrlAsync(fileName);
+        string imageUrl = await _blobService.GetPreviewUrlAsync(fileName);
         if (string.IsNullOrEmpty(imageUrl))
             throw ErrorHelper.Internal("Lỗi khi lấy URL ảnh Blind Box.");
 
