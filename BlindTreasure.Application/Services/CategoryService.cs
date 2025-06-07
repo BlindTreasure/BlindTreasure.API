@@ -47,7 +47,9 @@ public class CategoryService : ICategoryService
 
         var category = await _unitOfWork.Categories.GetQueryable()
             .Include(c => c.Parent)
+            .Include(c => c.Children.Where(ch => !ch.IsDeleted)) 
             .FirstOrDefaultAsync(c => c.Id == id);
+
 
         if (category == null)
         {
@@ -68,7 +70,7 @@ public class CategoryService : ICategoryService
 
         var query = _unitOfWork.Categories.GetQueryable()
             .Include(c => c.Children.Where(ch => !ch.IsDeleted))
-            .Where(c => !c.IsDeleted)
+            .Where(c => !c.IsDeleted && c.ParentId == null)
             .AsNoTracking();
 
         var keyword = param.Search?.Trim().ToLower();
@@ -134,6 +136,9 @@ public class CategoryService : ICategoryService
 
         if (dto.ImageFile != null)
         {
+            if (dto.ParentId != null)
+                throw ErrorHelper.BadRequest("Chỉ category cấp cha (không có ParentId) mới được phép upload ảnh.");
+
             try
             {
                 var fileName = $"category-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
@@ -150,6 +155,7 @@ public class CategoryService : ICategoryService
                 throw ErrorHelper.Internal("Lỗi khi upload ảnh category.");
             }
         }
+
 
         await _unitOfWork.Categories.AddAsync(category);
         await _unitOfWork.SaveChangesAsync();
@@ -201,6 +207,9 @@ public class CategoryService : ICategoryService
 
         if (dto.ImageFile != null)
         {
+            if (category.ParentId != null)
+                throw ErrorHelper.BadRequest("Chỉ category cấp cha (không có ParentId) mới được phép cập nhật ảnh.");
+
             try
             {
                 if (!string.IsNullOrWhiteSpace(category.ImageUrl))
@@ -257,10 +266,12 @@ public class CategoryService : ICategoryService
 
         _logger.Info($"[DeleteAsync] Admin/Staff deletes category {id} by {user.FullName}");
 
-        // Không xóa nếu còn sản phẩm hoặc category con
+        // Không xóa nếu còn sản phẩm hoặc category con chưa bị xóa
         if ((category.Products != null && category.Products.Any()) ||
-            (category.Children != null && category.Children.Any()))
+            (category.Children != null && category.Children.Any(c => !c.IsDeleted)))
+        {
             throw ErrorHelper.Conflict("Không thể xóa category khi còn sản phẩm hoặc category con liên quan.");
+        }
 
         await _unitOfWork.Categories.SoftRemove(category);
         await _unitOfWork.SaveChangesAsync();
