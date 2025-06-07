@@ -18,6 +18,8 @@ public class BlindBox : BaseEntity
 
     public string ImageUrl { get; set; }
     public DateTime ReleaseDate { get; set; }
+    
+    public string? RejectReason { get; set; }
 
     public ICollection<BlindBoxItem> BlindBoxItems { get; set; }
     public ICollection<CartItem> CartItems { get; set; }

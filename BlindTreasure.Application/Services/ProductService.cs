@@ -125,7 +125,7 @@ public class ProductService : IProductService
 
         _logger.Info($"[CreateAsync] Seller {userId} tạo sản phẩm mới: {dto.Name}");
 
-        await ValidateProductDto(dto); 
+        await ValidateProductDto(dto);
 
         var product = new Product
         {
@@ -147,7 +147,8 @@ public class ProductService : IProductService
             Status = dto.Status
         };
 
-        var result = await _unitOfWork.Products.AddAsync(product); // tracking entity nè bro, savechange xong phải xài thằng này
+        var result =
+            await _unitOfWork.Products.AddAsync(product); // tracking entity nè bro, savechange xong phải xài thằng này
         await _unitOfWork.SaveChangesAsync();
 
         if (dto.Images is { Count: > 0 })
@@ -261,25 +262,24 @@ public class ProductService : IProductService
 
     public async Task<string?> UploadProductImageAsync(Guid productId, IFormFile file)
     {
-        _logger.Info($"[UploadProductImageAsync] Bắt đầu cập nhật avatar cho product {productId}");
+        if (file == null || file.Length == 0)
+        {
+            _logger.Warn("[UploadProductImageAsync] File ảnh không hợp lệ hoặc rỗng.");
+            throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
+        }
 
         var product = await _unitOfWork.Products.GetByIdAsync(productId);
         if (product == null || product.IsDeleted)
         {
-            _logger.Warn($"[UploadAvatarAsync] Không tìm thấy user {productId} hoặc đã bị xóa.");
-            throw ErrorHelper.NotFound("Người dùng không tồn tại hoặc đã bị xóa.");
+            _logger.Warn($"[UploadProductImageAsync] Không tìm thấy sản phẩm {productId} hoặc đã bị xóa.");
+            throw ErrorHelper.NotFound("Sản phẩm không tồn tại hoặc đã bị xóa.");
         }
 
-        if (file == null || file.Length == 0)
-        {
-            _logger.Warn("[UploadProductImageAsync] File avatar không hợp lệ.");
-            throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
-        }
-
-        // Sinh tên file duy nhất để tránh trùng (VD: avatar_userId_timestamp.png)
+        // Sinh tên file duy nhất bằng Guid để tránh trùng
         var fileExtension = Path.GetExtension(file.FileName);
-        var fileName =
-            $"products/product_thumbnails{productId}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}{fileExtension}";
+        var fileName = $"products/product_thumbnails_{productId}_{Guid.NewGuid():N}{fileExtension}";
+
+        _logger.Info($"[UploadProductImageAsync] Uploading file: {fileName}");
 
         await using var stream = file.OpenReadStream();
         await _blobService.UploadFileAsync(fileName, stream);
@@ -287,22 +287,20 @@ public class ProductService : IProductService
         var fileUrl = await _blobService.GetPreviewUrlAsync(fileName);
         if (string.IsNullOrEmpty(fileUrl))
         {
-            _logger.Error($"[UploadAvatarAsync] Không thể lấy URL cho file {fileName}");
-            throw ErrorHelper.Internal("Không thể tạo URL cho ảnh đại diện.");
+            _logger.Error($"[UploadProductImageAsync] Không thể lấy URL cho file {fileName}");
+            throw ErrorHelper.Internal("Không thể tạo URL cho ảnh.");
         }
 
-        product.ImageUrls ??= [];
+        product.ImageUrls ??= new List<string>();
         product.ImageUrls.Add(fileUrl);
 
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
 
-        // Ghi cache theo email và id
+        // Ghi cache
         await _cacheService.SetAsync($"product:{product.Id}", product, TimeSpan.FromHours(1));
-        await _cacheService.SetAsync($"user:{product.Id}", product, TimeSpan.FromHours(1));
 
-        _logger.Success(
-            $"[UploadAvatarAsync] Đã cập nhật image thành công cho product {product.Id} tên {product.Name}");
+        _logger.Success($"[UploadProductImageAsync] Đã cập nhật image cho product {product.Id}: {fileUrl}");
 
         return fileUrl;
     }
@@ -351,7 +349,6 @@ public class ProductService : IProductService
     }
 
 
-
     #region PRIVATE HELPER METHODS
 
     private async Task ValidateProductDto(ProductCreateDto dto)
@@ -391,8 +388,6 @@ public class ProductService : IProductService
         await _cacheService.RemoveAsync($"product:{productId}");
         await _cacheService.RemoveByPatternAsync($"product:all:{sellerId}");
     }
-
-
 
     #endregion
 }
