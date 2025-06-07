@@ -10,7 +10,7 @@ public interface IBlindBoxService
     Task<Pagination<BlindBoxDetailDto>> GetAllBlindBoxesAsync(BlindBoxQueryParameter param);
     Task<BlindBoxDetailDto> CreateBlindBoxAsync(CreateBlindBoxDto dto);
     Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemDto> items);
-    Task<bool> SubmitBlindBoxAsync(Guid blindBoxId);
+    Task<BlindBoxDetailDto> SubmitBlindBoxAsync(Guid blindBoxId);
 
     Task<List<BlindBoxDetailDto>> GetPendingApprovalBlindBoxesAsync();
     Task<BlindBoxDetailDto> ApproveBlindBoxAsync(Guid blindBoxId);

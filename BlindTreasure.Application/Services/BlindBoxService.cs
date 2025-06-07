@@ -268,7 +268,7 @@ public class BlindBoxService : IBlindBoxService
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
 
-    public async Task<bool> SubmitBlindBoxAsync(Guid blindBoxId)
+    public async Task<BlindBoxDetailDto> SubmitBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
             x => x.Id == blindBoxId && !x.IsDeleted,
@@ -300,7 +300,7 @@ public class BlindBoxService : IBlindBoxService
 
         await RemoveBlindBoxCacheAsync(blindBoxId);
         _logger.Success($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} submitted for approval.");
-        return true;
+        return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
     public async Task<List<BlindBoxDetailDto>> GetPendingApprovalBlindBoxesAsync()
