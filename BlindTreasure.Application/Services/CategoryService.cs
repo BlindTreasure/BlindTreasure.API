@@ -68,7 +68,7 @@ public class CategoryService : ICategoryService
 
         var query = _unitOfWork.Categories.GetQueryable()
             .Include(c => c.Children.Where(ch => !ch.IsDeleted))
-            .Where(c => !c.IsDeleted)
+            .Where(c => !c.IsDeleted && c.ParentId == null)
             .AsNoTracking();
 
         var keyword = param.Search?.Trim().ToLower();
