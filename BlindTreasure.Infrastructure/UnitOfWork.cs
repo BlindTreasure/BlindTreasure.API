@@ -12,7 +12,8 @@ public class UnitOfWork(
     IGenericRepository<Category> categories,
     IGenericRepository<Product> products,
     IGenericRepository<BlindBox> blindBoxes,
-    IGenericRepository<BlindBoxItem> blindBoxItems)
+    IGenericRepository<BlindBoxItem> blindBoxItems,
+    IGenericRepository<ProbabilityConfig> probabilityConfigs)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
@@ -22,6 +23,7 @@ public class UnitOfWork(
     public IGenericRepository<Product> Products { get; } = products;
     public IGenericRepository<BlindBox> BlindBoxes { get; } = blindBoxes;
     public IGenericRepository<BlindBoxItem> BlindBoxItems { get; } = blindBoxItems;
+    public IGenericRepository<ProbabilityConfig> ProbabilityConfigs { get; } = probabilityConfigs;
 
     public void Dispose()
     {

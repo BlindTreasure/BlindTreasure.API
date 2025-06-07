@@ -236,7 +236,109 @@ public class BlindBoxService : IBlindBoxService
 
         return true;
     }
+    
+    public async Task<List<BlindBoxDetailDto>> GetPendingApprovalBlindBoxesAsync()
+    {
+        var boxes = await _unitOfWork.BlindBoxes.GetAllAsync(
+            b => b.Status == BlindBoxStatus.PendingApproval && !b.IsDeleted,
+            b => b.BlindBoxItems,
+            b => b.Seller
+        );
 
+        if (boxes == null || boxes.Count == 0)
+            throw ErrorHelper.NotFound("Không có Blind Box nào đang chờ duyệt.");
+
+        return boxes.Select(b =>
+        {
+            var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(b);
+            dto.Items = b.BlindBoxItems.Select(i => new BlindBoxItemDto
+            {
+                ProductId = i.ProductId,
+                Quantity = i.Quantity,
+                DropRate = i.DropRate,
+                Rarity = i.Rarity,
+                ProductName = i.Product?.Name ?? ""
+            }).ToList();
+
+            return dto;
+        }).ToList();
+    }
+
+    public async Task<bool> ApproveBlindBoxAsync(Guid blindBoxId)
+    {
+        var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
+            b => b.Id == blindBoxId && b.Status == BlindBoxStatus.PendingApproval && !b.IsDeleted,
+            b => b.BlindBoxItems
+        );
+
+        if (blindBox == null)
+            throw ErrorHelper.NotFound("Blind Box không tồn tại hoặc không hợp lệ.");
+
+        if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
+            throw ErrorHelper.BadRequest("Blind Box không chứa item nào.");
+
+        var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
+        if (totalDropRate != 100)
+            throw ErrorHelper.BadRequest("Tổng DropRate phải bằng 100%.");
+
+        var currentUserId = _claimsService.CurrentUserId;
+        var now = _time.GetCurrentTime();
+
+        // Cập nhật trạng thái Blind Box
+        blindBox.Status = BlindBoxStatus.Approved;
+        blindBox.UpdatedAt = now;
+        blindBox.UpdatedBy = currentUserId;
+
+        await _unitOfWork.BlindBoxes.Update(blindBox);
+
+        // Tạo bản ghi ProbabilityConfig cho từng item
+        var configs = blindBox.BlindBoxItems.Select(item => new ProbabilityConfig
+        {
+            Id = Guid.NewGuid(),
+            BlindBoxItemId = item.Id,
+            Probability = item.DropRate,
+            EffectiveFrom = now,
+            EffectiveTo = blindBox.ReleaseDate, // sử dụng ngày phát hành làm mốc kết thúc hiệu lực
+            ApprovedBy = currentUserId,
+            ApprovedAt = now,
+            CreatedAt = now,
+            CreatedBy = currentUserId
+        }).ToList();
+
+        await _unitOfWork.ProbabilityConfigs.AddRangeAsync(configs);
+        await _unitOfWork.SaveChangesAsync();
+
+        return true;
+    }
+
+    
+    public async Task<bool> RejectBlindBoxAsync(Guid blindBoxId, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw ErrorHelper.BadRequest("Lý do từ chối không được để trống.");
+
+        var box = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
+            b => b.Id == blindBoxId && b.Status == BlindBoxStatus.PendingApproval && !b.IsDeleted
+        );
+
+        if (box == null)
+            throw ErrorHelper.NotFound("Blind Box không hợp lệ hoặc không tồn tại.");
+
+        var currentUserId = _claimsService.CurrentUserId;
+
+        box.Status = BlindBoxStatus.Rejected;
+        box.RejectReason = reason.Trim();
+        box.UpdatedAt = _time.GetCurrentTime();
+        box.UpdatedBy = currentUserId;
+
+        await _unitOfWork.BlindBoxes.Update(box);
+        await _unitOfWork.SaveChangesAsync();
+
+        // TODO: Thêm gửi thông báo cho Seller nếu cần
+
+        return true;
+    }
+    
     /// <summary>
     /// 1. Danh sách item không được để trống.
     /// 2. Mỗi sản phẩm phải thuộc Seller hiện tại và còn hàng (Stock > 0, chưa bị xoá).
