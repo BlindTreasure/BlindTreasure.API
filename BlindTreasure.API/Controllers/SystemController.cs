@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.API.Controllers;
-
+// hehehehehe test
 [ApiController]
 [Route("api/system")]
 public class SystemController : ControllerBase
