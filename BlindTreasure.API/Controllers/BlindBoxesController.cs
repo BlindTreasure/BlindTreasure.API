@@ -21,6 +21,7 @@ public class BlindBoxesController : ControllerBase
 
     /// <summary>
     /// Lấy danh sách tất cả Blind Box của seller hiện tại (phân trang)
+    /// Search là search by name
     /// </summary>
     /// <param name="param">Tham số phân trang (PageIndex, PageSize)</param>
     /// <returns>Danh sách BlindBox phân trang</returns>
@@ -82,8 +83,7 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.CreateBlindBoxAsync(dto);
-            return CreatedAtAction(nameof(GetById), new { boxId = result.Id },
-                ApiResult<BlindBoxDetailDto>.Success(result, "201", "Tạo Blind Box thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "201", "Tạo Blind Box thành công."));
         }
         catch (Exception ex)
         {
