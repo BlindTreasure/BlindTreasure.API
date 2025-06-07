@@ -82,16 +82,18 @@ public class SystemController : ControllerBase
             Id = Guid.NewGuid(),
             Name = "Collectible Toys",
             Description = "Danh mục đồ chơi sưu tầm, thiết kế đặc biệt và giới hạn.",
+            ImageUrl = "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=category-thumbnails%2FCollectible%20Toys.png&version_id=null",
             CreatedAt = now
         };
 
-        // var sneaker = new Category
-        // {
-        //     Id = Guid.NewGuid(),
-        //     Name = "Sneaker",
-        //     Description = "Danh mục giày sneaker thời trang.",
-        //     CreatedAt = now
-        // };
+        var sneaker = new Category
+        {
+            Id = Guid.NewGuid(),
+            Name = "Sneaker",
+            Description = "Danh mục giày sneaker thời trang.",
+            ImageUrl = "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=category-thumbnails%2Fsneakers.png&version_id=null",
+            CreatedAt = now
+        };
 
         // Danh sách category con
         var children = new List<Category>
@@ -148,7 +150,7 @@ public class SystemController : ControllerBase
         };
 
         // Thêm vào context
-        await _context.Categories.AddRangeAsync(collectibleToys);
+        await _context.Categories.AddRangeAsync(collectibleToys, sneaker);
         await _context.Categories.AddRangeAsync(children);
         await _context.SaveChangesAsync();
 
