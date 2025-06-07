@@ -14,5 +14,4 @@ public interface IBlindBoxService
 
     Task<List<BlindBoxDetailDto>> GetPendingApprovalBlindBoxesAsync();
     Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null);
-    
 }

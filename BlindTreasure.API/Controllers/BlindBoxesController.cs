@@ -168,7 +168,7 @@ public class BlindBoxesController : ControllerBase
     }
 
     /// <summary>
-    /// [Staff] Duyệt hoặc từ chối Blind Box (chỉ áp dụng cho trạng thái DRAFT)
+    ///     [Staff] Duyệt hoặc từ chối Blind Box (chỉ áp dụng cho trạng thái PendingApproval)
     /// </summary>
     /// <param name="id">ID của Blind Box</param>
     /// <param name="request">Yêu cầu duyệt hoặc từ chối</param>
@@ -182,7 +182,8 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.ReviewBlindBoxAsync(id, request.Approve, request.RejectReason);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", request.Approve ? "Phê duyệt thành công." : "Từ chối thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200",
+                request.Approve ? "Phê duyệt thành công." : "Từ chối thành công."));
         }
         catch (Exception ex)
         {
@@ -191,5 +192,4 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
 }

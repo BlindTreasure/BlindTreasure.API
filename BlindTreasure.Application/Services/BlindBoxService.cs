@@ -357,7 +357,7 @@ public class BlindBoxService : IBlindBoxService
     public async Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
-            b => b.Id == blindBoxId && b.Status == BlindBoxStatus.Draft && !b.IsDeleted,
+            b => b.Id == blindBoxId && b.Status == BlindBoxStatus.PendingApproval && !b.IsDeleted,
             b => b.BlindBoxItems,
             b => b.Seller
         );
@@ -401,13 +401,11 @@ public class BlindBoxService : IBlindBoxService
             var sellerUser =
                 await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId && !u.IsDeleted);
             if (sellerUser != null)
-            {
                 await _emailService.SendBlindBoxApprovedAsync(
                     sellerUser.Email!,
                     sellerUser.FullName ?? "Seller",
                     blindBox.Name
                 );
-            }
         }
         else
         {
@@ -424,14 +422,12 @@ public class BlindBoxService : IBlindBoxService
             var sellerUser =
                 await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId && !u.IsDeleted);
             if (sellerUser != null)
-            {
                 await _emailService.SendBlindBoxRejectedAsync(
                     sellerUser.Email!,
                     sellerUser.FullName ?? "Seller",
                     blindBox.Name,
                     rejectReason
                 );
-            }
         }
 
         await _unitOfWork.SaveChangesAsync();
