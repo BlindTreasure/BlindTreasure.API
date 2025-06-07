@@ -300,7 +300,6 @@ public class BlindBoxService : IBlindBoxService
         return true;
     }
 
-
     /// <summary>
     /// 1. Danh sách item không được để trống.
     /// 2. Mỗi sản phẩm phải thuộc Seller hiện tại và còn hàng (Stock > 0, chưa bị xoá).
