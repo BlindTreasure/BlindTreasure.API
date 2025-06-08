@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
+using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Application.Services;
 
@@ -54,6 +55,41 @@ public class BlindyService : IBlindyService
                       """;
         return await AskStaffAsync(prompt);
     }
+
+    public async Task<string> GetProductsForAiAnalysisAsync()
+    {
+        var products = await _analyzerService.GetProductsAiAnalysisAsync();
+
+        var formatted = string.Join("\n", products.Select(p =>
+            $"""
+             - ID: {p.Id}
+               Tên: {p.Name}
+               Mô tả: {p.Description}
+               Giá: {p.Price} VNĐ
+               Tồn kho: {p.Stock}
+               Danh mục: {p.Category?.Name ?? "Không rõ"}
+               Seller: {p.Seller.CompanyName ?? "Không rõ"}
+               Số lượt đánh giá: {p.Reviews?.Count ?? 0}
+               Số lượng trong kho khách: {p.InventoryItems?.Count ?? 0}
+             """
+        ));
+
+        var prompt = $"""
+                          Dưới đây là danh sách sản phẩm hiện có trong hệ thống BlindTreasure:
+                          {formatted}
+
+                          Phân tích giúp tôi:
+                          - Mức giá trung bình hiện tại là bao nhiêu?
+                          - Sản phẩm nào có mô tả quá sơ sài hoặc tên không chuẩn mực?
+                          - Có dấu hiệu sản phẩm ảo, trùng lặp hay thiếu COA không?
+                          - Gợi ý 1-2 điều cần kiểm tra thêm về dữ liệu sản phẩm?
+
+                          Trả lời súc tích, rõ ràng, theo dạng bullet.
+                      """;
+
+        return await AskStaffAsync(prompt);
+    }
+
 
     #region AskRoles
 

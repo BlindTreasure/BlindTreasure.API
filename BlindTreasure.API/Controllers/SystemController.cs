@@ -122,34 +122,7 @@ public class SystemController : ControllerBase
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
             }
-            // new()
-            // {
-            //     Name = "Marvel",
-            //     Description = "Mô hình nhân vật vũ trụ Marvel.",
-            //     ParentId = collectibleToys.Id,
-            //     CreatedAt = now
-            // },
-            // new()
-            // {
-            //     Name = "Gundam",
-            //     Description = "Mô hình robot lắp ráp dòng Gundam.",
-            //     ParentId = collectibleToys.Id,
-            //     CreatedAt = now
-            // },
-            // new()
-            // {
-            //     Name = "Adidas",
-            //     Description = "Giày sneaker thương hiệu Adidas.",
-            //     ParentId = sneaker.Id,
-            //     CreatedAt = now
-            // },
-            // new()
-            // {
-            //     Name = "Nike",
-            //     Description = "Giày sneaker thương hiệu Nike.",
-            //     ParentId = sneaker.Id,
-            //     CreatedAt = now
-            // }
+           
         };
 
         // Thêm vào context
