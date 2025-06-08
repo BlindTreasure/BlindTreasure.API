@@ -34,8 +34,14 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.GetAllBlindBoxesAsync(param);
-            return Ok(ApiResult<Pagination<BlindBoxDetailDto>>.Success(result, "200",
-                "Lấy danh sách Blind Box thành công."));
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách Blind Box thành công."));
         }
         catch (Exception ex)
         {

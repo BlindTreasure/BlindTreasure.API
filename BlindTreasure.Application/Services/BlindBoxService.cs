@@ -243,6 +243,10 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.Forbidden("Không có quyền chỉnh sửa Blind Box này.");
         }
 
+        // Validate số lượng item phải là 6 hoặc 12
+        if (items.Count != 6 && items.Count != 12)
+            throw ErrorHelper.BadRequest("Blind Box chỉ được phép chứa đúng 6 hoặc 12 sản phẩm.");
+
         // Validate logic (dropRate, số lượng tồn kho, secret logic)
         await ValidateBlindBoxItemsAsync(blindBox, seller, items);
 
