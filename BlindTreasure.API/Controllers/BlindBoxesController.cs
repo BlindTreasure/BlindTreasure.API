@@ -198,4 +198,57 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
+    /// <summary>
+    ///     [Seller] Xoá một item khỏi Blind Box theo itemId
+    /// </summary>
+    /// <param name="itemId">Id của item trong Blind Box</param>
+    /// <returns>Blind Box sau khi xoá item</returns>
+    [HttpDelete("items/{itemId}")]
+    [Authorize(Roles = "Seller")]
+    [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<BlindBoxDetailDto>> RemoveItem(Guid itemId)
+    {
+        try
+        {
+            var result = await _blindBoxService.RemoveItemFromBlindBoxAsync(itemId);
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Xoá item khỏi Blind Box thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<BlindBoxDetailDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    /// <summary>
+    ///     [Seller] Xoá toàn bộ item trong Blind Box
+    /// </summary>
+    /// <param name="id">Id của Blind Box</param>
+    /// <returns>Blind Box sau khi xoá hết item</returns>
+    [HttpDelete("{id}/items")]
+    [Authorize(Roles = "Seller")]
+    [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<BlindBoxDetailDto>> ClearItems(Guid id)
+    {
+        try
+        {
+            var result = await _blindBoxService.ClearItemsFromBlindBoxAsync(id);
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200",
+                "Xoá toàn bộ item trong Blind Box thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<BlindBoxDetailDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 }
