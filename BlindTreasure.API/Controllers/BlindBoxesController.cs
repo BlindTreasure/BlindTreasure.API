@@ -198,8 +198,9 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
     /// <summary>
-    /// [Seller] Xoá một item khỏi Blind Box theo itemId
+    ///     [Seller] Xoá một item khỏi Blind Box theo itemId
     /// </summary>
     /// <param name="itemId">Id của item trong Blind Box</param>
     /// <returns>Blind Box sau khi xoá item</returns>
@@ -225,7 +226,7 @@ public class BlindBoxesController : ControllerBase
     }
 
     /// <summary>
-    /// [Seller] Xoá toàn bộ item trong Blind Box
+    ///     [Seller] Xoá toàn bộ item trong Blind Box
     /// </summary>
     /// <param name="id">Id của Blind Box</param>
     /// <returns>Blind Box sau khi xoá hết item</returns>
@@ -240,7 +241,8 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.ClearItemsFromBlindBoxAsync(id);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Xoá toàn bộ item trong Blind Box thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200",
+                "Xoá toàn bộ item trong Blind Box thành công."));
         }
         catch (Exception ex)
         {
@@ -249,6 +251,4 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
-    
 }

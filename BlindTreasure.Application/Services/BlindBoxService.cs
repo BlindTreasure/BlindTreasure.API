@@ -91,10 +91,7 @@ public class BlindBoxService : IBlindBoxService
                 .Include(i => i.Product)
                 .ToListAsync();
 
-            foreach (var box in items)
-            {
-                box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
-            }
+            foreach (var box in items) box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
         }
         else
         {
@@ -110,10 +107,7 @@ public class BlindBoxService : IBlindBoxService
                 .Include(i => i.Product)
                 .ToListAsync();
 
-            foreach (var box in items)
-            {
-                box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
-            }
+            foreach (var box in items) box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
         }
 
         var dtos = items.Select(b =>
@@ -321,7 +315,7 @@ public class BlindBoxService : IBlindBoxService
 
         await RemoveBlindBoxCacheAsync(blindBoxId);
 
-        
+
         _logger.Success(
             $"[AddItemsToBlindBoxAsync] Added {entities.Count} items to Blind Box {blindBoxId} and deducted stock.");
         return await GetBlindBoxByIdAsync(blindBoxId);
@@ -357,9 +351,9 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
 
-        
+
         await RemoveBlindBoxCacheAsync(blindBoxId);
-        
+
         _logger.Success($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} submitted for approval.");
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
@@ -472,7 +466,6 @@ public class BlindBoxService : IBlindBoxService
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
-
     public async Task<BlindBoxDetailDto> RemoveItemFromBlindBoxAsync(Guid itemId)
     {
         var item = await _unitOfWork.BlindBoxItems.FirstOrDefaultAsync(i => i.Id == itemId && !i.IsDeleted,
@@ -551,7 +544,6 @@ public class BlindBoxService : IBlindBoxService
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
 
-
     /// <summary>
     ///     1. Danh sách item không được để trống.
     ///     2. Mỗi sản phẩm phải thuộc Seller hiện tại và còn hàng (Stock > 0, chưa bị xoá).
@@ -609,7 +601,6 @@ public class BlindBoxService : IBlindBoxService
         if (totalDropRate >= 100)
             throw ErrorHelper.BadRequest("Tổng DropRate của item (trừ Secret) phải nhỏ hơn 100%.");
     }
-
 
     /// <summary>
     ///     Xóa cache liên quan đến BlindBox (theo id và theo list).
