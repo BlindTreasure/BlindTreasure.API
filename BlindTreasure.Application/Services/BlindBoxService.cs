@@ -79,31 +79,55 @@ public class BlindBoxService : IBlindBoxService
 
         List<BlindBox> items;
         if (param.PageIndex == 0)
-            // Trả về toàn bộ danh sách
-            items = await query
-                .Include(b => b.BlindBoxItems)
-                .ThenInclude(item => item.Product)
+        {
+            // Lấy BlindBox trước
+            items = await query.ToListAsync();
+
+            // Load BlindBoxItems có IsDeleted = false cho từng BlindBox
+            var blindBoxIds = items.Select(b => b.Id).ToList();
+
+            var itemsGrouped = await _unitOfWork.BlindBoxItems.GetQueryable()
+                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
+                .Include(i => i.Product)
                 .ToListAsync();
+
+            foreach (var box in items)
+            {
+                box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
+            }
+        }
         else
+        {
             items = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
-                .Include(b => b.BlindBoxItems)
-                .ThenInclude(item => item.Product)
                 .ToListAsync();
+
+            var blindBoxIds = items.Select(b => b.Id).ToList();
+
+            var itemsGrouped = await _unitOfWork.BlindBoxItems.GetQueryable()
+                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
+                .Include(i => i.Product)
+                .ToListAsync();
+
+            foreach (var box in items)
+            {
+                box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
+            }
+        }
 
         var dtos = items.Select(b =>
         {
             var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(b);
-            dto.Items = b.BlindBoxItems?.Select(item => new BlindBoxItemDto
+            dto.Items = b.BlindBoxItems.Select(item => new BlindBoxItemDto
             {
                 ProductId = item.ProductId,
                 Quantity = item.Quantity,
-                ProductName = item.Product?.Name ?? string.Empty,
-                ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
+                ProductName = item.Product.Name,
+                ImageUrl = item.Product.ImageUrls.FirstOrDefault(),
                 DropRate = item.DropRate,
                 Rarity = item.Rarity
-            }).ToList() ?? new List<BlindBoxItemDto>();
+            }).ToList();
             return dto;
         }).ToList();
 
@@ -123,10 +147,9 @@ public class BlindBoxService : IBlindBoxService
             return cached;
         }
 
+        // Lấy BlindBox, không include BlindBoxItems
         var blindBox = await _unitOfWork.BlindBoxes.GetQueryable()
             .Where(x => x.Id == blindBoxId && !x.IsDeleted)
-            .Include(b => b.BlindBoxItems)
-            .ThenInclude(i => i.Product)
             .FirstOrDefaultAsync();
 
         if (blindBox == null)
@@ -134,6 +157,14 @@ public class BlindBoxService : IBlindBoxService
             _logger.Warn($"[GetBlindBoxByIdAsync] Blind Box {blindBoxId} not found.");
             throw ErrorHelper.NotFound("Blind Box không tồn tại");
         }
+
+        // Load BlindBoxItems lọc isDeleted = false
+        var items = await _unitOfWork.BlindBoxItems.GetQueryable()
+            .Where(i => i.BlindBoxId == blindBoxId && !i.IsDeleted)
+            .Include(i => i.Product)
+            .ToListAsync();
+
+        blindBox.BlindBoxItems = items;
 
         var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
         result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
@@ -154,7 +185,7 @@ public class BlindBoxService : IBlindBoxService
     public async Task<BlindBoxDetailDto> CreateBlindBoxAsync(CreateBlindBoxDto dto)
     {
         var currentUserId = _claimsService.CurrentUserId;
-        _logger.Info($"[CreateBlindBoxAsync] User {currentUserId} requests to create blind box: {dto?.Name}");
+        _logger.Info($"[CreateBlindBoxAsync] User {currentUserId} requests to create blind box: {dto.Name}");
 
         if (dto == null)
             throw ErrorHelper.BadRequest("Dữ liệu Blind Box không được để trống.");
@@ -212,7 +243,6 @@ public class BlindBoxService : IBlindBoxService
         var result = await _unitOfWork.BlindBoxes.AddAsync(blindBox);
         await _unitOfWork.SaveChangesAsync();
 
-        await RemoveBlindBoxCacheAsync(blindBox.Id);
         _logger.Success($"[CreateBlindBoxAsync] Blind box {blindBox.Name} created by user {currentUserId}.");
         var mappingResult = _mapperService.Map<BlindBox, BlindBoxDetailDto>(result);
         return mappingResult;
@@ -290,6 +320,8 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.SaveChangesAsync();
 
         await RemoveBlindBoxCacheAsync(blindBoxId);
+
+        
         _logger.Success(
             $"[AddItemsToBlindBoxAsync] Added {entities.Count} items to Blind Box {blindBoxId} and deducted stock.");
         return await GetBlindBoxByIdAsync(blindBoxId);
@@ -325,7 +357,9 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
 
+        
         await RemoveBlindBoxCacheAsync(blindBoxId);
+        
         _logger.Success($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} submitted for approval.");
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
@@ -350,8 +384,8 @@ public class BlindBoxService : IBlindBoxService
                 Quantity = i.Quantity,
                 DropRate = i.DropRate,
                 Rarity = i.Rarity,
-                ProductName = i.Product?.Name ?? "",
-                ImageUrl = i.Product?.ImageUrls.FirstOrDefault()
+                ProductName = i.Product.Name,
+                ImageUrl = i.Product.ImageUrls.FirstOrDefault()
             }).ToList();
 
             return dto;
@@ -406,7 +440,7 @@ public class BlindBoxService : IBlindBoxService
                 await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId && !u.IsDeleted);
             if (sellerUser != null)
                 await _emailService.SendBlindBoxApprovedAsync(
-                    sellerUser.Email!,
+                    sellerUser.Email,
                     sellerUser.FullName ?? "Seller",
                     blindBox.Name
                 );
@@ -427,7 +461,7 @@ public class BlindBoxService : IBlindBoxService
                 await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId && !u.IsDeleted);
             if (sellerUser != null)
                 await _emailService.SendBlindBoxRejectedAsync(
-                    sellerUser.Email!,
+                    sellerUser.Email,
                     sellerUser.FullName ?? "Seller",
                     blindBox.Name,
                     rejectReason
@@ -435,8 +469,86 @@ public class BlindBoxService : IBlindBoxService
         }
 
         await _unitOfWork.SaveChangesAsync();
-        await RemoveBlindBoxCacheAsync(blindBox.Id);
         return await GetBlindBoxByIdAsync(blindBox.Id);
+    }
+
+
+    public async Task<BlindBoxDetailDto> RemoveItemFromBlindBoxAsync(Guid itemId)
+    {
+        var item = await _unitOfWork.BlindBoxItems.FirstOrDefaultAsync(i => i.Id == itemId && !i.IsDeleted,
+            i => i.Product, i => i.BlindBox);
+
+        if (item == null)
+            throw ErrorHelper.NotFound("Item không tồn tại hoặc đã bị xoá.");
+
+        var blindBox = item.BlindBox;
+        if (blindBox == null || blindBox.IsDeleted)
+            throw ErrorHelper.NotFound("Blind Box không hợp lệ.");
+
+        var currentUserId = _claimsService.CurrentUserId;
+
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
+            s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
+
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Không có quyền xoá item khỏi Blind Box này.");
+
+        // Hoàn lại tồn kho
+        var product = item.Product;
+        product.Stock += item.Quantity;
+        await _unitOfWork.Products.Update(product);
+
+        await _unitOfWork.BlindBoxItems.SoftRemove(item);
+        await _unitOfWork.SaveChangesAsync();
+
+        _logger.Success($"[RemoveItemFromBlindBoxAsync] Đã xoá item {itemId} khỏi Blind Box {blindBox.Id}.");
+
+        return await GetBlindBoxByIdAsync(blindBox.Id);
+    }
+
+    public async Task<BlindBoxDetailDto> ClearItemsFromBlindBoxAsync(Guid blindBoxId)
+    {
+        var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
+            b => b.Id == blindBoxId && !b.IsDeleted,
+            b => b.BlindBoxItems
+        );
+
+        if (blindBox == null)
+            throw ErrorHelper.NotFound("Blind Box không tồn tại.");
+
+        var currentUserId = _claimsService.CurrentUserId;
+
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
+            s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
+
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Không có quyền xoá item khỏi Blind Box này.");
+
+        if (!blindBox.BlindBoxItems.Any())
+            return await GetBlindBoxByIdAsync(blindBoxId);
+
+        var items = blindBox.BlindBoxItems.ToList();
+
+        // Hoàn lại stock
+        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
+        var products = await _unitOfWork.Products.GetAllAsync(p =>
+            productIds.Contains(p.Id) && !p.IsDeleted && p.SellerId == seller.Id);
+
+        foreach (var item in items)
+        {
+            var product = products.FirstOrDefault(p => p.Id == item.ProductId);
+            if (product != null)
+                product.Stock += item.Quantity;
+        }
+
+        await _unitOfWork.Products.UpdateRange(products);
+        await _unitOfWork.BlindBoxItems.SoftRemoveRange(items);
+        await _unitOfWork.SaveChangesAsync();
+
+        await RemoveBlindBoxCacheAsync(blindBoxId);
+        _logger.Success($"[ClearItemsFromBlindBoxAsync] Đã xoá toàn bộ item khỏi Blind Box {blindBoxId}.");
+
+        return await GetBlindBoxByIdAsync(blindBoxId);
     }
 
 
