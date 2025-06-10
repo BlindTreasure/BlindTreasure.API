@@ -114,6 +114,18 @@ public class BlindTreasureDbContext : DbContext
             .HasConversion<string>()
             .HasMaxLength(32); // nếu cần giới hạn
 
+        
+        modelBuilder.Entity<Promotion>(entity =>
+        {
+            entity.Property(e => e.DiscountType)
+                .HasConversion<string>()
+                .HasMaxLength(16);
+
+            entity.Property(e => e.Status)
+                .HasConversion<string>()
+                .HasMaxLength(16);
+        });
+
         #endregion
 
 

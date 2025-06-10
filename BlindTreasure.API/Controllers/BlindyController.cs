@@ -28,9 +28,9 @@ public class BlindyController : ControllerBase
             return StatusCode(500, ApiResult<string>.Failure("500", ex.Message));
         }
     }
-    
+
     /// <summary>
-    /// Staff gọi endpoint này để phân tích AI về thông tin người dùng gần nhất trong hệ thống.
+    ///     Staff gọi endpoint này để phân tích AI về thông tin người dùng gần nhất trong hệ thống.
     /// </summary>
     [HttpGet("analyze-users")]
     public async Task<IActionResult> AnalyzeUsers()
@@ -45,9 +45,9 @@ public class BlindyController : ControllerBase
             return StatusCode(500, ApiResult<string>.Failure("500", ex.Message));
         }
     }
-    
+
     /// <summary>
-    /// Staff gọi endpoint này để phân tích AI danh sách sản phẩm.
+    ///     Staff gọi endpoint này để phân tích AI danh sách sản phẩm.
     /// </summary>
     [HttpGet("analyze-products")]
     public async Task<IActionResult> AnalyzeProducts()
@@ -62,5 +62,4 @@ public class BlindyController : ControllerBase
             return StatusCode(500, ApiResult<string>.Failure("500", ex.Message));
         }
     }
-
 }

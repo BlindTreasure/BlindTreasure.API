@@ -1,7 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
-using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Application.Services;
 

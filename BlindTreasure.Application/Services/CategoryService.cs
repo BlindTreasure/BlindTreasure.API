@@ -190,7 +190,7 @@ public class CategoryService : ICategoryService
             category.Description = dto.Description.Trim();
 
         // Xác định có đang chuyển từ cha thành con không
-        bool isBecomingChild = category.ParentId == null && dto.ParentId.HasValue;
+        var isBecomingChild = category.ParentId == null && dto.ParentId.HasValue;
 
         // Cập nhật ParentId
         if (dto.ParentId.HasValue)
