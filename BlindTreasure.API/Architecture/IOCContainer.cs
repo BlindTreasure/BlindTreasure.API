@@ -145,6 +145,8 @@ public static class IocContainer
         services.AddScoped<IDataAnalyzerService, DataAnalyzerService>();
         services.AddScoped<IBlindBoxService, BlindBoxService>();
         services.AddScoped<IPromotionService, PromotionService>();
+        services.AddScoped<ICartItemService, CartItemService>();
+        services.AddScoped<IOrderService, OrderService>();
 
         //3rd party
         services.AddHttpClient();
