@@ -12,6 +12,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<BlindBox> BlindBoxes { get; }
     IGenericRepository<BlindBoxItem> BlindBoxItems { get; }
     IGenericRepository<ProbabilityConfig> ProbabilityConfigs { get; }
+    IGenericRepository<Promotion> Promotions { get; }
 
     Task<int> SaveChangesAsync();
 }
