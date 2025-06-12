@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Infrastructure.Commons;
@@ -98,6 +99,28 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+    
+    [HttpPut("{id}")]
+    [Authorize(Roles = "Seller")]
+    [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<BlindBoxDetailDto>> Update(Guid id, [FromBody] UpdateBlindBoxDto dto)
+    {
+        try
+        {
+            var result = await _blindBoxService.UpdateBlindBoxAsync(id, dto);
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Cập nhật Blind Box thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<BlindBoxDetailDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
 
 
     /// <summary>
