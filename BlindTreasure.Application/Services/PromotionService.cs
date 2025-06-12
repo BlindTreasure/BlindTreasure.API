@@ -11,48 +11,106 @@ namespace BlindTreasure.Application.Services;
 public class PromotionService : IPromotionService
 {
     private readonly ILoggerService _loggerService;
+    private readonly IClaimsService _claimsService;
+    private readonly IUserService _userService;
     private readonly IMapperService _mapperService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public PromotionService(IUnitOfWork unitOfWork, ILoggerService loggerService, IMapperService mapperService)
+    public PromotionService(IUnitOfWork unitOfWork, ILoggerService loggerService, IMapperService mapperService,
+        IClaimsService claimsService, IUserService userService)
     {
         _unitOfWork = unitOfWork;
         _loggerService = loggerService;
         _mapperService = mapperService;
+        _claimsService = claimsService;
+        _userService = userService;
     }
 
-    public async Task<PromotionDto> CreateGlobalPromotionAsync(CreatePromotionDto dto)
+    public async Task<PromotionDto> CreatePromotionAsync(CreatePromotionDto dto)
     {
-        _loggerService.Info($"[CreateGlobalPromotionAsync] Staff tạo voucher toàn sàn: {dto.Code}");
+        var currentUserId = _claimsService.CurrentUserId;
+        var user = await _userService.GetUserById(currentUserId, useCache: true);
 
-        // Validate đầu vào
-        if (dto.StartDate >= dto.EndDate)
-            throw ErrorHelper.BadRequest("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc.");
+        if (user == null)
+        {
+            _loggerService.Warn($"[CreatePromotion] Không tìm thấy user với ID: {currentUserId}");
+            throw ErrorHelper.Unauthorized("Không tìm thấy thông tin người dùng.");
+        }
 
-        if (dto.DiscountType != DiscountType.Percentage && dto.DiscountType != DiscountType.Fixed)
-            throw ErrorHelper.BadRequest("Loại khuyến mãi không hợp lệ. Chỉ chấp nhận: percentage, fixed.");
+        _loggerService.Info(
+            $"[CreatePromotion] Bắt đầu xử lý tạo promotion bởi userId: {currentUserId}, role: {user.RoleName}");
 
-        if (dto.DiscountValue <= 0)
-            throw ErrorHelper.BadRequest("Giá trị khuyến mãi phải lớn hơn 0.");
+        await ValidateCreatePromotionAsync(user);
+        _loggerService.Info($"[CreatePromotion] Passed validation cho userId: {currentUserId}");
 
-        // Tạo entity
+        var promotion = await SetPromotionDataAsync(dto, user);
+        await _unitOfWork.Promotions.AddAsync(promotion);
+        await _unitOfWork.SaveChangesAsync();
+
+        _loggerService.Success(
+            $"[CreatePromotion] Tạo promotion thành công. Code: {promotion.Code}, UserId: {currentUserId}, Role: {user.RoleName}");
+
+        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+    }
+
+    private async Task<Promotion> SetPromotionDataAsync(CreatePromotionDto dto, User user)
+    {
         var promotion = new Promotion
         {
-            Code = dto.Code.Trim().ToUpper(),
+            Code = dto.Code,
             Description = dto.Description,
             DiscountType = dto.DiscountType,
             DiscountValue = dto.DiscountValue,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
-            UsageLimit = dto.UsageLimit,
-            Status = PromotionStatus.Approved,
-            SellerId = null // voucher toàn sàn nên seller id để null
+            UsageLimit = dto.UsageLimit
         };
 
-        await _unitOfWork.Promotions.AddAsync(promotion);
-        await _unitOfWork.SaveChangesAsync();
+        switch (user.RoleName)
+        {
+            case RoleType.Admin:
+            case RoleType.Staff:
+                promotion.Status = PromotionStatus.Approved;
+                promotion.SellerId = null;
+                break;
 
-        _loggerService.Info($"[CreateGlobalPromotionAsync] Tạo thành công voucher toàn sàn: {promotion.Code}");
-        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+            case RoleType.Seller:
+                var seller =
+                    await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
+                        s.UserId == user.Id && s.IsVerified && !s.IsDeleted);
+
+                promotion.SellerId = seller?.Id;
+                promotion.Status = PromotionStatus.Pending;
+                break;
+
+            default:
+                throw ErrorHelper.Forbidden("Không có quyền tạo voucher.");
+        }
+
+        return promotion;
+    }
+
+    private async Task ValidateCreatePromotionAsync(User user)
+    {
+        if (user.RoleName == RoleType.Seller)
+        {
+            var seller =
+                await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == user.Id && s.IsVerified && !s.IsDeleted);
+
+            if (seller == null)
+            {
+                _loggerService.Warn("ValidateCreatePromotion: Seller chưa xác minh hoặc bị xoá");
+                throw ErrorHelper.Forbidden("Tài khoản không đủ điều kiện để tạo voucher.");
+            }
+
+            var count = await _unitOfWork.Promotions.CountAsync(p =>
+                p.SellerId == seller.Id &&
+                (p.Status == PromotionStatus.Pending || p.Status == PromotionStatus.Approved));
+
+            if (count >= 3)
+            {
+                throw ErrorHelper.BadRequest("Bạn chỉ được tạo tối đa 3 voucher đang chờ duyệt hoặc đã duyệt.");
+            }
+        }
     }
 }
