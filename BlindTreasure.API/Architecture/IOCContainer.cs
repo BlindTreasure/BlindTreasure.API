@@ -147,6 +147,8 @@ public static class IocContainer
         services.AddScoped<IPromotionService, PromotionService>();
         services.AddScoped<ICartItemService, CartItemService>();
         services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<IStripeService, StripeService>();
+        services.AddScoped<ITransactionService, TransactionService>();
 
         //3rd party
         services.AddHttpClient();
