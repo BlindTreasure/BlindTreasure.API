@@ -1,13 +1,14 @@
 ﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stripe;
-using System.Text;
 using Stripe.Checkout;
-using BlindTreasure.Application.Interfaces.Commons;
+using System.Text;
 
 namespace BlindTreasure.API.Controllers;
 
@@ -25,6 +26,29 @@ public class OrderController : ControllerBase
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));    
         _orderService = orderService;
         _transactionService = transactionService ?? throw new ArgumentNullException(nameof(transactionService));
+    }
+
+    /// <summary>
+    /// Đặt hàng (checkout) từ cart truyền lên từ client, trả về link thanh toán Stripe.
+    /// </summary>
+    /// <param name="cart">Cart truyền từ FE (danh sách sản phẩm, số lượng, giá, ...)</param>
+    /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
+    [HttpPost("checkout-direct")]
+    [ProducesResponseType(typeof(ApiResult<string>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> CheckoutDirect([FromBody] DirectCartCheckoutDto cart)
+    {
+        try
+        {
+            var paymentUrl = await _orderService.CheckoutFromClientCartAsync(cart);
+            return Ok(ApiResult<string>.Success(paymentUrl, "200", "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<string>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.DTOs.OrderDTOs;
+﻿using BlindTreasure.Domain.DTOs.CartItemDTOs;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,7 @@ namespace BlindTreasure.Application.Interfaces
     {
         Task CancelOrderAsync(Guid orderId);
         Task<string> CheckoutAsync(CreateOrderDto dto);
+        Task<string> CheckoutFromClientCartAsync(DirectCartCheckoutDto cartDto);
         Task DeleteOrderAsync(Guid orderId);
         Task<List<OrderDto>> GetMyOrdersAsync();
         Task<OrderDto> GetOrderByIdAsync(Guid orderId);
