@@ -14,7 +14,8 @@ public class UnitOfWork(
     IGenericRepository<BlindBox> blindBoxes,
     IGenericRepository<BlindBoxItem> blindBoxItems,
     IGenericRepository<ProbabilityConfig> probabilityConfigs,
-    IGenericRepository<CartItem> cartitems,
+    IGenericRepository<Promotion> promotions,
+    IGenericRepository<CartItem> cartItems,
     IGenericRepository<Order> orders,
     IGenericRepository<OrderDetail> orderDetails,
     IGenericRepository<Transaction> transactions,
@@ -30,7 +31,8 @@ public class UnitOfWork(
     public IGenericRepository<BlindBox> BlindBoxes { get; } = blindBoxes;
     public IGenericRepository<BlindBoxItem> BlindBoxItems { get; } = blindBoxItems;
     public IGenericRepository<ProbabilityConfig> ProbabilityConfigs { get; } = probabilityConfigs;
-    public IGenericRepository<CartItem> CartItems { get; } = cartitems;
+    public IGenericRepository<Promotion> Promotions { get; } = promotions;
+    public IGenericRepository<CartItem> CartItems { get; } = cartItems;
     public IGenericRepository<Order> Orders { get; } = orders;
     public IGenericRepository<OrderDetail> OrderDetails { get; } = orderDetails;
     public IGenericRepository<Transaction> Transactions { get; } = transactions;

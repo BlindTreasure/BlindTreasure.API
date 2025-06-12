@@ -144,6 +144,7 @@ public static class IocContainer
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IDataAnalyzerService, DataAnalyzerService>();
         services.AddScoped<IBlindBoxService, BlindBoxService>();
+        services.AddScoped<IPromotionService, PromotionService>();
         services.AddScoped<ICartItemService, CartItemService>();
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<IStripeService, StripeService>();

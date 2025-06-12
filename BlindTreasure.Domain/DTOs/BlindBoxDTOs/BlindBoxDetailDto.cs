@@ -11,11 +11,9 @@ public class BlindBoxDetailDto
     public int TotalQuantity { get; set; }
     public string ImageUrl { get; set; }
     public DateTime ReleaseDate { get; set; }
-
     public BlindBoxStatus Status { get; set; } // ví dụ: Draft, PendingApproval, Approved...
-
     public bool HasSecretItem { get; set; }
     public decimal SecretProbability { get; set; }
-
+    public bool IsDeleted { get; set; }
     public List<BlindBoxItemDto>? Items { get; set; }
 }

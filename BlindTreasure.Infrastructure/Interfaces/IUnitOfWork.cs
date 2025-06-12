@@ -12,6 +12,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<BlindBox> BlindBoxes { get; }
     IGenericRepository<BlindBoxItem> BlindBoxItems { get; }
     IGenericRepository<ProbabilityConfig> ProbabilityConfigs { get; }
+    IGenericRepository<Promotion> Promotions { get; }
     IGenericRepository<Order> Orders { get; }
     IGenericRepository<CartItem> CartItems { get; }
     IGenericRepository<OrderDetail> OrderDetails { get; }

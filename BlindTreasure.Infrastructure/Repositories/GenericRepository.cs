@@ -183,4 +183,16 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity> where TEnt
             throw new Exception($"Error while performing hard remove range: {ex.Message}");
         }
     }
+
+    public Task<int> CountAsync(Expression<Func<TEntity, bool>> predicate)
+    {
+        try
+        {
+            return _dbSet.CountAsync(predicate);
+        }
+        catch (Exception e)
+        {
+            throw new Exception($"Error while performing: {e.Message}");
+        }
+    }
 }
