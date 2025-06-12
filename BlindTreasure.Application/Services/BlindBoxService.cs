@@ -482,6 +482,61 @@ public class BlindBoxService : IBlindBoxService
 
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
+    
+    public async Task<BlindBoxDetailDto> DeleteBlindBoxAsync(Guid blindBoxId)
+    {
+        var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
+            b => b.Id == blindBoxId && !b.IsDeleted,
+            b => b.BlindBoxItems
+        );
+
+        if (blindBox == null)
+            throw ErrorHelper.NotFound("Blind Box không tồn tại.");
+
+        var currentUserId = _claimsService.CurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
+            s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
+
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Không có quyền xoá Blind Box này.");
+
+        // Soft delete BlindBox
+        await _unitOfWork.BlindBoxes.SoftRemove(blindBox);
+
+        // Restore stock của từng item
+        var productIds = blindBox.BlindBoxItems.Select(i => i.ProductId).Distinct().ToList();
+        var products = await _unitOfWork.Products.GetAllAsync(p =>
+            productIds.Contains(p.Id) && p.SellerId == seller.Id && !p.IsDeleted);
+
+        foreach (var item in blindBox.BlindBoxItems)
+        {
+            var product = products.FirstOrDefault(p => p.Id == item.ProductId);
+            if (product != null)
+                product.Stock += item.Quantity;
+        }
+
+        await _unitOfWork.Products.UpdateRange(products);
+        await _unitOfWork.SaveChangesAsync();
+
+        await RemoveBlindBoxCacheAsync(blindBoxId);
+
+        _logger.Success($"[DeleteBlindBoxAsync] Đã xoá Blind Box {blindBoxId}.");
+
+        var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
+        result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
+        {
+            ProductId = item.ProductId,
+            ProductName = item.Product?.Name ?? string.Empty,
+            DropRate = item.DropRate,
+            ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
+            Quantity = item.Quantity,
+            Rarity = item.Rarity
+        }).ToList();
+
+        return result;
+        
+    }
+
 
     /// <summary>
     ///     1. Danh sách item không được để trống.

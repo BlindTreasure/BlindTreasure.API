@@ -201,4 +201,28 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
+    /// <summary>
+    /// [Seller] Xoá Blind Box (soft delete)
+    /// </summary>
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Seller")]
+    [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<BlindBoxDetailDto>> Delete(Guid id)
+    {
+        try
+        {
+            var result = await _blindBoxService.DeleteBlindBoxAsync(id);
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Xoá Blind Box thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<BlindBoxDetailDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 }
