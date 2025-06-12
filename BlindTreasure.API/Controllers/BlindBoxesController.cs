@@ -139,36 +139,12 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.SubmitBlindBoxAsync(id);
-            return Ok(ApiResult<object>.Success(result!, "200", "Gửi duyệt Blind Box thành công."));
+            return Ok(ApiResult<object>.Success(result, "200", "Gửi duyệt Blind Box thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<bool>(ex);
-            return StatusCode(statusCode, errorResponse);
-        }
-    }
-
-    /// <summary>
-    ///     [Staff] Lấy danh sách Blind Box đang ở trạng thái chờ duyệt (PendingApproval)
-    /// </summary>
-    /// <returns>Danh sách Blind Box kèm item và tỷ lệ</returns>
-    [HttpGet("pending-approval")]
-    [Authorize(Roles = "Staff")]
-    [ProducesResponseType(typeof(List<BlindBoxDetailDto>), 200)]
-    [ProducesResponseType(404)]
-    public async Task<ActionResult<List<BlindBoxDetailDto>>> GetPendingApproval()
-    {
-        try
-        {
-            var result = await _blindBoxService.GetPendingApprovalBlindBoxesAsync();
-            return Ok(ApiResult<List<BlindBoxDetailDto>>.Success(result, "200",
-                "Lấy danh sách Blind Box chờ duyệt thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<List<BlindBoxDetailDto>>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
@@ -190,32 +166,6 @@ public class BlindBoxesController : ControllerBase
             var result = await _blindBoxService.ReviewBlindBoxAsync(id, request.Approve, request.RejectReason);
             return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200",
                 request.Approve ? "Phê duyệt thành công." : "Từ chối thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<BlindBoxDetailDto>(ex);
-            return StatusCode(statusCode, errorResponse);
-        }
-    }
-
-    /// <summary>
-    ///     [Seller] Xoá một item khỏi Blind Box theo itemId
-    /// </summary>
-    /// <param name="itemId">Id của item trong Blind Box</param>
-    /// <returns>Blind Box sau khi xoá item</returns>
-    [HttpDelete("items/{itemId}")]
-    [Authorize(Roles = "Seller")]
-    [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(403)]
-    [ProducesResponseType(404)]
-    public async Task<ActionResult<BlindBoxDetailDto>> RemoveItem(Guid itemId)
-    {
-        try
-        {
-            var result = await _blindBoxService.RemoveItemFromBlindBoxAsync(itemId);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Xoá item khỏi Blind Box thành công."));
         }
         catch (Exception ex)
         {

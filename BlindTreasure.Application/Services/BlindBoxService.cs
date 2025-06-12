@@ -358,34 +358,6 @@ public class BlindBoxService : IBlindBoxService
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
-    public async Task<List<BlindBoxDetailDto>> GetPendingApprovalBlindBoxesAsync()
-    {
-        var boxes = await _unitOfWork.BlindBoxes.GetAllAsync(
-            b => b.Status == BlindBoxStatus.PendingApproval && !b.IsDeleted,
-            b => b.BlindBoxItems,
-            b => b.Seller
-        );
-
-        if (boxes == null || boxes.Count == 0)
-            throw ErrorHelper.NotFound("Không có Blind Box nào đang chờ duyệt.");
-
-        return boxes.Select(b =>
-        {
-            var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(b);
-            dto.Items = b.BlindBoxItems.Select(i => new BlindBoxItemDto
-            {
-                ProductId = i.ProductId,
-                Quantity = i.Quantity,
-                DropRate = i.DropRate,
-                Rarity = i.Rarity,
-                ProductName = i.Product.Name,
-                ImageUrl = i.Product.ImageUrls.FirstOrDefault()
-            }).ToList();
-
-            return dto;
-        }).ToList();
-    }
-
     public async Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -463,39 +435,6 @@ public class BlindBoxService : IBlindBoxService
         }
 
         await _unitOfWork.SaveChangesAsync();
-        return await GetBlindBoxByIdAsync(blindBox.Id);
-    }
-
-    public async Task<BlindBoxDetailDto> RemoveItemFromBlindBoxAsync(Guid itemId)
-    {
-        var item = await _unitOfWork.BlindBoxItems.FirstOrDefaultAsync(i => i.Id == itemId && !i.IsDeleted,
-            i => i.Product, i => i.BlindBox);
-
-        if (item == null)
-            throw ErrorHelper.NotFound("Item không tồn tại hoặc đã bị xoá.");
-
-        var blindBox = item.BlindBox;
-        if (blindBox == null || blindBox.IsDeleted)
-            throw ErrorHelper.NotFound("Blind Box không hợp lệ.");
-
-        var currentUserId = _claimsService.CurrentUserId;
-
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
-            s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
-
-        if (seller == null)
-            throw ErrorHelper.Forbidden("Không có quyền xoá item khỏi Blind Box này.");
-
-        // Hoàn lại tồn kho
-        var product = item.Product;
-        product.Stock += item.Quantity;
-        await _unitOfWork.Products.Update(product);
-
-        await _unitOfWork.BlindBoxItems.SoftRemove(item);
-        await _unitOfWork.SaveChangesAsync();
-
-        _logger.Success($"[RemoveItemFromBlindBoxAsync] Đã xoá item {itemId} khỏi Blind Box {blindBox.Id}.");
-
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 

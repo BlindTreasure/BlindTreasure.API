@@ -11,10 +11,6 @@ public interface IBlindBoxService
     Task<BlindBoxDetailDto> CreateBlindBoxAsync(CreateBlindBoxDto dto);
     Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemDto> items);
     Task<BlindBoxDetailDto> SubmitBlindBoxAsync(Guid blindBoxId);
-
-    Task<List<BlindBoxDetailDto>> GetPendingApprovalBlindBoxesAsync();
     Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null);
-
-    Task<BlindBoxDetailDto> RemoveItemFromBlindBoxAsync(Guid itemId);
     Task<BlindBoxDetailDto> ClearItemsFromBlindBoxAsync(Guid blindBoxId);
 }
