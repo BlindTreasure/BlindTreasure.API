@@ -142,6 +142,7 @@ public class BlindBoxService : IBlindBoxService
         _logger.Info("[GetAllBlindBoxesAsync] Blind box list loaded from DB.");
         return result;
     }
+
     public async Task<BlindBoxDetailDto> GetBlindBoxByIdAsync(Guid blindBoxId)
     {
         var cacheKey = $"blindbox:{blindBoxId}";
@@ -186,6 +187,7 @@ public class BlindBoxService : IBlindBoxService
         _logger.Info($"[GetBlindBoxByIdAsync] Blind box {blindBoxId} loaded from DB and cached.");
         return result;
     }
+
     public async Task<BlindBoxDetailDto> CreateBlindBoxAsync(CreateBlindBoxDto dto)
     {
         var currentUserId = _claimsService.CurrentUserId;
@@ -251,6 +253,7 @@ public class BlindBoxService : IBlindBoxService
         var mappingResult = _mapperService.Map<BlindBox, BlindBoxDetailDto>(result);
         return mappingResult;
     }
+
     public async Task<BlindBoxDetailDto> UpdateBlindBoxAsync(Guid blindBoxId, UpdateBlindBoxDto dto)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(b => b.Id == blindBoxId && !b.IsDeleted);
@@ -265,25 +268,69 @@ public class BlindBoxService : IBlindBoxService
         if (seller == null)
             throw ErrorHelper.Forbidden("Không có quyền cập nhật Blind Box này.");
 
-        blindBox.Name = dto.Name.Trim();
-        blindBox.Description = dto.Description.Trim();
-        blindBox.Price = dto.Price;
-        blindBox.TotalQuantity = dto.TotalQuantity;
-        blindBox.ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate, DateTimeKind.Utc);
-        blindBox.HasSecretItem = dto.HasSecretItem;
-        blindBox.SecretProbability = dto.SecretProbability;
+        if (!string.IsNullOrWhiteSpace(dto.Name))
+            blindBox.Name = dto.Name.Trim();
+
+        if (!string.IsNullOrWhiteSpace(dto.Description))
+            blindBox.Description = dto.Description.Trim();
+
+        if (dto.Price.HasValue)
+            blindBox.Price = dto.Price.Value;
+
+        if (dto.TotalQuantity.HasValue)
+            blindBox.TotalQuantity = dto.TotalQuantity.Value;
+
+        if (dto.ReleaseDate.HasValue)
+            blindBox.ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate.Value, DateTimeKind.Utc);
+
+        if (dto.HasSecretItem.HasValue)
+            blindBox.HasSecretItem = dto.HasSecretItem.Value;
+
+        if (dto.SecretProbability.HasValue)
+            blindBox.SecretProbability = dto.SecretProbability.Value;
+
         blindBox.UpdatedAt = _time.GetCurrentTime();
         blindBox.UpdatedBy = currentUserId;
 
+        // Upload ảnh mới nếu có
+        if (dto.ImageFile != null)
+        {
+            try
+            {
+                // Xóa ảnh cũ nếu có
+                if (!string.IsNullOrWhiteSpace(blindBox.ImageUrl))
+                {
+                    var oldFileName = Path.GetFileName(new Uri(blindBox.ImageUrl).LocalPath);
+                    _logger.Info($"[UpdateBlindBoxAsync] Deleting old image: {oldFileName}");
+
+                    await _blobService.DeleteFileAsync($"blindbox-thumbnails/{oldFileName}");
+                }
+
+                // Upload ảnh mới
+                var newFileName = $"blindbox-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
+                _logger.Info($"[UpdateBlindBoxAsync] Uploading new image: {newFileName}");
+
+                await _blobService.UploadFileAsync(newFileName, dto.ImageFile.OpenReadStream());
+                blindBox.ImageUrl = await _blobService.GetPreviewUrlAsync(newFileName);
+
+                _logger.Info($"[UpdateBlindBoxAsync] New image uploaded. Preview URL: {blindBox.ImageUrl}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"[UpdateBlindBoxAsync] Upload image failed: {ex.Message}");
+                throw ErrorHelper.Internal("Lỗi khi cập nhật ảnh Blind Box.");
+            }
+        }
+
+
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
-
         await RemoveBlindBoxCacheAsync(blindBoxId);
 
         _logger.Success($"[UpdateBlindBoxAsync] Cập nhật Blind Box {blindBoxId} thành công.");
-
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
+
     public async Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemDto> items)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -578,6 +625,7 @@ public class BlindBoxService : IBlindBoxService
         return result;
     }
 
+    #region private methods
 
     /// <summary>
     ///     1. Danh sách item không được để trống.
@@ -645,4 +693,6 @@ public class BlindBoxService : IBlindBoxService
         await _cacheService.RemoveAsync($"blindbox:{blindBoxId}");
         await _cacheService.RemoveByPatternAsync("blindbox:all");
     }
+
+    #endregion
 }
