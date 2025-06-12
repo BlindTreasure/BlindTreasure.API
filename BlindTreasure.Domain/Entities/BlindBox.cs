@@ -13,7 +13,7 @@ public class BlindBox : BaseEntity
     public int TotalQuantity { get; set; }
 
     public bool HasSecretItem { get; set; }
-    public decimal SecretProbability { get; set; } = 0.05m; // mặc định 5%
+    public int SecretProbability { get; set; }
     public BlindBoxStatus Status { get; set; }
 
     public string ImageUrl { get; set; }

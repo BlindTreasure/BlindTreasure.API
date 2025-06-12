@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
@@ -72,6 +73,17 @@ public class BlindBoxService : IBlindBoxService
         if (param.ReleaseDateTo.HasValue)
             query = query.Where(b => b.ReleaseDate <= param.ReleaseDateTo.Value);
 
+        if (param.HasItem == true)
+        {
+            var boxIdsWithItem = _unitOfWork.BlindBoxItems.GetQueryable()
+                .Where(i => !i.IsDeleted)
+                .Select(i => i.BlindBoxId)
+                .Distinct();
+
+            query = query.Where(b => boxIdsWithItem.Contains(b.Id));
+        }
+
+
         // Sort: UpdatedAt desc, CreatedAt desc
         query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
 
@@ -130,7 +142,6 @@ public class BlindBoxService : IBlindBoxService
         _logger.Info("[GetAllBlindBoxesAsync] Blind box list loaded from DB.");
         return result;
     }
-
     public async Task<BlindBoxDetailDto> GetBlindBoxByIdAsync(Guid blindBoxId)
     {
         var cacheKey = $"blindbox:{blindBoxId}";
@@ -175,7 +186,6 @@ public class BlindBoxService : IBlindBoxService
         _logger.Info($"[GetBlindBoxByIdAsync] Blind box {blindBoxId} loaded from DB and cached.");
         return result;
     }
-
     public async Task<BlindBoxDetailDto> CreateBlindBoxAsync(CreateBlindBoxDto dto)
     {
         var currentUserId = _claimsService.CurrentUserId;
@@ -241,7 +251,39 @@ public class BlindBoxService : IBlindBoxService
         var mappingResult = _mapperService.Map<BlindBox, BlindBoxDetailDto>(result);
         return mappingResult;
     }
+    public async Task<BlindBoxDetailDto> UpdateBlindBoxAsync(Guid blindBoxId, UpdateBlindBoxDto dto)
+    {
+        var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(b => b.Id == blindBoxId && !b.IsDeleted);
 
+        if (blindBox == null)
+            throw ErrorHelper.NotFound("Blind Box không tồn tại.");
+
+        var currentUserId = _claimsService.CurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
+            s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
+
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Không có quyền cập nhật Blind Box này.");
+
+        blindBox.Name = dto.Name.Trim();
+        blindBox.Description = dto.Description.Trim();
+        blindBox.Price = dto.Price;
+        blindBox.TotalQuantity = dto.TotalQuantity;
+        blindBox.ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate, DateTimeKind.Utc);
+        blindBox.HasSecretItem = dto.HasSecretItem;
+        blindBox.SecretProbability = dto.SecretProbability;
+        blindBox.UpdatedAt = _time.GetCurrentTime();
+        blindBox.UpdatedBy = currentUserId;
+
+        await _unitOfWork.BlindBoxes.Update(blindBox);
+        await _unitOfWork.SaveChangesAsync();
+
+        await RemoveBlindBoxCacheAsync(blindBoxId);
+
+        _logger.Success($"[UpdateBlindBoxAsync] Cập nhật Blind Box {blindBoxId} thành công.");
+
+        return await GetBlindBoxByIdAsync(blindBoxId);
+    }
     public async Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemDto> items)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -482,7 +524,7 @@ public class BlindBoxService : IBlindBoxService
 
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
-    
+
     public async Task<BlindBoxDetailDto> DeleteBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -534,7 +576,6 @@ public class BlindBoxService : IBlindBoxService
         }).ToList();
 
         return result;
-        
     }
 
 

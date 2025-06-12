@@ -268,7 +268,7 @@ public class UserService : IUserService
     /// <summary>
     ///     Gets a user by id, optionally using cache.
     /// </summary>
-    private async Task<User?> GetUserById(Guid id, bool useCache = false)
+    public async Task<User?> GetUserById(Guid id, bool useCache = false)
     {
         if (useCache)
         {

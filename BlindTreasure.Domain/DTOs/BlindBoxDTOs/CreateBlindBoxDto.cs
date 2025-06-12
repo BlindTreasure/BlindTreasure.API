@@ -21,5 +21,5 @@ public class CreateBlindBoxDto
 
     [DefaultValue(false)] public bool HasSecretItem { get; set; } = false;
 
-    [DefaultValue(0.05)] public decimal SecretProbability { get; set; } = 0.05m;
+    [DefaultValue(5)] public int SecretProbability { get; set; }
 }
