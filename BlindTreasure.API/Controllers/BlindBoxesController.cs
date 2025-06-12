@@ -106,7 +106,7 @@ public class BlindBoxesController : ControllerBase
     [ProducesResponseType(400)]
     [ProducesResponseType(403)]
     [ProducesResponseType(404)]
-    public async Task<ActionResult<BlindBoxDetailDto>> Update(Guid id, [FromBody] UpdateBlindBoxDto dto)
+    public async Task<ActionResult<BlindBoxDetailDto>> Update(Guid id, [FromForm] UpdateBlindBoxDto dto)
     {
         try
         {
