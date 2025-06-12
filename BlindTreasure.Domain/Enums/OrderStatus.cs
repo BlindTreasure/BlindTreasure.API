@@ -9,7 +9,9 @@ namespace BlindTreasure.Domain.Enums
     public enum OrderStatus
     {
         PENDING,
-        CANCELLED
+        CANCELLED,
+        PAID,
+        FAILED
     }
 
     public enum OrderDetailStatus

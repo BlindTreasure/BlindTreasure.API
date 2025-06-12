@@ -16,7 +16,10 @@ public class UnitOfWork(
     IGenericRepository<ProbabilityConfig> probabilityConfigs,
     IGenericRepository<CartItem> cartitems,
     IGenericRepository<Order> orders,
-    IGenericRepository<OrderDetail> orderDetails)
+    IGenericRepository<OrderDetail> orderDetails,
+    IGenericRepository<Transaction> transactions,
+    IGenericRepository<Payment> payments
+    )
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
@@ -30,6 +33,8 @@ public class UnitOfWork(
     public IGenericRepository<CartItem> CartItems { get; } = cartitems;
     public IGenericRepository<Order> Orders { get; } = orders;
     public IGenericRepository<OrderDetail> OrderDetails { get; } = orderDetails;
+    public IGenericRepository<Transaction> Transactions { get; } = transactions;
+    public IGenericRepository<Payment> Payments { get; } = payments;
 
     public void Dispose()
     {

@@ -23,8 +23,9 @@ namespace BlindTreasure.Application.Services
         private readonly IProductService _productService;
         private readonly IUnitOfWork _unitOfWork;
         private readonly ICartItemService _cartItemService;
+        private readonly IStripeService _stripeService;
 
-        public OrderService(ICacheService cacheService, IClaimsService claimsService, ILoggerService loggerService, IMapperService mapper, IProductService productService, IUnitOfWork unitOfWork, ICartItemService cartItemService)
+        public OrderService(ICacheService cacheService, IClaimsService claimsService, ILoggerService loggerService, IMapperService mapper, IProductService productService, IUnitOfWork unitOfWork, ICartItemService cartItemService, IStripeService stripeService)
         {
             _cacheService = cacheService;
             _claimsService = claimsService;
@@ -33,12 +34,14 @@ namespace BlindTreasure.Application.Services
             _productService = productService;
             _unitOfWork = unitOfWork;
             _cartItemService = cartItemService;
+            _stripeService = stripeService;
         }
 
         /// <summary>
         /// Đặt hàng (checkout) từ giỏ hàng, tạo order và order details, kiểm tra tồn kho, trừ kho, xóa cart.
+        /// Trả về link thanh toán Stripe cho đơn hàng vừa tạo.
         /// </summary>
-        public async Task<OrderDto> CheckoutAsync(CreateOrderDto dto)
+        public async Task<string> CheckoutAsync(CreateOrderDto dto)
         {
             try
             {
@@ -46,15 +49,6 @@ namespace BlindTreasure.Application.Services
                 var cart = await _cartItemService.GetCurrentUserCartAsync();
                 if (cart.Items == null || !cart.Items.Any())
                     throw ErrorHelper.BadRequest("Giỏ hàng trống.");
-
-                //// Kiểm tra địa chỉ giao hàng
-                //Address? address = null;
-                //if (dto.ShippingAddressId != null)
-                //{
-                //    address = await _unitOfWork.Addresses.GetByIdAsync(dto.ShippingAddressId.Value);
-                //    if (address == null || address.UserId != userId)
-                //        throw ErrorHelper.BadRequest("Địa chỉ giao hàng không hợp lệ.");
-                //}
 
                 // Kiểm tra tồn kho và trạng thái sản phẩm/blindbox
                 foreach (var item in cart.Items)
@@ -136,7 +130,10 @@ namespace BlindTreasure.Application.Services
                 await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
 
                 _loggerService.Success($"[CheckoutAsync] Đặt hàng thành công cho user {userId}.");
-                return await GetOrderByIdAsync(order.Id);
+
+                // Gọi StripeService để lấy link thanh toán cho order vừa tạo
+                var paymentUrl = await _stripeService.CreateCheckoutSession(order.Id);
+                return paymentUrl;
             }
             catch (Exception ex)
             {
