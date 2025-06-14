@@ -19,7 +19,8 @@ public class UnitOfWork(
     IGenericRepository<Order> orders,
     IGenericRepository<OrderDetail> orderDetails,
     IGenericRepository<Transaction> transactions,
-    IGenericRepository<Payment> payments
+    IGenericRepository<Payment> payments,
+    IGenericRepository<Address> addresses
     )
     : IUnitOfWork
 {
@@ -37,6 +38,7 @@ public class UnitOfWork(
     public IGenericRepository<OrderDetail> OrderDetails { get; } = orderDetails;
     public IGenericRepository<Transaction> Transactions { get; } = transactions;
     public IGenericRepository<Payment> Payments { get; } = payments;
+    public IGenericRepository<Address> Addresses { get; } = addresses;
 
     public void Dispose()
     {

@@ -14,7 +14,8 @@ public class StripeService : IStripeService
     private readonly IClaimsService _claimsService;
     private readonly IStripeClient _stripeClient;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly string redirectUrl = "";
+    private readonly string succesRedirectUrl = "http://localhost:4040/thankyou";
+    private readonly string failRedirectUrl = "http://localhost:4040/fail";
 
     public StripeService(IUnitOfWork unitOfWork, IStripeClient stripeClient,
         IClaimsService claimsService)
@@ -109,8 +110,8 @@ public class StripeService : IStripeService
             PaymentMethodTypes = new List<string> { "card" },
             LineItems = lineItems,
             Mode = "payment",
-            SuccessUrl = $"{redirectUrl}/payment?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
-            CancelUrl = $"{redirectUrl}/payment?status=cancel&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+            SuccessUrl = $"{succesRedirectUrl}/payment?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+            CancelUrl = $"{failRedirectUrl}/payment?status=cancel&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             ExpiresAt = DateTime.UtcNow.AddMinutes(30),
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
