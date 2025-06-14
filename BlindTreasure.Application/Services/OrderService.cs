@@ -205,7 +205,7 @@ namespace BlindTreasure.Application.Services
             _loggerService.Success($"[CheckoutCore] Đặt hàng thành công cho user {userId}.");
 
             // 7. Gọi StripeService để lấy link thanh toán cho order vừa tạo
-            return await _stripeService.CreateCheckoutSession(order.Id);
+            return await _stripeService.CreateCheckoutSession(order.Id, false);
         }
 
         /// <summary>

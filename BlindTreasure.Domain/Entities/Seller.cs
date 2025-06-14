@@ -15,7 +15,7 @@ public class Seller : BaseEntity
     public string? RejectReason { get; set; }
 
     public SellerStatus Status { get; set; }
-    //public string? StripeAccountId { get; set; }
+    public string? StripeAccountId { get; set; }
 
 
     public User User { get; set; }
