@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Text.Json;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
@@ -49,6 +50,11 @@ public class BlindBoxService : IBlindBoxService
 
         var query = _unitOfWork.BlindBoxes.GetQueryable()
             .Where(b => !b.IsDeleted);
+
+        var cacheKey = BlindBoxCacheKeys.BlindBoxAll(JsonSerializer.Serialize(param));
+        var cached = await _cacheService.GetAsync<Pagination<BlindBoxDetailDto>>(cacheKey);
+        if (cached != null)
+            return cached;
 
         // Filter
         var keyword = param.Search?.Trim().ToLower();
@@ -145,7 +151,7 @@ public class BlindBoxService : IBlindBoxService
 
     public async Task<BlindBoxDetailDto> GetBlindBoxByIdAsync(Guid blindBoxId)
     {
-        var cacheKey = $"blindbox:{blindBoxId}";
+        var cacheKey = BlindBoxCacheKeys.BlindBoxDetail(blindBoxId);
         var cached = await _cacheService.GetAsync<BlindBoxDetailDto>(cacheKey);
         if (cached != null)
         {
@@ -251,6 +257,10 @@ public class BlindBoxService : IBlindBoxService
 
         _logger.Success($"[CreateBlindBoxAsync] Blind box {blindBox.Name} created by user {currentUserId}.");
         var mappingResult = _mapperService.Map<BlindBox, BlindBoxDetailDto>(result);
+
+        await RemoveBlindBoxCacheAsync(blindBox.Id, seller.Id);
+
+
         return mappingResult;
     }
 
@@ -294,7 +304,6 @@ public class BlindBoxService : IBlindBoxService
 
         // Upload ảnh mới nếu có
         if (dto.ImageFile != null)
-        {
             try
             {
                 // Xóa ảnh cũ nếu có
@@ -320,7 +329,6 @@ public class BlindBoxService : IBlindBoxService
                 _logger.Error($"[UpdateBlindBoxAsync] Upload image failed: {ex.Message}");
                 throw ErrorHelper.Internal("Lỗi khi cập nhật ảnh Blind Box.");
             }
-        }
 
 
         await _unitOfWork.BlindBoxes.Update(blindBox);
@@ -402,7 +410,7 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.Products.UpdateRange(products);
         await _unitOfWork.SaveChangesAsync();
 
-        await RemoveBlindBoxCacheAsync(blindBoxId);
+        await RemoveBlindBoxCacheAsync(blindBoxId, seller?.Id);
 
 
         _logger.Success(
@@ -688,10 +696,35 @@ public class BlindBoxService : IBlindBoxService
     /// <summary>
     ///     Xóa cache liên quan đến BlindBox (theo id và theo list).
     /// </summary>
-    private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId)
+    // Trong BlindBoxService.cs:
+    private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId, Guid? sellerId = null)
     {
-        await _cacheService.RemoveAsync($"blindbox:{blindBoxId}");
-        await _cacheService.RemoveByPatternAsync("blindbox:all");
+        await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxDetail(blindBoxId));
+        await _cacheService.RemoveByPatternAsync(BlindBoxCacheKeys.BlindBoxAllPrefix + "*");
+
+        if (sellerId.HasValue)
+            await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxSeller(sellerId.Value));
+    }
+
+
+    public static class BlindBoxCacheKeys
+    {
+        public const string BlindBoxAllPrefix = "blindbox:list:public";
+
+        public static string BlindBoxDetail(Guid id)
+        {
+            return $"blindbox:detail:{id}";
+        }
+
+        public static string BlindBoxSeller(Guid sellerId)
+        {
+            return $"blindbox:list:seller:{sellerId}";
+        }
+
+        public static string BlindBoxAll(string paramJson)
+        {
+            return $"{BlindBoxAllPrefix}:{paramJson}";
+        }
     }
 
     #endregion

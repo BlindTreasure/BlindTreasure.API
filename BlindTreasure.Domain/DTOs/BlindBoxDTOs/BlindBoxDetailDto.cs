@@ -13,7 +13,9 @@ public class BlindBoxDetailDto
     public DateTime ReleaseDate { get; set; }
     public BlindBoxStatus Status { get; set; } // ví dụ: Draft, PendingApproval, Approved...
     public bool HasSecretItem { get; set; }
-    public decimal SecretProbability { get; set; }
+    public int SecretProbability { get; set; }
+    public string? RejectReason { get; set; }
+
     public bool IsDeleted { get; set; }
     public List<BlindBoxItemDto>? Items { get; set; }
 }
