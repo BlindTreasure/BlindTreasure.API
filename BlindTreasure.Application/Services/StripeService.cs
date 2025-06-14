@@ -40,7 +40,7 @@ public class StripeService : IStripeService
     }
 
 
-    public async Task<string> CreateCheckoutSession(Guid orderId)
+    public async Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false)
     {
         // Lấy user hiện tại
         var userId = _claimsService.CurrentUserId;
@@ -60,8 +60,16 @@ public class StripeService : IStripeService
         if (order == null)
             throw ErrorHelper.NotFound("Đơn hàng không tồn tại.");
 
-        if (order.Status != OrderStatus.PENDING.ToString())
-            throw ErrorHelper.BadRequest("Chỉ có thể thanh toán đơn hàng ở trạng thái chờ xử lý.");
+        if (!isRenew)
+        {
+            if (order.Status != OrderStatus.PENDING.ToString())
+                throw ErrorHelper.BadRequest("Chỉ có thể thanh toán đơn hàng ở trạng thái chờ xử lý.");
+        }
+        else
+        {
+            if (order.Status != OrderStatus.EXPIRED.ToString() && order.Status != OrderStatus.COMPLETED.ToString())
+                throw ErrorHelper.BadRequest("Chỉ có thể gia hạn đơn hàng đã hoàn thành hoặc hết hạn.");
+        }
 
 
         // Chuẩn bị line items cho Stripe
@@ -124,7 +132,8 @@ public class StripeService : IStripeService
                     { "orderStatus", order.Status },
                     { "itemCount", order.OrderDetails.Count.ToString() },
                     { "totalAmount", order.TotalAmount.ToString() },
-                    { "currency", "vnd" }
+                    { "currency", "vnd" },
+                    { "isRenew", isRenew.ToString() }
                 }
             }
         };
@@ -159,7 +168,7 @@ public class StripeService : IStripeService
             {
                 // Id sẽ được EF sinh khi SaveChanges
                 Payment = payment,
-                Type = "Checkout",
+                Type = isRenew ? "Renew" : "Checkout",
                 Amount = order.TotalAmount,
                 Currency = "vnd",
                 Status = "Pending",
@@ -180,7 +189,7 @@ public class StripeService : IStripeService
             var transaction = new Transaction
             {
                 Payment = order.Payment,
-                Type = "Checkout",
+                Type = isRenew ? "Renew" : "Checkout",
                 Amount = order.TotalAmount,
                 Currency = "vnd",
                 Status = "Pending",
@@ -199,5 +208,155 @@ public class StripeService : IStripeService
         return session.Url;
 
 
+    }
+
+    // 1. Chuyển tiền payout cho seller (Stripe Connect)
+    public async Task<Transfer> PayoutToSellerAsync(string sellerStripeAccountId, decimal amount, string currency = "usd", string description = "Payout to seller")
+    {
+        var userId = _claimsService.CurrentUserId; // chỗ này là lấy user id của seller là người đang login
+        var user = await _unitOfWork.Users.FirstOrDefaultAsync(user => user.Id == userId) ??
+                     throw ErrorHelper.Forbidden("User is not existing");
+
+        var transferService = new TransferService(_stripeClient);
+        var transferOptions = new TransferCreateOptions
+        {
+            Amount = (long)(amount), // Stripe expects smallest unit (vnd: xu)
+            Currency = currency,
+            Destination = sellerStripeAccountId,
+            Description = description + $" - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}" + "made by user:" +user.FullName,
+        };
+
+        try
+        {
+            var transfer = await transferService.CreateAsync(transferOptions);
+            if (transfer == null)
+                throw ErrorHelper.Internal("Stripe payout failed.");
+            // TODO: Lưu transaction payout vào DB nếu cần
+
+            var transaction = new Transaction
+            {
+                Type = "Payout",
+                Amount = amount,
+                Currency = currency,
+                ExternalRef = transfer.Id,
+                OccurredAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId
+            };
+            await _unitOfWork.Transactions.AddAsync(transaction);
+            await _unitOfWork.SaveChangesAsync();
+
+            return transfer;
+        }
+        catch (StripeException ex)
+        {
+            throw ErrorHelper.BadRequest($"Stripe error: {ex.StripeError?.Message ?? ex.Message}");
+        }
+    }
+
+    // 2. Hoàn lại tiền cho khách (refund)
+    public async Task<Refund> RefundPaymentAsync(string paymentIntentId, decimal amount)
+    {
+        var refundService = new RefundService(_stripeClient);
+        var refundOptions = new RefundCreateOptions
+        {
+            PaymentIntent = paymentIntentId,
+            Amount = (long)(amount), // Stripe expects smallest unit
+        };
+
+        try
+        {
+            var refund = await refundService.CreateAsync(refundOptions);
+            if (refund == null)
+                throw ErrorHelper.Internal("Stripe refund failed.");
+            // TODO: Lưu transaction refund vào DB nếu cần
+            var transaction = new Transaction
+            {
+                Type = "Refund",
+                Amount = amount,
+                Currency = refund.Currency,
+                ExternalRef = refund.Id,
+                OccurredAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = _claimsService.CurrentUserId
+            };
+            await _unitOfWork.Transactions.AddAsync(transaction);
+            await _unitOfWork.SaveChangesAsync();
+            return refund;
+        }
+        catch (StripeException ex)
+        {
+            throw ErrorHelper.BadRequest($"Stripe error: {ex.StripeError?.Message ?? ex.Message}");
+        }
+    }
+
+    // 3. Tạo onboarding link cho seller (Stripe Express)
+    public async Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId, string redirectUrl)
+    {
+        var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId);
+        if (seller == null)
+            throw ErrorHelper.NotFound("Seller không tồn tại.");
+
+        // Nếu chưa có StripeAccountId thì tạo mới
+        if (string.IsNullOrEmpty(seller.StripeAccountId))
+        {
+            var acOptions = new AccountCreateOptions
+            {
+                Country = "VN",
+                Type = "express",
+                Email = seller.User?.Email,
+                Capabilities = new AccountCapabilitiesOptions
+                {
+                    Transfers = new AccountCapabilitiesTransfersOptions { Requested = true },
+                },
+                BusinessType = "individual",
+                BusinessProfile = new AccountBusinessProfileOptions
+                {
+                    Name = seller.CompanyName,
+                    Mcc = "5945", // Toys, Hobby, and Game Shops
+                    ProductDescription = "Marketplace for collectibles",
+                    SupportEmail = seller.User?.Email
+                },
+                TosAcceptance = new AccountTosAcceptanceOptions
+                {
+                    ServiceAgreement = "recipient"
+                }
+            };
+            var accountService = new AccountService(_stripeClient);
+            var account = await accountService.CreateAsync(acOptions);
+
+            seller.StripeAccountId = account.Id;
+            await _unitOfWork.Sellers.Update(seller);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        var linkOptions = new AccountLinkCreateOptions
+        {
+            Account = seller.StripeAccountId,
+            RefreshUrl = $"{redirectUrl}/profile",
+            ReturnUrl = $"{redirectUrl}/profile",
+            Type = "account_onboarding"
+        };
+
+        var linkService = new AccountLinkService(_stripeClient);
+        var accountLink = await linkService.CreateAsync(linkOptions);
+
+        return accountLink.Url;
+    }
+
+    // 4. Kiểm tra seller đã xác minh Stripe account chưa (đủ điều kiện nhận tiền)
+    public async Task<bool> IsSellerStripeAccountVerifiedAsync(string sellerStripeAccountId)
+    {
+        var accountService = new AccountService(_stripeClient);
+        var account = await accountService.GetAsync(sellerStripeAccountId);
+        return account.ChargesEnabled && account.PayoutsEnabled;
+    }
+
+    // 5. Đảo ngược payout (reversal) nếu cần
+    public async Task<TransferReversal> ReversePayoutAsync(string transferId)
+    {
+        var reversalService = new TransferReversalService(_stripeClient);
+        var options = new TransferReversalCreateOptions();
+        return await reversalService.CreateAsync(transferId, options);
     }
 }

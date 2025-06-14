@@ -11,7 +11,9 @@ namespace BlindTreasure.Domain.Enums
         PENDING,
         CANCELLED,
         PAID,
-        FAILED
+        FAILED,
+        COMPLETED,
+        EXPIRED
     }
 
     public enum OrderDetailStatus
