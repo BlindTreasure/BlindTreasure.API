@@ -249,22 +249,6 @@ public class UserService : IUserService
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
     }
 
-
-    // ----------------- PRIVATE HELPER METHODS -----------------
-
-    /// <summary>
-    ///     Checks if a user exists in cache or DB.
-    /// </summary>
-    private async Task<bool> UserExistsAsync(string email)
-    {
-        var cacheKey = $"user:{email}";
-        var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
-        if (cachedUser != null) return true;
-
-        var existingUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
-        return existingUser != null;
-    }
-
     /// <summary>
     ///     Gets a user by id, optionally using cache.
     /// </summary>
@@ -283,5 +267,21 @@ public class UserService : IUserService
         }
 
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id);
+    }
+
+
+    // ----------------- PRIVATE HELPER METHODS -----------------
+
+    /// <summary>
+    ///     Checks if a user exists in cache or DB.
+    /// </summary>
+    private async Task<bool> UserExistsAsync(string email)
+    {
+        var cacheKey = $"user:{email}";
+        var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
+        if (cachedUser != null) return true;
+
+        var existingUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
+        return existingUser != null;
     }
 }

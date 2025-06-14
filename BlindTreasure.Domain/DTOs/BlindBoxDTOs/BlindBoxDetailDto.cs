@@ -11,7 +11,7 @@ public class BlindBoxDetailDto
     public int TotalQuantity { get; set; }
     public string ImageUrl { get; set; }
     public DateTime ReleaseDate { get; set; }
-    public BlindBoxStatus Status { get; set; } // ví dụ: Draft, PendingApproval, Approved...
+    public BlindBoxStatus Status { get; set; } //Draft, PendingApproval, Approved...
     public bool HasSecretItem { get; set; }
     public int SecretProbability { get; set; }
     public string? RejectReason { get; set; }

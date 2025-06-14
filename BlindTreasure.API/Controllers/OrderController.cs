@@ -1,5 +1,4 @@
 ﻿using BlindTreasure.Application.Interfaces;
-using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using Microsoft.AspNetCore.Authorization;
@@ -20,7 +19,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Đặt hàng (checkout) từ giỏ hàng hiện tại.
+    ///     Đặt hàng (checkout) từ giỏ hàng hiện tại.
     /// </summary>
     /// <param name="dto">Thông tin đặt hàng (địa chỉ giao hàng, ...)</param>
     /// <returns>Thông tin đơn hàng vừa tạo</returns>
@@ -43,7 +42,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy chi tiết một đơn hàng của user hiện tại.
+    ///     Lấy chi tiết một đơn hàng của user hiện tại.
     /// </summary>
     /// <param name="orderId">Id đơn hàng</param>
     /// <returns>Chi tiết đơn hàng</returns>
@@ -66,7 +65,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách đơn hàng của user hiện tại.
+    ///     Lấy danh sách đơn hàng của user hiện tại.
     /// </summary>
     /// <returns>Danh sách đơn hàng</returns>
     [HttpGet]
@@ -87,7 +86,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Hủy một đơn hàng (chỉ khi trạng thái cho phép).
+    ///     Hủy một đơn hàng (chỉ khi trạng thái cho phép).
     /// </summary>
     /// <param name="orderId">Id đơn hàng</param>
     [HttpPut("{orderId}/cancel")]
@@ -109,7 +108,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Xóa mềm một đơn hàng (user chỉ xóa được đơn của mình).
+    ///     Xóa mềm một đơn hàng (user chỉ xóa được đơn của mình).
     /// </summary>
     /// <param name="orderId">Id đơn hàng</param>
     [HttpDelete("{orderId}")]

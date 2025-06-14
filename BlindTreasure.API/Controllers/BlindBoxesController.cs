@@ -99,7 +99,7 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
+
     [HttpPut("{id}")]
     [Authorize(Roles = "Seller")]
     [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
@@ -120,7 +120,6 @@ public class BlindBoxesController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
 
 
     /// <summary>
@@ -226,7 +225,7 @@ public class BlindBoxesController : ControllerBase
     }
 
     /// <summary>
-    /// [Seller] Xoá Blind Box (soft delete)
+    ///     [Seller] Xoá Blind Box (soft delete)
     /// </summary>
     [HttpDelete("{id}")]
     [Authorize(Roles = "Seller")]
