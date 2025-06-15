@@ -131,6 +131,7 @@ public class BlindBoxService : IBlindBoxService
         var dtos = items.Select(b =>
         {
             var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(b);
+            dto.StockStatus = b.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
             dto.Items = b.BlindBoxItems.Select(item => new BlindBoxItemDto
             {
                 ProductId = item.ProductId,
@@ -179,6 +180,7 @@ public class BlindBoxService : IBlindBoxService
         blindBox.BlindBoxItems = items;
 
         var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
+        result.StockStatus = blindBox.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
         result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
         {
             ProductId = item.ProductId,
