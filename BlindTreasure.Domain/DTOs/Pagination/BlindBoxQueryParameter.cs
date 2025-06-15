@@ -11,7 +11,6 @@ public class BlindBoxQueryParameter : PaginationParameter
     public decimal? MaxPrice { get; set; }
     public DateTime? ReleaseDateFrom { get; set; }
     public DateTime? ReleaseDateTo { get; set; }
-    
-    public bool? HasItem { get; set; }
 
+    public bool? HasItem { get; set; }
 }

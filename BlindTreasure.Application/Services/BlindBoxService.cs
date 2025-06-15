@@ -267,14 +267,12 @@ public class BlindBoxService : IBlindBoxService
     public async Task<BlindBoxDetailDto> UpdateBlindBoxAsync(Guid blindBoxId, UpdateBlindBoxDto dto)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(b => b.Id == blindBoxId && !b.IsDeleted);
-
         if (blindBox == null)
             throw ErrorHelper.NotFound("Blind Box không tồn tại.");
 
         var currentUserId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
             s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
-
         if (seller == null)
             throw ErrorHelper.Forbidden("Không có quyền cập nhật Blind Box này.");
 
@@ -302,34 +300,23 @@ public class BlindBoxService : IBlindBoxService
         blindBox.UpdatedAt = _time.GetCurrentTime();
         blindBox.UpdatedBy = currentUserId;
 
-        // Upload ảnh mới nếu có
         if (dto.ImageFile != null)
+        {
             try
             {
-                // Xóa ảnh cũ nếu có
-                if (!string.IsNullOrWhiteSpace(blindBox.ImageUrl))
-                {
-                    var oldFileName = Path.GetFileName(new Uri(blindBox.ImageUrl).LocalPath);
-                    _logger.Info($"[UpdateBlindBoxAsync] Deleting old image: {oldFileName}");
-
-                    await _blobService.DeleteFileAsync($"blindbox-thumbnails/{oldFileName}");
-                }
-
-                // Upload ảnh mới
-                var newFileName = $"blindbox-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
-                _logger.Info($"[UpdateBlindBoxAsync] Uploading new image: {newFileName}");
-
-                await _blobService.UploadFileAsync(newFileName, dto.ImageFile.OpenReadStream());
-                blindBox.ImageUrl = await _blobService.GetPreviewUrlAsync(newFileName);
-
-                _logger.Info($"[UpdateBlindBoxAsync] New image uploaded. Preview URL: {blindBox.ImageUrl}");
+                blindBox.ImageUrl = await _blobService.ReplaceImageAsync(
+                    dto.ImageFile.OpenReadStream(),
+                    dto.ImageFile.FileName,
+                    blindBox.ImageUrl,
+                    "blindbox-thumbnails"
+                );
             }
             catch (Exception ex)
             {
-                _logger.Error($"[UpdateBlindBoxAsync] Upload image failed: {ex.Message}");
+                _logger.Error($"[UpdateBlindBoxAsync] ReplaceImageAsync failed: {ex.Message}");
                 throw ErrorHelper.Internal("Lỗi khi cập nhật ảnh Blind Box.");
             }
-
+        }
 
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
