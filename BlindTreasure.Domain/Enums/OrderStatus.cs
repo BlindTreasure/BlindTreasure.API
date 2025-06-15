@@ -1,15 +1,26 @@
-﻿namespace BlindTreasure.Domain.Enums;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-public enum OrderStatus
+namespace BlindTreasure.Domain.Enums
 {
-    PENDING,
-    CANCELLED
-}
+    public enum OrderStatus
+    {
+        PENDING,
+        CANCELLED,
+        PAID,
+        FAILED,
+        COMPLETED,
+        EXPIRED
+    }
 
-public enum OrderDetailStatus
-{
-    PENDING,
-    SHIPPED,
-    DELIVERED,
-    CANCELLED
+    public enum OrderDetailStatus
+    {
+        PENDING,
+        SHIPPED,
+        DELIVERED,
+        CANCELLED
+    }
 }
