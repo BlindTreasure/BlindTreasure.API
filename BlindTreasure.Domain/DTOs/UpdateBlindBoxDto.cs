@@ -11,6 +11,9 @@ public class UpdateBlindBoxDto
     [DefaultValue(100000)] public decimal? Price { get; set; }
 
     [DefaultValue(100)] public int? TotalQuantity { get; set; }
+    
+    [DefaultValue("Bandai")]
+    public required string Brand { get; set; }
 
     [DefaultValue(typeof(DateTime), "2025-07-01T00:00:00")]
     public DateTime? ReleaseDate { get; set; }

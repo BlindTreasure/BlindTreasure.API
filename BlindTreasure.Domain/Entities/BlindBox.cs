@@ -11,7 +11,7 @@ public class BlindBox : BaseEntity
     public string Description { get; set; }
     public decimal Price { get; set; }
     public int TotalQuantity { get; set; }
-
+    public string Brand { get; set; }
     public bool HasSecretItem { get; set; }
     public int SecretProbability { get; set; }
     public BlindBoxStatus Status { get; set; }

@@ -131,6 +131,7 @@ public class BlindBoxService : IBlindBoxService
         var dtos = items.Select(b =>
         {
             var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(b);
+            dto.StockStatus = b.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
             dto.Items = b.BlindBoxItems.Select(item => new BlindBoxItemDto
             {
                 ProductId = item.ProductId,
@@ -179,6 +180,7 @@ public class BlindBoxService : IBlindBoxService
         blindBox.BlindBoxItems = items;
 
         var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
+        result.StockStatus = blindBox.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
         result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
         {
             ProductId = item.ProductId,
@@ -211,6 +213,9 @@ public class BlindBoxService : IBlindBoxService
         if (dto.TotalQuantity <= 0)
             throw ErrorHelper.BadRequest("Tổng số lượng phải lớn hơn 0.");
 
+        if (string.IsNullOrWhiteSpace(dto.Brand))
+            throw ErrorHelper.BadRequest("Brand Blind Box là bắt buộc.");
+        
         if (dto.ReleaseDate == default)
             throw ErrorHelper.BadRequest("Ngày phát hành không hợp lệ.");
 
@@ -242,6 +247,7 @@ public class BlindBoxService : IBlindBoxService
             Name = dto.Name.Trim(),
             Price = dto.Price,
             TotalQuantity = dto.TotalQuantity,
+            Brand = dto.Brand,
             Description = dto.Description.Trim(),
             ImageUrl = imageUrl,
             ReleaseDate = releaseDateUtc,
@@ -287,6 +293,9 @@ public class BlindBoxService : IBlindBoxService
 
         if (dto.TotalQuantity.HasValue)
             blindBox.TotalQuantity = dto.TotalQuantity.Value;
+        
+        if (!string.IsNullOrWhiteSpace(dto.Brand))
+            blindBox.Brand = dto.Brand.Trim();
 
         if (dto.ReleaseDate.HasValue)
             blindBox.ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate.Value, DateTimeKind.Utc);

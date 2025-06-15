@@ -48,6 +48,24 @@ public class CategoryController : ControllerBase
         }
     }
 
+    [HttpGet("with-products")]
+    [ProducesResponseType(typeof(ApiResult<List<CategoryWithProductsDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetCategoriesWithProducts()
+    {
+        try
+        {
+            var result = await _categoryService.GetCategoriesWithAllProductsAsync();
+            return Ok(ApiResult<List<CategoryWithProductsDto>>.Success(result, "200",
+                "Lấy danh sách danh mục kèm sản phẩm thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
     /// <summary>
     ///     Lấy thông tin chi tiết một danh mục theo Id.
     /// </summary>

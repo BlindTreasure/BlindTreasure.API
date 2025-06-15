@@ -21,10 +21,12 @@ public class CategoryServiceTests
     private readonly Mock<ILoggerService> _loggerMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IUserService> _userServiceMock;
+    private readonly Mock<IMapperService> _mapperMock;
 
-    public CategoryServiceTests(Mock<IBlobService> blobServiceMock)
+    public CategoryServiceTests(Mock<IBlobService> blobServiceMock, Mock<IMapperService> mapperMock)
     {
         _blobServiceMock = blobServiceMock;
+        _mapperMock = mapperMock;
         _cacheServiceMock = new Mock<ICacheService>();
         _claimsServiceMock = new Mock<IClaimsService>();
         _loggerMock = new Mock<ILoggerService>();
@@ -40,7 +42,8 @@ public class CategoryServiceTests
             _cacheServiceMock.Object,
             _claimsServiceMock.Object,
             _userServiceMock.Object,
-            _blobServiceMock.Object
+            _blobServiceMock.Object,
+            _mapperMock.Object
         );
     }
 
