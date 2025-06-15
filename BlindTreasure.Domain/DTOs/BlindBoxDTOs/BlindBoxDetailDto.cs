@@ -9,6 +9,7 @@ public class BlindBoxDetailDto
     public string Description { get; set; }
     public decimal Price { get; set; }
     public int TotalQuantity { get; set; }
+    public string Brand { get; set; }
     public string ImageUrl { get; set; }
     public DateTime ReleaseDate { get; set; }
     public BlindBoxStatus Status { get; set; } //Draft, PendingApproval, Approved...
