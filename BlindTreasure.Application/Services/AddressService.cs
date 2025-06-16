@@ -30,18 +30,13 @@ namespace BlindTreasure.Application.Services
         public async Task<List<AddressDto>> GetCurrentUserAddressesAsync()
         {
             var userId = _claimsService.CurrentUserId;
-            var cacheKey = $"address:user:{userId}";
-            var cached = await _cacheService.GetAsync<List<Address>>(cacheKey);
-            if (cached != null)
-            {
-                _logger.Info($"[GetCurrentUserAddressesAsync] Cache hit for user {userId}");
-                return cached.Select(ToAddressDto).ToList();
-            }
-
             var addresses = await _unitOfWork.Addresses.GetAllAsync(a => a.UserId == userId && !a.IsDeleted);
-            await _cacheService.SetAsync(cacheKey, addresses, TimeSpan.FromHours(1));
-            _logger.Info($"[GetCurrentUserAddressesAsync] Loaded from DB and cached for user {userId}");
-            return addresses.Select(ToAddressDto).ToList();
+            // Sắp xếp: IsDefault=true lên đầu, còn lại sort theo UpdatedAt (nếu có) rồi CreatedAt giảm dần
+            var sorted = addresses
+                .OrderByDescending(a => a.IsDefault)
+                .ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt)
+                .ToList(); _logger.Info($"[GetCurrentUserAddressesAsync] Loaded from DB and cached for user {userId}");
+            return sorted.Select(ToAddressDto).ToList();
         }
 
         public async Task<AddressDto> GetByIdAsync(Guid id)
@@ -86,8 +81,8 @@ namespace BlindTreasure.Application.Services
                 City = dto.City,
                 Province = dto.Province,
                 PostalCode = dto.PostalCode,
+                IsDefault = dto.IsDefault,
                 //Country = dto.Country,
-                IsDefault = isFirstAddress ? true : false
             };
 
             if (!isFirstAddress && dto.IsDefault)
@@ -101,9 +96,15 @@ namespace BlindTreasure.Application.Services
                 }
 
             }
+            else
+            {
+                // Set this address as default if it's the first one or if IsDefault is true
+                address.IsDefault = isFirstAddress;
+            }
 
 
-            await _unitOfWork.Addresses.AddAsync(address);
+
+                await _unitOfWork.Addresses.AddAsync(address);
             await _unitOfWork.SaveChangesAsync();
 
             await RemoveAddressCacheAsync(userId, address.Id);

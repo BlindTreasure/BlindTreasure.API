@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 
 namespace BlindTreasure.Application.Services;
@@ -71,24 +72,24 @@ public class CartItemService : ICartItemService
         if (dto.ProductId == null && dto.BlindBoxId == null)
             throw ErrorHelper.BadRequest("Phải chọn sản phẩm hoặc blind box.");
 
-        // Kiểm tra tồn tại và lấy giá
-        decimal unitPrice;
-        if (dto.ProductId.HasValue)
-        {
-            var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId.Value);
-            if (product == null || product.IsDeleted)
-                throw ErrorHelper.NotFound("Sản phẩm không tồn tại.");
-            if (product.Stock < dto.Quantity)
-                throw ErrorHelper.BadRequest("Sản phẩm không đủ tồn kho.");
-            unitPrice = product.Price;
-        }
-        else
-        {
-            var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(dto.BlindBoxId.Value);
-            if (blindBox == null || blindBox.IsDeleted)
-                throw ErrorHelper.NotFound("Blind box không tồn tại.");
-            unitPrice = blindBox.Price;
-        }
+            // Kiểm tra tồn tại và lấy giá
+            decimal unitPrice;
+            if (dto.ProductId.HasValue)
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId.Value);
+                if (product == null || product.IsDeleted)
+                    throw ErrorHelper.NotFound("Sản phẩm không tồn tại.");
+                if (product.Stock < dto.Quantity)
+                    throw ErrorHelper.BadRequest("Sản phẩm không đủ tồn kho.");
+                unitPrice = product.Price;
+            }
+            else
+            {
+                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(dto.BlindBoxId.Value);
+                if (blindBox == null || blindBox.IsDeleted || blindBox.Status == BlindBoxStatus.Rejected)
+                    throw ErrorHelper.NotFound("Blind box không tồn tại hoặc đã bị rejected.");
+                unitPrice = blindBox.Price;
+            }
 
         // Kiểm tra đã có trong cart chưa
         var existed = await _unitOfWork.CartItems.FirstOrDefaultAsync(c => c.UserId == userId
