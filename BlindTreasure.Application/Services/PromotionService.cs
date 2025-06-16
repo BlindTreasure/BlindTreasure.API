@@ -10,11 +10,11 @@ namespace BlindTreasure.Application.Services;
 
 public class PromotionService : IPromotionService
 {
-    private readonly ILoggerService _loggerService;
     private readonly IClaimsService _claimsService;
-    private readonly IUserService _userService;
+    private readonly ILoggerService _loggerService;
     private readonly IMapperService _mapperService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IUserService _userService;
 
     public PromotionService(IUnitOfWork unitOfWork, ILoggerService loggerService, IMapperService mapperService,
         IClaimsService claimsService, IUserService userService)
@@ -26,10 +26,16 @@ public class PromotionService : IPromotionService
         _userService = userService;
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="dto"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
     public async Task<PromotionDto> CreatePromotionAsync(CreatePromotionDto dto)
     {
         var currentUserId = _claimsService.CurrentUserId;
-        var user = await _userService.GetUserById(currentUserId, useCache: true);
+        var user = await _userService.GetUserById(currentUserId, true);
 
         if (user == null)
         {
@@ -52,6 +58,9 @@ public class PromotionService : IPromotionService
 
         return _mapperService.Map<Promotion, PromotionDto>(promotion);
     }
+
+
+    #region private methods
 
     private async Task<Promotion> SetPromotionDataAsync(CreatePromotionDto dto, User user)
     {
@@ -108,9 +117,9 @@ public class PromotionService : IPromotionService
                 (p.Status == PromotionStatus.Pending || p.Status == PromotionStatus.Approved));
 
             if (count >= 3)
-            {
                 throw ErrorHelper.BadRequest("Bạn chỉ được tạo tối đa 3 voucher đang chờ duyệt hoặc đã duyệt.");
-            }
         }
     }
+
+    #endregion
 }

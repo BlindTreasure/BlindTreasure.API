@@ -1,23 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace BlindTreasure.Domain.DTOs.CartItemDTOs;
 
-namespace BlindTreasure.Domain.DTOs.CartItemDTOs
+public class CartItemDto
 {
-    public class CartItemDto
-    {
-        public Guid Id { get; set; }
-        public Guid? ProductId { get; set; }
-        public string? ProductName { get; set; }
-        public List<string>? ProductImages { get; set; }
-        public Guid? BlindBoxId { get; set; }
-        public string? BlindBoxName { get; set; }
-        public string? BlindBoxImage { get; set; }
-        public int Quantity { get; set; }
-        public decimal UnitPrice { get; set; }
-        public decimal TotalPrice { get; set; } 
-        public DateTime CreatedAt { get; set; }
-    }
+    public Guid Id { get; set; }
+    public Guid? ProductId { get; set; }
+    public string? ProductName { get; set; }
+    public List<string>? ProductImages { get; set; }
+    public Guid? BlindBoxId { get; set; }
+    public string? BlindBoxName { get; set; }
+    public string? BlindBoxImage { get; set; }
+    public int Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal TotalPrice { get; set; }
+    public DateTime CreatedAt { get; set; }
 }

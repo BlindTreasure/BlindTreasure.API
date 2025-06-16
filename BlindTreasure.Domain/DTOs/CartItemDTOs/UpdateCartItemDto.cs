@@ -1,14 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace BlindTreasure.Domain.DTOs.CartItemDTOs;
 
-namespace BlindTreasure.Domain.DTOs.CartItemDTOs
+public class UpdateCartItemDto
 {
-    public class UpdateCartItemDto
-    {
-        public Guid CartItemId { get; set; }
-        public int Quantity { get; set; }
-    }
+    public Guid CartItemId { get; set; }
+    public int Quantity { get; set; }
 }

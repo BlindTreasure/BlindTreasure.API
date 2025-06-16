@@ -131,6 +131,7 @@ public class BlindBoxService : IBlindBoxService
         var dtos = items.Select(b =>
         {
             var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(b);
+            dto.StockStatus = b.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
             dto.Items = b.BlindBoxItems.Select(item => new BlindBoxItemDto
             {
                 ProductId = item.ProductId,
@@ -179,6 +180,7 @@ public class BlindBoxService : IBlindBoxService
         blindBox.BlindBoxItems = items;
 
         var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
+        result.StockStatus = blindBox.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
         result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
         {
             ProductId = item.ProductId,
@@ -211,6 +213,9 @@ public class BlindBoxService : IBlindBoxService
         if (dto.TotalQuantity <= 0)
             throw ErrorHelper.BadRequest("Tổng số lượng phải lớn hơn 0.");
 
+        if (string.IsNullOrWhiteSpace(dto.Brand))
+            throw ErrorHelper.BadRequest("Brand Blind Box là bắt buộc.");
+        
         if (dto.ReleaseDate == default)
             throw ErrorHelper.BadRequest("Ngày phát hành không hợp lệ.");
 
@@ -242,6 +247,7 @@ public class BlindBoxService : IBlindBoxService
             Name = dto.Name.Trim(),
             Price = dto.Price,
             TotalQuantity = dto.TotalQuantity,
+            Brand = dto.Brand,
             Description = dto.Description.Trim(),
             ImageUrl = imageUrl,
             ReleaseDate = releaseDateUtc,
@@ -267,14 +273,12 @@ public class BlindBoxService : IBlindBoxService
     public async Task<BlindBoxDetailDto> UpdateBlindBoxAsync(Guid blindBoxId, UpdateBlindBoxDto dto)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(b => b.Id == blindBoxId && !b.IsDeleted);
-
         if (blindBox == null)
             throw ErrorHelper.NotFound("Blind Box không tồn tại.");
 
         var currentUserId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
             s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
-
         if (seller == null)
             throw ErrorHelper.Forbidden("Không có quyền cập nhật Blind Box này.");
 
@@ -289,6 +293,9 @@ public class BlindBoxService : IBlindBoxService
 
         if (dto.TotalQuantity.HasValue)
             blindBox.TotalQuantity = dto.TotalQuantity.Value;
+        
+        if (!string.IsNullOrWhiteSpace(dto.Brand))
+            blindBox.Brand = dto.Brand.Trim();
 
         if (dto.ReleaseDate.HasValue)
             blindBox.ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate.Value, DateTimeKind.Utc);
@@ -302,34 +309,23 @@ public class BlindBoxService : IBlindBoxService
         blindBox.UpdatedAt = _time.GetCurrentTime();
         blindBox.UpdatedBy = currentUserId;
 
-        // Upload ảnh mới nếu có
         if (dto.ImageFile != null)
+        {
             try
             {
-                // Xóa ảnh cũ nếu có
-                if (!string.IsNullOrWhiteSpace(blindBox.ImageUrl))
-                {
-                    var oldFileName = Path.GetFileName(new Uri(blindBox.ImageUrl).LocalPath);
-                    _logger.Info($"[UpdateBlindBoxAsync] Deleting old image: {oldFileName}");
-
-                    await _blobService.DeleteFileAsync($"blindbox-thumbnails/{oldFileName}");
-                }
-
-                // Upload ảnh mới
-                var newFileName = $"blindbox-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
-                _logger.Info($"[UpdateBlindBoxAsync] Uploading new image: {newFileName}");
-
-                await _blobService.UploadFileAsync(newFileName, dto.ImageFile.OpenReadStream());
-                blindBox.ImageUrl = await _blobService.GetPreviewUrlAsync(newFileName);
-
-                _logger.Info($"[UpdateBlindBoxAsync] New image uploaded. Preview URL: {blindBox.ImageUrl}");
+                blindBox.ImageUrl = await _blobService.ReplaceImageAsync(
+                    dto.ImageFile.OpenReadStream(),
+                    dto.ImageFile.FileName,
+                    blindBox.ImageUrl,
+                    "blindbox-thumbnails"
+                );
             }
             catch (Exception ex)
             {
-                _logger.Error($"[UpdateBlindBoxAsync] Upload image failed: {ex.Message}");
+                _logger.Error($"[UpdateBlindBoxAsync] ReplaceImageAsync failed: {ex.Message}");
                 throw ErrorHelper.Internal("Lỗi khi cập nhật ảnh Blind Box.");
             }
-
+        }
 
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();

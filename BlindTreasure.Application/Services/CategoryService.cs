@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CategoryDtos;
 using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
@@ -19,13 +20,14 @@ public class CategoryService : ICategoryService
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserService _userService;
+    private readonly IMapperService _mapper;
 
     public CategoryService(
         IUnitOfWork unitOfWork,
         ILoggerService logger,
         ICacheService cacheService,
         IClaimsService claimsService,
-        IUserService userService, IBlobService blobService)
+        IUserService userService, IBlobService blobService, IMapperService mapper)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -33,6 +35,7 @@ public class CategoryService : ICategoryService
         _claimsService = claimsService;
         _userService = userService;
         _blobService = blobService;
+        _mapper = mapper;
     }
 
     public async Task<CategoryDto?> GetByIdAsync(Guid id)
@@ -61,7 +64,6 @@ public class CategoryService : ICategoryService
         _logger.Info($"[GetByIdAsync] Category {id} loaded from DB and cached.");
         return ToCategoryDto(category);
     }
-
 
     public async Task<Pagination<CategoryDto>> GetAllAsync(CategoryQueryParameter param)
     {
@@ -101,6 +103,38 @@ public class CategoryService : ICategoryService
         return result;
     }
 
+    public async Task<List<CategoryWithProductsDto>> GetCategoriesWithAllProductsAsync()
+    {
+        // Lấy tất cả category cấp cha
+        var parentCategories = await _unitOfWork.Categories.GetQueryable()
+            .Where(c => !c.IsDeleted && c.ParentId == null)
+            .Include(c => c.Children.Where(ch => !ch.IsDeleted))
+            .ThenInclude(ch => ch.Products.Where(p => !p.IsDeleted))
+            .Include(c => c.Products.Where(p => !p.IsDeleted))
+            .AsNoTracking()
+            .ToListAsync();
+
+        var result = parentCategories.Select(parent =>
+        {
+            var childProducts = parent.Children
+                .SelectMany(ch => ch.Products)
+                .Where(p => !p.IsDeleted)
+                .ToList();
+
+            var allProducts = parent.Products.Concat(childProducts).ToList();
+
+            return new CategoryWithProductsDto
+            {
+                Id = parent.Id,
+                Name = parent.Name,
+                Products = allProducts.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList(),
+                ProductCount = allProducts.Count
+            };
+
+        }).ToList();
+
+        return result;
+    }
 
     public async Task<CategoryDto> CreateAsync(CategoryCreateDto dto)
     {

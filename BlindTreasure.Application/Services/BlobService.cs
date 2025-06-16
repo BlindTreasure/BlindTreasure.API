@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Utils;
 using Minio;
 using Minio.DataModel.Args;
 using Minio.Exceptions;
@@ -150,6 +151,44 @@ public class BlobService : IBlobService
         }
     }
 
+    public async Task<string> ReplaceImageAsync(Stream newImageStream, string originalFileName, string? oldImageUrl, string containerPrefix)
+    {
+        try
+        {
+            // Xóa ảnh cũ nếu có
+            if (!string.IsNullOrWhiteSpace(oldImageUrl))
+            {
+                try
+                {
+                    var oldFileName = Path.GetFileName(new Uri(oldImageUrl).LocalPath);
+                    var fullOldPath = $"{containerPrefix}/{oldFileName}";
+                    await DeleteFileAsync(fullOldPath);
+                    _logger.Info($"[ReplaceImageAsync] Deleted old image: {fullOldPath}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"[ReplaceImageAsync] Failed to delete old image: {ex.Message}");
+                }
+            }
+
+            // Upload ảnh mới
+            var newFileName = $"{containerPrefix}/{Guid.NewGuid()}{Path.GetExtension(originalFileName)}";
+            _logger.Info($"[ReplaceImageAsync] Uploading new image: {newFileName}");
+
+            await UploadFileAsync(newFileName, newImageStream);
+
+            var previewUrl = await GetPreviewUrlAsync(newFileName);
+            _logger.Success($"[ReplaceImageAsync] Uploaded and generated preview URL: {previewUrl}");
+            return previewUrl;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[ReplaceImageAsync] Error occurred: {ex.Message}");
+            throw ErrorHelper.Internal("Lỗi khi xử lý ảnh.");
+        }
+    }
+
+    
     private string GetContentType(string fileName)
     {
         _logger.Info($"Determining content type for file: {fileName}");
