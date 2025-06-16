@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -90,8 +91,8 @@ namespace BlindTreasure.Application.Services
             else
             {
                 var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(dto.BlindBoxId.Value);
-                if (blindBox == null || blindBox.IsDeleted)
-                    throw ErrorHelper.NotFound("Blind box không tồn tại.");
+                if (blindBox == null || blindBox.IsDeleted || blindBox.Status == BlindBoxStatus.Rejected)
+                    throw ErrorHelper.NotFound("Blind box không tồn tại hoặc đã bị rejected.");
                 unitPrice = blindBox.Price;
             }
 

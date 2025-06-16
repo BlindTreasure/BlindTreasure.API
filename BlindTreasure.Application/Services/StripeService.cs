@@ -106,7 +106,7 @@ public class StripeService : IStripeService
                                                   $"Price: {unitPrice} VND\n" +
                                                   $"Time: {item.CreatedAt}" ,
                     },
-                    UnitAmount = (long)(unitPrice * 100), // Stripe expects amount in cents
+                    UnitAmount = (long)(unitPrice), // Stripe expects amount in cents
                 },
                 Quantity = item.Quantity
             });
