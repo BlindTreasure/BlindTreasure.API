@@ -143,28 +143,30 @@ public class StripeController : ControllerBase
         }
 
         _logger.Info($"[Stripe][Webhook] Nhận event: {stripeEvent.Type}");
-        var session = stripeEvent.Data.Object as Session ?? throw ErrorHelper.NotFound("Stripe session not found.");
         try
         {
-
             switch (stripeEvent.Type)
             {
                 case "checkout.session.expired":
-                    _logger.Warn("[Stripe][Webhook] Checkout session expired.");
-                    await HandleExpiredCheckoutSession(session);
+                    var expiredSession = stripeEvent.Data.Object as Session
+                        ?? throw ErrorHelper.NotFound("Stripe session not found.");
+                    _logger.Warn("[Stripe][Webhook] Checkout session expired, Session ID: " + expiredSession.Id);
+                    await HandleExpiredCheckoutSession(expiredSession);
                     break;
 
                 case "checkout.session.completed":
-                    _logger.Info("[Stripe][Webhook] Thanh toán thành công.");
-                    await HandleSuccessfulPayment(session);
-                    _logger.Info("[Stripe][Webhook] Payment Intent created, Id: " + session.PaymentIntentId);
-                    await HandlePaymentIntentCreatedSession(session);
+                    var completedSession = stripeEvent.Data.Object as Session
+                        ?? throw ErrorHelper.NotFound("Stripe session not found.");
+                    _logger.Info("[Stripe][Webhook] Thanh toán thành công, Session ID: " + completedSession.Id);
+                    await HandleSuccessfulPayment(completedSession);
+                    await HandlePaymentIntentCreatedSession(completedSession);
                     break;
 
                 default:
-                    _logger.Warn($"[Stripe][Webhook] Unhandled event type: {stripeEvent.Type}");
+                    _logger.Warn($"[Stripe][Webhook] Bỏ qua event không xử lý: {stripeEvent.Type}");
                     break;
             }
+
             return Ok();
         }
         catch (StripeException ex)
