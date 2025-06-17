@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250617070552_addRejectReason")]
-    partial class addRejectReason
+    [Migration("20250617162149_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

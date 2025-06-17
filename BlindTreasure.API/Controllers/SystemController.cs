@@ -35,7 +35,7 @@ public class SystemController : ControllerBase
             await SeedRolesAndUsers();
 
             await SeedCategories();
-            await SeedProducts();
+            await SeedProductsAndBlindBoxes();
             return Ok(ApiResult<object>.Success(new
             {
                 Message = "Data seeded successfully."
@@ -221,7 +221,7 @@ public class SystemController : ControllerBase
         _logger.Success("[SeedCategories] Seed danh mục thành công.");
     }
 
-    private async Task SeedProducts()
+    private async Task SeedProductsAndBlindBoxes()
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
         if (sellerUser == null)
@@ -350,9 +350,7 @@ public class SystemController : ControllerBase
                             CreatedAt = now,
                             ImageUrls = new List<string>
                             {
-                                //image 1
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Vinyl%20Plush%20Dinosaur%20M%C3%A0u%20Xanh%20L%C3%A1%2Fbup-be-baby-three-v3-vinyl-plush-dinosaur-mau-xanh-la-66f4e3b343e26-26092024113147.png&version_id=null",
-                                //image 2
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Vinyl%20Plush%20Dinosaur%20M%C3%A0u%20Xanh%20L%C3%A1%2Fbup-be-baby-three-v3-vinyl-plush-dinosaur-mau-xanh-la-66f4e3b346bef-26092024113147.png&version_id=null"
                             },
                             Brand = "Baby Three",
@@ -384,249 +382,104 @@ public class SystemController : ControllerBase
                     });
                     break;
 
-                // case "Marvel":
-                //     products.AddRange(new[]
-                //     {
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Marvel Iron Man Figure",
-                //             Description = "Mô hình Iron Man chi tiết cao, thích hợp sưu tập.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 1200000,
-                //             Stock = 15,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/marvel1.jpg" },
-                //             Brand = "Marvel",
-                //             Material = "PVC",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = 18
-                //         },
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Marvel Spider-Man Statue",
-                //             Description = "Tượng Spider-Man phiên bản đặc biệt, giới hạn.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 1100000,
-                //             Stock = 20,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/marvel2.jpg" },
-                //             Brand = "Marvel",
-                //             Material = "Resin",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = 20
-                //         },
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Marvel Captain America Figure",
-                //             Description = "Mô hình Captain America, hàng chính hãng Marvel.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 1300000,
-                //             Stock = 10,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/marvel3.jpg" },
-                //             Brand = "Marvel",
-                //             Material = "PVC",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = 17
-                //         }
-                //     });
-                //     break;
-                //
-                // case "Gundam":
-                //     products.AddRange(new[]
-                //     {
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Gundam RX-78-2 Model",
-                //             Description = "Mô hình Gundam RX-78-2 chi tiết, lắp ráp được.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 900000,
-                //             Stock = 30,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/gundam1.jpg" },
-                //             Brand = "Bandai",
-                //             Material = "Plastic",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = 25
-                //         },
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Gundam Wing Zero Custom",
-                //             Description = "Mô hình Gundam Wing Zero phiên bản tùy chỉnh.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 1200000,
-                //             Stock = 20,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/gundam2.jpg" },
-                //             Brand = "Bandai",
-                //             Material = "Plastic",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = 28
-                //         },
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Gundam Strike Rouge",
-                //             Description = "Mô hình Gundam Strike Rouge chính hãng.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 1000000,
-                //             Stock = 15,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/gundam3.jpg" },
-                //             Brand = "Bandai",
-                //             Material = "Plastic",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = 27
-                //         }
-                //     });
-                //     break;
-                //
-                // case "Adidas":
-                //     products.AddRange(new[]
-                //     {
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Adidas Ultraboost 22",
-                //             Description = "Giày Adidas Ultraboost phiên bản 2022, thoáng khí và êm ái.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 4500000,
-                //             Stock = 40,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/adidas1.jpg" },
-                //             Brand = "Adidas",
-                //             Material = "Synthetic",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = null
-                //         },
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Adidas Superstar",
-                //             Description = "Giày Adidas Superstar cổ điển, phong cách thời trang.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 3200000,
-                //             Stock = 30,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/adidas2.jpg" },
-                //             Brand = "Adidas",
-                //             Material = "Leather",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = null
-                //         },
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Adidas NMD R1",
-                //             Description = "Giày Adidas NMD R1 với thiết kế hiện đại và thoải mái.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 4000000,
-                //             Stock = 20,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/adidas3.jpg" },
-                //             Brand = "Adidas",
-                //             Material = "Synthetic",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = null
-                //         }
-                //     });
-                //     break;
-                //
-                // case "Nike":
-                //     products.AddRange(new[]
-                //     {
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Nike Air Max 270",
-                //             Description = "Giày Nike Air Max 270 phiên bản thể thao, êm ái.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 5000000,
-                //             Stock = 35,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/nike1.jpg" },
-                //             Brand = "Nike",
-                //             Material = "Synthetic",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = null
-                //         },
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Nike Dunk Low",
-                //             Description = "Giày Nike Dunk Low phong cách cổ điển.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 3500000,
-                //             Stock = 25,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/nike2.jpg" },
-                //             Brand = "Nike",
-                //             Material = "Leather",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = null
-                //         },
-                //         new Product
-                //         {
-                //             Id = Guid.NewGuid(),
-                //             Name = "Nike React Infinity Run",
-                //             Description = "Giày Nike React với công nghệ giảm chấn tối ưu.",
-                //             CategoryId = category.Id,
-                //             SellerId = seller.Id,
-                //             Price = 4800000,
-                //             Stock = 20,
-                //             Status = ProductStatus.Active,
-                //             CreatedAt = now,
-                //             ImageUrls = new List<string> { "https://example.com/nike3.jpg" },
-                //             Brand = "Nike",
-                //             Material = "Synthetic",
-                //             ProductType = ProductSaleType.DirectSale,
-                //             Height = null
-                //         }
-                //     });
-                //     break;
-
                 default:
                     _logger.Warn($"Chưa có dữ liệu mẫu cho category {category.Name}, bỏ qua tạo sản phẩm.");
                     break;
             }
 
-        if (products.Count > 0)
-        {
-            await _context.Products.AddRangeAsync(products);
-            await _context.SaveChangesAsync();
-            _logger.Success("[SeedProducts] Seed sản phẩm chuẩn thành công.");
-        }
-        else
+        if (products.Count == 0)
         {
             _logger.Warn("[SeedProducts] Không có sản phẩm nào được tạo do không có category con phù hợp.");
+            return;
         }
+
+        await _context.Products.AddRangeAsync(products);
+        await _context.SaveChangesAsync();
+        _logger.Success("[SeedProducts] Seed sản phẩm chuẩn thành công.");
+
+        // === Seed BlindBox ===
+
+        var popmartProducts = products.Where(p => p.Brand == "PopMart").ToList();
+        if (popmartProducts.Count == 0)
+        {
+            _logger.Warn("[SeedProducts] Không có sản phẩm PopMart để tạo blind box.");
+            return;
+        }
+
+        var blindBoxes = new List<BlindBox>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                SellerId = seller.Id,
+                Name = "PopMart Mini Series Vol.1",
+                Description = "Hộp blindbox nhỏ gồm các mô hình dễ thương từ PopMart.",
+                Price = 299000,
+                TotalQuantity = 50,
+                Brand = "PopMart",
+                HasSecretItem = true,
+                SecretProbability = 10,
+                Status = BlindBoxStatus.Approved,
+                ImageUrl =
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindboxes%2Fpopmart_series1.png",
+                ReleaseDate = now,
+                CreatedAt = now
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                SellerId = seller.Id,
+                Name = "PopMart Collector Edition Vol.2",
+                Description = "Blindbox PopMart cao cấp, nhiều item hiếm.",
+                Price = 499000,
+                TotalQuantity = 100,
+                Brand = "PopMart",
+                HasSecretItem = true,
+                SecretProbability = 10,
+                Status = BlindBoxStatus.Approved,
+                ImageUrl =
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindboxes%2Fpopmart_series2.png",
+                ReleaseDate = now,
+                CreatedAt = now
+            }
+        };
+
+        // === Seed BlindBoxItems ===
+        var blindBoxItems = new List<BlindBoxItem>();
+        var random = new Random();
+
+        foreach (var box in blindBoxes)
+        {
+            var selectedProducts = Enumerable.Range(0, 6)
+                .Select(_ => popmartProducts[random.Next(popmartProducts.Count)])
+                .ToList();
+
+            var secretIndex = random.Next(6);
+            const decimal secretDropRate = 10m;
+            var commonDropRate = Math.Round((100m - secretDropRate) / 5, 2);
+
+            for (var j = 0; j < 6; j++)
+            {
+                var product = selectedProducts[j];
+                blindBoxItems.Add(new BlindBoxItem
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxId = box.Id,
+                    ProductId = product.Id,
+                    Quantity = 20,
+                    DropRate = j == secretIndex ? secretDropRate : commonDropRate,
+                    Rarity = j == secretIndex ? BlindBoxRarity.Secret : BlindBoxRarity.Common,
+                    IsActive = true,
+                    CreatedAt = now
+                });
+            }
+        }
+
+        await _context.BlindBoxes.AddRangeAsync(blindBoxes);
+        await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
+        await _context.SaveChangesAsync();
+
+        _logger.Success("[SeedProducts] Seed 2 blindbox PopMart thành công.");
     }
 
     #endregion
