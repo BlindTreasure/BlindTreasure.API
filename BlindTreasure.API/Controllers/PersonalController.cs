@@ -14,12 +14,13 @@ namespace BlindTreasure.API.Controllers;
 [ApiController]
 public class PersonalController : ControllerBase
 {
+    private readonly IAddressService _addressService;
     private readonly IClaimsService _claimsService;
     private readonly ISellerService _sellerService;
     private readonly IUserService _userService;
-    private readonly IAddressService _addressService;
 
-    public PersonalController(IClaimsService claimsService, IUserService userService, ISellerService sellerService, IAddressService addressService)
+    public PersonalController(IClaimsService claimsService, IUserService userService, ISellerService sellerService,
+        IAddressService addressService)
     {
         _claimsService = claimsService;
         _userService = userService;
@@ -145,7 +146,7 @@ public class PersonalController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách địa chỉ của user hiện tại.
+    ///     Lấy danh sách địa chỉ của user hiện tại.
     /// </summary>
     [Authorize]
     [HttpGet("addresses")]
@@ -166,7 +167,7 @@ public class PersonalController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy chi tiết một địa chỉ theo id.
+    ///     Lấy chi tiết một địa chỉ theo id.
     /// </summary>
     [Authorize]
     [HttpGet("addresses/{id}")]
@@ -188,7 +189,8 @@ public class PersonalController : ControllerBase
     }
 
     /// <summary>
-    /// Thêm mới địa chỉ cho user hiện tại. Không cần truyền field IsDefault hoặc muốn có thể tự truyền true tùy vào mục đích
+    ///     Thêm mới địa chỉ cho user hiện tại. Không cần truyền field IsDefault hoặc muốn có thể tự truyền true tùy vào mục
+    ///     đích
     /// </summary>
     [Authorize]
     [HttpPost("addresses")]
@@ -210,7 +212,7 @@ public class PersonalController : ControllerBase
     }
 
     /// <summary>
-    /// Cập nhật địa chỉ theo id.
+    ///     Cập nhật địa chỉ theo id.
     /// </summary>
     [Authorize]
     [HttpPut("addresses/{id}")]
@@ -232,7 +234,7 @@ public class PersonalController : ControllerBase
     }
 
     /// <summary>
-    /// Xóa địa chỉ theo id.
+    ///     Xóa địa chỉ theo id.
     /// </summary>
     [Authorize]
     [HttpDelete("addresses/{id}")]
@@ -256,7 +258,7 @@ public class PersonalController : ControllerBase
     }
 
     /// <summary>
-    /// Đặt một địa chỉ là mặc định.
+    ///     Đặt một địa chỉ là mặc định.
     /// </summary>
     [Authorize]
     [HttpPut("addresses/{id}/default")]

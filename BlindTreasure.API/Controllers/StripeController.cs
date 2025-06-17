@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Text;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CartItemDTOs;
@@ -9,27 +10,31 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stripe;
 using Stripe.Checkout;
-using System.Text;
 
 namespace BlindTreasure.API.Controllers;
 
 /// <summary>
-/// Stripe payment, payout, refund, and account management APIs for BlindTreasure marketplace.
+///     Stripe payment, payout, refund, and account management APIs for BlindTreasure marketplace.
 /// </summary>
 [Route("api/stripe")]
 [ApiController]
 public class StripeController : ControllerBase
 {
+    private const string
+        LocalStripeSecret =
+            "whsec_1922024ed268f46c73bfac2bd2bab31e490189a882ec21e458c387b0f8ed8b13"; // Use Environment Variables in Production
+
+    private const string
+        DeployStripeSecret = "whsec_uWjfI4fkQ7zbwE8VrWMcu2Ysyqm8heUh"; // Use Environment Variables in Production
+
     private readonly IClaimsService _claimService;
-    private readonly IUserService _userService;
-    private readonly ISellerService _sellerService;
-    private readonly IStripeService _stripeService;
     private readonly ILoggerService _logger;
-    private readonly IStripeClient _stripeClient;
-    private const string LocalStripeSecret = "whsec_1922024ed268f46c73bfac2bd2bab31e490189a882ec21e458c387b0f8ed8b13"; // Use Environment Variables in Production
-    private const string DeployStripeSecret = "whsec_uWjfI4fkQ7zbwE8VrWMcu2Ysyqm8heUh"; // Use Environment Variables in Production
     private readonly IOrderService _orderService;
+    private readonly ISellerService _sellerService;
+    private readonly IStripeClient _stripeClient;
+    private readonly IStripeService _stripeService;
     private readonly ITransactionService _transactionService;
+    private readonly IUserService _userService;
 
     public StripeController(
         ISellerService sellerService,
@@ -52,7 +57,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo đơn hàng và trả về link thanh toán Stripe cho đơn hàng từ cart truyền lên từ client.
+    ///     Tạo đơn hàng và trả về link thanh toán Stripe cho đơn hàng từ cart truyền lên từ client.
     /// </summary>
     /// <param name="cart">Thông tin cart từ FE (danh sách sản phẩm, số lượng, giá...)</param>
     /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
@@ -66,7 +71,8 @@ public class StripeController : ControllerBase
         {
             var paymentUrl = await _orderService.CheckoutFromClientCartAsync(cart);
             _logger.Success("[Stripe][CheckoutDirect] Đặt hàng thành công, trả về link thanh toán.");
-            return Ok(ApiResult<string>.Success(paymentUrl, "200", "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
+            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+                "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)
         {
@@ -78,7 +84,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Tạo đơn hàng từ giỏ hàng hiện tại và trả về link thanh toán Stripe.
+    ///     Tạo đơn hàng từ giỏ hàng hiện tại và trả về link thanh toán Stripe.
     /// </summary>
     /// <param name="dto">Thông tin đặt hàng (địa chỉ giao hàng, ...)</param>
     /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
@@ -92,7 +98,8 @@ public class StripeController : ControllerBase
         {
             var paymentUrl = await _orderService.CheckoutAsync(dto);
             _logger.Success("[Stripe][Checkout] Đặt hàng thành công, trả về link thanh toán.");
-            return Ok(ApiResult<string>.Success(paymentUrl, "200", "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
+            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+                "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)
         {
@@ -104,7 +111,8 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Stripe webhook callback: xử lý sự kiện thanh toán từ Stripe (checkout.session.completed, checkout.session.expired, ...).
+    ///     Stripe webhook callback: xử lý sự kiện thanh toán từ Stripe (checkout.session.completed, checkout.session.expired,
+    ///     ...).
     /// </summary>
     [HttpPost("checkout-callback-handler")]
     public async Task<IActionResult> HandleChechoutWebhook()
@@ -112,11 +120,10 @@ public class StripeController : ControllerBase
         _logger.Info("[Stripe][Webhook] Nhận sự kiện webhook từ Stripe.");
         var json = await new StreamReader(Request.Body, Encoding.UTF8).ReadToEndAsync();
 
-        Stripe.Event? stripeEvent = null;
+        Event? stripeEvent = null;
         Exception? lastEx = null;
 
         foreach (var secret in new[] { LocalStripeSecret, DeployStripeSecret })
-        {
             try
             {
                 stripeEvent = EventUtility.ConstructEvent(
@@ -132,7 +139,6 @@ public class StripeController : ControllerBase
                 lastEx = ex;
                 _logger.Warn($"[Stripe][Webhook] Sai secret thử: {secret.Substring(0, 12)}... - {ex.Message}");
             }
-        }
 
         if (stripeEvent == null)
         {
@@ -149,14 +155,14 @@ public class StripeController : ControllerBase
             {
                 case "checkout.session.expired":
                     var expiredSession = stripeEvent.Data.Object as Session
-                        ?? throw ErrorHelper.NotFound("Stripe session not found.");
+                                         ?? throw ErrorHelper.NotFound("Stripe session not found.");
                     _logger.Warn("[Stripe][Webhook] Checkout session expired, Session ID: " + expiredSession.Id);
                     await HandleExpiredCheckoutSession(expiredSession);
                     break;
 
                 case "checkout.session.completed":
                     var completedSession = stripeEvent.Data.Object as Session
-                        ?? throw ErrorHelper.NotFound("Stripe session not found.");
+                                           ?? throw ErrorHelper.NotFound("Stripe session not found.");
                     _logger.Info("[Stripe][Webhook] Thanh toán thành công, Session ID: " + completedSession.Id);
                     await HandleSuccessfulPayment(completedSession);
                     await HandlePaymentIntentCreatedSession(completedSession);
@@ -186,7 +192,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy onboarding link Stripe Express cho seller để hoàn tất xác minh tài khoản Stripe.
+    ///     Lấy onboarding link Stripe Express cho seller để hoàn tất xác minh tài khoản Stripe.
     /// </summary>
     /// <param name="redirectUrl">URL chuyển hướng sau khi seller hoàn thành onboarding (tùy chọn)</param>
     /// <returns>Onboarding link Stripe Express</returns>
@@ -205,7 +211,8 @@ public class StripeController : ControllerBase
                 return NotFound(ApiResult<object>.Failure("Seller not found."));
             }
 
-            var url = await _stripeService.GenerateSellerOnboardingLinkAsync(seller.SellerId, redirectUrl ?? "http://localhost:4040");
+            var url = await _stripeService.GenerateSellerOnboardingLinkAsync(seller.SellerId,
+                redirectUrl ?? "http://localhost:4040");
             _logger.Success("[Stripe][OnboardingLink] Onboarding link generated.");
             return Ok(ApiResult<string>.Success(url, "200", "Onboarding link generated."));
         }
@@ -217,7 +224,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy login link Stripe Express cho seller để đăng nhập vào dashboard Stripe.
+    ///     Lấy login link Stripe Express cho seller để đăng nhập vào dashboard Stripe.
     /// </summary>
     [HttpGet("login-link")]
     [Authorize(Roles = "Seller,Admin,Staff")]
@@ -238,7 +245,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Thực hiện payout chuyển tiền cho seller (Stripe Connect). Chỉ cho phép Admin/Staff.
+    ///     Thực hiện payout chuyển tiền cho seller (Stripe Connect). Chỉ cho phép Admin/Staff.
     /// </summary>
     /// <param name="dto">Thông tin payout (StripeAccountId, số tiền, currency, mô tả)</param>
     /// <returns>Thông tin Stripe Transfer</returns>
@@ -246,10 +253,12 @@ public class StripeController : ControllerBase
     [Authorize(Roles = "Admin,Staff")]
     public async Task<IActionResult> PayoutToSeller([FromBody] PayoutRequestDto dto)
     {
-        _logger.Info($"[Stripe][Payout] Thực hiện payout cho seller: {dto.SellerStripeAccountId}, amount: {dto.Amount} {dto.Currency}");
+        _logger.Info(
+            $"[Stripe][Payout] Thực hiện payout cho seller: {dto.SellerStripeAccountId}, amount: {dto.Amount} {dto.Currency}");
         try
         {
-            var transfer = await _stripeService.PayoutToSellerAsync(dto.SellerStripeAccountId, dto.Amount, dto.Currency, dto.Description);
+            var transfer = await _stripeService.PayoutToSellerAsync(dto.SellerStripeAccountId, dto.Amount, dto.Currency,
+                dto.Description);
             _logger.Success("[Stripe][Payout] Payout thành công.");
             return Ok(ApiResult<object>.Success(transfer, "200", "Payout successful."));
         }
@@ -261,7 +270,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Hoàn tiền cho khách hàng (Stripe Refund). Chỉ cho phép Admin/Staff.
+    ///     Hoàn tiền cho khách hàng (Stripe Refund). Chỉ cho phép Admin/Staff.
     /// </summary>
     /// <param name="dto">Thông tin refund (PaymentIntentId, số tiền)</param>
     /// <returns>Thông tin Stripe Refund</returns>
@@ -269,7 +278,8 @@ public class StripeController : ControllerBase
     [Authorize(Roles = "Admin,Staff")]
     public async Task<IActionResult> RefundPayment([FromBody] RefundRequestDto dto)
     {
-        _logger.Info($"[Stripe][Refund] Thực hiện refund cho paymentIntent: {dto.PaymentIntentId}, amount: {dto.Amount}");
+        _logger.Info(
+            $"[Stripe][Refund] Thực hiện refund cho paymentIntent: {dto.PaymentIntentId}, amount: {dto.Amount}");
         try
         {
             var refund = await _stripeService.RefundPaymentAsync(dto.PaymentIntentId, dto.Amount);
@@ -284,7 +294,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Đảo ngược payout (Stripe Transfer Reversal). Chỉ cho phép Admin/Staff.
+    ///     Đảo ngược payout (Stripe Transfer Reversal). Chỉ cho phép Admin/Staff.
     /// </summary>
     /// <param name="dto">Thông tin reversal (TransferId)</param>
     /// <returns>Thông tin Stripe TransferReversal</returns>
@@ -307,7 +317,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Kiểm tra trạng thái xác minh Stripe account của seller (đủ điều kiện nhận tiền hay chưa).
+    ///     Kiểm tra trạng thái xác minh Stripe account của seller (đủ điều kiện nhận tiền hay chưa).
     /// </summary>
     /// <param name="sellerStripeAccountId">Stripe Account Id của seller</param>
     /// <returns>True nếu đã xác minh, false nếu chưa</returns>
@@ -330,23 +340,21 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Stripe webhook callback: xử lý sự kiện refund từ Stripe (charge.refunded, refund.updated, refund.failed).
+    ///     Stripe webhook callback: xử lý sự kiện refund từ Stripe (charge.refunded, refund.updated, refund.failed).
     /// </summary>
     [HttpPost("refund-callback-handler")]
     public async Task<IActionResult> HandleRefundWebhook()
     {
-
         _logger.Info("[Stripe][Webhook] Nhận sự kiện webhook từ Stripe.");
         var json = await new StreamReader(Request.Body, Encoding.UTF8).ReadToEndAsync();
 
         // Fallback 2 secret: local và deploy
         var localSecret = "whsec_1922024ed268f46c73bfac2bd2bab31e490189a882ec21e458c387b0f8ed8b13";
         var deploySecret = "whsec_uWjfI4fkQ7zbwE8VrWMcu2Ysyqm8heUh";
-        Stripe.Event? stripeEvent = null;
+        Event? stripeEvent = null;
         Exception? lastEx = null;
 
         foreach (var secret in new[] { localSecret, deploySecret })
-        {
             try
             {
                 stripeEvent = EventUtility.ConstructEvent(
@@ -362,7 +370,6 @@ public class StripeController : ControllerBase
                 lastEx = ex;
                 _logger.Warn($"[Stripe][Webhook] Sai secret thử: {secret.Substring(0, 12)}... - {ex.Message}");
             }
-        }
 
         if (stripeEvent == null)
         {
@@ -377,7 +384,6 @@ public class StripeController : ControllerBase
 
         try
         {
-
             switch (stripeEvent.Type)
             {
                 case "charge.refunded":
@@ -387,7 +393,8 @@ public class StripeController : ControllerBase
                     return Ok("refund successfully");
                 case "refund.updated":
                     var refundUpdated = stripeEvent.Data.Object as Refund;
-                    _logger.Info($"[Stripe][RefundWebhook] Refund {refundUpdated?.Id} updated: {refundUpdated?.Status}");
+                    _logger.Info(
+                        $"[Stripe][RefundWebhook] Refund {refundUpdated?.Id} updated: {refundUpdated?.Status}");
                     break;
                 case "refund.failed":
                     var refundFailed = stripeEvent.Data.Object as Refund;
@@ -397,6 +404,7 @@ public class StripeController : ControllerBase
                     _logger.Warn($"[Stripe][RefundWebhook] Unhandled event type: {stripeEvent.Type}");
                     break;
             }
+
             return Ok();
         }
         catch (StripeException e)
@@ -409,13 +417,13 @@ public class StripeController : ControllerBase
     #region Private Handlers
 
     /// <summary>
-    /// Xử lý khi thanh toán thành công từ Stripe webhook.
+    ///     Xử lý khi thanh toán thành công từ Stripe webhook.
     /// </summary>
     private async Task HandleSuccessfulPayment(Session session)
     {
         try
         {
-            string orderId = session.Metadata != null && session.Metadata.TryGetValue("orderId", out var orderIdStr)
+            var orderId = session.Metadata != null && session.Metadata.TryGetValue("orderId", out var orderIdStr)
                 ? orderIdStr
                 : null;
 
@@ -424,7 +432,8 @@ public class StripeController : ControllerBase
 
             if (!string.IsNullOrEmpty(orderId))
             {
-                _logger.Success($"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {session.Id}");
+                _logger.Success(
+                    $"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {session.Id}");
                 await _transactionService.HandleSuccessfulPaymentAsync(session.Id, orderId);
             }
             else
@@ -443,7 +452,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Xử lý khi checkout session hết hạn.
+    ///     Xử lý khi checkout session hết hạn.
     /// </summary>
     private async Task HandleExpiredCheckoutSession(Session session)
     {
@@ -452,7 +461,7 @@ public class StripeController : ControllerBase
     }
 
     /// <summary>
-    /// Xử lý khi Stripe tạo PaymentIntent (sau khi thanh toán thành công).
+    ///     Xử lý khi Stripe tạo PaymentIntent (sau khi thanh toán thành công).
     /// </summary>
     private async Task HandlePaymentIntentCreatedSession(Session session)
     {
@@ -460,7 +469,8 @@ public class StripeController : ControllerBase
         {
             if (!string.IsNullOrEmpty(session.PaymentIntentId))
             {
-                _logger.Info($"[Stripe][Webhook] PaymentIntent created: {session.PaymentIntentId}, sessionId: {session.Id}");
+                _logger.Info(
+                    $"[Stripe][Webhook] PaymentIntent created: {session.PaymentIntentId}, sessionId: {session.Id}");
                 await _transactionService.HandlePaymentIntentCreatedAsync(session.PaymentIntentId, session.Id);
             }
         }

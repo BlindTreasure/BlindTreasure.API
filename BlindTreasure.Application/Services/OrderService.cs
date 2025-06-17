@@ -9,42 +9,42 @@ using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
-namespace BlindTreasure.Application.Services
-{
-    /// <summary>
-    /// OrderService xử lý toàn bộ luồng đặt hàng, checkout, truy vấn đơn hàng.
-    /// Đã refactor để loại bỏ duplicate code, tách logic nghiệp vụ dùng chung, tuân thủ SOLID.
-    /// </summary>
-    public class OrderService : IOrderService
-    {
-        private readonly ICacheService _cacheService;
-        private readonly IClaimsService _claimsService;
-        private readonly ILoggerService _loggerService;
-        private readonly IMapperService _mapper;
-        private readonly IProductService _productService;
-        private readonly IUnitOfWork _unitOfWork;
-        private readonly ICartItemService _cartItemService;
-        private readonly IStripeService _stripeService;
+namespace BlindTreasure.Application.Services;
 
-        public OrderService(
-            ICacheService cacheService,
-            IClaimsService claimsService,
-            ILoggerService loggerService,
-            IMapperService mapper,
-            IProductService productService,
-            IUnitOfWork unitOfWork,
-            ICartItemService cartItemService,
-            IStripeService stripeService)
-        {
-            _cacheService = cacheService;
-            _claimsService = claimsService;
-            _loggerService = loggerService;
-            _mapper = mapper;
-            _productService = productService;
-            _unitOfWork = unitOfWork;
-            _cartItemService = cartItemService;
-            _stripeService = stripeService;
-        }
+/// <summary>
+///     OrderService xử lý toàn bộ luồng đặt hàng, checkout, truy vấn đơn hàng.
+///     Đã refactor để loại bỏ duplicate code, tách logic nghiệp vụ dùng chung, tuân thủ SOLID.
+/// </summary>
+public class OrderService : IOrderService
+{
+    private readonly ICacheService _cacheService;
+    private readonly ICartItemService _cartItemService;
+    private readonly IClaimsService _claimsService;
+    private readonly ILoggerService _loggerService;
+    private readonly IMapperService _mapper;
+    private readonly IProductService _productService;
+    private readonly IStripeService _stripeService;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public OrderService(
+        ICacheService cacheService,
+        IClaimsService claimsService,
+        ILoggerService loggerService,
+        IMapperService mapper,
+        IProductService productService,
+        IUnitOfWork unitOfWork,
+        ICartItemService cartItemService,
+        IStripeService stripeService)
+    {
+        _cacheService = cacheService;
+        _claimsService = claimsService;
+        _loggerService = loggerService;
+        _mapper = mapper;
+        _productService = productService;
+        _unitOfWork = unitOfWork;
+        _cartItemService = cartItemService;
+        _stripeService = stripeService;
+    }
 
         /// <summary>
         /// Đặt hàng (checkout) từ giỏ hàng hệ thống, trả về link thanh toán Stripe.
@@ -243,18 +243,18 @@ namespace BlindTreasure.Application.Services
                 .OrderByDescending(o => o.PlacedAt)
                 .FirstOrDefaultAsync();
 
-            if (order == null)
-            {
-                _loggerService.Warn($"[GetOrderByIdAsync] Đơn hàng {orderId} không tồn tại.");
-                throw ErrorHelper.NotFound("Đơn hàng không tồn tại.");
-            }
+        if (order == null)
+        {
+            _loggerService.Warn($"[GetOrderByIdAsync] Đơn hàng {orderId} không tồn tại.");
+            throw ErrorHelper.NotFound("Đơn hàng không tồn tại.");
+        }
 
             var dto = OrderDtoMapper.ToOrderDto(order);
 
-            await _cacheService.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(10));
-            _loggerService.Info($"[GetOrderByIdAsync] Order {orderId} loaded from DB and cached.");
-            return dto;
-        }
+        await _cacheService.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(10));
+        _loggerService.Info($"[GetOrderByIdAsync] Order {orderId} loaded from DB and cached.");
+        return dto;
+    }
 
         /// <summary>
         /// Lấy danh sách đơn hàng của user hiện tại.
@@ -281,80 +281,81 @@ namespace BlindTreasure.Application.Services
             return dtos;
         }
 
-        /// <summary>
-        /// Hủy đơn hàng (chỉ khi trạng thái cho phép), trả lại tồn kho.
-        /// </summary>
-        public async Task CancelOrderAsync(Guid orderId)
+    /// <summary>
+    ///     Hủy đơn hàng (chỉ khi trạng thái cho phép), trả lại tồn kho.
+    /// </summary>
+    public async Task CancelOrderAsync(Guid orderId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var order = await _unitOfWork.Orders.GetByIdAsync(orderId, o => o.OrderDetails);
+        if (order == null || order.IsDeleted || order.UserId != userId)
         {
-            var userId = _claimsService.CurrentUserId;
-            var order = await _unitOfWork.Orders.GetByIdAsync(orderId, o => o.OrderDetails);
-            if (order == null || order.IsDeleted || order.UserId != userId)
-            {
-                _loggerService.Warn($"[CancelOrderAsync] Đơn hàng {orderId} không tồn tại hoặc không thuộc user.");
-                throw ErrorHelper.NotFound("Đơn hàng không tồn tại.");
-            }
-
-            if (order.Status != OrderStatus.PENDING.ToString())
-            {
-                _loggerService.Warn($"[CancelOrderAsync] Đơn hàng {orderId} không ở trạng thái PENDING.");
-                throw ErrorHelper.BadRequest("Chỉ có thể hủy đơn hàng ở trạng thái chờ xử lý.");
-            }
-
-            order.Status = OrderStatus.CANCELLED.ToString();
-            order.UpdatedAt = DateTime.UtcNow;
-
-            // Trả lại tồn kho nếu là product hoặc blindbox
-            foreach (var od in order.OrderDetails)
-            {
-                if (od.ProductId.HasValue)
-                {
-                    var product = await _unitOfWork.Products.GetByIdAsync(od.ProductId.Value);
-                    product.Stock += od.Quantity;
-                    await _unitOfWork.Products.Update(product);
-                }
-                else if (od.BlindBoxId.HasValue)
-                {
-                    var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(od.BlindBoxId.Value);
-                    blindBox.TotalQuantity += od.Quantity;
-                    await _unitOfWork.BlindBoxes.Update(blindBox);
-                }
-                od.Status = OrderDetailStatus.CANCELLED.ToString();
-            }
-
-            await _unitOfWork.Orders.Update(order);
-            await _unitOfWork.SaveChangesAsync();
-
-            // Xóa cache liên quan
-            await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
-            _loggerService.Info($"[CancelOrderAsync] Đã xóa cache order:user:{userId}:* sau khi hủy đơn hàng.");
-
-            _loggerService.Success($"[CancelOrderAsync] Đã hủy đơn hàng {orderId}.");
+            _loggerService.Warn($"[CancelOrderAsync] Đơn hàng {orderId} không tồn tại hoặc không thuộc user.");
+            throw ErrorHelper.NotFound("Đơn hàng không tồn tại.");
         }
 
-        /// <summary>
-        /// Xóa mềm đơn hàng (chỉ cho phép user xóa đơn của mình).
-        /// </summary>
-        public async Task DeleteOrderAsync(Guid orderId)
+        if (order.Status != OrderStatus.PENDING.ToString())
         {
-            var userId = _claimsService.CurrentUserId;
-            var order = await _unitOfWork.Orders.GetByIdAsync(orderId);
-            if (order == null || order.IsDeleted || order.UserId != userId)
+            _loggerService.Warn($"[CancelOrderAsync] Đơn hàng {orderId} không ở trạng thái PENDING.");
+            throw ErrorHelper.BadRequest("Chỉ có thể hủy đơn hàng ở trạng thái chờ xử lý.");
+        }
+
+        order.Status = OrderStatus.CANCELLED.ToString();
+        order.UpdatedAt = DateTime.UtcNow;
+
+        // Trả lại tồn kho nếu là product hoặc blindbox
+        foreach (var od in order.OrderDetails)
+        {
+            if (od.ProductId.HasValue)
             {
-                _loggerService.Warn($"[DeleteOrderAsync] Đơn hàng {orderId} không tồn tại hoặc không thuộc user.");
-                throw ErrorHelper.NotFound("Đơn hàng không tồn tại.");
+                var product = await _unitOfWork.Products.GetByIdAsync(od.ProductId.Value);
+                product.Stock += od.Quantity;
+                await _unitOfWork.Products.Update(product);
+            }
+            else if (od.BlindBoxId.HasValue)
+            {
+                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(od.BlindBoxId.Value);
+                blindBox.TotalQuantity += od.Quantity;
+                await _unitOfWork.BlindBoxes.Update(blindBox);
             }
 
-            order.IsDeleted = true;
-            order.DeletedAt = DateTime.UtcNow;
-            await _unitOfWork.Orders.Update(order);
-            await _unitOfWork.SaveChangesAsync();
-
-            // Xóa cache liên quan
-            await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
-            _loggerService.Info($"[DeleteOrderAsync] Đã xóa cache order:user:{userId}:* sau khi xóa đơn hàng.");
-
-            _loggerService.Success($"[DeleteOrderAsync] Đã xóa đơn hàng {orderId}.");
+            od.Status = OrderDetailStatus.CANCELLED.ToString();
         }
+
+        await _unitOfWork.Orders.Update(order);
+        await _unitOfWork.SaveChangesAsync();
+
+        // Xóa cache liên quan
+        await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
+        _loggerService.Info($"[CancelOrderAsync] Đã xóa cache order:user:{userId}:* sau khi hủy đơn hàng.");
+
+        _loggerService.Success($"[CancelOrderAsync] Đã hủy đơn hàng {orderId}.");
+    }
+
+    /// <summary>
+    ///     Xóa mềm đơn hàng (chỉ cho phép user xóa đơn của mình).
+    /// </summary>
+    public async Task DeleteOrderAsync(Guid orderId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var order = await _unitOfWork.Orders.GetByIdAsync(orderId);
+        if (order == null || order.IsDeleted || order.UserId != userId)
+        {
+            _loggerService.Warn($"[DeleteOrderAsync] Đơn hàng {orderId} không tồn tại hoặc không thuộc user.");
+            throw ErrorHelper.NotFound("Đơn hàng không tồn tại.");
+        }
+
+        order.IsDeleted = true;
+        order.DeletedAt = DateTime.UtcNow;
+        await _unitOfWork.Orders.Update(order);
+        await _unitOfWork.SaveChangesAsync();
+
+        // Xóa cache liên quan
+        await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
+        _loggerService.Info($"[DeleteOrderAsync] Đã xóa cache order:user:{userId}:* sau khi xóa đơn hàng.");
+
+        _loggerService.Success($"[DeleteOrderAsync] Đã xóa đơn hàng {orderId}.");
+    }
 
 
 

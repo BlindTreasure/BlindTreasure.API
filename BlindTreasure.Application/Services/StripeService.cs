@@ -14,8 +14,8 @@ public class StripeService : IStripeService
     private readonly IClaimsService _claimsService;
     private readonly IStripeClient _stripeClient;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly string succesRedirectUrl = "http://localhost:4040/thankyou";
     private readonly string failRedirectUrl = "http://localhost:4040/fail";
+    private readonly string succesRedirectUrl = "http://localhost:4040/thankyou";
 
     public StripeService(IUnitOfWork unitOfWork, IStripeClient stripeClient,
         IClaimsService claimsService)
@@ -52,9 +52,9 @@ public class StripeService : IStripeService
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
+            .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
+            .ThenInclude(od => od.BlindBox)
             .FirstOrDefaultAsync();
 
         if (order == null)
@@ -100,13 +100,14 @@ public class StripeService : IStripeService
                     Currency = "vnd",
                     ProductData = new SessionLineItemPriceDataProductDataOptions
                     {
-                        Name = $"Product/Blindbox Name: {name} , Order Detail id {item.Id} belongs to Order {order.Id} paid by {user.Email}",
+                        Name =
+                            $"Product/Blindbox Name: {name} , Order Detail id {item.Id} belongs to Order {order.Id} paid by {user.Email}",
                         Description = $"Product/BlindBox Name: {name}\n" +
-                                                  $"Quantity: {item.Quantity} / Total: {item.TotalPrice} \n" +
-                                                  $"Price: {unitPrice} VND\n" +
-                                                  $"Time: {item.CreatedAt}" ,
+                                      $"Quantity: {item.Quantity} / Total: {item.TotalPrice} \n" +
+                                      $"Price: {unitPrice} VND\n" +
+                                      $"Time: {item.CreatedAt}"
                     },
-                    UnitAmount = (long)(unitPrice), // Stripe expects amount in cents
+                    UnitAmount = (long)unitPrice // Stripe expects amount in cents
                 },
                 Quantity = item.Quantity
             });
@@ -116,18 +117,20 @@ public class StripeService : IStripeService
         {
             // Bổ sung metadata vào chính Session
             Metadata = new Dictionary<string, string>
-        {
-            { "orderId", orderId.ToString() },
-            { "userId", userId.ToString() },
-            { "isRenew", isRenew.ToString() }
-        },
+            {
+                { "orderId", orderId.ToString() },
+                { "userId", userId.ToString() },
+                { "isRenew", isRenew.ToString() }
+            },
 
             CustomerEmail = user.Email,
             PaymentMethodTypes = new List<string> { "card" },
             LineItems = lineItems,
             Mode = "payment",
-            SuccessUrl = $"{succesRedirectUrl}/payment?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
-            CancelUrl = $"{failRedirectUrl}/payment?status=cancel&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+            SuccessUrl =
+                $"{succesRedirectUrl}/payment?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+            CancelUrl =
+                $"{failRedirectUrl}/payment?status=cancel&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             ExpiresAt = DateTime.UtcNow.AddMinutes(30),
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
@@ -147,7 +150,7 @@ public class StripeService : IStripeService
         };
 
         var service = new SessionService(_stripeClient);
-        Session session = await service.CreateAsync(options);
+        var session = await service.CreateAsync(options);
 
         // Có thể lưu session.Id vào DB để đối soát khi webhook trả về
 
@@ -214,24 +217,23 @@ public class StripeService : IStripeService
         await _unitOfWork.SaveChangesAsync();
 
         return session.Url;
-
-
     }
 
     // 1. Chuyển tiền payout cho seller (Stripe Connect)
-    public async Task<Transfer> PayoutToSellerAsync(string sellerStripeAccountId, decimal amount, string currency = "usd", string description = "Payout to seller")
+    public async Task<Transfer> PayoutToSellerAsync(string sellerStripeAccountId, decimal amount,
+        string currency = "usd", string description = "Payout to seller")
     {
         var userId = _claimsService.CurrentUserId; // chỗ này là lấy user id của seller là người đang login
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(user => user.Id == userId) ??
-                     throw ErrorHelper.Forbidden("User is not existing");
+                   throw ErrorHelper.Forbidden("User is not existing");
 
         var transferService = new TransferService(_stripeClient);
         var transferOptions = new TransferCreateOptions
         {
-            Amount = (long)(amount), // Stripe expects smallest unit (vnd: xu)
+            Amount = (long)amount, // Stripe expects smallest unit (vnd: xu)
             Currency = currency,
             Destination = sellerStripeAccountId,
-            Description = description + $" - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}" + "made by user:" +user.FullName,
+            Description = description + $" - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}" + "made by user:" + user.FullName
         };
 
         try
@@ -269,7 +271,7 @@ public class StripeService : IStripeService
         var refundOptions = new RefundCreateOptions
         {
             PaymentIntent = paymentIntentId,
-            Amount = (long)(amount), // Stripe expects smallest unit
+            Amount = (long)amount // Stripe expects smallest unit
         };
 
         try
@@ -315,7 +317,7 @@ public class StripeService : IStripeService
                 Email = seller.User?.Email,
                 Capabilities = new AccountCapabilitiesOptions
                 {
-                    Transfers = new AccountCapabilitiesTransfersOptions { Requested = true },
+                    Transfers = new AccountCapabilitiesTransfersOptions { Requested = true }
                 },
                 BusinessType = "individual",
                 BusinessProfile = new AccountBusinessProfileOptions

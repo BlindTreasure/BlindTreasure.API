@@ -18,9 +18,9 @@ public class CategoryService : ICategoryService
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
+    private readonly IMapperService _mapper;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserService _userService;
-    private readonly IMapperService _mapper;
 
     public CategoryService(
         IUnitOfWork unitOfWork,
@@ -130,7 +130,6 @@ public class CategoryService : ICategoryService
                 Products = allProducts.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList(),
                 ProductCount = allProducts.Count
             };
-
         }).ToList();
 
         return result;

@@ -2,6 +2,6 @@
 
 public enum DiscountType
 {
-    Percentage,
-    Fixed
+    Percentage, // Giảm theo phần trăm
+    Fixed       // Giảm cố định theo số tiền
 }

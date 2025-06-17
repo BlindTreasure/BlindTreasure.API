@@ -21,7 +21,7 @@ public class UnitOfWork(
     IGenericRepository<Transaction> transactions,
     IGenericRepository<Payment> payments,
     IGenericRepository<Address> addresses
-    )
+)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
