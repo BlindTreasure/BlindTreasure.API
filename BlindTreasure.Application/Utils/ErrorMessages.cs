@@ -2,11 +2,7 @@
 
 public static class ErrorMessages
 {
-    #region Category Error Message
-
-    public const string CategoryNotFound = "Category not found.";
-
-    #endregion
+  
 
     #region Notificaiton Error Message
 
@@ -145,6 +141,82 @@ public static class ErrorMessages
     public const string CartItemBlindBoxNotFoundOrRejected = "Blind box not found or has been rejected.";
     public const string CartItemNotFound = "Cart item not found.";
     public const string CartItemBlindBoxNotFound = "Blind box not found.";
+
+    #endregion
+
+
+    #region Category Error Message
+
+    public const string CategoryNotFound = "Category not found.";
+    public const string CategoryNameRequired = "Category name is required.";
+    public const string CategoryNameAlreadyExists = "Category name already exists.";
+    public const string CategoryParentIdInvalid = "ParentId is invalid.";
+    public const string CategoryImageOnlyForRoot = "Only root categories (no ParentId) can have an image.";
+    public const string CategoryImageUploadError = "Error uploading category image.";
+    public const string CategoryNoUpdatePermission = "You do not have permission to update categories.";
+    public const string CategoryParentIdSelf = "ParentId cannot be the same as the category itself.";
+    public const string CategoryHierarchyLoop = "Cannot create a category hierarchy loop.";
+    public const string CategoryNoDeletePermission = "You do not have permission to delete categories.";
+    public const string CategoryDeleteHasChildrenOrProducts = "Cannot delete category with related products or child categories.";
+
+    #endregion
+
+
+    #region Order Error Message
+
+    public const string OrderCartEmpty = "Cart is empty.";
+    public const string OrderCartEmptyLog = "[CheckoutAsync] Cart is empty.";
+    public const string OrderCheckoutStartLog = "[CheckoutAsync] Start processing checkout from system cart.";
+    public const string OrderClientCartInvalid = "Client cart is invalid or empty.";
+    public const string OrderClientCartInvalidLog = "[CheckoutFromClientCartAsync] Client cart is invalid or empty.";
+    public const string OrderCheckoutFromClientStartLog = "[CheckoutFromClientCartAsync] Start processing checkout from client cart.";
+    public const string OrderCartEmptyOrInvalid = "Cart is empty or invalid.";
+    public const string OrderCartEmptyOrInvalidLog = "[CheckoutCore] Cart is empty or invalid.";
+    public const string OrderShippingAddressInvalid = "Shipping address is invalid or does not belong to user.";
+    public const string OrderShippingAddressInvalidLog = "[CheckoutCore] Shipping address is invalid or does not belong to user.";
+    public const string OrderProductNotFound = "Product {0} not found.";
+    public const string OrderProductOutOfStock = "Product {0} is out of stock.";
+    public const string OrderProductNotForSale = "Product {0} is not for sale.";
+    public const string OrderBlindBoxNotFound = "Blind box {0} not found.";
+    public const string OrderBlindBoxNotApproved = "Blind box {0} is not approved.";
+    public const string OrderBlindBoxOutOfStock = "Blind box {0} is out of stock.";
+    public const string OrderCartClearedAfterCheckoutLog = "[CheckoutCore] System cart cleared after checkout.";
+    public const string OrderCacheClearedAfterCheckoutLog = "[CheckoutCore] Order cache cleared for user {0} after checkout.";
+    public const string OrderCheckoutSuccessLog = "[CheckoutCore] Checkout successful for user {0}.";
+    public const string OrderCacheHitLog = "[GetOrderByIdAsync] Cache hit for order {0}";
+    public const string OrderNotFoundLog = "[GetOrderByIdAsync] Order {0} not found.";
+    public const string OrderNotFound = "Order not found.";
+    public const string OrderLoadedAndCachedLog = "[GetOrderByIdAsync] Order {0} loaded from DB and cached.";
+    public const string OrderListLoadedLog = "[GetMyOrdersAsync] User orders loaded from DB.";
+    public const string OrderNotFoundOrNotBelongToUserLog = "[CancelOrderAsync] Order {0} not found or does not belong to user.";
+    public const string OrderNotPendingLog = "[CancelOrderAsync] Order {0} is not in PENDING status.";
+    public const string OrderCancelOnlyPending = "Only orders in PENDING status can be cancelled.";
+    public const string OrderCacheClearedAfterCancelLog = "[CancelOrderAsync] Order cache cleared for user {0} after cancellation.";
+    public const string OrderCancelSuccessLog = "[CancelOrderAsync] Order {0} cancelled successfully.";
+    public const string OrderCacheClearedAfterDeleteLog = "[DeleteOrderAsync] Order cache cleared for user {0} after deletion.";
+    public const string OrderDeleteSuccessLog = "[DeleteOrderAsync] Order {0} deleted successfully.";
+
+    #endregion
+
+    #region Product Error Message
+
+    public const string ProductNotFound = "Product not found.";
+    public const string ProductNotFoundOrDeleted = "Product does not exist or has been deleted.";
+    public const string ProductSellerNotFound = "Seller does not exist.";
+    public const string ProductSellerNotVerified = "Seller is not verified.";
+    public const string ProductCreatedLog = "[CreateAsync] Product {0} created with {1} images.";
+    public const string ProductUpdateNotFoundLog = "[UpdateAsync] Product {0} not found or deleted.";
+    public const string ProductUpdateLog = "[UpdateAsync] User {0} updates product {1}";
+    public const string ProductUpdateSuccessLog = "[UpdateAsync] Product {0} updated by user {1}";
+    public const string ProductDeleteNotFoundLog = "[DeleteAsync] Product {0} not found or deleted.";
+    public const string ProductDeleteSuccessLog = "[DeleteAsync] Product {0} soft deleted by user {1}";
+    public const string ProductImageFileInvalidLog = "[UploadProductImageAsync] Image file is invalid or empty.";
+    public const string ProductImageFileInvalid = "Image file is invalid or empty.";
+    public const string ProductImageNotFoundLog = "[UploadProductImageAsync] Product {0} not found or deleted.";
+    public const string ProductImageUrlErrorLog = "[UploadProductImageAsync] Cannot get URL for file {0}";
+    public const string ProductImageUrlError = "Cannot create image URL.";
+    public const string ProductImageUploadingLog = "[UploadProductImageAsync] Uploading file: {0}";
+    public const string ProductImageUpdateSuccessLog = "[UploadProductImageAsync] Updated image for product {0}: {1}";
 
     #endregion
 
