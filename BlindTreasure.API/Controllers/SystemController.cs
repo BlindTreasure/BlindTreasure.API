@@ -421,7 +421,7 @@ public class SystemController : ControllerBase
                 SecretProbability = 10,
                 Status = BlindBoxStatus.Approved,
                 ImageUrl =
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindboxes%2Fpopmart_series1.png",
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FPopMart%20Collector%20Edition%20Vol2.png&version_id=null",
                 ReleaseDate = now,
                 CreatedAt = now
             },
@@ -438,7 +438,7 @@ public class SystemController : ControllerBase
                 SecretProbability = 10,
                 Status = BlindBoxStatus.Approved,
                 ImageUrl =
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindboxes%2Fpopmart_series2.png",
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FPopMart%20Mini%20Series%20Vol1.jpg&version_id=null",
                 ReleaseDate = now,
                 CreatedAt = now
             }
