@@ -27,6 +27,7 @@ public class StripeController : ControllerBase
     private readonly ILoggerService _logger;
     private readonly IStripeClient _stripeClient;
     private const string LocalStripeSecret = "whsec_1922024ed268f46c73bfac2bd2bab31e490189a882ec21e458c387b0f8ed8b13"; // Use Environment Variables in Production
+    private const string DeployStripeSecret = "whsec_uWjfI4fkQ7zbwE8VrWMcu2Ysyqm8heUh"; // Use Environment Variables in Production
     private readonly IOrderService _orderService;
     private readonly ITransactionService _transactionService;
 
@@ -111,35 +112,61 @@ public class StripeController : ControllerBase
         _logger.Info("[Stripe][Webhook] Nhận sự kiện webhook từ Stripe.");
         var json = await new StreamReader(Request.Body, Encoding.UTF8).ReadToEndAsync();
 
+        Stripe.Event? stripeEvent = null;
+        Exception? lastEx = null;
+
+        foreach (var secret in new[] { LocalStripeSecret, DeployStripeSecret })
+        {
+            try
+            {
+                stripeEvent = EventUtility.ConstructEvent(
+                    json,
+                    Request.Headers["Stripe-Signature"],
+                    secret
+                );
+                _logger.Info($"[Stripe][Webhook] Đã xác thực thành công với secret: {secret.Substring(0, 12)}...");
+                break;
+            }
+            catch (StripeException ex)
+            {
+                lastEx = ex;
+                _logger.Warn($"[Stripe][Webhook] Sai secret thử: {secret.Substring(0, 12)}... - {ex.Message}");
+            }
+        }
+
+        if (stripeEvent == null)
+        {
+            _logger.Error("[Stripe][Webhook] Không xác thực được Stripe webhook với bất kỳ secret nào.");
+            var statusCode = ExceptionUtils.ExtractStatusCode(lastEx);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(lastEx);
+            return StatusCode(statusCode, errorResponse);
+        }
+
+        _logger.Info($"[Stripe][Webhook] Nhận event: {stripeEvent.Type}");
         try
         {
-            var stripeEvent = EventUtility.ConstructEvent(
-                json,
-                Request.Headers["Stripe-Signature"],
-                LocalStripeSecret // TODO: Move to config/secret
-            );
-
-            _logger.Info($"[Stripe][Webhook] Nhận event: {stripeEvent.Type}");
-            var session = stripeEvent.Data.Object as Session ?? throw ErrorHelper.NotFound("Stripe session not found.");
-
             switch (stripeEvent.Type)
             {
                 case "checkout.session.expired":
-                    _logger.Warn("[Stripe][Webhook] Checkout session expired.");
-                    await HandleExpiredCheckoutSession(session);
+                    var expiredSession = stripeEvent.Data.Object as Session
+                        ?? throw ErrorHelper.NotFound("Stripe session not found.");
+                    _logger.Warn("[Stripe][Webhook] Checkout session expired, Session ID: " + expiredSession.Id);
+                    await HandleExpiredCheckoutSession(expiredSession);
                     break;
 
                 case "checkout.session.completed":
-                    _logger.Info("[Stripe][Webhook] Thanh toán thành công.");
-                    await HandleSuccessfulPayment(session);
-                    _logger.Info("[Stripe][Webhook] Payment Intent created, Id: " + session.PaymentIntentId);
-                    await HandlePaymentIntentCreatedSession(session);
+                    var completedSession = stripeEvent.Data.Object as Session
+                        ?? throw ErrorHelper.NotFound("Stripe session not found.");
+                    _logger.Info("[Stripe][Webhook] Thanh toán thành công, Session ID: " + completedSession.Id);
+                    await HandleSuccessfulPayment(completedSession);
+                    await HandlePaymentIntentCreatedSession(completedSession);
                     break;
 
                 default:
-                    _logger.Warn($"[Stripe][Webhook] Unhandled event type: {stripeEvent.Type}");
+                    _logger.Warn($"[Stripe][Webhook] Bỏ qua event không xử lý: {stripeEvent.Type}");
                     break;
             }
+
             return Ok();
         }
         catch (StripeException ex)
@@ -308,16 +335,48 @@ public class StripeController : ControllerBase
     [HttpPost("refund-callback-handler")]
     public async Task<IActionResult> HandleRefundWebhook()
     {
-        _logger.Info("[Stripe][RefundWebhook] Nhận refund webhook từ Stripe.");
+
+        _logger.Info("[Stripe][Webhook] Nhận sự kiện webhook từ Stripe.");
         var json = await new StreamReader(Request.Body, Encoding.UTF8).ReadToEndAsync();
+
+        // Fallback 2 secret: local và deploy
+        var localSecret = "whsec_1922024ed268f46c73bfac2bd2bab31e490189a882ec21e458c387b0f8ed8b13";
+        var deploySecret = "whsec_uWjfI4fkQ7zbwE8VrWMcu2Ysyqm8heUh";
+        Stripe.Event? stripeEvent = null;
+        Exception? lastEx = null;
+
+        foreach (var secret in new[] { localSecret, deploySecret })
+        {
+            try
+            {
+                stripeEvent = EventUtility.ConstructEvent(
+                    json,
+                    Request.Headers["Stripe-Signature"],
+                    secret
+                );
+                _logger.Info($"[Stripe][Webhook] Đã xác thực thành công với secret: {secret.Substring(0, 12)}...");
+                break;
+            }
+            catch (StripeException ex)
+            {
+                lastEx = ex;
+                _logger.Warn($"[Stripe][Webhook] Sai secret thử: {secret.Substring(0, 12)}... - {ex.Message}");
+            }
+        }
+
+        if (stripeEvent == null)
+        {
+            _logger.Error("[Stripe][Webhook] Không xác thực được Stripe webhook với bất kỳ secret nào.");
+            var statusCode = ExceptionUtils.ExtractStatusCode(lastEx);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(lastEx);
+            return StatusCode(statusCode, errorResponse);
+        }
+
+        _logger.Info($"[Stripe][Webhook] Nhận event: {stripeEvent.Type}");
+        var session = stripeEvent.Data.Object as Session ?? throw ErrorHelper.NotFound("Stripe session not found.");
 
         try
         {
-            var stripeEvent = EventUtility.ConstructEvent(
-                json,
-                Request.Headers["Stripe-Signature"],
-                LocalStripeSecret // Đặt đúng secret cho refund webhook
-            );
 
             switch (stripeEvent.Type)
             {

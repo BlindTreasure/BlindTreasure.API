@@ -106,7 +106,7 @@ public class StripeService : IStripeService
                                                   $"Price: {unitPrice} VND\n" +
                                                   $"Time: {item.CreatedAt}" ,
                     },
-                    UnitAmount = (long)(unitPrice * 100), // Stripe expects amount in cents
+                    UnitAmount = (long)(unitPrice), // Stripe expects amount in cents
                 },
                 Quantity = item.Quantity
             });
@@ -114,6 +114,14 @@ public class StripeService : IStripeService
 
         var options = new SessionCreateOptions
         {
+            // Bổ sung metadata vào chính Session
+            Metadata = new Dictionary<string, string>
+        {
+            { "orderId", orderId.ToString() },
+            { "userId", userId.ToString() },
+            { "isRenew", isRenew.ToString() }
+        },
+
             CustomerEmail = user.Email,
             PaymentMethodTypes = new List<string> { "card" },
             LineItems = lineItems,
