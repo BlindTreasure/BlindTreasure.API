@@ -53,11 +53,10 @@ public class CategoryService : ICategoryService
             .Include(c => c.Children.Where(ch => !ch.IsDeleted))
             .FirstOrDefaultAsync(c => c.Id == id);
 
-
         if (category == null)
         {
             _logger.Warn($"[GetByIdAsync] Category {id} not found.");
-            throw ErrorHelper.NotFound("Không tìm thấy category.");
+            throw ErrorHelper.NotFound(ErrorMessages.CategoryNotFound);
         }
 
         await _cacheService.SetAsync(cacheKey, category, TimeSpan.FromHours(1));
@@ -142,16 +141,16 @@ public class CategoryService : ICategoryService
         _logger.Info($"[CreateAsync] Admin/Staff creates category {dto.Name} by {user?.FullName}");
 
         if (string.IsNullOrWhiteSpace(dto.Name))
-            throw ErrorHelper.BadRequest("Tên category không được để trống.");
+            throw ErrorHelper.BadRequest(ErrorMessages.CategoryNameRequired);
 
         var exists = await _unitOfWork.Categories.GetQueryable().Where(x => !x.IsDeleted)
             .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower());
         if (exists)
-            throw ErrorHelper.Conflict("Tên danh mục đã tồn tại trong hệ thống.");
+            throw ErrorHelper.Conflict(ErrorMessages.CategoryNameAlreadyExists);
 
         if (dto.ParentId.HasValue)
             if (!await _unitOfWork.Categories.GetQueryable().AnyAsync(c => c.Id == dto.ParentId.Value))
-                throw ErrorHelper.BadRequest("ParentId không hợp lệ.");
+                throw ErrorHelper.BadRequest(ErrorMessages.CategoryParentIdInvalid);
 
         var category = new Category
         {
@@ -163,7 +162,7 @@ public class CategoryService : ICategoryService
         if (dto.ImageFile != null)
         {
             if (dto.ParentId != null)
-                throw ErrorHelper.BadRequest("Chỉ category cấp cha (không có ParentId) mới được phép upload ảnh.");
+                throw ErrorHelper.BadRequest(ErrorMessages.CategoryImageOnlyForRoot);
 
             try
             {
@@ -178,10 +177,9 @@ public class CategoryService : ICategoryService
             catch (Exception ex)
             {
                 _logger.Error($"[CreateAsync] Upload image failed: {ex.Message}");
-                throw ErrorHelper.Internal("Lỗi khi upload ảnh category.");
+                throw ErrorHelper.Internal(ErrorMessages.CategoryImageUploadError);
             }
         }
-
 
         await _unitOfWork.Categories.AddAsync(category);
         await _unitOfWork.SaveChangesAsync();
@@ -196,7 +194,7 @@ public class CategoryService : ICategoryService
         var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
-            throw ErrorHelper.Forbidden("Bạn không có quyền update danh mục.");
+            throw ErrorHelper.Forbidden(ErrorMessages.CategoryNoUpdatePermission);
 
         _logger.Info($"[UpdateAsync] Admin/Staff updates category {dto.Name ?? "(no name change)"} by {user.FullName}");
 
@@ -205,38 +203,33 @@ public class CategoryService : ICategoryService
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (category == null)
-            throw ErrorHelper.NotFound("Không tìm thấy category.");
+            throw ErrorHelper.NotFound(ErrorMessages.CategoryNotFound);
 
-        // Tên mới
         if (!string.IsNullOrWhiteSpace(dto.Name))
         {
             var exists = await _unitOfWork.Categories.GetQueryable().Where(x => !x.IsDeleted)
                 .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower() && c.Id != id);
             if (exists)
-                throw ErrorHelper.Conflict("Tên danh mục đã tồn tại trong hệ thống.");
+                throw ErrorHelper.Conflict(ErrorMessages.CategoryNameAlreadyExists);
 
             category.Name = dto.Name.Trim();
         }
 
-        // Mô tả
         if (!string.IsNullOrWhiteSpace(dto.Description))
             category.Description = dto.Description.Trim();
 
-        // Xác định có đang chuyển từ cha thành con không
         var isBecomingChild = category.ParentId == null && dto.ParentId.HasValue;
 
-        // Cập nhật ParentId
         if (dto.ParentId.HasValue)
         {
             if (dto.ParentId.Value == id)
-                throw ErrorHelper.BadRequest("ParentId không được trùng với chính nó.");
+                throw ErrorHelper.BadRequest(ErrorMessages.CategoryParentIdSelf);
 
             if (await IsDescendantAsync(id, dto.ParentId.Value))
-                throw ErrorHelper.BadRequest("Không được tạo vòng lặp phân cấp category.");
+                throw ErrorHelper.BadRequest(ErrorMessages.CategoryHierarchyLoop);
 
             category.ParentId = dto.ParentId;
 
-            // Nếu chuyển từ cha thành con thì xóa ảnh và ảnh trên server
             if (isBecomingChild && !string.IsNullOrWhiteSpace(category.ImageUrl))
             {
                 try
@@ -259,15 +252,13 @@ public class CategoryService : ICategoryService
             category.ParentId = null;
         }
 
-        // Upload ảnh mới nếu có
         if (dto.ImageFile != null)
         {
             if (category.ParentId != null)
-                throw ErrorHelper.BadRequest("Chỉ category cấp cha (không có ParentId) mới được phép cập nhật ảnh.");
+                throw ErrorHelper.BadRequest(ErrorMessages.CategoryImageOnlyForRoot);
 
             try
             {
-                // Xóa ảnh cũ nếu có
                 if (!string.IsNullOrWhiteSpace(category.ImageUrl))
                 {
                     var oldFileName = Path.GetFileName(new Uri(category.ImageUrl).LocalPath);
@@ -276,7 +267,6 @@ public class CategoryService : ICategoryService
                     await _blobService.DeleteFileAsync($"category-thumbnails/{oldFileName}");
                 }
 
-                // Upload ảnh mới
                 var newFileName = $"category-thumbnails/{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
                 _logger.Info($"[UpdateAsync] Uploading new image {newFileName}");
 
@@ -288,11 +278,10 @@ public class CategoryService : ICategoryService
             catch (Exception ex)
             {
                 _logger.Error($"[UpdateAsync] Upload image failed: {ex.Message}");
-                throw ErrorHelper.Internal("Lỗi khi cập nhật ảnh category.");
+                throw ErrorHelper.Internal(ErrorMessages.CategoryImageUploadError);
             }
         }
 
-        // Audit
         category.UpdatedAt = DateTime.UtcNow;
         category.UpdatedBy = userId;
 
@@ -305,13 +294,12 @@ public class CategoryService : ICategoryService
         return ToCategoryDto(category);
     }
 
-
     public async Task<CategoryDto> DeleteAsync(Guid id)
     {
         var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
-            throw ErrorHelper.Forbidden("Bạn không có quyền xóa danh mục.");
+            throw ErrorHelper.Forbidden(ErrorMessages.CategoryNoDeletePermission);
 
         var category = await _unitOfWork.Categories.GetQueryable()
             .Include(c => c.Products)
@@ -321,15 +309,14 @@ public class CategoryService : ICategoryService
         if (category == null)
         {
             _logger.Warn($"[DeleteAsync] Category {id} not found.");
-            throw ErrorHelper.NotFound("Không tìm thấy category.");
+            throw ErrorHelper.NotFound(ErrorMessages.CategoryNotFound);
         }
 
         _logger.Info($"[DeleteAsync] Admin/Staff deletes category {id} by {user.FullName}");
 
-        // Không xóa nếu còn sản phẩm hoặc category con chưa bị xóa
         if ((category.Products != null && category.Products.Any()) ||
             (category.Children != null && category.Children.Any(c => !c.IsDeleted)))
-            throw ErrorHelper.Conflict("Không thể xóa category khi còn sản phẩm hoặc category con liên quan.");
+            throw ErrorHelper.Conflict(ErrorMessages.CategoryDeleteHasChildrenOrProducts);
 
         await _unitOfWork.Categories.SoftRemove(category);
         await _unitOfWork.SaveChangesAsync();
@@ -338,7 +325,6 @@ public class CategoryService : ICategoryService
         await _cacheService.RemoveByPatternAsync("category:all");
         _logger.Success($"[DeleteAsync] Category {id} deleted.");
 
-        // Trả về DTO với trạng thái isDeleted đã cập nhật
         return ToCategoryDto(category);
     }
 
@@ -361,7 +347,6 @@ public class CategoryService : ICategoryService
                 : new List<CategoryDto>()
         };
     }
-
 
     /// <summary>
     ///     Kiểm tra xem parentId có nằm trong cây con của categoryId không (để tránh vòng lặp).
