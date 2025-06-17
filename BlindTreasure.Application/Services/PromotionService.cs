@@ -1,10 +1,14 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Text.RegularExpressions;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PromotionDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
 
@@ -26,11 +30,31 @@ public class PromotionService : IPromotionService
         _userService = userService;
     }
 
-    /// <summary>
-    /// </summary>
-    /// <param name="dto"></param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
+    public async Task<Pagination<PromotionDto>> GetPromotionsAsync(PromotionQueryParameter param)
+    {
+        var query = _unitOfWork.Promotions.GetQueryable();
+
+        if (param.SellerId.HasValue)
+            query = query.Where(p => p.SellerId == param.SellerId.Value);
+
+        if (param.Status.HasValue)
+            query = query.Where(p => p.Status == param.Status.Value);
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .OrderByDescending(p => p.CreatedAt)
+            .Skip((param.PageIndex - 1) * param.PageSize)
+            .Take(param.PageSize)
+            .ToListAsync();
+
+        var dtos = items
+            .Select(p => _mapperService.Map<Promotion, PromotionDto>(p))
+            .ToList();
+
+        return new Pagination<PromotionDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
+
     public async Task<PromotionDto> CreatePromotionAsync(CreatePromotionDto dto)
     {
         var currentUserId = _claimsService.CurrentUserId;
@@ -42,18 +66,12 @@ public class PromotionService : IPromotionService
             throw ErrorHelper.Unauthorized("Không tìm thấy thông tin người dùng.");
         }
 
-        _loggerService.Info(
-            $"[CreatePromotion] Bắt đầu xử lý tạo promotion bởi userId: {currentUserId}, role: {user.RoleName}");
-
         await ValidateCreatePromotionAsync(user);
-        _loggerService.Info($"[CreatePromotion] Passed validation cho userId: {currentUserId}");
+        await ValidatePromotionInputAsync(dto);
 
         var promotion = await SetPromotionDataAsync(dto, user);
         await _unitOfWork.Promotions.AddAsync(promotion);
         await _unitOfWork.SaveChangesAsync();
-
-        _loggerService.Success(
-            $"[CreatePromotion] Tạo promotion thành công. Code: {promotion.Code}, UserId: {currentUserId}, Role: {user.RoleName}");
 
         return _mapperService.Map<Promotion, PromotionDto>(promotion);
     }
@@ -65,7 +83,7 @@ public class PromotionService : IPromotionService
     {
         var promotion = new Promotion
         {
-            Code = dto.Code,
+            Code = dto.Code.Trim().ToUpper(),
             Description = dto.Description,
             DiscountType = dto.DiscountType,
             DiscountValue = dto.DiscountValue,
@@ -117,6 +135,33 @@ public class PromotionService : IPromotionService
 
             if (count >= 3)
                 throw ErrorHelper.BadRequest("Bạn chỉ được tạo tối đa 3 voucher đang chờ duyệt hoặc đã duyệt.");
+        }
+    }
+
+    private async Task ValidatePromotionInputAsync(CreatePromotionDto dto)
+    {
+        // Validate format: 6 ký tự in hoa
+        if (!Regex.IsMatch(dto.Code ?? "", @"^[A-Z]{6}$"))
+            throw ErrorHelper.BadRequest("Mã voucher phải gồm đúng 6 ký tự in hoa (A-Z).");
+
+        // Validate trùng mã
+        var isExisted = await _unitOfWork.Promotions
+            .GetQueryable()
+            .AnyAsync(p => p.Code == dto.Code);
+
+        if (isExisted)
+            throw ErrorHelper.BadRequest("Mã voucher đã tồn tại. Vui lòng chọn mã khác.");
+
+        // Validate discount
+        if (dto.DiscountType == DiscountType.Percentage)
+        {
+            if (dto.DiscountValue <= 0 || dto.DiscountValue > 100)
+                throw ErrorHelper.BadRequest("Giá trị giảm phần trăm phải lớn hơn 0 và không vượt quá 100.");
+        }
+        else if (dto.DiscountType == DiscountType.Fixed)
+        {
+            if (dto.DiscountValue <= 0)
+                throw ErrorHelper.BadRequest("Giá trị giảm cố định phải lớn hơn 0.");
         }
     }
 
