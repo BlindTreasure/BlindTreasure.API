@@ -128,9 +128,9 @@ public class StripeService : IStripeService
             LineItems = lineItems,
             Mode = "payment",
             SuccessUrl =
-                $"{succesRedirectUrl}/payment?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+                $"{succesRedirectUrl}?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             CancelUrl =
-                $"{failRedirectUrl}/payment?status=cancel&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+                $"{failRedirectUrl}?status=failed&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             ExpiresAt = DateTime.UtcNow.AddMinutes(30),
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
