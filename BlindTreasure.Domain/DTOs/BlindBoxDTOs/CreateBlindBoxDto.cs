@@ -14,10 +14,9 @@ public class CreateBlindBoxDto
 
     [DefaultValue(typeof(DateTime), "2025-07-01T00:00:00")]
     public DateTime ReleaseDate { get; set; }
-    
-    [DefaultValue("Bandai")]
-    public required string Brand { get; set; }
-    
+
+    [DefaultValue("Bandai")] public required string Brand { get; set; }
+
     [DefaultValue("Mô tả cho blind box")] public required string Description { get; set; }
 
     public required IFormFile ImageFile { get; set; }

@@ -151,13 +151,13 @@ public class BlobService : IBlobService
         }
     }
 
-    public async Task<string> ReplaceImageAsync(Stream newImageStream, string originalFileName, string? oldImageUrl, string containerPrefix)
+    public async Task<string> ReplaceImageAsync(Stream newImageStream, string originalFileName, string? oldImageUrl,
+        string containerPrefix)
     {
         try
         {
             // Xóa ảnh cũ nếu có
             if (!string.IsNullOrWhiteSpace(oldImageUrl))
-            {
                 try
                 {
                     var oldFileName = Path.GetFileName(new Uri(oldImageUrl).LocalPath);
@@ -169,7 +169,6 @@ public class BlobService : IBlobService
                 {
                     _logger.Warn($"[ReplaceImageAsync] Failed to delete old image: {ex.Message}");
                 }
-            }
 
             // Upload ảnh mới
             var newFileName = $"{containerPrefix}/{Guid.NewGuid()}{Path.GetExtension(originalFileName)}";
@@ -188,7 +187,7 @@ public class BlobService : IBlobService
         }
     }
 
-    
+
     private string GetContentType(string fileName)
     {
         _logger.Info($"Determining content type for file: {fileName}");

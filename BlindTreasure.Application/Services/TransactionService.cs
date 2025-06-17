@@ -34,7 +34,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Xử lý khi thanh toán Stripe thành công (webhook).
+    ///     Xử lý khi thanh toán Stripe thành công (webhook).
     /// </summary>
     public async Task HandleSuccessfulPaymentAsync(string sessionId, string orderId)
     {
@@ -67,7 +67,8 @@ public class TransactionService : ITransactionService
                 await _unitOfWork.Orders.Update(transaction.Payment.Order);
 
             await _unitOfWork.SaveChangesAsync();
-            _loggerService.Success($"[HandleSuccessfulPaymentAsync] Đã xác nhận thanh toán thành công cho order {orderId}.");
+            _loggerService.Success(
+                $"[HandleSuccessfulPaymentAsync] Đã xác nhận thanh toán thành công cho order {orderId}.");
         }
         catch (Exception ex)
         {
@@ -77,7 +78,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Xử lý khi thanh toán Stripe thất bại hoặc session hết hạn.
+    ///     Xử lý khi thanh toán Stripe thất bại hoặc session hết hạn.
     /// </summary>
     public async Task HandleFailedPaymentAsync(string sessionId)
     {
@@ -114,7 +115,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Xác nhận khi PaymentIntent được tạo (Stripe webhook).
+    ///     Xác nhận khi PaymentIntent được tạo (Stripe webhook).
     /// </summary>
     public async Task HandlePaymentIntentCreatedAsync(string paymentIntentId, string sessionId)
     {
@@ -129,7 +130,8 @@ public class TransactionService : ITransactionService
             transaction.Payment.TransactionId = paymentIntentId;
             await _unitOfWork.Transactions.Update(transaction);
             await _unitOfWork.SaveChangesAsync();
-            _loggerService.Info($"[HandlePaymentIntentCreatedAsync] Đã cập nhật PaymentIntentId cho transaction {transaction.Id}.");
+            _loggerService.Info(
+                $"[HandlePaymentIntentCreatedAsync] Đã cập nhật PaymentIntentId cho transaction {transaction.Id}.");
         }
         catch (Exception ex)
         {
@@ -139,7 +141,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Lấy danh sách transaction của user hiện tại.
+    ///     Lấy danh sách transaction của user hiện tại.
     /// </summary>
     public async Task<List<Transaction>> GetMyTransactionsAsync()
     {
@@ -151,7 +153,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Lấy danh sách transaction theo orderId.
+    ///     Lấy danh sách transaction theo orderId.
     /// </summary>
     public async Task<List<Transaction>> GetTransactionsByOrderIdAsync(Guid orderId)
     {
@@ -163,7 +165,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Lấy chi tiết transaction theo Id.
+    ///     Lấy chi tiết transaction theo Id.
     /// </summary>
     public async Task<Transaction?> GetTransactionByIdAsync(Guid transactionId)
     {

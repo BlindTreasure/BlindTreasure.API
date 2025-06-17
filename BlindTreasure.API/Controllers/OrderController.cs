@@ -1,14 +1,9 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
-using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Stripe;
-using Stripe.Checkout;
-using System.Text;
 
 namespace BlindTreasure.API.Controllers;
 
@@ -16,20 +11,20 @@ namespace BlindTreasure.API.Controllers;
 [Route("api/orders")]
 public class OrderController : ControllerBase
 {
-    private readonly IOrderService _orderService;
     private readonly ILoggerService _logger;
+    private readonly IOrderService _orderService;
     private readonly ITransactionService _transactionService;
 
 
     public OrderController(IOrderService orderService, ILoggerService logger, ITransactionService transactionService)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));    
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _orderService = orderService;
         _transactionService = transactionService ?? throw new ArgumentNullException(nameof(transactionService));
     }
 
     /// <summary>
-    /// Đặt hàng (checkout) từ cart truyền lên từ client, trả về link thanh toán Stripe.
+    ///     Đặt hàng (checkout) từ cart truyền lên từ client, trả về link thanh toán Stripe.
     /// </summary>
     /// <param name="cart">Cart truyền từ FE (danh sách sản phẩm, số lượng, giá, ...)</param>
     /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
@@ -41,7 +36,8 @@ public class OrderController : ControllerBase
         try
         {
             var paymentUrl = await _orderService.CheckoutFromClientCartAsync(cart);
-            return Ok(ApiResult<string>.Success(paymentUrl, "200", "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
+            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+                "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)
         {
@@ -52,7 +48,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Đặt hàng (checkout) từ giỏ hàng hiện tại, trả về link thanh toán Stripe.
+    ///     Đặt hàng (checkout) từ giỏ hàng hiện tại, trả về link thanh toán Stripe.
     /// </summary>
     /// <param name="dto">Thông tin đặt hàng (địa chỉ giao hàng, ...)</param>
     /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
@@ -64,7 +60,8 @@ public class OrderController : ControllerBase
         try
         {
             var paymentUrl = await _orderService.CheckoutAsync(dto);
-            return Ok(ApiResult<string>.Success(paymentUrl, "200", "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
+            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+                "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)
         {
@@ -75,7 +72,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy chi tiết một đơn hàng của user hiện tại.
+    ///     Lấy chi tiết một đơn hàng của user hiện tại.
     /// </summary>
     /// <param name="orderId">Id đơn hàng</param>
     /// <returns>Chi tiết đơn hàng</returns>
@@ -98,7 +95,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách đơn hàng của user hiện tại.
+    ///     Lấy danh sách đơn hàng của user hiện tại.
     /// </summary>
     /// <returns>Danh sách đơn hàng</returns>
     [HttpGet]
@@ -119,7 +116,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Hủy một đơn hàng (chỉ khi trạng thái cho phép).
+    ///     Hủy một đơn hàng (chỉ khi trạng thái cho phép).
     /// </summary>
     /// <param name="orderId">Id đơn hàng</param>
     [HttpPut("{orderId}/cancel")]
@@ -141,7 +138,7 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    /// Xóa mềm một đơn hàng (user chỉ xóa được đơn của mình).
+    ///     Xóa mềm một đơn hàng (user chỉ xóa được đơn của mình).
     /// </summary>
     /// <param name="orderId">Id đơn hàng</param>
     [HttpDelete("{orderId}")]
@@ -161,6 +158,4 @@ public class OrderController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
-  
 }
