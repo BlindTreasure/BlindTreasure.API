@@ -86,10 +86,24 @@ public class ProductService : IProductService
 
         if (param.CategoryId.HasValue)
             query = query.Where(p => p.CategoryId == param.CategoryId.Value);
+
         if (param.ProductStatus.HasValue)
             query = query.Where(p => p.Status == param.ProductStatus);
+
         if (param.SellerId.HasValue)
             query = query.Where(p => p.SellerId == param.SellerId.Value);
+
+        if (param.MinPrice.HasValue)
+            query = query.Where(p => p.Price >= param.MinPrice.Value);
+
+        if (param.MaxPrice.HasValue)
+            query = query.Where(p => p.Price <= param.MaxPrice.Value);
+
+        if (param.ReleaseDateFrom.HasValue)
+            query = query.Where(p => p.CreatedAt >= param.ReleaseDateFrom.Value);
+
+        if (param.ReleaseDateTo.HasValue)
+            query = query.Where(p => p.CreatedAt <= param.ReleaseDateTo.Value);
 
         // Sort: UpdatedAt desc, CreatedAt desc
         query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
@@ -108,10 +122,6 @@ public class ProductService : IProductService
         var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
         var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
 
-        var cacheKey =
-            $"product:all:public:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:{param.SellerId}:UpdatedAtDesc";
-        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
-        _logger.Info("[GetAllAsync] Product list loaded from DB and cached.");
         return result;
     }
 

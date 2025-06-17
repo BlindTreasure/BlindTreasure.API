@@ -46,5 +46,4 @@ public interface IEmailService
 
     Task SendPromotionApprovedAsync(string toEmail, string? userName, string promotionCode);
     Task SendPromotionRejectedAsync(string toEmail, string? userName, string promotionCode, string reason);
-    
 }

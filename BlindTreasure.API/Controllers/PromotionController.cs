@@ -19,7 +19,7 @@ public class PromotionController : ControllerBase
     }
 
     /// <summary>
-    /// TẠO VOUCHER: SELLER THÌ PENDING; STAFF THÌ APPROVED
+    ///     TẠO VOUCHER: SELLER THÌ PENDING; STAFF THÌ APPROVED
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
@@ -40,9 +40,9 @@ public class PromotionController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách voucher 
+    ///     Lấy danh sách voucher
     /// </summary>
-    [HttpGet()]
+    [HttpGet]
     [ProducesResponseType(typeof(ApiResult<Pagination<PromotionDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyPromotions([FromQuery] PromotionQueryParameter param)
     {
@@ -58,9 +58,9 @@ public class PromotionController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-    
+
     /// <summary>
-    /// STAFF duyệt hoặc từ chối voucher đang chờ xử lý.
+    ///     STAFF duyệt hoặc từ chối voucher đang chờ xử lý.
     /// </summary>
     [HttpPost("review")]
     [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
@@ -79,5 +79,4 @@ public class PromotionController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-
 }
