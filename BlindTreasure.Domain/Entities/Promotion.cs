@@ -14,6 +14,7 @@ public class Promotion : BaseEntity
     public DateTime EndDate { get; set; }
 
     public int UsageLimit { get; set; }
+    public string? RejectReason { get; set; }
 
     public PromotionStatus Status { get; set; } // Enum: [Pending, Approved, Rejected]
 

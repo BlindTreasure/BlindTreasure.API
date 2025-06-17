@@ -194,6 +194,49 @@ public class EmailService : IEmailService
         await SendEmailAsync(toEmail, $"Blind Box {boxName} bị từ chối", html);
     }
 
+    public async Task SendPromotionApprovedAsync(string toEmail, string? userName, string promotionCode)
+    {
+        var html = $@"
+    <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+      <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
+        <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #d02a2a;border-radius:8px;"">
+          <div style=""background-color:#d02a2a;padding:16px 24px;"">
+            <h1 style=""color:#ffffff;font-size:20px;margin:0;"">Voucher của bạn đã được duyệt</h1>
+          </div>
+          <div style=""padding:24px;"">
+            <p>Chào {userName},</p>
+            <p>Voucher <strong>{promotionCode}</strong> của bạn đã được phê duyệt và sẵn sàng áp dụng trên nền tảng.</p>
+            <p>Chúc bạn kinh doanh thành công.</p>
+            <p style=""margin-top:24px;"">Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+          </div>
+        </div>
+      </body>
+    </html>";
+        await SendEmailAsync(toEmail, $"Voucher {promotionCode} đã được phê duyệt", html);
+    }
+
+    public async Task SendPromotionRejectedAsync(string toEmail, string? userName, string promotionCode, string reason)
+    {
+        var html = $@"
+    <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+      <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
+        <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #d02a2a;border-radius:8px;"">
+          <div style=""background-color:#d02a2a;padding:16px 24px;"">
+            <h1 style=""color:#ffffff;font-size:20px;margin:0;"">Voucher của bạn đã bị từ chối</h1>
+          </div>
+          <div style=""padding:24px;"">
+            <p>Chào {userName},</p>
+            <p>Rất tiếc, voucher <strong>{promotionCode}</strong> đã bị từ chối xét duyệt.</p>
+            <p><strong>Lý do:</strong> {reason}</p>
+            <p>Vui lòng điều chỉnh và gửi lại nếu cần.</p>
+            <p style=""margin-top:24px;"">Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+          </div>
+        </div>
+      </body>
+    </html>";
+        await SendEmailAsync(toEmail, $"Voucher {promotionCode} bị từ chối", html);
+    }
+
 
     private async Task SendEmailAsync(string to, string subject, string htmlContent)
     {

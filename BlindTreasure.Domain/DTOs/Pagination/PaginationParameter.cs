@@ -2,13 +2,19 @@
 
 public class PaginationParameter
 {
-    private const int maxPageSize = 50;
-    private int _pageSize = 5; // DEPENDENCE ON PROJECT
-    public int PageIndex { get; set; } = 0;
+    private const int MaxPageSize = 50;
+    private int _pageSize = 5;
+
+    private int _pageIndex = 1;
+    public int PageIndex
+    {
+        get => _pageIndex;
+        set => _pageIndex = value < 1 ? 1 : value;
+    }
 
     public int PageSize
     {
         get => _pageSize;
-        set => _pageSize = value > maxPageSize ? maxPageSize : value;
+        set => _pageSize = value > MaxPageSize ? MaxPageSize : value;
     }
 }
