@@ -168,7 +168,7 @@ public class BlindBoxService : IBlindBoxService
         if (blindBox == null)
         {
             _logger.Warn($"[GetBlindBoxByIdAsync] Blind Box {blindBoxId} not found.");
-            throw ErrorHelper.NotFound("Blind Box không tồn tại");
+            throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
         }
 
         // Load BlindBoxItems lọc isDeleted = false
@@ -202,31 +202,31 @@ public class BlindBoxService : IBlindBoxService
         _logger.Info($"[CreateBlindBoxAsync] User {currentUserId} requests to create blind box: {dto.Name}");
 
         if (dto == null)
-            throw ErrorHelper.BadRequest("Dữ liệu Blind Box không được để trống.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDataRequired);
 
         if (string.IsNullOrWhiteSpace(dto.Name))
-            throw ErrorHelper.BadRequest("Tên Blind Box là bắt buộc.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxNameRequired);
 
         if (dto.Price <= 0)
-            throw ErrorHelper.BadRequest("Giá Blind Box phải lớn hơn 0.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxPriceInvalid);
 
         if (dto.TotalQuantity <= 0)
-            throw ErrorHelper.BadRequest("Tổng số lượng phải lớn hơn 0.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxTotalQuantityInvalid);
 
         if (string.IsNullOrWhiteSpace(dto.Brand))
-            throw ErrorHelper.BadRequest("Brand Blind Box là bắt buộc.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxBrandRequired);
 
         if (dto.ReleaseDate == default)
-            throw ErrorHelper.BadRequest("Ngày phát hành không hợp lệ.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxReleaseDateInvalid);
 
         if (dto.ImageFile == null || dto.ImageFile.Length == 0)
-            throw ErrorHelper.BadRequest("Ảnh đại diện Blind Box là bắt buộc.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxImageRequired);
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
             s.UserId == currentUserId && !s.IsDeleted && s.Status == SellerStatus.Approved);
 
         if (seller == null)
-            throw ErrorHelper.Forbidden("Bạn chưa được xác minh Seller để tạo Blind Box.");
+            throw ErrorHelper.Forbidden(ErrorMessages.BlindBoxSellerNotVerified);
 
         // Upload file ảnh lên BlobStorage
         var fileName = $"blindbox-thumbnails/thumbnails-{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
@@ -236,7 +236,7 @@ public class BlindBoxService : IBlindBoxService
         // Lấy link file đã upload
         var imageUrl = await _blobService.GetPreviewUrlAsync(fileName);
         if (string.IsNullOrEmpty(imageUrl))
-            throw ErrorHelper.Internal("Lỗi khi lấy URL ảnh Blind Box.");
+            throw ErrorHelper.Internal(ErrorMessages.BlindBoxImageUrlError);
 
         var releaseDateUtc = DateTime.SpecifyKind(dto.ReleaseDate, DateTimeKind.Utc);
 
@@ -274,13 +274,13 @@ public class BlindBoxService : IBlindBoxService
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(b => b.Id == blindBoxId && !b.IsDeleted);
         if (blindBox == null)
-            throw ErrorHelper.NotFound("Blind Box không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
 
         var currentUserId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
             s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
         if (seller == null)
-            throw ErrorHelper.Forbidden("Không có quyền cập nhật Blind Box này.");
+            throw ErrorHelper.Forbidden(ErrorMessages.BlindBoxNoUpdatePermission);
 
         if (!string.IsNullOrWhiteSpace(dto.Name))
             blindBox.Name = dto.Name.Trim();
@@ -322,7 +322,7 @@ public class BlindBoxService : IBlindBoxService
             catch (Exception ex)
             {
                 _logger.Error($"[UpdateBlindBoxAsync] ReplaceImageAsync failed: {ex.Message}");
-                throw ErrorHelper.Internal("Lỗi khi cập nhật ảnh Blind Box.");
+                throw ErrorHelper.Internal(ErrorMessages.BlindBoxImageUpdateError);
             }
 
         await _unitOfWork.BlindBoxes.Update(blindBox);
@@ -343,7 +343,7 @@ public class BlindBoxService : IBlindBoxService
         if (blindBox == null)
         {
             _logger.Warn($"[AddItemsToBlindBoxAsync] Blind Box {blindBoxId} not found.");
-            throw ErrorHelper.NotFound("Blind Box không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
         }
 
         var currentUserId = _claimsService.CurrentUserId;
@@ -355,12 +355,12 @@ public class BlindBoxService : IBlindBoxService
         {
             _logger.Warn(
                 $"[AddItemsToBlindBoxAsync] User {currentUserId} has no permission for Blind Box {blindBoxId}.");
-            throw ErrorHelper.Forbidden("Không có quyền chỉnh sửa Blind Box này.");
+            throw ErrorHelper.Forbidden(ErrorMessages.BlindBoxNoEditPermission);
         }
 
         // Validate số lượng item phải là 6 hoặc 12
         if (items.Count != 6 && items.Count != 12)
-            throw ErrorHelper.BadRequest("Blind Box chỉ được phép chứa đúng 6 hoặc 12 sản phẩm.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxItemCountInvalid);
 
         // Validate logic (dropRate, số lượng tồn kho, secret logic)
         await ValidateBlindBoxItemsAsync(blindBox, seller, items);
@@ -381,7 +381,7 @@ public class BlindBoxService : IBlindBoxService
             var product = products.First(p => p.Id == item.ProductId);
 
             if (item.Quantity > product.Stock)
-                throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho.");
+                throw ErrorHelper.BadRequest(string.Format(ErrorMessages.BlindBoxProductStockExceeded, product.Name));
 
             // Trừ tồn kho
             product.Stock -= item.Quantity;
@@ -422,19 +422,19 @@ public class BlindBoxService : IBlindBoxService
         if (blindBox == null)
         {
             _logger.Warn($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} not found.");
-            throw ErrorHelper.NotFound("Blind Box không tồn tại");
+            throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
         }
 
         if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
-            throw ErrorHelper.BadRequest("Phải có ít nhất 1 item trong Blind Box");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxAtLeastOneItem);
 
         var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
         if (totalDropRate != 100)
-            throw ErrorHelper.BadRequest("Tổng DropRate phải bằng 100%.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateMustBe100);
 
         var itemCount = blindBox.BlindBoxItems.Count;
         if (itemCount != 6 && itemCount != 12)
-            throw ErrorHelper.BadRequest("Blind Box phải có đủ 6 hoặc 12 item để gửi duyệt.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxItemCountInvalid);
 
         blindBox.UpdatedAt = _time.GetCurrentTime();
         blindBox.Status = BlindBoxStatus.PendingApproval;
@@ -458,7 +458,7 @@ public class BlindBoxService : IBlindBoxService
         );
 
         if (blindBox == null)
-            throw ErrorHelper.NotFound("Blind Box không tồn tại hoặc không ở trạng thái chờ duyệt.");
+            throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFoundOrNotPending);
 
         var currentUserId = _claimsService.CurrentUserId;
         var now = _time.GetCurrentTime();
@@ -466,11 +466,11 @@ public class BlindBoxService : IBlindBoxService
         if (approve)
         {
             if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
-                throw ErrorHelper.BadRequest("Blind Box không chứa item nào.");
+                throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxNoItems);
 
             var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
             if (totalDropRate != 100)
-                throw ErrorHelper.BadRequest("Tổng DropRate phải bằng 100%.");
+                throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateMustBe100);
 
             blindBox.Status = BlindBoxStatus.Approved;
             blindBox.UpdatedAt = now;
@@ -505,7 +505,7 @@ public class BlindBoxService : IBlindBoxService
         else
         {
             if (string.IsNullOrWhiteSpace(rejectReason))
-                throw ErrorHelper.BadRequest("Lý do từ chối là bắt buộc.");
+                throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxRejectReasonRequired);
 
             blindBox.Status = BlindBoxStatus.Rejected;
             blindBox.RejectReason = rejectReason.Trim();
@@ -537,7 +537,7 @@ public class BlindBoxService : IBlindBoxService
         );
 
         if (blindBox == null)
-            throw ErrorHelper.NotFound("Blind Box không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
 
         var currentUserId = _claimsService.CurrentUserId;
 
@@ -545,7 +545,7 @@ public class BlindBoxService : IBlindBoxService
             s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
 
         if (seller == null)
-            throw ErrorHelper.Forbidden("Không có quyền xoá item khỏi Blind Box này.");
+            throw ErrorHelper.Forbidden(ErrorMessages.BlindBoxNoDeleteItemPermission);
 
         if (!blindBox.BlindBoxItems.Any())
             return await GetBlindBoxByIdAsync(blindBoxId);
@@ -582,14 +582,14 @@ public class BlindBoxService : IBlindBoxService
         );
 
         if (blindBox == null)
-            throw ErrorHelper.NotFound("Blind Box không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
 
         var currentUserId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
             s.Id == blindBox.SellerId && s.UserId == currentUserId && !s.IsDeleted);
 
         if (seller == null)
-            throw ErrorHelper.Forbidden("Không có quyền xoá Blind Box này.");
+            throw ErrorHelper.Forbidden(ErrorMessages.BlindBoxNoDeletePermission);
 
         // Soft delete BlindBox
         await _unitOfWork.BlindBoxes.SoftRemove(blindBox);
@@ -641,7 +641,7 @@ public class BlindBoxService : IBlindBoxService
     private async Task ValidateBlindBoxItemsAsync(BlindBox blindBox, Seller seller, List<BlindBoxItemDto> items)
     {
         if (items == null || items.Count == 0)
-            throw ErrorHelper.BadRequest("Danh sách item không được để trống.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxItemListRequired);
 
         var productIds = items.Select(i => i.ProductId).ToList();
 
@@ -652,14 +652,14 @@ public class BlindBoxService : IBlindBoxService
             !p.IsDeleted);
 
         if (products.Count != items.Count)
-            throw ErrorHelper.BadRequest("Một hoặc nhiều sản phẩm không hợp lệ hoặc đã hết hàng.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxProductInvalidOrOutOfStock);
 
         // Validate số lượng
         foreach (var item in items)
         {
             var product = products.First(p => p.Id == item.ProductId);
             if (item.Quantity > product.Stock)
-                throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' vượt quá số lượng tồn kho.");
+                throw ErrorHelper.BadRequest(string.Format(ErrorMessages.BlindBoxProductStockExceeded, product.Name));
         }
 
         // Validate DropRate và xử lý Secret
@@ -670,7 +670,7 @@ public class BlindBoxService : IBlindBoxService
             if (item.Rarity == BlindBoxRarity.Secret)
             {
                 if (!blindBox.HasSecretItem)
-                    throw ErrorHelper.BadRequest("Blind Box không hỗ trợ Secret item.");
+                    throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxNoSecretSupport);
 
                 item.DropRate = 5m; // ép cứng drop rate cho Secret
                 hasSecret = true;
@@ -681,10 +681,10 @@ public class BlindBoxService : IBlindBoxService
             }
 
         if (!hasSecret)
-            throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item loại Secret.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxSecretItemRequired);
 
         if (totalDropRate >= 100)
-            throw ErrorHelper.BadRequest("Tổng DropRate của item (trừ Secret) phải nhỏ hơn 100%.");
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateExceeded);
     }
 
     /// <summary>
