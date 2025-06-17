@@ -91,6 +91,10 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
         c.RoutePrefix = string.Empty;
         c.InjectStylesheet("/swagger-ui/custom-theme.css");
         c.HeadContent = $"<style>{SwaggerTheme.GetSwaggerThemeCss(Theme.OneDark)}</style>";
+        c.ConfigObject.AdditionalItems.Add("persistAuthorization", "true");
+        c.InjectJavascript("/custom-swagger.js");
+        c.InjectStylesheet("/custom-swagger.css");
+
     });
 }
 
