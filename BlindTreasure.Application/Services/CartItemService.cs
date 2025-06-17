@@ -5,6 +5,7 @@ using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
+using static BlindTreasure.Application.Services.OrderService;
 
 namespace BlindTreasure.Application.Services;
 
@@ -136,7 +137,15 @@ public class CartItemService : ICartItemService
             throw ErrorHelper.NotFound("Cart item không tồn tại.");
 
         if (dto.Quantity <= 0)
-            throw ErrorHelper.BadRequest("Số lượng phải lớn hơn 0.");
+        {
+            // Xóa mềm cart item nếu số lượng <= 0
+            cartItem.IsDeleted = true;
+            cartItem.DeletedAt = DateTime.UtcNow;
+            await _unitOfWork.CartItems.Update(cartItem);
+            await _unitOfWork.SaveChangesAsync();
+            _loggerService.Success("[UpdateCartItemAsync] Đã xóa item khỏi giỏ hàng do số lượng <= 0.");
+            return await GetCurrentUserCartAsync();
+        }
 
         // Kiểm tra tồn kho nếu là product
         if (cartItem.ProductId.HasValue)
@@ -196,5 +205,36 @@ public class CartItemService : ICartItemService
         await _unitOfWork.CartItems.UpdateRange(cartItems);
         await _unitOfWork.SaveChangesAsync();
         _loggerService.Success("[ClearCartAsync] Đã xóa toàn bộ giỏ hàng.");
+    }
+
+    public async Task UpdateCartAfterCheckoutAsync(Guid userId, List<CheckoutItem> checkoutItems)
+    {
+        foreach (var item in checkoutItems)
+        {
+            // Tìm cart item theo user, productId, blindBoxId
+            var cartItem = await _unitOfWork.CartItems.FirstOrDefaultAsync(
+                c => c.UserId == userId
+                    && c.ProductId == item.ProductId
+                    && c.BlindBoxId == item.BlindBoxId
+                    && !c.IsDeleted
+            );
+
+            if (cartItem != null)
+            {
+                cartItem.Quantity -= item.Quantity;
+                if (cartItem.Quantity <= 0)
+                {
+                    cartItem.IsDeleted = true;
+                    cartItem.DeletedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    cartItem.TotalPrice = cartItem.Quantity * cartItem.UnitPrice;
+                    cartItem.UpdatedAt = DateTime.UtcNow;
+                }
+                await _unitOfWork.CartItems.Update(cartItem);
+            }
+        }
+        await _unitOfWork.SaveChangesAsync();
     }
 }

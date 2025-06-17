@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.DTOs.CartItemDTOs;
+﻿using BlindTreasure.Application.Services;
+using BlindTreasure.Domain.DTOs.CartItemDTOs;
 
 namespace BlindTreasure.Application.Interfaces;
 
@@ -8,5 +9,6 @@ public interface ICartItemService
     Task ClearCartAsync();
     Task<CartDto> GetCurrentUserCartAsync();
     Task<CartDto> RemoveCartItemAsync(Guid cartItemId);
+    Task UpdateCartAfterCheckoutAsync(Guid userId, List<OrderService.CheckoutItem> checkoutItems);
     Task<CartDto> UpdateCartItemAsync(UpdateCartItemDto dto);
 }

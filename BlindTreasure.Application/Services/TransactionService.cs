@@ -68,6 +68,7 @@ public class TransactionService : ITransactionService
 
             await _unitOfWork.SaveChangesAsync();
             _loggerService.Success($"[HandleSuccessfulPaymentAsync] Đã xác nhận thanh toán thành công cho order {orderId}.");
+            _loggerService.Success($"[HandleSuccessfulPaymentAsync] Đã cập nhật trang thái PAID thành công cho {orderId}.");
         }
         catch (Exception ex)
         {
