@@ -215,7 +215,7 @@ public class BlindBoxService : IBlindBoxService
 
         if (string.IsNullOrWhiteSpace(dto.Brand))
             throw ErrorHelper.BadRequest("Brand Blind Box là bắt buộc.");
-        
+
         if (dto.ReleaseDate == default)
             throw ErrorHelper.BadRequest("Ngày phát hành không hợp lệ.");
 
@@ -293,7 +293,7 @@ public class BlindBoxService : IBlindBoxService
 
         if (dto.TotalQuantity.HasValue)
             blindBox.TotalQuantity = dto.TotalQuantity.Value;
-        
+
         if (!string.IsNullOrWhiteSpace(dto.Brand))
             blindBox.Brand = dto.Brand.Trim();
 
@@ -310,7 +310,6 @@ public class BlindBoxService : IBlindBoxService
         blindBox.UpdatedBy = currentUserId;
 
         if (dto.ImageFile != null)
-        {
             try
             {
                 blindBox.ImageUrl = await _blobService.ReplaceImageAsync(
@@ -325,7 +324,6 @@ public class BlindBoxService : IBlindBoxService
                 _logger.Error($"[UpdateBlindBoxAsync] ReplaceImageAsync failed: {ex.Message}");
                 throw ErrorHelper.Internal("Lỗi khi cập nhật ảnh Blind Box.");
             }
-        }
 
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();

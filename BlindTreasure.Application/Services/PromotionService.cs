@@ -27,7 +27,6 @@ public class PromotionService : IPromotionService
     }
 
     /// <summary>
-    /// 
     /// </summary>
     /// <param name="dto"></param>
     /// <returns></returns>

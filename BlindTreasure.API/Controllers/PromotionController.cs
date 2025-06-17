@@ -13,7 +13,4 @@ public class PromotionController : ControllerBase
     {
         _promotionService = promotionService;
     }
-    
-    
-    
 }

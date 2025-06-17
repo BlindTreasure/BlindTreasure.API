@@ -63,10 +63,10 @@ builder.Services.AddTransient<IStripeClient, StripeClient>(s =>
     var clientFactory = s.GetRequiredService<IHttpClientFactory>();
 
     var sysHttpClient = new SystemNetHttpClient(
-     httpClient: clientFactory.CreateClient("Stripe"),
-     maxNetworkRetries: StripeConfiguration.MaxNetworkRetries,
-     appInfo: appInfo,
-     enableTelemetry: StripeConfiguration.EnableTelemetry);
+        clientFactory.CreateClient("Stripe"),
+        StripeConfiguration.MaxNetworkRetries,
+        appInfo,
+        StripeConfiguration.EnableTelemetry);
 
     return new StripeClient(StripeConfiguration.ApiKey, httpClient: sysHttpClient);
 });

@@ -19,9 +19,9 @@ public class CategoryServiceTests
     private readonly CategoryService _categoryService;
     private readonly Mock<IClaimsService> _claimsServiceMock;
     private readonly Mock<ILoggerService> _loggerMock;
+    private readonly Mock<IMapperService> _mapperMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IUserService> _userServiceMock;
-    private readonly Mock<IMapperService> _mapperMock;
 
     public CategoryServiceTests(Mock<IBlobService> blobServiceMock, Mock<IMapperService> mapperMock)
     {
