@@ -8,4 +8,5 @@ public interface IPromotionService
 {
     Task<Pagination<PromotionDto>> GetPromotionsAsync(PromotionQueryParameter param);
     Task<PromotionDto> CreatePromotionAsync(CreatePromotionDto dto);
+    Task<PromotionDto> ReviewPromotionAsync(ReviewPromotionDto dto);
 }

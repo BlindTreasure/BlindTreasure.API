@@ -40,7 +40,7 @@ public class PromotionController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách voucher của Seller hiện tại (có filter theo Status, phân trang).
+    /// Lấy danh sách voucher 
     /// </summary>
     [HttpGet()]
     [ProducesResponseType(typeof(ApiResult<Pagination<PromotionDto>>), StatusCodes.Status200OK)]
@@ -58,4 +58,26 @@ public class PromotionController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
+    
+    /// <summary>
+    /// STAFF duyệt hoặc từ chối voucher đang chờ xử lý.
+    /// </summary>
+    [HttpPost("review")]
+    [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ReviewPromotion([FromBody] ReviewPromotionDto dto)
+    {
+        try
+        {
+            var result = await _promotionService.ReviewPromotionAsync(dto);
+            return Ok(ApiResult<PromotionDto>.Success(result, "200", "Xử lý xét duyệt voucher thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<PromotionDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
 }

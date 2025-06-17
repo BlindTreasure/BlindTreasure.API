@@ -19,15 +19,17 @@ public class PromotionService : IPromotionService
     private readonly IMapperService _mapperService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserService _userService;
+    private readonly IEmailService _emailService;
 
     public PromotionService(IUnitOfWork unitOfWork, ILoggerService loggerService, IMapperService mapperService,
-        IClaimsService claimsService, IUserService userService)
+        IClaimsService claimsService, IUserService userService, IEmailService emailService)
     {
         _unitOfWork = unitOfWork;
         _loggerService = loggerService;
         _mapperService = mapperService;
         _claimsService = claimsService;
         _userService = userService;
+        _emailService = emailService;
     }
 
     public async Task<Pagination<PromotionDto>> GetPromotionsAsync(PromotionQueryParameter param)
@@ -71,6 +73,69 @@ public class PromotionService : IPromotionService
 
         var promotion = await SetPromotionDataAsync(dto, user);
         await _unitOfWork.Promotions.AddAsync(promotion);
+        await _unitOfWork.SaveChangesAsync();
+
+        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+    }
+
+    public async Task<PromotionDto> ReviewPromotionAsync(ReviewPromotionDto dto)
+    {
+        var currentUserId = _claimsService.CurrentUserId;
+        var user = await _userService.GetUserById(currentUserId, useCache: true);
+
+        if (user == null || (user.RoleName != RoleType.Staff && user.RoleName != RoleType.Admin))
+            throw ErrorHelper.Forbidden("Bạn không có quyền thực hiện hành động này.");
+
+        var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == dto.PromotionId);
+        if (promotion == null)
+            throw ErrorHelper.NotFound("Không tìm thấy voucher.");
+
+        if (promotion.Status != PromotionStatus.Pending)
+            throw ErrorHelper.BadRequest("Chỉ có thể duyệt hoặc từ chối voucher đang chờ duyệt.");
+
+        // Lấy thông tin seller để gửi email
+        if (!promotion.SellerId.HasValue)
+            throw ErrorHelper.BadRequest("Voucher toàn sàn không thể duyệt qua luồng này.");
+
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.Id == promotion.SellerId.Value);
+        if (seller == null)
+            throw ErrorHelper.NotFound("Không tìm thấy seller của voucher.");
+
+        var sellerUser = await _userService.GetUserById(seller.UserId, useCache: true);
+        if (sellerUser == null)
+            throw ErrorHelper.NotFound("Không tìm thấy tài khoản của seller.");
+
+        // Xử lý duyệt hoặc từ chối
+        if (dto.IsApproved)
+        {
+            promotion.Status = PromotionStatus.Approved;
+            promotion.UpdatedAt = DateTime.UtcNow;
+
+            _loggerService.Info($"[ReviewPromotion] Duyệt voucher {promotion.Code} bởi user {user.Id}");
+
+            await _emailService.SendPromotionApprovedAsync(
+                sellerUser.Email,
+                sellerUser.FullName,
+                promotion.Code
+            );
+        }
+        else
+        {
+            promotion.Status = PromotionStatus.Rejected;
+            promotion.RejectReason = dto.RejectReason?.Trim();
+            promotion.UpdatedAt = DateTime.UtcNow;
+
+            _loggerService.Info($"[ReviewPromotion] Từ chối voucher {promotion.Code} bởi user {user.Id}");
+
+            await _emailService.SendPromotionRejectedAsync(
+                sellerUser.Email,
+                sellerUser.FullName,
+                promotion.Code,
+                dto.RejectReason ?? "Không xác định"
+            );
+        }
+
+        await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
 
         return _mapperService.Map<Promotion, PromotionDto>(promotion);
