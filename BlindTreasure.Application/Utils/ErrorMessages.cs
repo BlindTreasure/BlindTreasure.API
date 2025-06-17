@@ -22,14 +22,17 @@ public static class ErrorMessages
 
     #region Account Error Message
 
-    public const string AccountNotFound = "User not found.";
+    public const string AccountNotFound = "User id/email is not found.";
     public const string AccountInvalidRole = "Invalid role.";
-    public const string AccountSuspended = "Suspended account.";
+    public const string AccountSuspendedOrBan = "Suspended account or banned.";
     public const string AccountLocked = "Account is locked until {0}. Please try again later.";
     public const string AccountWrongPassword = "Wrong password.";
     public const string AccountVerificationCodeExpired = "Verification code expired.";
     public const string AccountInvalidVerificationCode = "Invalid code.";
     public const string AccountRecoveryEmailInUse = "Recovery email already in use.";
+    public const string AccountAccesstokenInvalid = "The user has been log out or invalid token.";
+    public const string ExpiredRefreshtokenInvalid = "Refresh token has expired.";
+    public const string AccountInvalidRefreshToken = "The refresh token is invalid or expired.";
 
     public const string AccountTooManyRecoveryAttempts =
         "Too many failed recovery attempts. Please try again after {0}.";
@@ -56,9 +59,10 @@ public static class ErrorMessages
     #region Oauth Error Message
 
     public const string Oauth_ClientIdMissing = "ClientID is missing.";
-    public const string Oauth_PayloadNull = "Google payload is null.";
     public const string Oauth_InvalidToken = "Google token is invalid.";
+    public const string Oauth_PayloadNull = "Google payload is null.";
     public const string Oauth_InvalidCredential = "Invalid credential.";
+    public const string Oauth_InvalidOtp = "Invalid Otp code.";
 
     #endregion
 
@@ -81,7 +85,7 @@ public static class ErrorMessages
     public const string Jwt_InvalidToken = "Invalid or expired JWT Token.";
     public const string Jwt_RefreshTokenExpired = "Refresh token expired. Please re-login.";
     public const string AuthenticationFailed = "Authentication failed. Please try again.";
-    public const string GeneratedSubdomainTroll = "Subdomain is not valid. Please try again.";
+    public const string GeneratedSubdomain = "Subdomain is not valid. Please try again.";
 
     #endregion
 
@@ -91,4 +95,58 @@ public static class ErrorMessages
     public const string StripeSessionNotFound = "Stripe session not found, callback handler throwing exception!";
 
     #endregion
+
+    #region Caching
+
+    public const string VerifyOtpExistingCoolDown = "You are sending OTP too fast. Please try again after a few minutes.";
+    public const string CacheUserNotFound = "User data not found in cache.";
+
+    #endregion
+
+    #region BlindBox Error Message
+
+    public const string BlindBoxNotFound = "Blind box not found.";
+    public const string BlindBoxDataRequired = "Blind box data is required.";
+    public const string BlindBoxNameRequired = "Blind box name is required.";
+    public const string BlindBoxPriceInvalid = "Blind box price must be greater than 0.";
+    public const string BlindBoxTotalQuantityInvalid = "Blind box total quantity must be greater than 0.";
+    public const string BlindBoxBrandRequired = "Blind box brand is required.";
+    public const string BlindBoxReleaseDateInvalid = "Blind box release date is invalid.";
+    public const string BlindBoxImageRequired = "Blind box image is required.";
+    public const string BlindBoxSellerNotVerified = "You must be a verified seller to create a blind box.";
+    public const string BlindBoxImageUrlError = "Error retrieving blind box image URL.";
+    public const string BlindBoxNoUpdatePermission = "You do not have permission to update this blind box.";
+    public const string BlindBoxImageUpdateError = "Error updating blind box image.";
+    public const string BlindBoxNoEditPermission = "You do not have permission to edit this blind box.";
+    public const string BlindBoxItemCountInvalid = "Blind box must contain exactly 6 or 12 items.";
+    public const string BlindBoxAtLeastOneItem = "Blind box must have at least one item.";
+    public const string BlindBoxDropRateMustBe100 = "Total drop rate must be 100%.";
+    public const string BlindBoxNotFoundOrNotPending = "Blind box not found or not pending approval.";
+    public const string BlindBoxNoItems = "Blind box contains no items.";
+    public const string BlindBoxRejectReasonRequired = "Reject reason is required.";
+    public const string BlindBoxNoDeleteItemPermission = "You do not have permission to delete items from this blind box.";
+    public const string BlindBoxNoDeletePermission = "You do not have permission to delete this blind box.";
+    public const string BlindBoxItemListRequired = "Item list cannot be empty.";
+    public const string BlindBoxProductInvalidOrOutOfStock = "One or more products are invalid or out of stock.";
+    public const string BlindBoxProductStockExceeded = "Product '{0}' exceeds available stock.";
+    public const string BlindBoxNoSecretSupport = "Blind box does not support secret items.";
+    public const string BlindBoxSecretItemRequired = "Blind box must have at least one secret item.";
+    public const string BlindBoxDropRateExceeded = "Total drop rate (excluding secret) must be less than 100%.";
+
+    #endregion
+
+
+    #region Cart Error Message
+
+    public const string CartItemQuantityMustBeGreaterThanZero = "Quantity must be greater than 0.";
+    public const string CartItemProductOrBlindBoxRequired = "You must select a product or a blind box.";
+    public const string CartItemProductNotFound = "Product not found.";
+    public const string CartItemProductOutOfStock = "Product is out of stock.";
+    public const string CartItemBlindBoxNotFoundOrRejected = "Blind box not found or has been rejected.";
+    public const string CartItemNotFound = "Cart item not found.";
+    public const string CartItemBlindBoxNotFound = "Blind box not found.";
+
+    #endregion
+
+
 }

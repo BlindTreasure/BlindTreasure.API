@@ -42,7 +42,7 @@ public class AuthService : IAuthService
         if (await UserExistsAsync(registrationDto.Email))
         {
             _logger.Warn($"[RegisterUserAsync] Email {registrationDto.Email} already registered.");
-            throw ErrorHelper.Conflict("Email đã được sử dụng.");
+            throw ErrorHelper.Conflict(ErrorMessages.AccountEmailAlreadyRegistered);
         }
 
         var hashedPassword = new PasswordHasher().HashPassword(registrationDto.Password);
@@ -75,7 +75,7 @@ public class AuthService : IAuthService
     public async Task<UserDto?> RegisterSellerAsync(SellerRegistrationDto dto)
     {
         if (await UserExistsAsync(dto.Email))
-            throw ErrorHelper.Conflict("Email đã được sử dụng.");
+            throw ErrorHelper.Conflict(ErrorMessages.AccountEmailAlreadyRegistered);
 
         var hashedPassword = new PasswordHasher().HashPassword(dto.Password);
 
@@ -121,13 +121,13 @@ public class AuthService : IAuthService
         // Get user from cache or DBB
         var user = await GetUserByEmailAsync(loginDto.Email!, true);
         if (user == null)
-            throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
 
         if (!new PasswordHasher().VerifyPassword(loginDto.Password!, user.Password))
-            throw ErrorHelper.Unauthorized("Mật khẩu không chính xác.");
+            throw ErrorHelper.Unauthorized(ErrorMessages.AccountWrongPassword);
 
         if (user.Status != UserStatus.Active)
-            throw ErrorHelper.Forbidden("Tài khoản chưa được kích hoạt.");
+            throw ErrorHelper.Forbidden(ErrorMessages.AccountNotVerified);
 
         _logger.Success($"[LoginAsync] User {loginDto.Email} authenticated successfully.");
 
@@ -163,13 +163,13 @@ public class AuthService : IAuthService
 
         var user = await GetUserById(userId);
         if (user == null)
-            throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
 
         if (user.IsDeleted || user.Status == UserStatus.Suspended)
-            throw ErrorHelper.Forbidden("Tài khoản đã bị vô hiệu hóa hoặc cấm.");
+            throw ErrorHelper.Forbidden(ErrorMessages.AccountSuspendedOrBan);
 
         if (string.IsNullOrEmpty(user.RefreshToken))
-            throw ErrorHelper.BadRequest("Người dùng đã đăng xuất trước đó.");
+            throw ErrorHelper.BadRequest(ErrorMessages.AccountAccesstokenInvalid);
 
         // Xóa token trong DB
         user.RefreshToken = null;
@@ -187,20 +187,19 @@ public class AuthService : IAuthService
     public async Task<LoginResponseDto?> RefreshTokenAsync(TokenRefreshRequestDto refreshTokenDto,
         IConfiguration configuration)
     {
-        if (string.IsNullOrWhiteSpace(refreshTokenDto.RefreshToken)) throw ErrorHelper.BadRequest("Thiếu token");
 
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u =>
             u.RefreshToken == refreshTokenDto.RefreshToken);
 
         if (user == null)
-            throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
 
         if (string.IsNullOrEmpty(user.RefreshToken))
-            throw ErrorHelper.BadRequest("Người dùng đã đăng xuất trước đó.");
+            throw ErrorHelper.BadRequest(ErrorMessages.AccountAccesstokenInvalid);
 
         // Kiểm tra Refresh Token có hợp lệ không (thời gian hết hạn)
         if (user.RefreshTokenExpiryTime < DateTime.UtcNow)
-            throw ErrorHelper.Conflict("Refresh token has expired.");
+            throw ErrorHelper.Conflict(ErrorMessages.Jwt_RefreshTokenExpired);
 
         var roleName = user.RoleName.ToString();
 
@@ -236,7 +235,7 @@ public class AuthService : IAuthService
         _logger.Info($"[VerifyEmailOtpAsync] Verifying OTP for {email}");
 
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
-        if (user == null) throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
+        if (user == null) throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
 
         if (user.IsEmailVerified) return false;
         if (!await VerifyOtpAsync(email, otp, OtpPurpose.Register, "register-otp"))
@@ -322,7 +321,7 @@ public class AuthService : IAuthService
         {
             OtpType.Register => await ResendRegisterOtpAsync(email),
             OtpType.ForgotPassword => await SendForgotPasswordOtpRequestAsync(email),
-            _ => throw ErrorHelper.BadRequest("Loại OTP không hợp lệ.")
+            _ => throw ErrorHelper.BadRequest(ErrorMessages.Oauth_InvalidOtp)
         };
     }
 
@@ -330,16 +329,16 @@ public class AuthService : IAuthService
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
         if (user == null)
-            throw ErrorHelper.NotFound("Email không tồn tại trong hệ thống.");
+            throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
 
         if (user.IsDeleted || user.Status == UserStatus.Suspended)
-            throw ErrorHelper.Forbidden("Tài khoản đã bị vô hiệu hóa hoặc cấm.");
+            throw ErrorHelper.Forbidden(ErrorMessages.AccountSuspendedOrBan);
 
         if (user.IsEmailVerified)
-            throw ErrorHelper.Conflict("Tài khoản đã xác minh, không cần gửi lại OTP.");
+            throw ErrorHelper.Conflict(ErrorMessages.AccountAlreadyVerified);
 
         if (await _cacheService.ExistsAsync($"otp-sent:{email}"))
-            throw ErrorHelper.BadRequest("Bạn đang gửi OTP quá nhanh. Vui lòng thử lại sau ít phút.");
+            throw ErrorHelper.BadRequest(ErrorMessages.VerifyOtpExistingCoolDown);
 
         await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
         await _cacheService.SetAsync($"otp-sent:{email}", true, TimeSpan.FromMinutes(1));
@@ -351,25 +350,28 @@ public class AuthService : IAuthService
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
         if (user == null)
-            throw ErrorHelper.NotFound("Tài khoản không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
 
         if (user.Status == UserStatus.Suspended)
-            throw ErrorHelper.Forbidden("Tài khoản đã bị cấm.");
+            throw ErrorHelper.Forbidden(ErrorMessages.AccountSuspendedOrBan);
 
         if (!user.IsEmailVerified)
-            throw ErrorHelper.Conflict("Email chưa được xác minh. Không thể gửi OTP quên mật khẩu.");
+            throw ErrorHelper.Conflict(ErrorMessages.AccountNotVerified);
 
         var counterKey = $"forgot-otp-count:{email}";
         var countValue = await _cacheService.GetAsync<int?>(counterKey) ?? 0;
 
         if (countValue >= 3)
-            throw ErrorHelper.BadRequest("Bạn đã gửi quá nhiều OTP. Vui lòng thử lại sau 15 phút.");
+            throw ErrorHelper.BadRequest(ErrorMessages.Oauth_InvalidOtp);
 
         // Gửi OTP
         await GenerateAndSendOtpAsync(user, OtpPurpose.ForgotPassword, "forgot-otp");
 
         // Tăng số lần gửi và set timeout nếu là lần đầu tiên
         await _cacheService.SetAsync(counterKey, countValue + 1, TimeSpan.FromMinutes(15));
+
+
+        _logger.Info($"[SendForgotPasswordOtpRequestAsync] OTP sent to {email}");
 
         return true;
     }

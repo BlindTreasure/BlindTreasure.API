@@ -68,31 +68,29 @@ public class CartItemService : ICartItemService
     {
         var userId = _claimsService.CurrentUserId;
         if (dto.Quantity <= 0)
-            throw ErrorHelper.BadRequest("Số lượng phải lớn hơn 0.");
+            throw ErrorHelper.BadRequest(ErrorMessages.CartItemQuantityMustBeGreaterThanZero);
 
         if (dto.ProductId == null && dto.BlindBoxId == null)
-            throw ErrorHelper.BadRequest("Phải chọn sản phẩm hoặc blind box.");
+            throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOrBlindBoxRequired);
 
-        // Kiểm tra tồn tại và lấy giá
         decimal unitPrice;
         if (dto.ProductId.HasValue)
         {
             var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId.Value);
             if (product == null || product.IsDeleted)
-                throw ErrorHelper.NotFound("Sản phẩm không tồn tại.");
+                throw ErrorHelper.NotFound(ErrorMessages.CartItemProductNotFound);
             if (product.Stock < dto.Quantity)
-                throw ErrorHelper.BadRequest("Sản phẩm không đủ tồn kho.");
+                throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOutOfStock);
             unitPrice = product.Price;
         }
         else
         {
             var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(dto.BlindBoxId.Value);
             if (blindBox == null || blindBox.IsDeleted || blindBox.Status == BlindBoxStatus.Rejected)
-                throw ErrorHelper.NotFound("Blind box không tồn tại hoặc đã bị rejected.");
+                throw ErrorHelper.NotFound(ErrorMessages.CartItemBlindBoxNotFoundOrRejected);
             unitPrice = blindBox.Price;
         }
 
-        // Kiểm tra đã có trong cart chưa
         var existed = await _unitOfWork.CartItems.FirstOrDefaultAsync(c => c.UserId == userId
                                                                            && c.ProductId == dto.ProductId
                                                                            && c.BlindBoxId == dto.BlindBoxId
@@ -124,7 +122,7 @@ public class CartItemService : ICartItemService
         }
 
         await _unitOfWork.SaveChangesAsync();
-        _loggerService.Success("[AddToCartAsync] Thêm vào giỏ hàng thành công.");
+        _loggerService.Success("[AddToCartAsync] Add to cart successful.");
         return await GetCurrentUserCartAsync();
     }
 
@@ -134,34 +132,32 @@ public class CartItemService : ICartItemService
         var userId = _claimsService.CurrentUserId;
         var cartItem = await _unitOfWork.CartItems.GetByIdAsync(dto.CartItemId, c => c.Product, c => c.BlindBox);
         if (cartItem == null || cartItem.IsDeleted || cartItem.UserId != userId)
-            throw ErrorHelper.NotFound("Cart item không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.CartItemNotFound);
 
         if (dto.Quantity <= 0)
         {
-            // Xóa mềm cart item nếu số lượng <= 0
             cartItem.IsDeleted = true;
             cartItem.DeletedAt = DateTime.UtcNow;
             await _unitOfWork.CartItems.Update(cartItem);
             await _unitOfWork.SaveChangesAsync();
-            _loggerService.Success("[UpdateCartItemAsync] Đã xóa item khỏi giỏ hàng do số lượng <= 0.");
+            _loggerService.Success("[UpdateCartItemAsync] Cart item removed because quantity <= 0.");
             return await GetCurrentUserCartAsync();
         }
 
-        // Kiểm tra tồn kho nếu là product
         if (cartItem.ProductId.HasValue)
         {
             var product = cartItem.Product;
             if (product == null || product.IsDeleted)
-                throw ErrorHelper.NotFound("Sản phẩm không tồn tại.");
+                throw ErrorHelper.NotFound(ErrorMessages.CartItemProductNotFound);
             if (product.Stock < dto.Quantity)
-                throw ErrorHelper.BadRequest("Sản phẩm không đủ tồn kho.");
+                throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOutOfStock);
             cartItem.UnitPrice = product.Price;
         }
         else if (cartItem.BlindBoxId.HasValue)
         {
             var blindBox = cartItem.BlindBox;
             if (blindBox == null || blindBox.IsDeleted)
-                throw ErrorHelper.NotFound("Blind box không tồn tại.");
+                throw ErrorHelper.NotFound(ErrorMessages.CartItemBlindBoxNotFound);
             cartItem.UnitPrice = blindBox.Price;
         }
 
@@ -171,7 +167,7 @@ public class CartItemService : ICartItemService
 
         await _unitOfWork.CartItems.Update(cartItem);
         await _unitOfWork.SaveChangesAsync();
-        _loggerService.Success("[UpdateCartItemAsync] Cập nhật giỏ hàng thành công.");
+        _loggerService.Success("[UpdateCartItemAsync] Cart updated successfully.");
         return await GetCurrentUserCartAsync();
     }
 
@@ -181,13 +177,13 @@ public class CartItemService : ICartItemService
         var userId = _claimsService.CurrentUserId;
         var cartItem = await _unitOfWork.CartItems.GetByIdAsync(cartItemId);
         if (cartItem == null || cartItem.IsDeleted || cartItem.UserId != userId)
-            throw ErrorHelper.NotFound("Cart item không tồn tại.");
+            throw ErrorHelper.NotFound(ErrorMessages.CartItemNotFound);
 
         cartItem.IsDeleted = true;
         cartItem.DeletedAt = DateTime.UtcNow;
         await _unitOfWork.CartItems.Update(cartItem);
         await _unitOfWork.SaveChangesAsync();
-        _loggerService.Success("[RemoveCartItemAsync] Xóa item khỏi giỏ hàng thành công.");
+        _loggerService.Success("[RemoveCartItemAsync] Cart item removed successfully.");
         return await GetCurrentUserCartAsync();
     }
 
