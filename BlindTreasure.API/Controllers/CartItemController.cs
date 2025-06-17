@@ -64,14 +64,14 @@ public class CartItemController : ControllerBase
     /// <summary>
     ///     Xóa một item khỏi giỏ hàng.
     /// </summary>
-    [HttpDelete("{cartItemId}")]
+    [HttpDelete("{id}")]
     [ProducesResponseType(typeof(ApiResult<CartDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 404)]
-    public async Task<IActionResult> RemoveCartItem(Guid cartItemId)
+    public async Task<IActionResult> RemoveCartItem(Guid id)
     {
         try
         {
-            var result = await _cartItemService.RemoveCartItemAsync(cartItemId);
+            var result = await _cartItemService.RemoveCartItemAsync(id);
             return Ok(ApiResult<CartDto>.Success(result, "200", "Xóa item khỏi giỏ hàng thành công."));
         }
         catch (Exception ex)
