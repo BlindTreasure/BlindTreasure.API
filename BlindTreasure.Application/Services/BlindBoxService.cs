@@ -128,21 +128,12 @@ public class BlindBoxService : IBlindBoxService
             foreach (var box in items) box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
         }
 
-        var dtos = items.Select(b =>
+        var dtos = new List<BlindBoxDetailDto>();
+        foreach (var b in items)
         {
-            var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(b);
-            dto.StockStatus = b.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
-            dto.Items = b.BlindBoxItems.Select(item => new BlindBoxItemDto
-            {
-                ProductId = item.ProductId,
-                Quantity = item.Quantity,
-                ProductName = item.Product.Name,
-                ImageUrl = item.Product.ImageUrls.FirstOrDefault(),
-                DropRate = item.DropRate,
-                Rarity = item.Rarity
-            }).ToList();
-            return dto;
-        }).ToList();
+            var dto = await MapBlindBoxToDtoAsync(b);
+            dtos.Add(dto);
+        }
 
         var result = new Pagination<BlindBoxDetailDto>(dtos, count, param.PageIndex, param.PageSize);
 
@@ -179,17 +170,7 @@ public class BlindBoxService : IBlindBoxService
 
         blindBox.BlindBoxItems = items;
 
-        var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
-        result.StockStatus = blindBox.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
-        result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
-        {
-            ProductId = item.ProductId,
-            ProductName = item.Product?.Name ?? string.Empty,
-            DropRate = item.DropRate,
-            ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
-            Quantity = item.Quantity,
-            Rarity = item.Rarity
-        }).ToList();
+        var result = await MapBlindBoxToDtoAsync(blindBox);
 
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromHours(1));
         _logger.Info($"[GetBlindBoxByIdAsync] Blind box {blindBoxId} loaded from DB and cached.");
@@ -213,8 +194,8 @@ public class BlindBoxService : IBlindBoxService
         if (dto.TotalQuantity <= 0)
             throw ErrorHelper.BadRequest("Tổng số lượng phải lớn hơn 0.");
 
-        if (string.IsNullOrWhiteSpace(dto.Brand))
-            throw ErrorHelper.BadRequest("Brand Blind Box là bắt buộc.");
+        if (dto.CategoryId == Guid.Empty)
+            throw ErrorHelper.BadRequest("Danh mục sản phẩm là bắt buộc.");
 
         if (dto.ReleaseDate == default)
             throw ErrorHelper.BadRequest("Ngày phát hành không hợp lệ.");
@@ -228,12 +209,16 @@ public class BlindBoxService : IBlindBoxService
         if (seller == null)
             throw ErrorHelper.Forbidden("Bạn chưa được xác minh Seller để tạo Blind Box.");
 
-        // Upload file ảnh lên BlobStorage
+        // Kiểm tra Category tồn tại
+        var category = await _unitOfWork.Categories.FirstOrDefaultAsync(c =>
+            c.Id == dto.CategoryId && !c.IsDeleted);
+        if (category == null)
+            throw ErrorHelper.BadRequest("Danh mục không tồn tại.");
+
         var fileName = $"blindbox-thumbnails/thumbnails-{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
         await using var stream = dto.ImageFile.OpenReadStream();
         await _blobService.UploadFileAsync(fileName, stream);
 
-        // Lấy link file đã upload
         var imageUrl = await _blobService.GetPreviewUrlAsync(fileName);
         if (string.IsNullOrEmpty(imageUrl))
             throw ErrorHelper.Internal("Lỗi khi lấy URL ảnh Blind Box.");
@@ -244,11 +229,11 @@ public class BlindBoxService : IBlindBoxService
         {
             Id = Guid.NewGuid(),
             SellerId = seller.Id,
+            CategoryId = dto.CategoryId,
             Name = dto.Name.Trim(),
             Price = dto.Price,
             TotalQuantity = dto.TotalQuantity,
-            Brand = dto.Brand,
-            Description = dto.Description.Trim(),
+            Description = dto.Description?.Trim(),
             ImageUrl = imageUrl,
             ReleaseDate = releaseDateUtc,
             HasSecretItem = dto.HasSecretItem,
@@ -265,7 +250,6 @@ public class BlindBoxService : IBlindBoxService
         var mappingResult = _mapperService.Map<BlindBox, BlindBoxDetailDto>(result);
 
         await RemoveBlindBoxCacheAsync(blindBox.Id, seller.Id);
-
 
         return mappingResult;
     }
@@ -294,9 +278,6 @@ public class BlindBoxService : IBlindBoxService
         if (dto.TotalQuantity.HasValue)
             blindBox.TotalQuantity = dto.TotalQuantity.Value;
 
-        if (!string.IsNullOrWhiteSpace(dto.Brand))
-            blindBox.Brand = dto.Brand.Trim();
-
         if (dto.ReleaseDate.HasValue)
             blindBox.ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate.Value, DateTimeKind.Utc);
 
@@ -306,10 +287,17 @@ public class BlindBoxService : IBlindBoxService
         if (dto.SecretProbability.HasValue)
             blindBox.SecretProbability = dto.SecretProbability.Value;
 
-        blindBox.UpdatedAt = _time.GetCurrentTime();
-        blindBox.UpdatedBy = currentUserId;
+        if (dto.CategoryId.HasValue)
+        {
+            var category = await _unitOfWork.Categories.FirstOrDefaultAsync(c =>
+                c.Id == dto.CategoryId.Value && !c.IsDeleted);
+            if (category == null)
+                throw ErrorHelper.BadRequest("Danh mục không tồn tại.");
+            blindBox.CategoryId = dto.CategoryId.Value;
+        }
 
         if (dto.ImageFile != null)
+        {
             try
             {
                 blindBox.ImageUrl = await _blobService.ReplaceImageAsync(
@@ -324,6 +312,10 @@ public class BlindBoxService : IBlindBoxService
                 _logger.Error($"[UpdateBlindBoxAsync] ReplaceImageAsync failed: {ex.Message}");
                 throw ErrorHelper.Internal("Lỗi khi cập nhật ảnh Blind Box.");
             }
+        }
+
+        blindBox.UpdatedAt = _time.GetCurrentTime();
+        blindBox.UpdatedBy = currentUserId;
 
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
@@ -629,15 +621,6 @@ public class BlindBoxService : IBlindBoxService
 
     #region private methods
 
-    /// <summary>
-    ///     1. Danh sách item không được để trống.
-    ///     2. Mỗi sản phẩm phải thuộc Seller hiện tại và còn hàng (Stock > 0, chưa bị xoá).
-    ///     3. Số lượng (quantity) của mỗi item không được vượt quá tồn kho (Stock) của sản phẩm tương ứng.
-    ///     4. Blind Box phải có ít nhất 1 item loại Secret.
-    ///     5. Nếu có item loại Secret thì DropRate cố định là 5% (frontend không được nhập).
-    ///     6. Nếu Blind Box không hỗ trợ Secret nhưng có item Secret thì sẽ báo lỗi.
-    ///     7. Tổng DropRate của các item (trừ Secret) phải nhỏ hơn 100%.
-    /// </summary>
     private async Task ValidateBlindBoxItemsAsync(BlindBox blindBox, Seller seller, List<BlindBoxItemDto> items)
     {
         if (items == null || items.Count == 0)
@@ -687,10 +670,6 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.BadRequest("Tổng DropRate của item (trừ Secret) phải nhỏ hơn 100%.");
     }
 
-    /// <summary>
-    ///     Xóa cache liên quan đến BlindBox (theo id và theo list).
-    /// </summary>
-    // Trong BlindBoxService.cs:
     private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId, Guid? sellerId = null)
     {
         await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxDetail(blindBoxId));
@@ -700,8 +679,7 @@ public class BlindBoxService : IBlindBoxService
             await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxSeller(sellerId.Value));
     }
 
-
-    public static class BlindBoxCacheKeys
+    private static class BlindBoxCacheKeys
     {
         public const string BlindBoxAllPrefix = "blindbox:list:public";
 
@@ -719,6 +697,30 @@ public class BlindBoxService : IBlindBoxService
         {
             return $"{BlindBoxAllPrefix}:{paramJson}";
         }
+    }
+
+    private async Task<BlindBoxDetailDto> MapBlindBoxToDtoAsync(BlindBox blindBox)
+    {
+        var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
+        dto.StockStatus = blindBox.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
+
+        // Gán danh sách item
+        dto.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
+        {
+            ProductId = item.ProductId,
+            Quantity = item.Quantity,
+            ProductName = item.Product?.Name ?? string.Empty,
+            ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
+            DropRate = item.DropRate,
+            Rarity = item.Rarity
+        }).ToList();
+
+        // Lấy tên danh mục
+        var category =
+            await _unitOfWork.Categories.FirstOrDefaultAsync(c => c.Id == blindBox.CategoryId && !c.IsDeleted);
+        dto.CategoryName = category?.Name ?? "Không xác định";
+
+        return dto;
     }
 
     #endregion

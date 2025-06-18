@@ -15,7 +15,8 @@ public class CreateBlindBoxDto
     [DefaultValue(typeof(DateTime), "2025-07-01T00:00:00")]
     public DateTime ReleaseDate { get; set; }
 
-    [DefaultValue("Bandai")] public required string Brand { get; set; }
+    [DefaultValue("780e2631-c6e8-40fe-b487-09565faefffe")]
+    public required Guid CategoryId { get; set; }
 
     [DefaultValue("Mô tả cho blind box")] public required string Description { get; set; }
 
