@@ -15,11 +15,11 @@ namespace BlindTreasure.Application.Services;
 public class PromotionService : IPromotionService
 {
     private readonly IClaimsService _claimsService;
+    private readonly IEmailService _emailService;
     private readonly ILoggerService _loggerService;
     private readonly IMapperService _mapperService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserService _userService;
-    private readonly IEmailService _emailService;
 
     public PromotionService(IUnitOfWork unitOfWork, ILoggerService loggerService, IMapperService mapperService,
         IClaimsService claimsService, IUserService userService, IEmailService emailService)
@@ -81,7 +81,7 @@ public class PromotionService : IPromotionService
     public async Task<PromotionDto> ReviewPromotionAsync(ReviewPromotionDto dto)
     {
         var currentUserId = _claimsService.CurrentUserId;
-        var user = await _userService.GetUserById(currentUserId, useCache: true);
+        var user = await _userService.GetUserById(currentUserId, true);
 
         if (user == null || (user.RoleName != RoleType.Staff && user.RoleName != RoleType.Admin))
             throw ErrorHelper.Forbidden("Bạn không có quyền thực hiện hành động này.");
@@ -101,7 +101,7 @@ public class PromotionService : IPromotionService
         if (seller == null)
             throw ErrorHelper.NotFound("Không tìm thấy seller của voucher.");
 
-        var sellerUser = await _userService.GetUserById(seller.UserId, useCache: true);
+        var sellerUser = await _userService.GetUserById(seller.UserId, true);
         if (sellerUser == null)
             throw ErrorHelper.NotFound("Không tìm thấy tài khoản của seller.");
 
