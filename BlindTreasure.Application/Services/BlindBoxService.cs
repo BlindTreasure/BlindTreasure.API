@@ -17,12 +17,14 @@ public class BlindBoxService : IBlindBoxService
 {
     private readonly IBlobService _blobService;
     private readonly ICacheService _cacheService;
+    private readonly ICategoryService _categoryService;
     private readonly IClaimsService _claimsService;
     private readonly IEmailService _emailService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapperService;
     private readonly ICurrentTime _time;
     private readonly IUnitOfWork _unitOfWork;
+
 
     public BlindBoxService(
         IUnitOfWork unitOfWork,
@@ -31,7 +33,7 @@ public class BlindBoxService : IBlindBoxService
         IMapperService mapperService,
         IBlobService blobService,
         ICacheService cacheService,
-        ILoggerService logger, IEmailService emailService)
+        ILoggerService logger, IEmailService emailService, ICategoryService categoryService)
     {
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
@@ -41,6 +43,7 @@ public class BlindBoxService : IBlindBoxService
         _cacheService = cacheService;
         _logger = logger;
         _emailService = emailService;
+        _categoryService = categoryService;
     }
 
     public async Task<Pagination<BlindBoxDetailDto>> GetAllBlindBoxesAsync(BlindBoxQueryParameter param)
@@ -78,6 +81,12 @@ public class BlindBoxService : IBlindBoxService
 
         if (param.ReleaseDateTo.HasValue)
             query = query.Where(b => b.ReleaseDate <= param.ReleaseDateTo.Value);
+
+        if (param.CategoryId.HasValue)
+        {
+            var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
+            query = query.Where(b => categoryIds.Contains(b.CategoryId));
+        }
 
         if (param.HasItem == true)
         {

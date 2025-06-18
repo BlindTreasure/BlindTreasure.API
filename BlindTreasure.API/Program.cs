@@ -94,7 +94,6 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
         c.ConfigObject.AdditionalItems.Add("persistAuthorization", "true");
         c.InjectJavascript("/custom-swagger.js");
         c.InjectStylesheet("/custom-swagger.css");
-
     });
 }
 

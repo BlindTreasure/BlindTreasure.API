@@ -187,7 +187,6 @@ public class AuthService : IAuthService
     public async Task<LoginResponseDto?> RefreshTokenAsync(TokenRefreshRequestDto refreshTokenDto,
         IConfiguration configuration)
     {
-
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u =>
             u.RefreshToken == refreshTokenDto.RefreshToken);
 

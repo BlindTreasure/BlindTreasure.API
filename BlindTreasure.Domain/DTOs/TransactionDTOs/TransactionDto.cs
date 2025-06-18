@@ -1,23 +1,15 @@
-﻿using BlindTreasure.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace BlindTreasure.Domain.DTOs.TransactionDTOs;
 
-namespace BlindTreasure.Domain.DTOs.TransactionDTOs
+public class TransactionDto
 {
-    public class TransactionDto
-    {
-        //public Guid PaymentId { get; set; }
-        //public Payment Payment { get; set; }
-        public Guid Id { get; set; }
+    //public Guid PaymentId { get; set; }
+    //public Payment Payment { get; set; }
+    public Guid Id { get; set; }
 
-        public string Type { get; set; }
-        public decimal Amount { get; set; }
-        public string Currency { get; set; }
-        public string Status { get; set; }
-        public DateTime OccurredAt { get; set; }
-        public string ExternalRef { get; set; }
-    }
+    public string Type { get; set; }
+    public decimal Amount { get; set; }
+    public string Currency { get; set; }
+    public string Status { get; set; }
+    public DateTime OccurredAt { get; set; }
+    public string ExternalRef { get; set; }
 }

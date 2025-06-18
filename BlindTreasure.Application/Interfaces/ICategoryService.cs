@@ -12,4 +12,6 @@ public interface ICategoryService
     Task<List<CategoryWithProductsDto>> GetCategoriesWithAllProductsAsync();
     Task<CategoryDto?> GetByIdAsync(Guid id);
     Task<CategoryDto> UpdateAsync(Guid id, CategoryUpdateDto dto);
+
+    Task<List<Guid>> GetAllChildCategoryIdsAsync(Guid parentId);
 }

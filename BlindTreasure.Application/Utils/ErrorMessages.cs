@@ -2,8 +2,6 @@
 
 public static class ErrorMessages
 {
-  
-
     #region Notificaiton Error Message
 
     public const string NotificaionNotFound = "Notificaiton not found.";
@@ -94,7 +92,9 @@ public static class ErrorMessages
 
     #region Caching
 
-    public const string VerifyOtpExistingCoolDown = "You are sending OTP too fast. Please try again after a few minutes.";
+    public const string VerifyOtpExistingCoolDown =
+        "You are sending OTP too fast. Please try again after a few minutes.";
+
     public const string CacheUserNotFound = "User data not found in cache.";
 
     #endregion
@@ -120,7 +120,10 @@ public static class ErrorMessages
     public const string BlindBoxNotFoundOrNotPending = "Blind box not found or not pending approval.";
     public const string BlindBoxNoItems = "Blind box contains no items.";
     public const string BlindBoxRejectReasonRequired = "Reject reason is required.";
-    public const string BlindBoxNoDeleteItemPermission = "You do not have permission to delete items from this blind box.";
+
+    public const string BlindBoxNoDeleteItemPermission =
+        "You do not have permission to delete items from this blind box.";
+
     public const string BlindBoxNoDeletePermission = "You do not have permission to delete this blind box.";
     public const string BlindBoxItemListRequired = "Item list cannot be empty.";
     public const string BlindBoxProductInvalidOrOutOfStock = "One or more products are invalid or out of stock.";
@@ -157,7 +160,9 @@ public static class ErrorMessages
     public const string CategoryParentIdSelf = "ParentId cannot be the same as the category itself.";
     public const string CategoryHierarchyLoop = "Cannot create a category hierarchy loop.";
     public const string CategoryNoDeletePermission = "You do not have permission to delete categories.";
-    public const string CategoryDeleteHasChildrenOrProducts = "Cannot delete category with related products or child categories.";
+
+    public const string CategoryDeleteHasChildrenOrProducts =
+        "Cannot delete category with related products or child categories.";
 
     #endregion
 
@@ -169,11 +174,17 @@ public static class ErrorMessages
     public const string OrderCheckoutStartLog = "[CheckoutAsync] Start processing checkout from system cart.";
     public const string OrderClientCartInvalid = "Client cart is invalid or empty.";
     public const string OrderClientCartInvalidLog = "[CheckoutFromClientCartAsync] Client cart is invalid or empty.";
-    public const string OrderCheckoutFromClientStartLog = "[CheckoutFromClientCartAsync] Start processing checkout from client cart.";
+
+    public const string OrderCheckoutFromClientStartLog =
+        "[CheckoutFromClientCartAsync] Start processing checkout from client cart.";
+
     public const string OrderCartEmptyOrInvalid = "Cart is empty or invalid.";
     public const string OrderCartEmptyOrInvalidLog = "[CheckoutCore] Cart is empty or invalid.";
     public const string OrderShippingAddressInvalid = "Shipping address is invalid or does not belong to user.";
-    public const string OrderShippingAddressInvalidLog = "[CheckoutCore] Shipping address is invalid or does not belong to user.";
+
+    public const string OrderShippingAddressInvalidLog =
+        "[CheckoutCore] Shipping address is invalid or does not belong to user.";
+
     public const string OrderProductNotFound = "Product {0} not found.";
     public const string OrderProductOutOfStock = "Product {0} is out of stock.";
     public const string OrderProductNotForSale = "Product {0} is not for sale.";
@@ -181,19 +192,31 @@ public static class ErrorMessages
     public const string OrderBlindBoxNotApproved = "Blind box {0} is not approved.";
     public const string OrderBlindBoxOutOfStock = "Blind box {0} is out of stock.";
     public const string OrderCartClearedAfterCheckoutLog = "[CheckoutCore] System cart cleared after checkout.";
-    public const string OrderCacheClearedAfterCheckoutLog = "[CheckoutCore] Order cache cleared for user {0} after checkout.";
+
+    public const string OrderCacheClearedAfterCheckoutLog =
+        "[CheckoutCore] Order cache cleared for user {0} after checkout.";
+
     public const string OrderCheckoutSuccessLog = "[CheckoutCore] Checkout successful for user {0}.";
     public const string OrderCacheHitLog = "[GetOrderByIdAsync] Cache hit for order {0}";
     public const string OrderNotFoundLog = "[GetOrderByIdAsync] Order {0} not found.";
     public const string OrderNotFound = "Order not found.";
     public const string OrderLoadedAndCachedLog = "[GetOrderByIdAsync] Order {0} loaded from DB and cached.";
     public const string OrderListLoadedLog = "[GetMyOrdersAsync] User orders loaded from DB.";
-    public const string OrderNotFoundOrNotBelongToUserLog = "[CancelOrderAsync] Order {0} not found or does not belong to user.";
+
+    public const string OrderNotFoundOrNotBelongToUserLog =
+        "[CancelOrderAsync] Order {0} not found or does not belong to user.";
+
     public const string OrderNotPendingLog = "[CancelOrderAsync] Order {0} is not in PENDING status.";
     public const string OrderCancelOnlyPending = "Only orders in PENDING status can be cancelled.";
-    public const string OrderCacheClearedAfterCancelLog = "[CancelOrderAsync] Order cache cleared for user {0} after cancellation.";
+
+    public const string OrderCacheClearedAfterCancelLog =
+        "[CancelOrderAsync] Order cache cleared for user {0} after cancellation.";
+
     public const string OrderCancelSuccessLog = "[CancelOrderAsync] Order {0} cancelled successfully.";
-    public const string OrderCacheClearedAfterDeleteLog = "[DeleteOrderAsync] Order cache cleared for user {0} after deletion.";
+
+    public const string OrderCacheClearedAfterDeleteLog =
+        "[DeleteOrderAsync] Order cache cleared for user {0} after deletion.";
+
     public const string OrderDeleteSuccessLog = "[DeleteOrderAsync] Order {0} deleted successfully.";
 
     #endregion
@@ -219,6 +242,4 @@ public static class ErrorMessages
     public const string ProductImageUpdateSuccessLog = "[UploadProductImageAsync] Updated image for product {0}: {1}";
 
     #endregion
-
-
 }

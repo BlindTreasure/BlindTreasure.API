@@ -7,6 +7,7 @@ public class BlindBoxQueryParameter : PaginationParameter
     public string? Search { get; set; }
     public Guid? SellerId { get; set; }
     public BlindBoxStatus? Status { get; set; }
+    public Guid? CategoryId { get; set; }
     public decimal? MinPrice { get; set; }
     public decimal? MaxPrice { get; set; }
     public DateTime? ReleaseDateFrom { get; set; }

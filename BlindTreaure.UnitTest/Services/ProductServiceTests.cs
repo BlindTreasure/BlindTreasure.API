@@ -16,6 +16,7 @@ public class ProductServiceTests
 {
     private readonly Mock<IBlobService> _blobServiceMock;
     private readonly Mock<ICacheService> _cacheServiceMock;
+    private readonly Mock<IGenericRepository<Category>> _categoryServiceMock;
     private readonly Mock<IClaimsService> _claimsServiceMock;
     private readonly Mock<ILoggerService> _loggerMock;
     private readonly Mock<IMapperService> _mapperMock;
@@ -24,29 +25,30 @@ public class ProductServiceTests
     private readonly Mock<IGenericRepository<Seller>> _sellerRepoMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
 
-    public ProductServiceTests()
-    {
-        _cacheServiceMock = new Mock<ICacheService>();
-        _claimsServiceMock = new Mock<IClaimsService>();
-        _loggerMock = new Mock<ILoggerService>();
-        _mapperMock = new Mock<IMapperService>();
-        _unitOfWorkMock = new Mock<IUnitOfWork>();
-        _blobServiceMock = new Mock<IBlobService>();
-        _productRepoMock = new Mock<IGenericRepository<Product>>();
-        _sellerRepoMock = new Mock<IGenericRepository<Seller>>();
-
-        _unitOfWorkMock.Setup(x => x.Products).Returns(_productRepoMock.Object);
-        _unitOfWorkMock.Setup(x => x.Sellers).Returns(_sellerRepoMock.Object);
-
-        _productService = new ProductService(
-            _unitOfWorkMock.Object,
-            _loggerMock.Object,
-            _cacheServiceMock.Object,
-            _claimsServiceMock.Object,
-            _mapperMock.Object,
-            _blobServiceMock.Object
-        );
-    }
+    // public ProductServiceTests()
+    // {
+    //     _cacheServiceMock = new Mock<ICacheService>();
+    //     _claimsServiceMock = new Mock<IClaimsService>();
+    //     _loggerMock = new Mock<ILoggerService>();
+    //     _mapperMock = new Mock<IMapperService>();
+    //     _unitOfWorkMock = new Mock<IUnitOfWork>();
+    //     _blobServiceMock = new Mock<IBlobService>();
+    //     _productRepoMock = new Mock<IGenericRepository<Product>>();
+    //     _sellerRepoMock = new Mock<IGenericRepository<Seller>>();
+    //     _categoryServiceMock = new Mock<IGenericRepository<Category>>();
+    //
+    //     _unitOfWorkMock.Setup(x => x.Products).Returns(_productRepoMock.Object);
+    //     _unitOfWorkMock.Setup(x => x.Sellers).Returns(_sellerRepoMock.Object);
+    //
+    //     _productService = new ProductService(
+    //         _unitOfWorkMock.Object,
+    //         _loggerMock.Object,
+    //         _cacheServiceMock.Object,
+    //         _claimsServiceMock.Object,
+    //         _mapperMock.Object,
+    //         _blobServiceMock.Object
+    //     );
+    // }
 
     [Fact]
     public async Task GetByIdAsync_ShouldReturnProductDto_WhenProductExistsAndNotDeleted()

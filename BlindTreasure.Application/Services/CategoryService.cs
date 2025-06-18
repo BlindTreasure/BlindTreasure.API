@@ -328,6 +328,33 @@ public class CategoryService : ICategoryService
         return ToCategoryDto(category);
     }
 
+    public async Task<List<Guid>> GetAllChildCategoryIdsAsync(Guid parentId)
+    {
+        var allCategories = await _unitOfWork.Categories.GetQueryable()
+            .Where(c => !c.IsDeleted)
+            .Select(c => new { c.Id, c.ParentId })
+            .ToListAsync();
+
+        var childCategoryIds = new List<Guid>();
+
+        void Traverse(Guid id)
+        {
+            var children = allCategories.Where(c => c.ParentId == id).ToList();
+            foreach (var child in children)
+            {
+                childCategoryIds.Add(child.Id);
+                Traverse(child.Id);
+            }
+        }
+
+        childCategoryIds.Add(parentId); // include category gốc
+        Traverse(parentId);
+
+        return childCategoryIds;
+    }
+
+    #region private methods
+
     private static CategoryDto ToCategoryDto(Category category)
     {
         return new CategoryDto
@@ -385,4 +412,6 @@ public class CategoryService : ICategoryService
                 : ((IOrderedQueryable<Category>)query).ThenBy(c => c.CreatedAt)
         };
     }
+
+    #endregion
 }

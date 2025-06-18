@@ -12,5 +12,4 @@ public class OrderDto
     public OrderAddressDto? ShippingAddress { get; set; }
     public List<OrderDetailDto> Details { get; set; }
     public PaymentDto? Payment { get; set; } // Thêm dòng này
-
 }
