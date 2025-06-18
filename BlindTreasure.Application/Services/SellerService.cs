@@ -206,7 +206,7 @@ public class SellerService : ISellerService
         return new Pagination<SellerDto>(items, totalCount, pagination.PageIndex, pagination.PageSize);
     }
 
-    public async Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param, Guid userId)
+    public async Task<Pagination<ProducDetailstDto>> GetAllProductsAsync(ProductQueryParameter param, Guid userId)
     {
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
         if (seller == null || !seller.IsVerified)
@@ -245,8 +245,8 @@ public class SellerService : ISellerService
                 .Take(param.PageSize)
                 .ToListAsync();
 
-        var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
-        var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
+        var dtos = items.Select(p => _mapper.Map<Product, ProducDetailstDto>(p)).ToList();
+        var result = new Pagination<ProducDetailstDto>(dtos, count, param.PageIndex, param.PageSize);
 
         var cacheKey =
             $"product:all:{seller.Id}:{param.PageIndex}:{param.PageSize}:{param.Search}:{param.CategoryId}:{param.ProductStatus}:UpdatedAtDesc";
@@ -255,7 +255,7 @@ public class SellerService : ISellerService
         return result;
     }
 
-    public async Task<ProductDto?> GetProductByIdAsync(Guid id, Guid userId)
+    public async Task<ProducDetailstDto?> GetProductByIdAsync(Guid id, Guid userId)
     {
         var cacheKey = $"product:{id}";
         var cached = await _cacheService.GetAsync<Product>(cacheKey);
@@ -267,7 +267,7 @@ public class SellerService : ISellerService
             var checkSeller = await GetSellerWithUserAsync(userId);
             if (cached.SellerId != checkSeller.Id)
                 throw ErrorHelper.Forbidden("Không được phép xem sản phẩm của Seller khác.");
-            return _mapper.Map<Product, ProductDto>(cached);
+            return _mapper.Map<Product, ProducDetailstDto>(cached);
         }
 
         var product = await _unitOfWork.Products.GetQueryable()
@@ -282,10 +282,10 @@ public class SellerService : ISellerService
 
         await _cacheService.SetAsync(cacheKey, product, TimeSpan.FromHours(1));
         _loggerService.Info($"[GetProductByIdAsync] Product {id} loaded from DB and cached.");
-        return _mapper.Map<Product, ProductDto>(product);
+        return _mapper.Map<Product, ProducDetailstDto>(product);
     }
 
-    public async Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto)
+    public async Task<ProducDetailstDto> CreateProductAsync(ProductSellerCreateDto dto)
     {
         var userId = _claimsService.CurrentUserId; // chỗ này là lấy user id của seller là người đang login
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId); // seller id ở day86
@@ -303,7 +303,7 @@ public class SellerService : ISellerService
         return result;
     }
 
-    public async Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto)
+    public async Task<ProducDetailstDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
@@ -325,7 +325,7 @@ public class SellerService : ISellerService
         return result;
     }
 
-    public async Task<ProductDto> DeleteProductAsync(Guid productId)
+    public async Task<ProducDetailstDto> DeleteProductAsync(Guid productId)
     {
         var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
@@ -348,7 +348,7 @@ public class SellerService : ISellerService
     }
 
 
-    public async Task<ProductDto> UpdateSellerProductImagesAsync(Guid productId, List<IFormFile> images)
+    public async Task<ProducDetailstDto> UpdateSellerProductImagesAsync(Guid productId, List<IFormFile> images)
     {
         var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);

@@ -56,12 +56,12 @@ public class ProductServiceTests
         // Arrange
         var id = Guid.NewGuid();
         var product = new Product { Id = id, IsDeleted = false };
-        var productDto = new ProductDto { Id = id };
+        var productDto = new ProducDetailstDto { Id = id };
 
         _cacheServiceMock.Setup(x => x.GetAsync<Product>($"product:{id}")).ReturnsAsync((Product)null!);
         _productRepoMock.Setup(x => x.GetQueryable())
             .Returns(new List<Product> { product }.AsQueryable());
-        _mapperMock.Setup(x => x.Map<Product, ProductDto>(product)).Returns(productDto);
+        _mapperMock.Setup(x => x.Map<Product, ProducDetailstDto>(product)).Returns(productDto);
 
         // Act
         var result = await _productService.GetByIdAsync(id);
@@ -94,10 +94,10 @@ public class ProductServiceTests
         // Arrange
         var id = Guid.NewGuid();
         var product = new Product { Id = id, IsDeleted = false };
-        var productDto = new ProductDto { Id = id };
+        var productDto = new ProducDetailstDto { Id = id };
 
         _cacheServiceMock.Setup(x => x.GetAsync<Product>($"product:{id}")).ReturnsAsync(product);
-        _mapperMock.Setup(x => x.Map<Product, ProductDto>(product)).Returns(productDto);
+        _mapperMock.Setup(x => x.Map<Product, ProducDetailstDto>(product)).Returns(productDto);
 
         // Act
         var result = await _productService.GetByIdAsync(id);
@@ -118,12 +118,12 @@ public class ProductServiceTests
             new() { Id = Guid.NewGuid(), IsDeleted = false, Name = "A" },
             new() { Id = Guid.NewGuid(), IsDeleted = false, Name = "B" }
         };
-        var productDtos = products.Select(p => new ProductDto { Id = p.Id }).ToList();
+        var productDtos = products.Select(p => new ProducDetailstDto { Id = p.Id }).ToList();
 
         _productRepoMock.Setup(x => x.GetQueryable())
             .Returns(products.AsQueryable());
-        _mapperMock.Setup(x => x.Map<Product, ProductDto>(It.IsAny<Product>()))
-            .Returns<Product>(p => new ProductDto { Id = p.Id });
+        _mapperMock.Setup(x => x.Map<Product, ProducDetailstDto>(It.IsAny<Product>()))
+            .Returns<Product>(p => new ProducDetailstDto { Id = p.Id });
 
         // Act
         var result = await _productService.GetAllAsync(param);
@@ -151,14 +151,14 @@ public class ProductServiceTests
             Status = ProductStatus.Active
         };
         var product = new Product { Id = Guid.NewGuid(), SellerId = sellerId };
-        var productDto = new ProductDto { Id = product.Id };
+        var productDto = new ProducDetailstDto { Id = product.Id };
 
         _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _sellerRepoMock.Setup(x => x.GetByIdAsync(sellerId, It.IsAny<Expression<Func<Seller, object>>[]>()))
             .ReturnsAsync(seller);
         _productRepoMock.Setup(x => x.AddAsync(It.IsAny<Product>())).ReturnsAsync(product);
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync()).ReturnsAsync(1);
-        _mapperMock.Setup(x => x.Map<Product, ProductDto>(It.IsAny<Product>())).Returns(productDto);
+        _mapperMock.Setup(x => x.Map<Product, ProducDetailstDto>(It.IsAny<Product>())).Returns(productDto);
 
         // Act
         var result = await _productService.CreateAsync(dto);
@@ -198,13 +198,13 @@ public class ProductServiceTests
         var userId = Guid.NewGuid();
         var product = new Product { Id = id, IsDeleted = false, SellerId = Guid.NewGuid() };
         var dto = new ProductUpdateDto { Name = "Updated", Description = "Desc" };
-        var productDto = new ProductDto { Id = id };
+        var productDto = new ProducDetailstDto { Id = id };
 
         _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _productRepoMock.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(product);
         _unitOfWorkMock.Setup(x => x.Products.Update(product)).ReturnsAsync(true);
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync()).ReturnsAsync(1);
-        _mapperMock.Setup(x => x.Map<Product, ProductDto>(product)).Returns(productDto);
+        _mapperMock.Setup(x => x.Map<Product, ProducDetailstDto>(product)).Returns(productDto);
 
         // Act
         var result = await _productService.UpdateAsync(id, dto);
@@ -241,13 +241,13 @@ public class ProductServiceTests
         var id = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var product = new Product { Id = id, IsDeleted = false, SellerId = Guid.NewGuid() };
-        var productDto = new ProductDto { Id = id };
+        var productDto = new ProducDetailstDto { Id = id };
 
         _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(userId);
         _productRepoMock.Setup(x => x.GetByIdAsync(id)).ReturnsAsync(product);
         _unitOfWorkMock.Setup(x => x.Products.Update(product)).ReturnsAsync(true);
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync()).ReturnsAsync(1);
-        _mapperMock.Setup(x => x.Map<Product, ProductDto>(product)).Returns(productDto);
+        _mapperMock.Setup(x => x.Map<Product, ProducDetailstDto>(product)).Returns(productDto);
 
         // Act
         var result = await _productService.DeleteAsync(id);

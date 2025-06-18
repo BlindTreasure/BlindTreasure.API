@@ -126,7 +126,7 @@ public class CategoryService : ICategoryService
             {
                 Id = parent.Id,
                 Name = parent.Name,
-                Products = allProducts.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList(),
+                Products = allProducts.Select(p => _mapper.Map<Product, ProducDetailstDto>(p)).ToList(),
                 ProductCount = allProducts.Count
             };
         }).ToList();
