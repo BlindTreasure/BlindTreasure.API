@@ -406,12 +406,15 @@ public class SystemController : ControllerBase
             return;
         }
 
+        var firstPopMartCategoryId = popmartProducts.FirstOrDefault()?.CategoryId ?? Guid.Empty;
+
         var blindBoxes = new List<BlindBox>
         {
             new()
             {
                 Id = Guid.NewGuid(),
                 SellerId = seller.Id,
+                CategoryId = firstPopMartCategoryId, // gán category
                 Name = "PopMart Mini Series Vol.1",
                 Description = "Hộp blindbox nhỏ gồm các mô hình dễ thương từ PopMart.",
                 Price = 299000,
@@ -428,6 +431,7 @@ public class SystemController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 SellerId = seller.Id,
+                CategoryId = firstPopMartCategoryId, // gán category
                 Name = "PopMart Collector Edition Vol.2",
                 Description = "Blindbox PopMart cao cấp, nhiều item hiếm.",
                 Price = 499000,
@@ -441,6 +445,7 @@ public class SystemController : ControllerBase
                 CreatedAt = now
             }
         };
+
 
         // === Seed BlindBoxItems ===
         var blindBoxItems = new List<BlindBoxItem>();
