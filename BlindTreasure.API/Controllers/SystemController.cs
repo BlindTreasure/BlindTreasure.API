@@ -35,7 +35,7 @@ public class SystemController : ControllerBase
             await SeedRolesAndUsers();
 
             await SeedCategories();
-            await SeedProductsAndBlindBoxes();
+            await SeedProducts();
             return Ok(ApiResult<object>.Success(new
             {
                 Message = "Data seeded successfully."
@@ -221,7 +221,7 @@ public class SystemController : ControllerBase
         _logger.Success("[SeedCategories] Seed danh mục thành công.");
     }
 
-    private async Task SeedProductsAndBlindBoxes()
+    private async Task SeedProducts()
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
         if (sellerUser == null)
@@ -308,6 +308,56 @@ public class SystemController : ControllerBase
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 6
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "THE MONSTERS Let's Checkmate Series-Vinyl Plush Doll",
+                            Description = "Blind box PopMart kích thước nhỏ gọn, thích hợp sưu tầm.",
+                            CategoryId = category.Id,
+                            SellerId = seller.Id,
+                            Price = 200000,
+                            Stock = 70,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                //img 1
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll.png&version_id=null",
+                                // img 2
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%20(2).jpg&version_id=null",
+                                //img 3
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%20(1).jpg&version_id=null"
+                            },
+                            Brand = "PopMart",
+                            Material = "PVC",
+                            ProductType = ProductSaleType.DirectSale,
+                            Height = 6
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "THE MONSTERS Let's Checkmate Series-Vinyl Plush Doll",
+                            Description = "Blind box PopMart kích thước nhỏ gọn, thích hợp sưu tầm.",
+                            CategoryId = category.Id,
+                            SellerId = seller.Id,
+                            Price = 3000000,
+                            Stock = 70,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                //img 1
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll.png&version_id=null",
+                                // img 2
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%20(2).jpg&version_id=null",
+                                //img 3
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%20(1).jpg&version_id=null"
+                            },
+                            Brand = "PopMart",
+                            Material = "PVC",
+                            ProductType = ProductSaleType.DirectSale,
+                            Height = 6
                         }
                     });
                     break;
@@ -378,6 +428,33 @@ public class SystemController : ControllerBase
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 11
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Yooki Lamb 400% Vinyl Plush Doll ( Chính Hãng )",
+                            Description = "Blind box PopMart kích thước nhỏ gọn, thích hợp sưu tầm.",
+                            CategoryId = category.Id,
+                            SellerId = seller.Id,
+                            Price = 750000,
+                            Stock = 70,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                //img 1
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%20(1).webp&version_id=null",
+                                // img 2
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%20(2).webp&version_id=null",
+                                //img 3
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%20(3).webp&version_id=null",
+                                //img 4
+                                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%20(4).webp&version_id=null"
+                            },
+                            Brand = "Baby Three",
+                            Material = "PVC",
+                            ProductType = ProductSaleType.DirectSale,
+                            Height = 30
                         }
                     });
                     break;
@@ -396,93 +473,191 @@ public class SystemController : ControllerBase
         await _context.Products.AddRangeAsync(products);
         await _context.SaveChangesAsync();
         _logger.Success("[SeedProducts] Seed sản phẩm chuẩn thành công.");
+    }
 
-        // === Seed BlindBox ===
+    private async Task SeedBlindBoxes()
+    {
+        var now = DateTime.UtcNow;
 
-        var popmartProducts = products.Where(p => p.Brand == "PopMart").ToList();
-        if (popmartProducts.Count == 0)
+        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
+        if (sellerUser == null)
         {
-            _logger.Warn("[SeedProducts] Không có sản phẩm PopMart để tạo blind box.");
+            _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo blind box.");
             return;
         }
 
-        var firstPopMartCategoryId = popmartProducts.FirstOrDefault()?.CategoryId ?? Guid.Empty;
-
-        var blindBoxes = new List<BlindBox>
+        var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == sellerUser.Id);
+        if (seller == null)
         {
-            new()
-            {
-                Id = Guid.NewGuid(),
-                SellerId = seller.Id,
-                CategoryId = firstPopMartCategoryId, // gán category
-                Name = "PopMart Mini Series Vol.1",
-                Description = "Hộp blindbox nhỏ gồm các mô hình dễ thương từ PopMart.",
-                Price = 299000,
-                TotalQuantity = 50,
-                HasSecretItem = true,
-                SecretProbability = 10,
-                Status = BlindBoxStatus.Approved,
-                ImageUrl =
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FPopMart%20Collector%20Edition%20Vol2.png&version_id=null",
-                ReleaseDate = now,
-                CreatedAt = now
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                SellerId = seller.Id,
-                CategoryId = firstPopMartCategoryId, // gán category
-                Name = "PopMart Collector Edition Vol.2",
-                Description = "Blindbox PopMart cao cấp, nhiều item hiếm.",
-                Price = 499000,
-                TotalQuantity = 100,
-                HasSecretItem = true,
-                SecretProbability = 10,
-                Status = BlindBoxStatus.Approved,
-                ImageUrl =
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FPopMart%20Mini%20Series%20Vol1.jpg&version_id=null",
-                ReleaseDate = now,
-                CreatedAt = now
-            }
-        };
-
-
-        // === Seed BlindBoxItems ===
-        var blindBoxItems = new List<BlindBoxItem>();
-        var random = new Random();
-
-        foreach (var box in blindBoxes)
-        {
-            var selectedProducts = Enumerable.Range(0, 6)
-                .Select(_ => popmartProducts[random.Next(popmartProducts.Count)])
-                .ToList();
-
-            var secretIndex = random.Next(6);
-            const decimal secretDropRate = 10m;
-            var commonDropRate = Math.Round((100m - secretDropRate) / 5, 2);
-
-            for (var j = 0; j < 6; j++)
-            {
-                var product = selectedProducts[j];
-                blindBoxItems.Add(new BlindBoxItem
-                {
-                    Id = Guid.NewGuid(),
-                    BlindBoxId = box.Id,
-                    ProductId = product.Id,
-                    Quantity = 20,
-                    DropRate = j == secretIndex ? secretDropRate : commonDropRate,
-                    Rarity = j == secretIndex ? BlindBoxRarity.Secret : BlindBoxRarity.Common,
-                    IsActive = true,
-                    CreatedAt = now
-                });
-            }
+            _logger.Error("User này chưa có Seller tương ứng.");
+            return;
         }
 
-        await _context.BlindBoxes.AddRangeAsync(blindBoxes);
+        var category = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "PopMart" && !c.IsDeleted);
+        if (category == null)
+        {
+            _logger.Error("Không tìm thấy category PopMart để gán cho sản phẩm.");
+            return;
+        }
+
+        // === Tạo sản phẩm riêng biệt chỉ dùng cho blind box ===
+        var blindBoxProducts = new List<Product>
+        {
+            //prod 1
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Blindbox Exclusive - Bunny Pink",
+                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                CategoryId = category.Id,
+                SellerId = seller.Id,
+                Price = 320000,
+                Stock = 40,
+                Status = ProductStatus.Active,
+                CreatedAt = now,
+                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
+                Brand = "Blindbox Exclusive",
+                Material = "PVC",
+                ProductType = ProductSaleType.BlindBoxOnly,
+                Height = 12
+            },
+            //prod 2
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Blindbox Exclusive - Bunny Pink",
+                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                CategoryId = category.Id,
+                SellerId = seller.Id,
+                Price = 320000,
+                Stock = 40,
+                Status = ProductStatus.Active,
+                CreatedAt = now,
+                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
+                Brand = "Blindbox Exclusive",
+                Material = "PVC",
+                ProductType = ProductSaleType.BlindBoxOnly,
+                Height = 12
+            },
+            //prod 3
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Blindbox Exclusive - Bunny Pink",
+                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                CategoryId = category.Id,
+                SellerId = seller.Id,
+                Price = 320000,
+                Stock = 40,
+                Status = ProductStatus.Active,
+                CreatedAt = now,
+                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
+                Brand = "Blindbox Exclusive",
+                Material = "PVC",
+                ProductType = ProductSaleType.BlindBoxOnly,
+                Height = 12
+            },
+            //prod 4
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Blindbox Exclusive - Bunny Pink",
+                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                CategoryId = category.Id,
+                SellerId = seller.Id,
+                Price = 320000,
+                Stock = 40,
+                Status = ProductStatus.Active,
+                CreatedAt = now,
+                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
+                Brand = "Blindbox Exclusive",
+                Material = "PVC",
+                ProductType = ProductSaleType.BlindBoxOnly,
+                Height = 12
+            },
+            //prod 5
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Blindbox Exclusive - Bunny Pink",
+                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                CategoryId = category.Id,
+                SellerId = seller.Id,
+                Price = 320000,
+                Stock = 40,
+                Status = ProductStatus.Active,
+                CreatedAt = now,
+                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
+                Brand = "Blindbox Exclusive",
+                Material = "PVC",
+                ProductType = ProductSaleType.BlindBoxOnly,
+                Height = 12
+            },
+            //prod 6
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Blindbox Exclusive - Bunny Pink",
+                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                CategoryId = category.Id,
+                SellerId = seller.Id,
+                Price = 320000,
+                Stock = 40,
+                Status = ProductStatus.Active,
+                CreatedAt = now,
+                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
+                Brand = "Blindbox Exclusive",
+                Material = "PVC",
+                ProductType = ProductSaleType.BlindBoxOnly,
+                Height = 12
+            },
+        };
+
+        await _context.Products.AddRangeAsync(blindBoxProducts);
+        await _context.SaveChangesAsync();
+
+        // === Tạo blind box và các item ===
+        var blindBox = new BlindBox
+        {
+            Id = Guid.NewGuid(),
+            SellerId = seller.Id,
+            CategoryId = category.Id,
+            Name = "Special Blindbox Edition",
+            Description = "Blindbox phiên bản đặc biệt chứa các mô hình giới hạn.",
+            Price = 500000,
+            TotalQuantity = 30,
+            HasSecretItem = true,
+            SecretProbability = 15,
+            Status = BlindBoxStatus.Approved,
+            ImageUrl = "https://example.com/images/blindbox-cover.png",
+            ReleaseDate = now,
+            CreatedAt = now
+        };
+
+        var blindBoxItems = new List<BlindBoxItem>();
+
+        for (int i = 0; i < blindBoxProducts.Count; i++)
+        {
+            var product = blindBoxProducts[i];
+
+            blindBoxItems.Add(new BlindBoxItem
+            {
+                Id = Guid.NewGuid(),
+                BlindBoxId = blindBox.Id,
+                ProductId = product.Id,
+                Quantity = 15,
+                DropRate = i == 1 ? 15m : 85m, // sản phẩm thứ 2 là secret
+                Rarity = i == 1 ? BlindBoxRarity.Secret : BlindBoxRarity.Common,
+                IsActive = true,
+                CreatedAt = now
+            });
+        }
+
+        await _context.BlindBoxes.AddAsync(blindBox);
         await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
         await _context.SaveChangesAsync();
 
-        _logger.Success("[SeedProducts] Seed 2 blindbox PopMart thành công.");
+        _logger.Success("Seed blindbox và sản phẩm riêng biệt thành công.");
     }
 
     #endregion
