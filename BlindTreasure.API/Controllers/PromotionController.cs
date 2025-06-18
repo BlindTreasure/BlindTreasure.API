@@ -3,6 +3,7 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PromotionDTOs;
 using BlindTreasure.Infrastructure.Commons;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
@@ -62,6 +63,7 @@ public class PromotionController : ControllerBase
     /// <summary>
     ///     STAFF duyệt hoặc từ chối voucher đang chờ xử lý.
     /// </summary>
+    [Authorize(Roles = "Staff")]
     [HttpPost("review")]
     [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
