@@ -248,11 +248,8 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.SaveChangesAsync();
 
         _logger.Success($"[CreateBlindBoxAsync] Blind box {blindBox.Name} created by user {currentUserId}.");
-        var mappingResult = _mapperService.Map<BlindBox, BlindBoxDetailDto>(result);
-
         await RemoveBlindBoxCacheAsync(blindBox.Id, seller.Id);
-
-        return mappingResult;
+        return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
     public async Task<BlindBoxDetailDto> UpdateBlindBoxAsync(Guid blindBoxId, UpdateBlindBoxDto dto)
@@ -298,7 +295,6 @@ public class BlindBoxService : IBlindBoxService
         }
 
         if (dto.ImageFile != null)
-        {
             try
             {
                 blindBox.ImageUrl = await _blobService.ReplaceImageAsync(
@@ -313,7 +309,6 @@ public class BlindBoxService : IBlindBoxService
                 _logger.Error($"[UpdateBlindBoxAsync] ReplaceImageAsync failed: {ex.Message}");
                 throw ErrorHelper.Internal(ErrorMessages.BlindBoxImageUpdateError);
             }
-        }
 
         blindBox.UpdatedAt = _time.GetCurrentTime();
         blindBox.UpdatedBy = currentUserId;
