@@ -134,7 +134,7 @@ public class BlindTreasureDbContext : DbContext
             .HasOne(bb => bb.Category)
             .WithMany()
             .HasForeignKey(bb => bb.CategoryId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Cascade);
 
 
         modelBuilder.Entity<Product>()
