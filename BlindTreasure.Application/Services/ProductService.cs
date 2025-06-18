@@ -50,7 +50,7 @@ public class ProductService : IProductService
         {
             _logger.Info($"[GetByIdAsync] Cache hit for product {id}");
             if (cached.IsDeleted)
-                throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+                throw ErrorHelper.NotFound(ErrorMessages.ProductNotFound);
             return _mapper.Map<Product, ProductDto>(cached);
         }
 
@@ -61,7 +61,7 @@ public class ProductService : IProductService
         if (product == null || product.IsDeleted)
         {
             _logger.Warn($"[GetByIdAsync] Product {id} not found or deleted.");
-            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+            throw ErrorHelper.NotFound(ErrorMessages.ProductNotFound);
         }
 
         await _cacheService.SetAsync(cacheKey, product, TimeSpan.FromHours(1));
@@ -127,14 +127,14 @@ public class ProductService : IProductService
 
     public async Task<ProductDto> CreateAsync(ProductCreateDto dto)
     {
-        var userId = _claimsService.CurrentUserId; // cái này chỉ để check là ai đang login, không phải sellerId 
+        var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId);
         if (seller == null)
-            throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
+            throw ErrorHelper.Forbidden(ErrorMessages.ProductSellerNotFound);
         if (!seller.IsVerified || seller.Status != SellerStatus.Approved)
-            throw ErrorHelper.Forbidden("Seller chưa được xác minh.");
+            throw ErrorHelper.Forbidden(ErrorMessages.ProductSellerNotVerified);
 
-        _logger.Info($"[CreateAsync] Seller {userId} tạo sản phẩm mới: {dto.Name}");
+        _logger.Info($"[CreateAsync] Seller {userId} creates new product: {dto.Name}");
 
         await ValidateProductDto(dto);
 
@@ -158,8 +158,7 @@ public class ProductService : IProductService
             Status = dto.Status
         };
 
-        var result =
-            await _unitOfWork.Products.AddAsync(product); // tracking entity nè bro, savechange xong phải xài thằng này
+        var result = await _unitOfWork.Products.AddAsync(product);
         await _unitOfWork.SaveChangesAsync();
 
         if (dto.Images is { Count: > 0 })
@@ -175,7 +174,6 @@ public class ProductService : IProductService
 
             if (uploadedUrls.Count > 0)
             {
-                // Ghi đè toàn bộ danh sách ảnh, không cộng dồn
                 result.ImageUrls = uploadedUrls.Distinct().ToList();
                 await _unitOfWork.Products.Update(result);
                 await _unitOfWork.SaveChangesAsync();
@@ -183,7 +181,7 @@ public class ProductService : IProductService
         }
 
         await RemoveProductCacheAsync(result.Id, seller.Id);
-        _logger.Success($"[CreateAsync] Đã tạo sản phẩm {result.Name} với {result.ImageUrls.Count} ảnh.");
+        _logger.Success(string.Format(ErrorMessages.ProductCreatedLog, result.Name, result.ImageUrls.Count));
 
         return _mapper.Map<Product, ProductDto>(result);
     }
@@ -194,13 +192,12 @@ public class ProductService : IProductService
         var product = await _unitOfWork.Products.GetByIdAsync(id);
         if (product == null || product.IsDeleted)
         {
-            _logger.Warn($"[UpdateAsync] Product {id} not found or deleted.");
-            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+            _logger.Warn(string.Format(ErrorMessages.ProductUpdateNotFoundLog, id));
+            throw ErrorHelper.NotFound(ErrorMessages.ProductNotFound);
         }
 
-        _logger.Info($"[UpdateAsync] User {userId} updates product {product.Name}");
+        _logger.Info(string.Format(ErrorMessages.ProductUpdateLog, userId, product.Name));
 
-        // Chỉ cập nhật trường có giá trị khác null
         if (dto.Name != null)
             product.Name = dto.Name.Trim();
         if (dto.Description != null)
@@ -211,8 +208,6 @@ public class ProductService : IProductService
             product.Price = dto.Price.Value;
         if (dto.Stock.HasValue)
             product.Stock = dto.Stock.Value;
-        //if (dto.Status.HasValue)
-        //    product.Status = dto.Status.Value.ToString();
         if (dto.Height.HasValue)
             product.Height = dto.Height.Value;
         if (dto.Material != null)
@@ -223,21 +218,12 @@ public class ProductService : IProductService
             product.Brand = dto.Brand;
         if (dto.ProductStatus.HasValue) product.Status = dto.ProductStatus.Value;
 
-
-        //if (productImageUrl.Length > 0)
-        //{
-        //    var imageUrl = await UploadProductImageAsync(product.Id, productImageUrl);
-        //}
-
-
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
 
         var result = await _unitOfWork.Products.GetByIdAsync(id);
 
-        //await RemoveProductCacheAsync(id, product.SellerId);
-
-        _logger.Success($"[UpdateAsync] Product {id} updated by user {userId}");
+        _logger.Success(string.Format(ErrorMessages.ProductUpdateSuccessLog, id, userId));
         return _mapper.Map<Product, ProductDto>(product);
     }
 
@@ -247,14 +233,11 @@ public class ProductService : IProductService
         var product = await _unitOfWork.Products.GetByIdAsync(id);
         if (product == null || product.IsDeleted)
         {
-            _logger.Warn($"[DeleteAsync] Product {id} not found or deleted.");
-            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+            _logger.Warn(string.Format(ErrorMessages.ProductDeleteNotFoundLog, id));
+            throw ErrorHelper.NotFound(ErrorMessages.ProductNotFound);
         }
 
-        //if (product.SellerId != await GetSellerIdByUserId(userId))
-        //    throw ErrorHelper.Forbidden("Không được phép thao tác sản phẩm của Seller khác.");
-
-        product.Status = ProductStatus.InActive; // Đặt trạng thái là Deleted
+        product.Status = ProductStatus.InActive;
         product.IsDeleted = true;
         product.DeletedAt = DateTime.UtcNow;
         product.DeletedBy = userId;
@@ -264,7 +247,7 @@ public class ProductService : IProductService
 
         await RemoveProductCacheAsync(id, product.SellerId);
 
-        _logger.Success($"[DeleteAsync] Product {id} soft deleted by user {userId}");
+        _logger.Success(string.Format(ErrorMessages.ProductDeleteSuccessLog, id, userId));
         return _mapper.Map<Product, ProductDto>(product);
     }
 
@@ -272,22 +255,21 @@ public class ProductService : IProductService
     {
         if (file == null || file.Length == 0)
         {
-            _logger.Warn("[UploadProductImageAsync] File ảnh không hợp lệ hoặc rỗng.");
-            throw ErrorHelper.BadRequest("File ảnh không hợp lệ hoặc rỗng.");
+            _logger.Warn(ErrorMessages.ProductImageFileInvalidLog);
+            throw ErrorHelper.BadRequest(ErrorMessages.ProductImageFileInvalid);
         }
 
         var product = await _unitOfWork.Products.GetByIdAsync(productId);
         if (product == null || product.IsDeleted)
         {
-            _logger.Warn($"[UploadProductImageAsync] Không tìm thấy sản phẩm {productId} hoặc đã bị xóa.");
-            throw ErrorHelper.NotFound("Sản phẩm không tồn tại hoặc đã bị xóa.");
+            _logger.Warn(string.Format(ErrorMessages.ProductImageNotFoundLog, productId));
+            throw ErrorHelper.NotFound(ErrorMessages.ProductNotFoundOrDeleted);
         }
 
-        // Sinh tên file duy nhất bằng Guid để tránh trùng
         var fileExtension = Path.GetExtension(file.FileName);
         var fileName = $"products/product_thumbnails_{productId}_{Guid.NewGuid():N}{fileExtension}";
 
-        _logger.Info($"[UploadProductImageAsync] Uploading file: {fileName}");
+        _logger.Info(string.Format(ErrorMessages.ProductImageUploadingLog, fileName));
 
         await using var stream = file.OpenReadStream();
         await _blobService.UploadFileAsync(fileName, stream);
@@ -295,8 +277,8 @@ public class ProductService : IProductService
         var fileUrl = await _blobService.GetPreviewUrlAsync(fileName);
         if (string.IsNullOrEmpty(fileUrl))
         {
-            _logger.Error($"[UploadProductImageAsync] Không thể lấy URL cho file {fileName}");
-            throw ErrorHelper.Internal("Không thể tạo URL cho ảnh.");
+            _logger.Error(string.Format(ErrorMessages.ProductImageUrlErrorLog, fileName));
+            throw ErrorHelper.Internal(ErrorMessages.ProductImageUrlError);
         }
 
         product.ImageUrls ??= new List<string>();
@@ -305,10 +287,9 @@ public class ProductService : IProductService
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
 
-        // Ghi cache
         await _cacheService.SetAsync($"product:{product.Id}", product, TimeSpan.FromHours(1));
 
-        _logger.Success($"[UploadProductImageAsync] Đã cập nhật image cho product {product.Id}: {fileUrl}");
+        _logger.Success(string.Format(ErrorMessages.ProductImageUpdateSuccessLog, product.Id, fileUrl));
 
         return fileUrl;
     }
@@ -318,9 +299,8 @@ public class ProductService : IProductService
         var userId = _claimsService.CurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(productId);
         if (product == null || product.IsDeleted)
-            throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
+            throw ErrorHelper.NotFound(ErrorMessages.ProductNotFound);
 
-        // Xóa ảnh cũ trên MinIO (nếu cần)
         if (product.ImageUrls != null && product.ImageUrls.Count > 0)
             foreach (var url in product.ImageUrls)
             {
@@ -373,21 +353,7 @@ public class ProductService : IProductService
             throw ErrorHelper.BadRequest("Danh mục sản phẩm không hợp lệ.");
     }
 
-    private async Task ValidateProductDto(ProductUpdateDto dto)
-    {
-        if (string.IsNullOrWhiteSpace(dto.Name))
-            throw ErrorHelper.BadRequest("Tên sản phẩm không được để trống.");
-        if (string.IsNullOrWhiteSpace(dto.Description))
-            throw ErrorHelper.BadRequest("Mô tả không được để trống.");
-        if (dto.Price <= 0)
-            throw ErrorHelper.BadRequest("Giá sản phẩm phải lớn hơn 0.");
-        if (dto.Stock < 0)
-            throw ErrorHelper.BadRequest("Số lượng tồn kho phải >= 0.");
-        var categoryExists = await _unitOfWork.Categories.GetQueryable()
-            .AnyAsync(c => c.Id == dto.CategoryId && !c.IsDeleted);
-        if (!categoryExists)
-            throw ErrorHelper.BadRequest("Danh mục sản phẩm không hợp lệ.");
-    }
+ 
 
     private async Task RemoveProductCacheAsync(Guid productId, Guid sellerId)
     {

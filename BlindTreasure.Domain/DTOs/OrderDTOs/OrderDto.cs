@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.DTOs.OrderDTOs;
+﻿using BlindTreasure.Domain.DTOs.PaymentDTOs;
+
+namespace BlindTreasure.Domain.DTOs.OrderDTOs;
 
 public class OrderDto
 {
@@ -9,4 +11,6 @@ public class OrderDto
     public DateTime? CompletedAt { get; set; }
     public OrderAddressDto? ShippingAddress { get; set; }
     public List<OrderDetailDto> Details { get; set; }
+    public PaymentDto? Payment { get; set; } // Thêm dòng này
+
 }

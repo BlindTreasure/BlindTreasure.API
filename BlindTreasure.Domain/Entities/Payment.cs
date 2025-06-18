@@ -13,7 +13,7 @@ public class Payment : BaseEntity
     public string Status { get; set; }
     public string TransactionId { get; set; }
     public DateTime PaidAt { get; set; }
-    public decimal RefundedAmount { get; set; }
+    public decimal RefundedAmount { get; set; } = 0;
 
     // 1-n → Transactions
     public ICollection<Transaction> Transactions { get; set; }

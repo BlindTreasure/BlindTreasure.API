@@ -76,14 +76,14 @@ public class OrderController : ControllerBase
     /// </summary>
     /// <param name="orderId">Id đơn hàng</param>
     /// <returns>Chi tiết đơn hàng</returns>
-    [HttpGet("{orderId}")]
+    [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResult<OrderDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 404)]
-    public async Task<IActionResult> GetOrderById(Guid orderId)
+    public async Task<IActionResult> GetOrderById(Guid id)
     {
         try
         {
-            var result = await _orderService.GetOrderByIdAsync(orderId);
+            var result = await _orderService.GetOrderByIdAsync(id);
             return Ok(ApiResult<OrderDto>.Success(result, "200", "Lấy chi tiết đơn hàng thành công."));
         }
         catch (Exception ex)
@@ -118,15 +118,15 @@ public class OrderController : ControllerBase
     /// <summary>
     ///     Hủy một đơn hàng (chỉ khi trạng thái cho phép).
     /// </summary>
-    /// <param name="orderId">Id đơn hàng</param>
-    [HttpPut("{orderId}/cancel")]
+    /// <param name="id">Id đơn hàng</param>
+    [HttpPut("{id}/cancel")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> CancelOrder(Guid orderId)
+    public async Task<IActionResult> CancelOrder(Guid id)
     {
         try
         {
-            await _orderService.CancelOrderAsync(orderId);
+            await _orderService.CancelOrderAsync(id);
             return Ok(ApiResult<object>.Success(null, "200", "Đã hủy đơn hàng thành công."));
         }
         catch (Exception ex)
@@ -140,15 +140,15 @@ public class OrderController : ControllerBase
     /// <summary>
     ///     Xóa mềm một đơn hàng (user chỉ xóa được đơn của mình).
     /// </summary>
-    /// <param name="orderId">Id đơn hàng</param>
-    [HttpDelete("{orderId}")]
+    /// <param name="id">Id đơn hàng</param>
+    [HttpDelete("{id}")]
     [ProducesResponseType(typeof(ApiResult<object>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 404)]
-    public async Task<IActionResult> DeleteOrder(Guid orderId)
+    public async Task<IActionResult> DeleteOrder(Guid id)
     {
         try
         {
-            await _orderService.DeleteOrderAsync(orderId);
+            await _orderService.DeleteOrderAsync(id);
             return Ok(ApiResult<object>.Success(null, "200", "Đã xóa đơn hàng thành công."));
         }
         catch (Exception ex)
