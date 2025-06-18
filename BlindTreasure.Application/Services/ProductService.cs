@@ -44,7 +44,7 @@ public class ProductService : IProductService
     /// <summary>
     ///     API dùng chung cho mọi role: lấy chi tiết sản phẩm theo Id (không ràng buộc seller).
     /// </summary>
-    public async Task<ProductDto?> GetByIdAsync(Guid id)
+    public async Task<ProducDetailstDto> GetByIdAsync(Guid id)
     {
         var cacheKey = $"product:{id}";
         var cached = await _cacheService.GetAsync<Product>(cacheKey);
@@ -53,7 +53,7 @@ public class ProductService : IProductService
             _logger.Info($"[GetByIdAsync] Cache hit for product {id}");
             if (cached.IsDeleted)
                 throw ErrorHelper.NotFound(ErrorMessages.ProductNotFound);
-            return _mapper.Map<Product, ProductDto>(cached);
+            return MapProductToDetailDto(cached);
         }
 
         var product = await _unitOfWork.Products.GetQueryable()
@@ -68,10 +68,10 @@ public class ProductService : IProductService
 
         await _cacheService.SetAsync(cacheKey, product, TimeSpan.FromHours(1));
         _logger.Info($"[GetByIdAsync] Product {id} loaded from DB and cached.");
-        return _mapper.Map<Product, ProductDto>(product);
+        return MapProductToDetailDto(product);
     }
 
-    public async Task<Pagination<ProductDto>> GetAllAsync(ProductQueryParameter param)
+    public async Task<Pagination<ProducDetailstDto>> GetAllAsync(ProductQueryParameter param)
     {
         _logger.Info($"[GetAllAsync] Public requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
@@ -124,13 +124,13 @@ public class ProductService : IProductService
                 .Take(param.PageSize)
                 .ToListAsync();
 
-        var dtos = items.Select(p => _mapper.Map<Product, ProductDto>(p)).ToList();
-        var result = new Pagination<ProductDto>(dtos, count, param.PageIndex, param.PageSize);
+        var dtos = items.Select(MapProductToDetailDto).ToList();
+        var result = new Pagination<ProducDetailstDto>(dtos, count, param.PageIndex, param.PageSize);
 
         return result;
     }
 
-    public async Task<ProductDto> CreateAsync(ProductCreateDto dto)
+    public async Task<ProducDetailstDto> CreateAsync(ProductCreateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId);
@@ -188,10 +188,10 @@ public class ProductService : IProductService
         await RemoveProductCacheAsync(result.Id, seller.Id);
         _logger.Success(string.Format(ErrorMessages.ProductCreatedLog, result.Name, result.ImageUrls.Count));
 
-        return _mapper.Map<Product, ProductDto>(result);
+        return await GetByIdAsync(product.Id);
     }
 
-    public async Task<ProductDto> UpdateAsync(Guid id, ProductUpdateDto dto)
+    public async Task<ProducDetailstDto> UpdateAsync(Guid id, ProductUpdateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(id);
@@ -229,10 +229,10 @@ public class ProductService : IProductService
         var result = await _unitOfWork.Products.GetByIdAsync(id);
 
         _logger.Success(string.Format(ErrorMessages.ProductUpdateSuccessLog, id, userId));
-        return _mapper.Map<Product, ProductDto>(product);
+        return await GetByIdAsync(product.Id);
     }
 
-    public async Task<ProductDto> DeleteAsync(Guid id)
+    public async Task<ProducDetailstDto> DeleteAsync(Guid id)
     {
         var userId = _claimsService.CurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(id);
@@ -253,7 +253,7 @@ public class ProductService : IProductService
         await RemoveProductCacheAsync(id, product.SellerId);
 
         _logger.Success(string.Format(ErrorMessages.ProductDeleteSuccessLog, id, userId));
-        return _mapper.Map<Product, ProductDto>(product);
+        return await GetByIdAsync(product.Id);
     }
 
     public async Task<string?> UploadProductImageAsync(Guid productId, IFormFile file)
@@ -299,7 +299,7 @@ public class ProductService : IProductService
         return fileUrl;
     }
 
-    public async Task<ProductDto> UpdateProductImagesAsync(Guid productId, List<IFormFile> images)
+    public async Task<ProducDetailstDto> UpdateProductImagesAsync(Guid productId, List<IFormFile> images)
     {
         var userId = _claimsService.CurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(productId);
@@ -327,16 +327,7 @@ public class ProductService : IProductService
         await _unitOfWork.SaveChangesAsync();
         await RemoveProductCacheAsync(product.Id, product.SellerId);
 
-        return _mapper.Map<Product, ProductDto>(product);
-    }
-
-    // Helper để lấy fileName từ URL
-    private string ExtractFileNameFromUrl(string url)
-    {
-        var uri = new Uri(url);
-        var query = HttpUtility.ParseQueryString(uri.Query);
-        var prefix = query.Get("prefix");
-        return prefix != null ? Uri.UnescapeDataString(prefix) : null;
+        return await GetByIdAsync(product.Id);
     }
 
 
@@ -363,6 +354,21 @@ public class ProductService : IProductService
     {
         await _cacheService.RemoveAsync($"product:{productId}");
         await _cacheService.RemoveByPatternAsync($"product:all:{sellerId}");
+    }
+
+    private ProducDetailstDto MapProductToDetailDto(Product product)
+    {
+        var dto = _mapper.Map<Product, ProducDetailstDto>(product);
+        dto.ProductStockStatus = product.Stock > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
+        return dto;
+    }
+
+    private string ExtractFileNameFromUrl(string url)
+    {
+        var uri = new Uri(url);
+        var query = HttpUtility.ParseQueryString(uri.Query);
+        var prefix = query.Get("prefix");
+        return prefix != null ? Uri.UnescapeDataString(prefix) : null;
     }
 
     #endregion

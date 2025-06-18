@@ -2,7 +2,7 @@
 
 namespace BlindTreasure.Domain.DTOs.ProductDTOs;
 
-public class ProductDto
+public class ProducDetailstDto
 {
     public Guid Id { get; set; }
     public string? Name { get; set; }
@@ -10,6 +10,7 @@ public class ProductDto
     public Guid CategoryId { get; set; }
     public decimal Price { get; set; }
     public int Stock { get; set; }
+    public StockStatus ProductStockStatus { get; set; }
     public decimal? Height { get; set; }
     public string? Material { get; set; }
     public ProductSaleType? ProductType { get; set; }

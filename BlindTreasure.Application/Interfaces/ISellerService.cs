@@ -14,10 +14,10 @@ public interface ISellerService
     Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId);
     Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto);
     Task<Pagination<SellerDto>> GetAllSellersAsync(SellerStatus? status, PaginationParameter pagination);
-    Task<ProductDto?> GetProductByIdAsync(Guid id, Guid userId);
-    Task<Pagination<ProductDto>> GetAllProductsAsync(ProductQueryParameter param, Guid userId);
-    Task<ProductDto> CreateProductAsync(ProductSellerCreateDto dto);
-    Task<ProductDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto);
-    Task<ProductDto> DeleteProductAsync(Guid productId);
-    Task<ProductDto> UpdateSellerProductImagesAsync(Guid productId, List<IFormFile> images);
+    Task<ProducDetailstDto?> GetProductByIdAsync(Guid id, Guid userId);
+    Task<Pagination<ProducDetailstDto>> GetAllProductsAsync(ProductQueryParameter param, Guid userId);
+    Task<ProducDetailstDto> CreateProductAsync(ProductSellerCreateDto dto);
+    Task<ProducDetailstDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto);
+    Task<ProducDetailstDto> DeleteProductAsync(Guid productId);
+    Task<ProducDetailstDto> UpdateSellerProductImagesAsync(Guid productId, List<IFormFile> images);
 }

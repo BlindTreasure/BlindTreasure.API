@@ -707,7 +707,7 @@ public class BlindBoxService : IBlindBoxService
     private async Task<BlindBoxDetailDto> MapBlindBoxToDtoAsync(BlindBox blindBox)
     {
         var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
-        dto.StockStatus = blindBox.TotalQuantity > 0 ? BlindBoxStockStatus.InStock : BlindBoxStockStatus.OutOfStock;
+        dto.BlindBoxStockStatus = blindBox.TotalQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
 
         // Gán danh sách item
         dto.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
