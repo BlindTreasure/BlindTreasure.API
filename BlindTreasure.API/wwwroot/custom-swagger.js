@@ -1,10 +1,10 @@
-﻿const 
+﻿const
 
-InitFunction = () => {
-    var searchDiv = document.createElement("div");
+    InitFunction = () => {
+        var searchDiv = document.createElement("div");
 
-    // Styling the container, search input, and checkbox container using inline CSS
-    searchDiv.innerHTML = `
+        // Styling the container, search input, and checkbox container using inline CSS
+        searchDiv.innerHTML = `
         <span style="font-size: 20px; font-weight: 900;">Search</span>
         <input 
             type="text" 
@@ -38,63 +38,63 @@ InitFunction = () => {
         </div>
     `;
 
-    document.querySelector(".information-container .main").appendChild(searchDiv);
+        document.querySelector(".information-container .main").appendChild(searchDiv);
 
-    var input = document.getElementById("apiSearch");
-    var checkboxContainer = document.getElementById("checkboxContainer");
+        var input = document.getElementById("apiSearch");
+        var checkboxContainer = document.getElementById("checkboxContainer");
 
-    // Populate checkboxes with unique data-tag values
-    var tags = document.getElementsByClassName("opblock-tag-section");
-    var uniqueTags = new Set();
-    for (var i = 0; i < tags.length; i++) {
-        var tag = tags[i].querySelector('[data-tag]').getAttribute('data-tag');
-        uniqueTags.add(tag);
-    }
-    uniqueTags.forEach(tag => {
-        var checkboxDiv = document.createElement("div");
-        checkboxDiv.style.margin = "5px";
-        checkboxDiv.innerHTML = `
+        // Populate checkboxes with unique data-tag values
+        var tags = document.getElementsByClassName("opblock-tag-section");
+        var uniqueTags = new Set();
+        for (var i = 0; i < tags.length; i++) {
+            var tag = tags[i].querySelector('[data-tag]').getAttribute('data-tag');
+            uniqueTags.add(tag);
+        }
+        uniqueTags.forEach(tag => {
+            var checkboxDiv = document.createElement("div");
+            checkboxDiv.style.margin = "5px";
+            checkboxDiv.innerHTML = `
             <label style="display: flex; align-items: center;">
                 <input type="checkbox" value="${tag}" style="margin-right: 8px;">
                 ${tag}
             </label>
         `;
-        checkboxContainer.appendChild(checkboxDiv);
-    });
+            checkboxContainer.appendChild(checkboxDiv);
+        });
 
-    // Function to filter based on both input and selected checkboxes
-    const filterContent = () => {
-        var filter = input.value.toLowerCase();
-        var checkedTags = Array.from(checkboxContainer.querySelectorAll('input[type="checkbox"]:checked')).map(checkbox => checkbox.value.toLowerCase());
+        // Function to filter based on both input and selected checkboxes
+        const filterContent = () => {
+            var filter = input.value.toLowerCase();
+            var checkedTags = Array.from(checkboxContainer.querySelectorAll('input[type="checkbox"]:checked')).map(checkbox => checkbox.value.toLowerCase());
 
-        for (var i = 0; i < tags.length; i++) {
-            var tagSection = tags[i];
-            var tag = tagSection.querySelector('[data-tag]').getAttribute('data-tag').toLowerCase();
-            var operations = tagSection.querySelectorAll('.opblock');
+            for (var i = 0; i < tags.length; i++) {
+                var tagSection = tags[i];
+                var tag = tagSection.querySelector('[data-tag]').getAttribute('data-tag').toLowerCase();
+                var operations = tagSection.querySelectorAll('.opblock');
 
-            var tagMatches = (checkedTags.length === 0 || checkedTags.includes(tag));
+                var tagMatches = (checkedTags.length === 0 || checkedTags.includes(tag));
 
-            operations.forEach(operation => {
-                var path = operation.querySelector('[data-path]').getAttribute('data-path').toLowerCase();
-                var pathMatches = path.includes(filter);
+                operations.forEach(operation => {
+                    var path = operation.querySelector('[data-path]').getAttribute('data-path').toLowerCase();
+                    var pathMatches = path.includes(filter);
 
-                if (tagMatches && pathMatches) {
-                    operation.style.display = "";
-                } else {
-                    operation.style.display = "none";
-                }
-            });
+                    if (tagMatches && pathMatches) {
+                        operation.style.display = "";
+                    } else {
+                        operation.style.display = "none";
+                    }
+                });
 
-            // Hide the entire tag section if no operations are visible
-            var anyOperationVisible = Array.from(operations).some(op => op.style.display === "");
-            tagSection.style.display = anyOperationVisible ? "" : "none";
-        }
+                // Hide the entire tag section if no operations are visible
+                var anyOperationVisible = Array.from(operations).some(op => op.style.display === "");
+                tagSection.style.display = anyOperationVisible ? "" : "none";
+            }
+        };
+
+        // Event listeners for input and checkboxes
+        input.addEventListener("keyup", filterContent);
+        checkboxContainer.addEventListener("change", filterContent);
     };
-
-    // Event listeners for input and checkboxes
-    input.addEventListener("keyup", filterContent);
-    checkboxContainer.addEventListener("change", filterContent);
-};
 
 const addDarkModeToggle = () => {
     const authWrapper = document.querySelector(".auth-wrapper");

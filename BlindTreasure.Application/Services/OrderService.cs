@@ -47,7 +47,7 @@ public class OrderService : IOrderService
     }
 
     /// <summary>
-    /// Đặt hàng (checkout) từ giỏ hàng hệ thống, trả về link thanh toán Stripe.
+    ///     Đặt hàng (checkout) từ giỏ hàng hệ thống, trả về link thanh toán Stripe.
     /// </summary>
     public async Task<string> CheckoutAsync(CreateOrderDto dto)
     {
@@ -57,6 +57,7 @@ public class OrderService : IOrderService
             _loggerService.Warn(ErrorMessages.OrderCartEmptyLog);
             throw ErrorHelper.BadRequest(ErrorMessages.OrderCartEmpty);
         }
+
         _loggerService.Info(ErrorMessages.OrderCheckoutStartLog);
         return await CheckoutCore(
             cart.Items.Select(i => new CheckoutItem
@@ -74,7 +75,7 @@ public class OrderService : IOrderService
     }
 
     /// <summary>
-    /// Đặt hàng (checkout) từ cart truyền lên từ client, trả về link thanh toán Stripe.
+    ///     Đặt hàng (checkout) từ cart truyền lên từ client, trả về link thanh toán Stripe.
     /// </summary>
     public async Task<string> CheckoutFromClientCartAsync(DirectCartCheckoutDto cartDto)
     {
@@ -83,6 +84,7 @@ public class OrderService : IOrderService
             _loggerService.Warn(ErrorMessages.OrderClientCartInvalidLog);
             throw ErrorHelper.BadRequest(ErrorMessages.OrderClientCartInvalid);
         }
+
         _loggerService.Info(ErrorMessages.OrderCheckoutFromClientStartLog);
         return await CheckoutCore(
             cartDto.Items.Select(i => new CheckoutItem
@@ -100,123 +102,7 @@ public class OrderService : IOrderService
     }
 
     /// <summary>
-    /// Logic nghiệp vụ đặt hàng dùng chung cho mọi loại cart.
-    /// Không tạo thêm DTO mới, chỉ dùng struct nội bộ.
-    /// </summary>
-    private async Task<string> CheckoutCore(
-        IEnumerable<CheckoutItem> items,
-        Guid? shippingAddressId)
-    {
-        var userId = _claimsService.CurrentUserId;
-        var itemList = items.ToList();
-        if (!itemList.Any())
-        {
-            _loggerService.Warn(ErrorMessages.OrderCartEmptyOrInvalidLog);
-            throw ErrorHelper.BadRequest(ErrorMessages.OrderCartEmptyOrInvalid);
-        }
-
-        // 1. Kiểm tra shipping address nếu có
-        Address? shippingAddress = null;
-        if (shippingAddressId.HasValue)
-        {
-            shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(shippingAddressId.Value);
-            if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != userId)
-            {
-                _loggerService.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
-                throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
-            }
-        }
-
-        // 1. Kiểm tra tồn kho & trạng thái sản phẩm/blindbox
-        foreach (var item in itemList)
-        {
-            if (item.ProductId.HasValue)
-            {
-                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
-                if (product == null || product.IsDeleted)
-                    throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderProductNotFound, item.ProductName));
-                if (product.Stock < item.Quantity)
-                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderProductOutOfStock, item.ProductName));
-                if (product.Status != ProductStatus.Active)
-                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderProductNotForSale, item.ProductName));
-            }
-            else if (item.BlindBoxId.HasValue)
-            {
-                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value);
-                if (blindBox == null || blindBox.IsDeleted)
-                    throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderBlindBoxNotFound, item.BlindBoxName));
-                if (blindBox.Status != BlindBoxStatus.Approved)
-                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderBlindBoxNotApproved, item.BlindBoxName));
-                if (blindBox.TotalQuantity < item.Quantity)
-                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderBlindBoxOutOfStock, item.BlindBoxName));
-            }
-        }
-
-        // 2. Tính tổng tiền
-        decimal totalPrice = itemList.Sum(i => i.TotalPrice);
-
-        // 3. Tạo order
-        var order = new Order
-        {
-            UserId = userId,
-            Status = OrderStatus.PENDING.ToString(),
-            TotalAmount = totalPrice,
-            PlacedAt = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow,
-            ShippingAddressId = shippingAddressId,
-            OrderDetails = new List<OrderDetail>()
-        };
-
-        // 4. Tạo order details & trừ tồn kho
-        foreach (var item in itemList)
-        {
-            var orderDetail = new OrderDetail
-            {
-                Id = Guid.NewGuid(),
-                OrderId = order.Id,
-                ProductId = item.ProductId,
-                BlindBoxId = item.BlindBoxId,
-                Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
-                TotalPrice = item.TotalPrice,
-                Status = OrderDetailStatus.PENDING.ToString(),
-                CreatedAt = DateTime.UtcNow
-            };
-            order.OrderDetails.Add(orderDetail);
-
-            if (item.ProductId.HasValue)
-            {
-                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
-                product.Stock -= item.Quantity;
-                await _unitOfWork.Products.Update(product);
-            }
-            else if (item.BlindBoxId.HasValue)
-            {
-                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value);
-                blindBox.TotalQuantity -= item.Quantity;
-                await _unitOfWork.BlindBoxes.Update(blindBox);
-            }
-        }
-
-        await _unitOfWork.Orders.AddAsync(order);
-        await _unitOfWork.SaveChangesAsync();
-
-        // 5. cập nhật cart hệ thống 
-        await _cartItemService.UpdateCartAfterCheckoutAsync(userId, itemList);
-        _loggerService.Info(ErrorMessages.OrderCartClearedAfterCheckoutLog);
-
-        // 6. Xóa cache liên quan
-        await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
-        _loggerService.Info(string.Format(ErrorMessages.OrderCacheClearedAfterCheckoutLog, userId));
-
-        _loggerService.Success(string.Format(ErrorMessages.OrderCheckoutSuccessLog, userId));
-
-        // 7. Gọi StripeService để lấy link thanh toán cho order vừa tạo
-        return await _stripeService.CreateCheckoutSession(order.Id, false);
-    }
-
-    /// <summary>
-    /// Lấy chi tiết đơn hàng của user hiện tại.
+    ///     Lấy chi tiết đơn hàng của user hiện tại.
     /// </summary>
     public async Task<OrderDto> GetOrderByIdAsync(Guid orderId)
     {
@@ -232,12 +118,12 @@ public class OrderService : IOrderService
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
+            .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
+            .ThenInclude(od => od.BlindBox)
             .Include(o => o.ShippingAddress)
             .Include(o => o.Payment)
-                .ThenInclude(p => p.Transactions)
+            .ThenInclude(p => p.Transactions)
             .OrderByDescending(o => o.PlacedAt)
             .FirstOrDefaultAsync();
 
@@ -255,7 +141,7 @@ public class OrderService : IOrderService
     }
 
     /// <summary>
-    /// Lấy danh sách đơn hàng của user hiện tại.
+    ///     Lấy danh sách đơn hàng của user hiện tại.
     /// </summary>
     public async Task<List<OrderDto>> GetMyOrdersAsync()
     {
@@ -264,12 +150,12 @@ public class OrderService : IOrderService
         var orders = await _unitOfWork.Orders.GetQueryable().AsNoTracking()
             .Where(o => o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
+            .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
+            .ThenInclude(od => od.BlindBox)
             .Include(o => o.ShippingAddress)
             .Include(o => o.Payment)
-                .ThenInclude(p => p.Transactions)
+            .ThenInclude(p => p.Transactions)
             .OrderByDescending(o => o.PlacedAt)
             .ToListAsync();
 
@@ -356,7 +242,123 @@ public class OrderService : IOrderService
     }
 
     /// <summary>
-    /// Struct nội bộ dùng chung cho logic checkout, không public ra ngoài.
+    ///     Logic nghiệp vụ đặt hàng dùng chung cho mọi loại cart.
+    ///     Không tạo thêm DTO mới, chỉ dùng struct nội bộ.
+    /// </summary>
+    private async Task<string> CheckoutCore(
+        IEnumerable<CheckoutItem> items,
+        Guid? shippingAddressId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var itemList = items.ToList();
+        if (!itemList.Any())
+        {
+            _loggerService.Warn(ErrorMessages.OrderCartEmptyOrInvalidLog);
+            throw ErrorHelper.BadRequest(ErrorMessages.OrderCartEmptyOrInvalid);
+        }
+
+        // 1. Kiểm tra shipping address nếu có
+        Address? shippingAddress = null;
+        if (shippingAddressId.HasValue)
+        {
+            shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(shippingAddressId.Value);
+            if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != userId)
+            {
+                _loggerService.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
+                throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
+            }
+        }
+
+        // 1. Kiểm tra tồn kho & trạng thái sản phẩm/blindbox
+        foreach (var item in itemList)
+            if (item.ProductId.HasValue)
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
+                if (product == null || product.IsDeleted)
+                    throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderProductNotFound, item.ProductName));
+                if (product.Stock < item.Quantity)
+                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderProductOutOfStock, item.ProductName));
+                if (product.Status != ProductStatus.Active)
+                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderProductNotForSale, item.ProductName));
+            }
+            else if (item.BlindBoxId.HasValue)
+            {
+                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value);
+                if (blindBox == null || blindBox.IsDeleted)
+                    throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderBlindBoxNotFound, item.BlindBoxName));
+                if (blindBox.Status != BlindBoxStatus.Approved)
+                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderBlindBoxNotApproved,
+                        item.BlindBoxName));
+                if (blindBox.TotalQuantity < item.Quantity)
+                    throw ErrorHelper.BadRequest(
+                        string.Format(ErrorMessages.OrderBlindBoxOutOfStock, item.BlindBoxName));
+            }
+
+        // 2. Tính tổng tiền
+        var totalPrice = itemList.Sum(i => i.TotalPrice);
+
+        // 3. Tạo order
+        var order = new Order
+        {
+            UserId = userId,
+            Status = OrderStatus.PENDING.ToString(),
+            TotalAmount = totalPrice,
+            PlacedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            ShippingAddressId = shippingAddressId,
+            OrderDetails = new List<OrderDetail>()
+        };
+
+        // 4. Tạo order details & trừ tồn kho
+        foreach (var item in itemList)
+        {
+            var orderDetail = new OrderDetail
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                ProductId = item.ProductId,
+                BlindBoxId = item.BlindBoxId,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                TotalPrice = item.TotalPrice,
+                Status = OrderDetailStatus.PENDING.ToString(),
+                CreatedAt = DateTime.UtcNow
+            };
+            order.OrderDetails.Add(orderDetail);
+
+            if (item.ProductId.HasValue)
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
+                product.Stock -= item.Quantity;
+                await _unitOfWork.Products.Update(product);
+            }
+            else if (item.BlindBoxId.HasValue)
+            {
+                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value);
+                blindBox.TotalQuantity -= item.Quantity;
+                await _unitOfWork.BlindBoxes.Update(blindBox);
+            }
+        }
+
+        await _unitOfWork.Orders.AddAsync(order);
+        await _unitOfWork.SaveChangesAsync();
+
+        // 5. cập nhật cart hệ thống 
+        await _cartItemService.UpdateCartAfterCheckoutAsync(userId, itemList);
+        _loggerService.Info(ErrorMessages.OrderCartClearedAfterCheckoutLog);
+
+        // 6. Xóa cache liên quan
+        await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
+        _loggerService.Info(string.Format(ErrorMessages.OrderCacheClearedAfterCheckoutLog, userId));
+
+        _loggerService.Success(string.Format(ErrorMessages.OrderCheckoutSuccessLog, userId));
+
+        // 7. Gọi StripeService để lấy link thanh toán cho order vừa tạo
+        return await _stripeService.CreateCheckoutSession(order.Id);
+    }
+
+    /// <summary>
+    ///     Struct nội bộ dùng chung cho logic checkout, không public ra ngoài.
     /// </summary>
     public struct CheckoutItem
     {

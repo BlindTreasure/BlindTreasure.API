@@ -17,6 +17,7 @@ public class ProductService : IProductService
 {
     private readonly IBlobService _blobService;
     private readonly ICacheService _cacheService;
+    private readonly ICategoryService _categoryService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
@@ -29,7 +30,7 @@ public class ProductService : IProductService
         ICacheService cacheService,
         IClaimsService claimsService,
         IMapperService mapper,
-        IBlobService blobService)
+        IBlobService blobService, ICategoryService categoryService)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -37,6 +38,7 @@ public class ProductService : IProductService
         _claimsService = claimsService;
         _mapper = mapper;
         _blobService = blobService;
+        _categoryService = categoryService;
     }
 
     /// <summary>
@@ -85,7 +87,10 @@ public class ProductService : IProductService
         }
 
         if (param.CategoryId.HasValue)
-            query = query.Where(p => p.CategoryId == param.CategoryId.Value);
+        {
+            var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
+            query = query.Where(p => categoryIds.Contains(p.CategoryId));
+        }
 
         if (param.ProductStatus.HasValue)
             query = query.Where(p => p.Status == param.ProductStatus);
@@ -353,7 +358,6 @@ public class ProductService : IProductService
             throw ErrorHelper.BadRequest("Danh mục sản phẩm không hợp lệ.");
     }
 
- 
 
     private async Task RemoveProductCacheAsync(Guid productId, Guid sellerId)
     {

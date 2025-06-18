@@ -208,11 +208,10 @@ public class CartItemService : ICartItemService
         foreach (var item in checkoutItems)
         {
             // Tìm cart item theo user, productId, blindBoxId
-            var cartItem = await _unitOfWork.CartItems.FirstOrDefaultAsync(
-                c => c.UserId == userId
-                    && c.ProductId == item.ProductId
-                    && c.BlindBoxId == item.BlindBoxId
-                    && !c.IsDeleted
+            var cartItem = await _unitOfWork.CartItems.FirstOrDefaultAsync(c => c.UserId == userId
+                && c.ProductId == item.ProductId
+                && c.BlindBoxId == item.BlindBoxId
+                && !c.IsDeleted
             );
 
             if (cartItem != null)
@@ -228,9 +227,11 @@ public class CartItemService : ICartItemService
                     cartItem.TotalPrice = cartItem.Quantity * cartItem.UnitPrice;
                     cartItem.UpdatedAt = DateTime.UtcNow;
                 }
+
                 await _unitOfWork.CartItems.Update(cartItem);
             }
         }
+
         await _unitOfWork.SaveChangesAsync();
     }
 }
