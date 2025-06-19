@@ -36,6 +36,7 @@ public class SystemController : ControllerBase
 
             await SeedCategories();
             await SeedProducts();
+            await SeedBlindBoxes();
             return Ok(ApiResult<object>.Success(new
             {
                 Message = "Data seeded successfully."
@@ -264,7 +265,7 @@ public class SystemController : ControllerBase
                             {
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FBaby%20Molly%20Funny%20Raining%20Day%20Figure.jpg&version_id=null"
                             },
-                            Brand = "PopMart",
+                            Brand = seller.CompanyName,
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 8
@@ -284,7 +285,7 @@ public class SystemController : ControllerBase
                             {
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FHand%20in%20Hand%20Series%20Figures.jpg&version_id=null"
                             },
-                            Brand = "PopMart",
+                            Brand = seller.CompanyName,
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 10
@@ -304,7 +305,7 @@ public class SystemController : ControllerBase
                             {
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FCHAKA%20Candle%20Whisper%20Series%20Figures.jpg&version_id=null"
                             },
-                            Brand = "PopMart",
+                            Brand = seller.CompanyName,
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 6
@@ -329,7 +330,7 @@ public class SystemController : ControllerBase
                                 //img 3
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%20(1).jpg&version_id=null"
                             },
-                            Brand = "PopMart",
+                            Brand = seller.CompanyName,
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 6
@@ -354,7 +355,7 @@ public class SystemController : ControllerBase
                                 //img 3
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fpopmarts%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%2FTHE%20MONSTERS%20Let%27s%20Checkmate%20Series-Vinyl%20Plush%20Doll%20(1).jpg&version_id=null"
                             },
-                            Brand = "PopMart",
+                            Brand = seller.CompanyName,
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 6
@@ -381,7 +382,7 @@ public class SystemController : ControllerBase
                             {
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Check%20Card%20Blindbox%20Th%E1%BB%8F%20M%C3%A0u%20H%E1%BB%93ng.png&version_id=null"
                             },
-                            Brand = "Baby Three",
+                            Brand = seller.CompanyName,
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 9
@@ -403,7 +404,7 @@ public class SystemController : ControllerBase
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Vinyl%20Plush%20Dinosaur%20M%C3%A0u%20Xanh%20L%C3%A1%2Fbup-be-baby-three-v3-vinyl-plush-dinosaur-mau-xanh-la-66f4e3b343e26-26092024113147.png&version_id=null",
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20V3%20Vinyl%20Plush%20Dinosaur%20M%C3%A0u%20Xanh%20L%C3%A1%2Fbup-be-baby-three-v3-vinyl-plush-dinosaur-mau-xanh-la-66f4e3b346bef-26092024113147.png&version_id=null"
                             },
-                            Brand = "Baby Three",
+                            Brand = seller.CompanyName,
                             Material = "Fabric",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 15
@@ -424,7 +425,7 @@ public class SystemController : ControllerBase
                             {
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FB%C3%BAp%20B%C3%AA%20Baby%20Three%20Chinese%20Zodiac%20Plush%20Doll%20Blind%20Box%20M%E1%BA%B7t%20D%C3%A2u%20M%C3%A0u%20H%E1%BB%93ng.png&version_id=null"
                             },
-                            Brand = "Baby Three",
+                            Brand = seller.CompanyName,
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 11
@@ -451,7 +452,7 @@ public class SystemController : ControllerBase
                                 //img 4
                                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=products%2Fbabythree%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%2FYooki%20Lamb%20400%25%20Vinyl%20Plush%20Doll%20(%20Ch%C3%ADnh%20H%C3%A3ng%20)%20(4).webp&version_id=null"
                             },
-                            Brand = "Baby Three",
+                            Brand = seller.CompanyName,
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
                             Height = 30
@@ -507,7 +508,7 @@ public class SystemController : ControllerBase
             new()
             {
                 Id = Guid.NewGuid(),
-                Name = "Blindbox Exclusive - Bunny Pink",
+                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
                 Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
                 CategoryId = category.Id,
                 SellerId = seller.Id,
@@ -515,8 +516,11 @@ public class SystemController : ControllerBase
                 Stock = 40,
                 Status = ProductStatus.Active,
                 CreatedAt = now,
-                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
-                Brand = "Blindbox Exclusive",
+                ImageUrls = new List<string>
+                {
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fca-sau-sao-chep.webp&version_id=null"
+                },
+                Brand = seller.CompanyName,
                 Material = "PVC",
                 ProductType = ProductSaleType.BlindBoxOnly,
                 Height = 12
@@ -525,7 +529,7 @@ public class SystemController : ControllerBase
             new()
             {
                 Id = Guid.NewGuid(),
-                Name = "Blindbox Exclusive - Bunny Pink",
+                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
                 Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
                 CategoryId = category.Id,
                 SellerId = seller.Id,
@@ -533,8 +537,11 @@ public class SystemController : ControllerBase
                 Stock = 40,
                 Status = ProductStatus.Active,
                 CreatedAt = now,
-                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
-                Brand = "Blindbox Exclusive",
+                ImageUrls = new List<string>
+                {
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fcanh-cut-sao-chep.webp&version_id=null"
+                },
+                Brand = seller.CompanyName,
                 Material = "PVC",
                 ProductType = ProductSaleType.BlindBoxOnly,
                 Height = 12
@@ -543,7 +550,7 @@ public class SystemController : ControllerBase
             new()
             {
                 Id = Guid.NewGuid(),
-                Name = "Blindbox Exclusive - Bunny Pink",
+                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
                 Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
                 CategoryId = category.Id,
                 SellerId = seller.Id,
@@ -551,8 +558,11 @@ public class SystemController : ControllerBase
                 Stock = 40,
                 Status = ProductStatus.Active,
                 CreatedAt = now,
-                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
-                Brand = "Blindbox Exclusive",
+                ImageUrls = new List<string>
+                {
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-hong-sao-chep.jpg&version_id=null"
+                },
+                Brand = seller.CompanyName,
                 Material = "PVC",
                 ProductType = ProductSaleType.BlindBoxOnly,
                 Height = 12
@@ -561,7 +571,7 @@ public class SystemController : ControllerBase
             new()
             {
                 Id = Guid.NewGuid(),
-                Name = "Blindbox Exclusive - Bunny Pink",
+                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
                 Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
                 CategoryId = category.Id,
                 SellerId = seller.Id,
@@ -569,8 +579,11 @@ public class SystemController : ControllerBase
                 Stock = 40,
                 Status = ProductStatus.Active,
                 CreatedAt = now,
-                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
-                Brand = "Blindbox Exclusive",
+                ImageUrls = new List<string>
+                {
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fkhung-moi-khong-website-sao-chep.webp&version_id=null"
+                },
+                Brand = seller.CompanyName,
                 Material = "PVC",
                 ProductType = ProductSaleType.BlindBoxOnly,
                 Height = 12
@@ -579,7 +592,7 @@ public class SystemController : ControllerBase
             new()
             {
                 Id = Guid.NewGuid(),
-                Name = "Blindbox Exclusive - Bunny Pink",
+                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
                 Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
                 CategoryId = category.Id,
                 SellerId = seller.Id,
@@ -587,8 +600,11 @@ public class SystemController : ControllerBase
                 Stock = 40,
                 Status = ProductStatus.Active,
                 CreatedAt = now,
-                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
-                Brand = "Blindbox Exclusive",
+                ImageUrls = new List<string>
+                {
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Ftim-sao-chep%20(1).webp&version_id=null"
+                },
+                Brand = seller.CompanyName,
                 Material = "PVC",
                 ProductType = ProductSaleType.BlindBoxOnly,
                 Height = 12
@@ -597,7 +613,7 @@ public class SystemController : ControllerBase
             new()
             {
                 Id = Guid.NewGuid(),
-                Name = "Blindbox Exclusive - Bunny Pink",
+                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
                 Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
                 CategoryId = category.Id,
                 SellerId = seller.Id,
@@ -605,8 +621,11 @@ public class SystemController : ControllerBase
                 Stock = 40,
                 Status = ProductStatus.Active,
                 CreatedAt = now,
-                ImageUrls = new List<string> { "https://example.com/images/bunny.png" },
-                Brand = "Blindbox Exclusive",
+                ImageUrls = new List<string>
+                {
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-hong-sao-chep.jpg&version_id=null"
+                },
+                Brand = seller.CompanyName,
                 Material = "PVC",
                 ProductType = ProductSaleType.BlindBoxOnly,
                 Height = 12
@@ -622,14 +641,15 @@ public class SystemController : ControllerBase
             Id = Guid.NewGuid(),
             SellerId = seller.Id,
             CategoryId = category.Id,
-            Name = "Special Blindbox Edition",
+            Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
             Description = "Blindbox phiên bản đặc biệt chứa các mô hình giới hạn.",
             Price = 500000,
             TotalQuantity = 30,
             HasSecretItem = true,
             SecretProbability = 15,
             Status = BlindBoxStatus.Approved,
-            ImageUrl = "https://example.com/images/blindbox-cover.png",
+            ImageUrl =
+                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box.webp&version_id=null",
             ReleaseDate = now,
             CreatedAt = now
         };
