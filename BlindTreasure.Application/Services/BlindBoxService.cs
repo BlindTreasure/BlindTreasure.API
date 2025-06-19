@@ -162,6 +162,7 @@ public class BlindBoxService : IBlindBoxService
 
         // Lấy BlindBox, không include BlindBoxItems
         var blindBox = await _unitOfWork.BlindBoxes.GetQueryable()
+            .Include(b => b.Seller)
             .Where(x => x.Id == blindBoxId && !x.IsDeleted)
             .FirstOrDefaultAsync();
 
@@ -708,6 +709,7 @@ public class BlindBoxService : IBlindBoxService
     {
         var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
         dto.BlindBoxStockStatus = blindBox.TotalQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
+        dto.Brand = blindBox.Seller.CompanyName;
 
         // Gán danh sách item
         dto.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
