@@ -15,6 +15,7 @@ public class BlindBoxDetailDto
     public DateTime ReleaseDate { get; set; }
     public BlindBoxStatus Status { get; set; } //Draft, PendingApproval, Approved...
     public bool HasSecretItem { get; set; }
+    public string? Brand { get; set; }
     public int SecretProbability { get; set; }
     public string? RejectReason { get; set; }
 

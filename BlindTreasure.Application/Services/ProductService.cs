@@ -57,8 +57,10 @@ public class ProductService : IProductService
         }
 
         var product = await _unitOfWork.Products.GetQueryable()
+            .Include(p => p.Seller)
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == id);
+
 
         if (product == null || product.IsDeleted)
         {
@@ -76,7 +78,7 @@ public class ProductService : IProductService
         _logger.Info($"[GetAllAsync] Public requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.Products.GetQueryable()
-            .Where(p => !p.IsDeleted)
+            .Where(p => !p.IsDeleted && p.ProductType == ProductSaleType.DirectSale)
             .AsNoTracking();
 
         // Filter
@@ -139,6 +141,10 @@ public class ProductService : IProductService
         if (!seller.IsVerified || seller.Status != SellerStatus.Approved)
             throw ErrorHelper.Forbidden(ErrorMessages.ProductSellerNotVerified);
 
+        if (string.IsNullOrWhiteSpace(seller.CompanyName))
+            throw ErrorHelper.BadRequest("Seller chưa cập nhật Company Name, không thể tạo sản phẩm.");
+
+
         _logger.Info($"[CreateAsync] Seller {userId} creates new product: {dto.Name}");
 
         await ValidateProductDto(dto);
@@ -153,7 +159,7 @@ public class ProductService : IProductService
             Height = dto.Height,
             Material = dto.Material,
             ProductType = dto.ProductType,
-            Brand = dto.Brand,
+            Brand = seller.CompanyName ?? "Unknown",
             ImageUrls = new List<string>(),
             SellerId = seller.Id,
             Seller = seller,
@@ -219,14 +225,10 @@ public class ProductService : IProductService
             product.Material = dto.Material;
         if (dto.ProductType.HasValue)
             product.ProductType = dto.ProductType.Value;
-        if (dto.Brand != null)
-            product.Brand = dto.Brand;
         if (dto.ProductStatus.HasValue) product.Status = dto.ProductStatus.Value;
 
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
-
-        var result = await _unitOfWork.Products.GetByIdAsync(id);
 
         _logger.Success(string.Format(ErrorMessages.ProductUpdateSuccessLog, id, userId));
         return await GetByIdAsync(product.Id);
@@ -360,6 +362,7 @@ public class ProductService : IProductService
     {
         var dto = _mapper.Map<Product, ProducDetailstDto>(product);
         dto.ProductStockStatus = product.Stock > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
+        dto.Brand = product.Seller.CompanyName;
         return dto;
     }
 

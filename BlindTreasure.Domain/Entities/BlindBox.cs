@@ -17,7 +17,7 @@ public class BlindBox : BaseEntity
     public bool HasSecretItem { get; set; }
     public int SecretProbability { get; set; }
     public BlindBoxStatus Status { get; set; }
-
+    public string? Brand { get; set; }
     public string ImageUrl { get; set; }
     public DateTime ReleaseDate { get; set; }
     public string? RejectReason { get; set; }
