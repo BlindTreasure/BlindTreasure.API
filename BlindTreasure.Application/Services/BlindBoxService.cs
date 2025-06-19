@@ -52,6 +52,7 @@ public class BlindBoxService : IBlindBoxService
             $"[GetAllBlindBoxesAsync] Public requests blind box list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.BlindBoxes.GetQueryable()
+            .Include(s => s.Seller)
             .Where(b => !b.IsDeleted);
 
         var cacheKey = BlindBoxCacheKeys.BlindBoxAll(JsonSerializer.Serialize(param));

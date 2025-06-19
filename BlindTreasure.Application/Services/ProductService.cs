@@ -78,8 +78,10 @@ public class ProductService : IProductService
         _logger.Info($"[GetAllAsync] Public requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.Products.GetQueryable()
+            .Include(p => p.Seller) // Thêm dòng này
             .Where(p => !p.IsDeleted && p.ProductType == ProductSaleType.DirectSale)
             .AsNoTracking();
+
 
         // Filter
         if (!string.IsNullOrWhiteSpace(param.Search))
