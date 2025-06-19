@@ -78,7 +78,7 @@ public class ProductService : IProductService
         _logger.Info($"[GetAllAsync] Public requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.Products.GetQueryable()
-            .Where(p => !p.IsDeleted)
+            .Where(p => !p.IsDeleted && p.ProductType == ProductSaleType.DirectSale)
             .AsNoTracking();
 
         // Filter
