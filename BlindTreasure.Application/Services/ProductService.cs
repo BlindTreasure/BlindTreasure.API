@@ -140,7 +140,7 @@ public class ProductService : IProductService
             throw ErrorHelper.Forbidden(ErrorMessages.ProductSellerNotFound);
         if (!seller.IsVerified || seller.Status != SellerStatus.Approved)
             throw ErrorHelper.Forbidden(ErrorMessages.ProductSellerNotVerified);
-        
+
         if (string.IsNullOrWhiteSpace(seller.CompanyName))
             throw ErrorHelper.BadRequest("Seller chưa cập nhật Company Name, không thể tạo sản phẩm.");
 
@@ -337,7 +337,6 @@ public class ProductService : IProductService
 
     private async Task ValidateProductDto(ProductCreateDto dto)
     {
-        
         if (string.IsNullOrWhiteSpace(dto.Name))
             throw ErrorHelper.BadRequest("Tên sản phẩm không được để trống.");
         if (string.IsNullOrWhiteSpace(dto.Description))

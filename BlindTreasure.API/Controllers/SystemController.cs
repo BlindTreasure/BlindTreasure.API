@@ -623,13 +623,13 @@ public class SystemController : ControllerBase
                 CreatedAt = now,
                 ImageUrls = new List<string>
                 {
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-hong-sao-chep.jpg&version_id=null"
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-sao-chep.webp&version_id=null"
                 },
                 Brand = seller.CompanyName,
                 Material = "PVC",
                 ProductType = ProductSaleType.BlindBoxOnly,
                 Height = 12
-            },
+            }
         };
 
         await _context.Products.AddRangeAsync(blindBoxProducts);
@@ -656,7 +656,7 @@ public class SystemController : ControllerBase
 
         var blindBoxItems = new List<BlindBoxItem>();
 
-        for (int i = 0; i < blindBoxProducts.Count; i++)
+        for (var i = 0; i < blindBoxProducts.Count; i++)
         {
             var product = blindBoxProducts[i];
 
