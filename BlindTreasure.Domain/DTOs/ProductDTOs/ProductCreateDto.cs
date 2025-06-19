@@ -45,7 +45,7 @@ public class ProductSellerCreateDto
     [DefaultValue(ProductSaleType.DirectSale)]
     public ProductSaleType? ProductType { get; set; }
 
-    [DefaultValue("Bandai")] public string? Brand { get; set; }
+    // [DefaultValue("Bandai")] public string? Brand { get; set; }
 
     [MaxLength(6, ErrorMessage = "Tối đa 6 ảnh.")]
     public List<IFormFile>? Images { get; set; }

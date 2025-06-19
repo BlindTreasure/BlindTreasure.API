@@ -17,7 +17,7 @@ public class ProductUpdateDto
     public decimal? Height { get; set; } // cm 
     public string? Material { get; set; }
     public ProductSaleType? ProductType { get; set; }
-    public string? Brand { get; set; }
+    // public string? Brand { get; set; }
 
     [JsonIgnore] public ProductStatus? ProductStatus { get; set; }
 }
