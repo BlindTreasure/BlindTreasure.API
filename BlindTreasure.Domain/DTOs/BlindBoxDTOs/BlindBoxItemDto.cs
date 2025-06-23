@@ -12,7 +12,7 @@ public class BlindBoxItemDto
 
     [DefaultValue("10")] public int Quantity { get; set; }
 
-    [DefaultValue("10.0")] public decimal DropRate { get; set; }
+    [DefaultValue("10")] public decimal DropRate { get; set; }
 
     [DefaultValue("Common")] public BlindBoxRarity Rarity { get; set; }
 

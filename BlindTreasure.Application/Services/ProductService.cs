@@ -257,7 +257,7 @@ public class ProductService : IProductService
         await RemoveProductCacheAsync(id, product.SellerId);
 
         _logger.Success(string.Format(ErrorMessages.ProductDeleteSuccessLog, id, userId));
-        return await GetByIdAsync(product.Id);
+        return MapProductToDetailDto(product);
     }
 
     public async Task<string?> UploadProductImageAsync(Guid productId, IFormFile file)

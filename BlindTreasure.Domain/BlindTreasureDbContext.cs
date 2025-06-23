@@ -129,12 +129,6 @@ public class BlindTreasureDbContext : DbContext
         #endregion
 
 
-        // BlindBox ↔ Category (n-1)
-        modelBuilder.Entity<BlindBox>()
-            .HasOne(bb => bb.Category)
-            .WithMany()
-            .HasForeignKey(bb => bb.CategoryId)
-            .OnDelete(DeleteBehavior.Cascade);
 
 
         modelBuilder.Entity<Product>()

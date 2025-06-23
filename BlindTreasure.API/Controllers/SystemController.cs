@@ -640,7 +640,6 @@ public class SystemController : ControllerBase
         {
             Id = Guid.NewGuid(),
             SellerId = seller.Id,
-            CategoryId = category.Id,
             Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
             Description = "Blindbox phiên bản đặc biệt chứa các mô hình giới hạn.",
             Price = 500000,
