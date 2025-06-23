@@ -141,6 +141,72 @@ public class PromotionService : IPromotionService
         return _mapperService.Map<Promotion, PromotionDto>(promotion);
     }
 
+    public async Task<PromotionApplicationResultDto> ApplyVoucherAsync(string voucherCode, Guid orderId)
+    {
+        // 1. Tìm order
+        var order = await _unitOfWork.Orders.FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted);
+        if (order == null)
+            throw ErrorHelper.NotFound("Không tìm thấy đơn hàng.");
+
+        // 2. Tìm promotion theo mã
+        var promotion = await _unitOfWork.Promotions
+            .FirstOrDefaultAsync(p => p.Code == voucherCode.Trim());
+
+        if (promotion == null)
+            throw ErrorHelper.BadRequest("Mã voucher không tồn tại.");
+
+        // 3. Kiểm tra trạng thái
+        if (promotion.Status != PromotionStatus.Approved)
+            throw ErrorHelper.BadRequest("Voucher chưa được duyệt.");
+
+        // 4. Kiểm tra thời hạn
+        var now = DateTime.UtcNow;
+        if (now < promotion.StartDate || now > promotion.EndDate)
+            throw ErrorHelper.BadRequest("Voucher đã hết hạn hoặc chưa bắt đầu.");
+
+        // 5. Kiểm tra usage
+        var usageCount = await _unitOfWork.Orders.CountAsync(o =>
+            o.CreatedAt >= promotion.StartDate &&
+            o.CreatedAt <= promotion.EndDate &&
+            o.Status != "Cancelled" &&
+            o.UserId == order.UserId); // có thể tracking thêm bảng OrderPromotion nếu có
+
+        if (usageCount >= promotion.UsageLimit)
+            throw ErrorHelper.BadRequest("Voucher đã được sử dụng quá giới hạn.");
+
+        // // 6. Kiểm tra phạm vi
+        // if (promotion.SellerId.HasValue)
+        // {
+        //     var hasSellerItems = await _unitOfWork.OrderDetails.(od =>
+        //         od.OrderId == order.Id && od.SellerId == promotion.SellerId);
+        //     if (!hasSellerItems)
+        //         throw ErrorHelper.BadRequest("Voucher không áp dụng cho đơn hàng này.");
+        // }
+
+        // 7. Tính giảm giá
+        decimal discountAmount = 0;
+        if (promotion.DiscountType == DiscountType.Percentage)
+        {
+            discountAmount = Math.Round(order.TotalAmount * (promotion.DiscountValue / 100m), 2);
+        }
+        else if (promotion.DiscountType == DiscountType.Fixed)
+        {
+            discountAmount = promotion.DiscountValue;
+        }
+
+        discountAmount = Math.Min(discountAmount, order.TotalAmount);
+        var finalAmount = order.TotalAmount - discountAmount;
+
+        return new PromotionApplicationResultDto
+        {
+            PromotionCode = promotion.Code,
+            OriginalAmount = order.TotalAmount,
+            DiscountAmount = discountAmount,
+            FinalAmount = finalAmount,
+            Message = "Áp dụng voucher thành công."
+        };
+    }
+
 
     #region private methods
 
