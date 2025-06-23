@@ -7,8 +7,7 @@ public class BlindBox : BaseEntity
     public Guid SellerId { get; set; }
     public Seller Seller { get; set; }
 
-    public Guid CategoryId { get; set; } // Thay thế Brand bằng CategoryId
-    public Category Category { get; set; } // Navigation property đến Category
+    public string? BindBoxTags { get; set; } // JSON string or array of tags
 
     public string Name { get; set; }
     public string Description { get; set; }

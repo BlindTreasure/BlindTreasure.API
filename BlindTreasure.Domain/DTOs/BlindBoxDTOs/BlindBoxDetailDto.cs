@@ -18,6 +18,8 @@ public class BlindBoxDetailDto
     public string? Brand { get; set; }
     public int SecretProbability { get; set; }
     public string? RejectReason { get; set; }
+    public string? BindBoxTags { get; set; } // JSON string or array of tags
+
 
     public bool IsDeleted { get; set; }
     public List<BlindBoxItemDto>? Items { get; set; }
