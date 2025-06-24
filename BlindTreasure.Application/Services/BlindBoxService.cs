@@ -83,11 +83,11 @@ public class BlindBoxService : IBlindBoxService
         if (param.ReleaseDateTo.HasValue)
             query = query.Where(b => b.ReleaseDate <= param.ReleaseDateTo.Value);
 
-        if (param.CategoryId.HasValue)
-        {
-            var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
-            query = query.Where(b => categoryIds.Contains(b.CategoryId));
-        }
+        //if (param.CategoryId.HasValue)
+        //{
+        //    var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
+        //    query = query.Where(b => categoryIds.Contains(b.CategoryId));
+        //}
 
         if (param.HasItem == true)
         {
@@ -206,9 +206,6 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxTotalQuantityInvalid);
 
 
-        if (dto.CategoryId == Guid.Empty)
-            throw ErrorHelper.BadRequest("Danh mục sản phẩm là bắt buộc.");
-
         if (dto.ReleaseDate == default)
             throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxReleaseDateInvalid);
 
@@ -221,11 +218,11 @@ public class BlindBoxService : IBlindBoxService
         if (seller == null)
             throw ErrorHelper.Forbidden(ErrorMessages.BlindBoxSellerNotVerified);
 
-        // Kiểm tra Category tồn tại
-        var category = await _unitOfWork.Categories.FirstOrDefaultAsync(c =>
-            c.Id == dto.CategoryId && !c.IsDeleted);
-        if (category == null)
-            throw ErrorHelper.BadRequest("Danh mục không tồn tại.");
+        //// Kiểm tra Category tồn tại
+        //var category = await _unitOfWork.Categories.FirstOrDefaultAsync(c =>
+        //    c.Id == dto.CategoryId && !c.IsDeleted);
+        //if (category == null)
+        //    throw ErrorHelper.BadRequest("Danh mục không tồn tại.");
 
         var fileName = $"blindbox-thumbnails/thumbnails-{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
         await using var stream = dto.ImageFile.OpenReadStream();
@@ -241,7 +238,6 @@ public class BlindBoxService : IBlindBoxService
         {
             Id = Guid.NewGuid(),
             SellerId = seller.Id,
-            CategoryId = dto.CategoryId,
             Name = dto.Name.Trim(),
             Price = dto.Price,
             TotalQuantity = dto.TotalQuantity,
@@ -302,7 +298,7 @@ public class BlindBoxService : IBlindBoxService
                 c.Id == dto.CategoryId.Value && !c.IsDeleted);
             if (category == null)
                 throw ErrorHelper.BadRequest("Danh mục không tồn tại.");
-            blindBox.CategoryId = dto.CategoryId.Value;
+           // blindBox.CategoryId = dto.CategoryId.Value;
         }
 
         if (dto.ImageFile != null)
@@ -358,7 +354,8 @@ public class BlindBoxService : IBlindBoxService
         }
 
         // Validate số lượng item phải là 6 hoặc 12
-        if (items.Count != 6 && items.Count != 12)
+        //if (items.Count != 6 && items.Count != 12)
+        if (items.Count <=0)
             throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxItemCountInvalid);
 
         // Validate logic (dropRate, số lượng tồn kho, secret logic)
@@ -369,7 +366,17 @@ public class BlindBoxService : IBlindBoxService
         var products = await _unitOfWork.Products.GetAllAsync(p =>
             productIds.Contains(p.Id) &&
             p.SellerId == seller.Id &&
-            !p.IsDeleted);
+            !p.IsDeleted, x=> x.Category);
+
+        // --- NEW: Collect unique category names for tags ---
+        var categoryNames = products
+            .Where(p => p.Category != null)
+            .Select(p => p.Category.Name)
+            .Distinct()
+            .ToList();
+
+        // Store as JSON array
+        blindBox.BindBoxTags = JsonSerializer.Serialize(categoryNames);
 
         // Chuẩn bị entity item + trừ stock tương ứng
         var now = _time.GetCurrentTime();
@@ -724,9 +731,9 @@ public class BlindBoxService : IBlindBoxService
         }).ToList();
 
         // Lấy tên danh mục
-        var category =
-            await _unitOfWork.Categories.FirstOrDefaultAsync(c => c.Id == blindBox.CategoryId && !c.IsDeleted);
-        dto.CategoryName = category?.Name ?? "Không xác định";
+        //var category =
+        //    await _unitOfWork.Categories.FirstOrDefaultAsync(c => c.Id == blindBox.CategoryId && !c.IsDeleted);
+        //dto.CategoryName = category?.Name ?? "Không xác định";
 
         return dto;
     }
