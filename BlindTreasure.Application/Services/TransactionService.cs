@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -16,6 +17,8 @@ public class TransactionService : ITransactionService
     private readonly IMapperService _mapper;
     private readonly IOrderService _orderService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IInventoryItemService _inventoryItemService;
+
 
     public TransactionService(
         ICacheService cacheService,
@@ -23,7 +26,8 @@ public class TransactionService : ITransactionService
         ILoggerService loggerService,
         IMapperService mapper,
         IOrderService orderService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IInventoryItemService inventoryItemService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -31,6 +35,7 @@ public class TransactionService : ITransactionService
         _mapper = mapper;
         _orderService = orderService;
         _unitOfWork = unitOfWork;
+        _inventoryItemService = inventoryItemService;
     }
 
     /// <summary>
@@ -59,8 +64,27 @@ public class TransactionService : ITransactionService
             {
                 transaction.Payment.Order.Status = OrderStatus.PAID.ToString();
                 transaction.Payment.Order.CompletedAt = DateTime.UtcNow;
-            }
 
+                // 4. Lấy order details và tạo inventory item cho từng sản phẩm
+                var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(
+                    od => od.OrderId == transaction.Payment.OrderId && !od.IsDeleted);
+
+                foreach (var od in orderDetails)
+                {
+                    if (od.ProductId.HasValue)
+                    {
+                        var createDto = new CreateInventoryItemDto
+                        {
+                            ProductId = od.ProductId.Value,
+                            Quantity = od.Quantity,
+                            Location = string.Empty,
+                            Status = "Active"
+                        };
+                        await _inventoryItemService.CreateAsync(createDto);
+                    }
+                    // Nếu muốn hỗ trợ BlindBox, bổ sung logic ở đây
+                }
+            }
             await _unitOfWork.Transactions.Update(transaction);
             await _unitOfWork.Payments.Update(transaction.Payment);
             if (transaction.Payment.Order != null)
