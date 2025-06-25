@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.Entities;
@@ -48,8 +49,11 @@ public class TransactionService : ITransactionService
             // Tìm transaction theo sessionId
             var transaction = await _unitOfWork.Transactions.GetQueryable()
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order)
+                .ThenInclude(p => p.Order).ThenInclude(o => o.OrderDetails)
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
+
+            _loggerService.Info(
+               "OrderDetails count for this transaction =" + transaction.Payment.Order.OrderDetails.Count);
 
             if (transaction == null)
                 throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
@@ -68,6 +72,15 @@ public class TransactionService : ITransactionService
                 // 4. Lấy order details và tạo inventory item cho từng sản phẩm
                 var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(
                     od => od.OrderId == transaction.Payment.OrderId && !od.IsDeleted);
+              
+                if (orderDetails == null || !orderDetails.Any())
+                {
+                    _loggerService.Warn(
+                        $"[HandleSuccessfulPaymentAsync] Không tìm thấy order details cho order {orderId}.");
+                    orderDetails = transaction.Payment.Order.OrderDetails.ToList();
+                }
+                    
+              
                 int count = 0;
                 foreach (var od in orderDetails)
                 {
