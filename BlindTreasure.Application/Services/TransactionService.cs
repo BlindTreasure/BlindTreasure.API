@@ -68,11 +68,14 @@ public class TransactionService : ITransactionService
                 // 4. Lấy order details và tạo inventory item cho từng sản phẩm
                 var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(
                     od => od.OrderId == transaction.Payment.OrderId && !od.IsDeleted);
-
+                int count = 0;
                 foreach (var od in orderDetails)
                 {
+                  
                     if (od.ProductId.HasValue)
                     {
+                        _loggerService.Info(
+                            $"[HandleSuccessfulPaymentAsync] Tạo inventory item cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
                         var createDto = new CreateInventoryItemDto
                         {
                             ProductId = od.ProductId.Value,
@@ -80,7 +83,9 @@ public class TransactionService : ITransactionService
                             Location = string.Empty,
                             Status = "Active"
                         };
-                        await _inventoryItemService.CreateAsync(createDto);
+                        var result = await _inventoryItemService.CreateAsync(createDto);
+                        _loggerService.Success(
+                            $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++count} cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
                     }
                     // Nếu muốn hỗ trợ BlindBox, bổ sung logic ở đây
                 }

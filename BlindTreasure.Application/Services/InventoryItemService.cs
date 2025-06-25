@@ -55,18 +55,17 @@ namespace BlindTreasure.Application.Services
                 RestockThreshold = 0,
                 Location = dto.Location ?? string.Empty,
                 Status = dto.Status ?? "Active",
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = userId
+
             };
 
-            await _unitOfWork.InventoryItems.AddAsync(item);
+           var result=  await _unitOfWork.InventoryItems.AddAsync(item);
             await _unitOfWork.SaveChangesAsync();
 
             // Invalidate cache for this item (should not exist, but for safety)
             await _cacheService.RemoveAsync(GetCacheKey(item.Id));
 
             _loggerService.Success($"[CreateAsync] Inventory item created for user {userId}, product {product.Name}.");
-            return await GetByIdAsync(item.Id) ?? throw ErrorHelper.Internal("Failed to create inventory item.");
+            return InventoryItemMapper.ToInventoryItemDto(result) ?? throw ErrorHelper.Internal("Failed to create inventory item.");
         }
 
         public async Task<InventoryItemDto?> GetByIdAsync(Guid id)
