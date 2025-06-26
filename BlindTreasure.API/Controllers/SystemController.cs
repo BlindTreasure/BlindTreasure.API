@@ -36,7 +36,7 @@ public class SystemController : ControllerBase
 
             await SeedCategories();
             await SeedProducts();
-            // await SeedBlindBoxes();
+            await SeedBlindBoxes();
             return Ok(ApiResult<object>.Success(new
             {
                 Message = "Data seeded successfully."
@@ -141,7 +141,6 @@ public class SystemController : ControllerBase
     }
 
     #region data seeding
-
     private async Task SeedRolesAndUsers()
     {
         await SeedRoles();
@@ -154,7 +153,6 @@ public class SystemController : ControllerBase
 
         _logger.Success("Users and seller seeded successfully.");
     }
-
     private async Task SeedCategories()
     {
         if (_context.Categories.Any())
@@ -175,17 +173,6 @@ public class SystemController : ControllerBase
                 "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=category-thumbnails%2FCollectible%20Toys.png&version_id=null",
             CreatedAt = now
         };
-
-        var sneaker = new Category
-        {
-            Id = Guid.NewGuid(),
-            Name = "Sneaker",
-            Description = "Danh mục giày sneaker thời trang.",
-            ImageUrl =
-                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=category-thumbnails%2Fsneakers.png&version_id=null",
-            CreatedAt = now
-        };
-
         // Danh sách category con
         var children = new List<Category>
         {
@@ -196,13 +183,6 @@ public class SystemController : ControllerBase
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
             },
-            // new()
-            // {
-            //     Name = "Smiski",
-            //     Description = "Đồ chơi sưu tầm nhân vật Smiski phát sáng.",
-            //     ParentId = collectibleToys.Id,
-            //     CreatedAt = now
-            // },
             new()
             {
                 Name = "Baby Three",
@@ -213,7 +193,7 @@ public class SystemController : ControllerBase
         };
 
         // Thêm vào context
-        await _context.Categories.AddRangeAsync(collectibleToys, sneaker);
+        await _context.Categories.AddRangeAsync(collectibleToys);
         await _context.Categories.AddRangeAsync(children);
         await _context.SaveChangesAsync();
 
@@ -475,7 +455,6 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Success("[SeedProducts] Seed sản phẩm chuẩn thành công.");
     }
-
     private async Task SeedBlindBoxes()
     {
         var now = DateTime.UtcNow;
@@ -494,196 +473,182 @@ public class SystemController : ControllerBase
             return;
         }
 
-        var category = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "PopMart" && !c.IsDeleted);
-        if (category == null)
+        // Chỉ lấy category con (ParentId != null)
+        var categories = await _context.Categories
+            .Where(c => !c.IsDeleted && c.ParentId != null)
+            .ToListAsync();
+
+        if (!categories.Any())
         {
-            _logger.Error("Không tìm thấy category PopMart để gán cho sản phẩm.");
+            _logger.Warn("[SeedBlindBoxes] Không tìm thấy category con để tạo blind box.");
             return;
         }
 
-        // === Tạo sản phẩm riêng biệt chỉ dùng cho blind box ===
-        var blindBoxProducts = new List<Product>
+        foreach (var category in categories)
         {
-            //prod 1
-            new()
+            var blindBoxProducts = new List<Product>
             {
-                Id = Guid.NewGuid(),
-                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
-                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
-                CategoryId = category.Id,
-                SellerId = seller.Id,
-                Price = 320000,
-                Stock = 40,
-                Status = ProductStatus.Active,
-                CreatedAt = now,
-                ImageUrls = new List<string>
+                //prod 1
+                new()
                 {
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fca-sau-sao-chep.webp&version_id=null"
+                    Id = Guid.NewGuid(),
+                    Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
+                    Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fca-sau-sao-chep.webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
                 },
-                Brand = seller.CompanyName,
-                Material = "PVC",
-                ProductType = ProductSaleType.BlindBoxOnly,
-                Height = 12
-            },
-            //prod 2
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
-                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
-                CategoryId = category.Id,
-                SellerId = seller.Id,
-                Price = 320000,
-                Stock = 40,
-                Status = ProductStatus.Active,
-                CreatedAt = now,
-                ImageUrls = new List<string>
+                //prod 2
+                new()
                 {
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fcanh-cut-sao-chep.webp&version_id=null"
+                    Id = Guid.NewGuid(),
+                    Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
+                    Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fcanh-cut-sao-chep.webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
                 },
-                Brand = seller.CompanyName,
-                Material = "PVC",
-                ProductType = ProductSaleType.BlindBoxOnly,
-                Height = 12
-            },
-            //prod 3
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
-                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
-                CategoryId = category.Id,
-                SellerId = seller.Id,
-                Price = 320000,
-                Stock = 40,
-                Status = ProductStatus.Active,
-                CreatedAt = now,
-                ImageUrls = new List<string>
+                //prod 3
+                new()
                 {
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-hong-sao-chep.jpg&version_id=null"
+                    Id = Guid.NewGuid(),
+                    Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
+                    Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-hong-sao-chep.jpg&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
                 },
-                Brand = seller.CompanyName,
-                Material = "PVC",
-                ProductType = ProductSaleType.BlindBoxOnly,
-                Height = 12
-            },
-            //prod 4
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
-                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
-                CategoryId = category.Id,
-                SellerId = seller.Id,
-                Price = 320000,
-                Stock = 40,
-                Status = ProductStatus.Active,
-                CreatedAt = now,
-                ImageUrls = new List<string>
+                //prod 4
+                new()
                 {
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fkhung-moi-khong-website-sao-chep.webp&version_id=null"
+                    Id = Guid.NewGuid(),
+                    Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
+                    Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fkhung-moi-khong-website-sao-chep.webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
                 },
-                Brand = seller.CompanyName,
-                Material = "PVC",
-                ProductType = ProductSaleType.BlindBoxOnly,
-                Height = 12
-            },
-            //prod 5
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
-                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
-                CategoryId = category.Id,
-                SellerId = seller.Id,
-                Price = 320000,
-                Stock = 40,
-                Status = ProductStatus.Active,
-                CreatedAt = now,
-                ImageUrls = new List<string>
+                //prod 5
+                new()
                 {
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Ftim-sao-chep%20(1).webp&version_id=null"
+                    Id = Guid.NewGuid(),
+                    Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
+                    Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Ftim-sao-chep%20(1).webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
                 },
-                Brand = seller.CompanyName,
-                Material = "PVC",
-                ProductType = ProductSaleType.BlindBoxOnly,
-                Height = 12
-            },
-            //prod 6
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
-                Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
-                CategoryId = category.Id,
-                SellerId = seller.Id,
-                Price = 320000,
-                Stock = 40,
-                Status = ProductStatus.Active,
-                CreatedAt = now,
-                ImageUrls = new List<string>
+                //prod 6
+                new()
                 {
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-sao-chep.webp&version_id=null"
-                },
-                Brand = seller.CompanyName,
-                Material = "PVC",
-                ProductType = ProductSaleType.BlindBoxOnly,
-                Height = 12
-            }
-        };
+                    Id = Guid.NewGuid(),
+                    Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
+                    Description = "Mô hình thỏ hồng phiên bản đặc biệt cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-sao-chep.webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                }
+            };
 
-        await _context.Products.AddRangeAsync(blindBoxProducts);
-        await _context.SaveChangesAsync();
+            await _context.Products.AddRangeAsync(blindBoxProducts);
+            await _context.SaveChangesAsync();
 
-        // === Tạo blind box và các item ===
-        var blindBox = new BlindBox
-        {
-            Id = Guid.NewGuid(),
-            SellerId = seller.Id,
-            Name = "HACIPUPU Snuggle With You Series Figure Blind Box",
-            Description = "Blindbox phiên bản đặc biệt chứa các mô hình giới hạn.",
-            Price = 500000,
-            TotalQuantity = 30,
-            HasSecretItem = true,
-            SecretProbability = 15,
-            Status = BlindBoxStatus.Approved,
-            ImageUrl =
-                "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box.webp&version_id=null",
-            ReleaseDate = now,
-            CreatedAt = now
-        };
-
-        var blindBoxItems = new List<BlindBoxItem>();
-
-        for (var i = 0; i < blindBoxProducts.Count; i++)
-        {
-            var product = blindBoxProducts[i];
-
-            blindBoxItems.Add(new BlindBoxItem
+            var blindBox = new BlindBox
             {
                 Id = Guid.NewGuid(),
-                BlindBoxId = blindBox.Id,
-                ProductId = product.Id,
-                Quantity = 15,
-                DropRate = i == 1 ? 15m : 85m, // sản phẩm thứ 2 là secret
-                Rarity = i == 1 ? BlindBoxRarity.Secret : BlindBoxRarity.Common,
-                IsActive = true,
+                SellerId = seller.Id,
+                CategoryId = category.Id,
+                Name = $"Blind Box - {category.Name}",
+                Description = $"Blindbox đặc biệt chứa các sản phẩm thuộc {category.Name}",
+                Price = 500000,
+                TotalQuantity = 30,
+                HasSecretItem = true,
+                SecretProbability = 5,
+                Status = BlindBoxStatus.Approved,
+                ImageUrl = "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box.webp&version_id=null",
+                ReleaseDate = now,
                 CreatedAt = now
-            });
+            };
+
+            // Tạo BlindBoxItem
+            var blindBoxItems = GenerateBlindBoxItems(blindBox.Id, blindBoxProducts, now);
+
+            await _context.BlindBoxes.AddAsync(blindBox);
+            await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
+            await _context.SaveChangesAsync();
+
+            _logger.Success($"[SeedBlindBoxes] Đã seed blind box cho category {category.Name} thành công.");
         }
-
-        await _context.BlindBoxes.AddAsync(blindBox);
-        await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
-        await _context.SaveChangesAsync();
-
-        _logger.Success("Seed blindbox và sản phẩm riêng biệt thành công.");
     }
 
     #endregion
-
-
     #region private methods
-
     private async Task SeedRoles()
     {
         var roles = new List<Role>
@@ -719,7 +684,6 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Success("Roles seeded successfully.");
     }
-
     private List<User> GetPredefinedUsers()
     {
         var passwordHasher = new PasswordHasher();
@@ -769,7 +733,6 @@ public class SystemController : ControllerBase
             }
         };
     }
-
     private async Task SeedSellerForUser(string sellerEmail)
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == sellerEmail);
@@ -795,6 +758,68 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Info("Seller seeded successfully.");
     }
+    private List<BlindBoxItem> GenerateBlindBoxItems(
+        Guid blindBoxId,
+        List<Product> products,
+        DateTime now)
+    {
+        if (products.Count < 4)
+            throw new Exception("Cần ít nhất 4 sản phẩm để chia đủ các tier: Common, Rare, Epic, Secret.");
 
+        // Gán cứng 1 sản phẩm đầu tiên cho mỗi tier
+        var rarityMap = new Dictionary<BlindBoxRarity, List<Product>>
+        {
+            { BlindBoxRarity.Common, new List<Product> { products[0] } },
+            { BlindBoxRarity.Rare, new List<Product> { products[1] } },
+            { BlindBoxRarity.Epic, new List<Product> { products[2] } },
+            { BlindBoxRarity.Secret, new List<Product> { products[3] } }
+        };
+
+        // Các sản phẩm còn lại chia vào Common/Rare/Epic
+        var remaining = products.Skip(4).ToList();
+        var rotatingRarities = new[] { BlindBoxRarity.Common, BlindBoxRarity.Rare, BlindBoxRarity.Epic };
+        int rotateIndex = 0;
+
+        foreach (var product in remaining)
+        {
+            var rarity = rotatingRarities[rotateIndex % rotatingRarities.Length];
+            rarityMap[rarity].Add(product);
+            rotateIndex++;
+        }
+
+        // Phân chia tỷ lệ
+        const decimal secretRate = 5m;
+        const decimal remainingRate = 95m;
+
+        var nonSecretCount = rarityMap
+            .Where(kv => kv.Key != BlindBoxRarity.Secret)
+            .Sum(kv => kv.Value.Count);
+
+        var items = new List<BlindBoxItem>();
+
+        foreach (var (rarity, productList) in rarityMap)
+        {
+            var rate = rarity == BlindBoxRarity.Secret
+                ? secretRate / productList.Count
+                : remainingRate / nonSecretCount;
+
+            foreach (var product in productList)
+            {
+                items.Add(new BlindBoxItem
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxId = blindBoxId,
+                    ProductId = product.Id,
+                    Quantity = 15,
+                    DropRate = Math.Round(rate, 2),
+                    Rarity = rarity,
+                    IsActive = true,
+                    CreatedAt = now
+                });
+            }
+        }
+
+        return items;
+    }
     #endregion
 }
