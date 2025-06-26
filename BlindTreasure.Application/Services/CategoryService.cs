@@ -37,7 +37,6 @@ public class CategoryService : ICategoryService
         _blobService = blobService;
         _mapper = mapper;
     }
-
     public async Task<CategoryDto?> GetByIdAsync(Guid id)
     {
         var cacheKey = $"category:{id}";
@@ -63,7 +62,6 @@ public class CategoryService : ICategoryService
         _logger.Info($"[GetByIdAsync] Category {id} loaded from DB and cached.");
         return ToCategoryDto(category);
     }
-
     public async Task<Pagination<CategoryDto>> GetAllAsync(CategoryQueryParameter param)
     {
         _logger.Info(
@@ -101,7 +99,6 @@ public class CategoryService : ICategoryService
         _logger.Info("[GetAllAsync] Category list loaded from DB and cached.");
         return result;
     }
-
     public async Task<List<CategoryWithProductsDto>> GetCategoriesWithAllProductsAsync()
     {
         // Lấy tất cả category cấp cha
@@ -133,7 +130,6 @@ public class CategoryService : ICategoryService
 
         return result;
     }
-
     public async Task<CategoryDto> CreateAsync(CategoryCreateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
@@ -188,7 +184,6 @@ public class CategoryService : ICategoryService
         _logger.Success($"[CreateAsync] Category {category.Name} created.");
         return ToCategoryDto(category);
     }
-
     public async Task<CategoryDto> UpdateAsync(Guid id, CategoryUpdateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
@@ -293,7 +288,6 @@ public class CategoryService : ICategoryService
 
         return ToCategoryDto(category);
     }
-
     public async Task<CategoryDto> DeleteAsync(Guid id)
     {
         var userId = _claimsService.CurrentUserId;

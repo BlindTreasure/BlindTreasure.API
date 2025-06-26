@@ -186,13 +186,8 @@ public class PromotionService : IPromotionService
         // 7. Tính giảm giá
         decimal discountAmount = 0;
         if (promotion.DiscountType == DiscountType.Percentage)
-        {
             discountAmount = Math.Round(order.TotalAmount * (promotion.DiscountValue / 100m), 2);
-        }
-        else if (promotion.DiscountType == DiscountType.Fixed)
-        {
-            discountAmount = promotion.DiscountValue;
-        }
+        else if (promotion.DiscountType == DiscountType.Fixed) discountAmount = promotion.DiscountValue;
 
         discountAmount = Math.Min(discountAmount, order.TotalAmount);
         var finalAmount = order.TotalAmount - discountAmount;
