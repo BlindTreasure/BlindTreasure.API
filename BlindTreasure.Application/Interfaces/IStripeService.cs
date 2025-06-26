@@ -4,7 +4,7 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface IStripeService
 {
-    Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false);
+    Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false, Guid? promotionId = null);
     Task<string> GenerateExpressLoginLink();
     Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId, string redirectUrl);
     Task<bool> IsSellerStripeAccountVerifiedAsync(string sellerStripeAccountId);

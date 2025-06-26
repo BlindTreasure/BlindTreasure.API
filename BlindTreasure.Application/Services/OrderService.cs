@@ -25,6 +25,8 @@ public class OrderService : IOrderService
     private readonly IProductService _productService;
     private readonly IStripeService _stripeService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPromotionService _promotionService;
+
 
     public OrderService(
         ICacheService cacheService,
@@ -34,7 +36,8 @@ public class OrderService : IOrderService
         IProductService productService,
         IUnitOfWork unitOfWork,
         ICartItemService cartItemService,
-        IStripeService stripeService)
+        IStripeService stripeService,
+        IPromotionService promotionService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -44,12 +47,13 @@ public class OrderService : IOrderService
         _unitOfWork = unitOfWork;
         _cartItemService = cartItemService;
         _stripeService = stripeService;
+        _promotionService = promotionService;
     }
 
     /// <summary>
     ///     Đặt hàng (checkout) từ giỏ hàng hệ thống, trả về link thanh toán Stripe.
     /// </summary>
-    public async Task<string> CheckoutAsync(CreateOrderDto dto)
+    public async Task<string> CheckoutAsync(CreateCheckoutRequestDto dto)
     {
         var cart = await _cartItemService.GetCurrentUserCartAsync();
         if (cart.Items == null || !cart.Items.Any())
@@ -70,7 +74,8 @@ public class OrderService : IOrderService
                 UnitPrice = i.UnitPrice,
                 TotalPrice = i.TotalPrice
             }),
-            dto.ShippingAddressId
+            dto.ShippingAddressId,
+            dto.PromotionId
         );
     }
 
@@ -97,7 +102,8 @@ public class OrderService : IOrderService
                 UnitPrice = i.UnitPrice,
                 TotalPrice = i.TotalPrice
             }),
-            cartDto.ShippingAddressId
+            cartDto.ShippingAddressId,
+            cartDto.PromotionId
         );
     }
 
@@ -247,7 +253,8 @@ public class OrderService : IOrderService
     /// </summary>
     private async Task<string> CheckoutCore(
         IEnumerable<CheckoutItem> items,
-        Guid? shippingAddressId)
+        Guid? shippingAddressId,
+        Guid? promotionId = null)
     {
         var userId = _claimsService.CurrentUserId;
         var itemList = items.ToList();
@@ -297,7 +304,30 @@ public class OrderService : IOrderService
         // 2. Tính tổng tiền
         var totalPrice = itemList.Sum(i => i.TotalPrice);
 
-        // 3. Tạo order
+        // 3. Áp dụng promotion nếu có
+        decimal discountAmount = 0;
+        if (promotionId.HasValue)
+        {
+            var promotion = await _unitOfWork.Promotions.GetByIdAsync(promotionId.Value);
+            if (promotion == null)
+                throw ErrorHelper.BadRequest("Voucher không tồn tại.");
+
+            if (promotion.Status != PromotionStatus.Approved)
+                throw ErrorHelper.BadRequest("Voucher chưa được duyệt.");
+
+            var now = DateTime.UtcNow;
+            if (now < promotion.StartDate || now > promotion.EndDate)
+                throw ErrorHelper.BadRequest("Voucher đã hết hạn hoặc chưa bắt đầu.");
+
+            if (promotion.DiscountType == DiscountType.Percentage)
+                discountAmount = Math.Round(totalPrice * (promotion.DiscountValue / 100m), 2);
+            else if (promotion.DiscountType == DiscountType.Fixed)
+                discountAmount = promotion.DiscountValue;
+
+            discountAmount = Math.Min(discountAmount, totalPrice);
+        }
+
+        // 5. Tạo order
         var order = new Order
         {
             UserId = userId,
@@ -309,7 +339,7 @@ public class OrderService : IOrderService
             OrderDetails = new List<OrderDetail>()
         };
 
-        // 4. Tạo order details & trừ tồn kho
+        // 6. Tạo order details & trừ tồn kho
         foreach (var item in itemList)
         {
             var orderDetail = new OrderDetail
@@ -343,17 +373,17 @@ public class OrderService : IOrderService
         await _unitOfWork.Orders.AddAsync(order);
         await _unitOfWork.SaveChangesAsync();
 
-        // 5. cập nhật cart hệ thống 
+        // 7. cập nhật cart hệ thống 
         await _cartItemService.UpdateCartAfterCheckoutAsync(userId, itemList);
         _loggerService.Info(ErrorMessages.OrderCartClearedAfterCheckoutLog);
 
-        // 6. Xóa cache liên quan
+        // 8. Xóa cache liên quan
         await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
         _loggerService.Info(string.Format(ErrorMessages.OrderCacheClearedAfterCheckoutLog, userId));
 
         _loggerService.Success(string.Format(ErrorMessages.OrderCheckoutSuccessLog, userId));
 
-        // 7. Gọi StripeService để lấy link thanh toán cho order vừa tạo
+        // 9. Gọi StripeService để lấy link thanh toán cho order vừa tạo
         return await _stripeService.CreateCheckoutSession(order.Id);
     }
 
