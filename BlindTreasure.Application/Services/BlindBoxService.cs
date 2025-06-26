@@ -217,16 +217,8 @@ public class BlindBoxService : IBlindBoxService
         if (seller == null)
             throw ErrorHelper.Forbidden(ErrorMessages.BlindBoxSellerNotVerified);
 
-        // ✅ Kiểm tra Category tồn tại và là danh mục lá
-        var category = await _categoryService.GetWithParentAsync(dto.CategoryId);
-        if (category == null)
-            throw ErrorHelper.BadRequest("Danh mục không tồn tại.");
-
-        var hasChild = await _unitOfWork.Categories.GetQueryable()
-            .AnyAsync(c => c.ParentId == dto.CategoryId && !c.IsDeleted);
-
-        if (hasChild)
-            throw ErrorHelper.BadRequest("Chỉ được chọn danh mục cấp thấp nhất (không có danh mục con).");
+        // Kiểm tra Category tồn tại và là danh mục lá
+        await ValidateLeafCategoryAsync(dto.CategoryId);
 
 
         var fileName = $"blindbox-thumbnails/thumbnails-{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
@@ -243,7 +235,7 @@ public class BlindBoxService : IBlindBoxService
         {
             Id = Guid.NewGuid(),
             SellerId = seller.Id,
-            CategoryId = category.Id,
+            CategoryId = dto.CategoryId,
             Name = dto.Name.Trim(),
             Price = dto.Price,
             TotalQuantity = dto.TotalQuantity,
@@ -298,13 +290,10 @@ public class BlindBoxService : IBlindBoxService
         if (dto.SecretProbability.HasValue)
             blindBox.SecretProbability = dto.SecretProbability.Value;
 
-        if (dto.CategoryId.HasValue)
+        if (dto.CategoryId != null)
         {
-            var category = await _unitOfWork.Categories.FirstOrDefaultAsync(c =>
-                c.Id == dto.CategoryId.Value && !c.IsDeleted);
-            if (category == null)
-                throw ErrorHelper.BadRequest("Danh mục không tồn tại.");
-            // blindBox.CategoryId = dto.CategoryId.Value;
+            await ValidateLeafCategoryAsync(dto.CategoryId.Value);
+            blindBox.CategoryId = dto.CategoryId.Value;
         }
 
         if (dto.ImageFile != null)
@@ -712,6 +701,18 @@ public class BlindBoxService : IBlindBoxService
         if (distinctRootIds.Count > 1)
             throw ErrorHelper.BadRequest("Tất cả sản phẩm trong blind box phải cùng loại (cùng root category).");
     }
+    private async Task ValidateLeafCategoryAsync(Guid categoryId)
+    {
+        var category = await _categoryService.GetWithParentAsync(categoryId);
+        if (category == null)
+            throw ErrorHelper.BadRequest(ErrorMessages.CategoryNotFound);
+
+        var hasChild = await _unitOfWork.Categories.GetQueryable()
+            .AnyAsync(c => c.ParentId == categoryId && !c.IsDeleted);
+
+        if (hasChild)
+            throw ErrorHelper.BadRequest(ErrorMessages.CategoryChildrenError);
+    }
     private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId, Guid? sellerId = null)
     {
         await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxDetail(blindBoxId));
@@ -720,7 +721,6 @@ public class BlindBoxService : IBlindBoxService
         if (sellerId.HasValue)
             await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxSeller(sellerId.Value));
     }
-
     private static class BlindBoxCacheKeys
     {
         public const string BlindBoxAllPrefix = "blindbox:list:public";
