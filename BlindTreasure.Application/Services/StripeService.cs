@@ -39,7 +39,6 @@ public class StripeService : IStripeService
         return loginLink.Url;
     }
 
-
     public async Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false)
     {
         // Lấy user hiện tại

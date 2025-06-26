@@ -129,8 +129,6 @@ public class BlindTreasureDbContext : DbContext
         #endregion
 
 
-
-
         modelBuilder.Entity<Product>()
             .Property(p => p.ImageUrls)
             .HasConversion(
