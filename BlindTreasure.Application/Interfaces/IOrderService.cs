@@ -6,7 +6,7 @@ namespace BlindTreasure.Application.Interfaces;
 public interface IOrderService
 {
     Task CancelOrderAsync(Guid orderId);
-    Task<string> CheckoutAsync(CreateOrderDto dto);
+    Task<string> CheckoutAsync(CreateCheckoutRequestDto dto);
     Task<string> CheckoutFromClientCartAsync(DirectCartCheckoutDto cartDto);
     Task DeleteOrderAsync(Guid orderId);
     Task<List<OrderDto>> GetMyOrdersAsync();
