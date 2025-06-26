@@ -355,7 +355,7 @@ public class BlindBoxService : IBlindBoxService
 
         // Validate sản phẩm cùng root category
         await ValidateSameRootCategoryAsync(items.Select(i => i.ProductId).ToList());
-        
+
         // Validate logic (dropRate, số lượng tồn kho, secret logic)
         await ValidateBlindBoxItemsAsync(blindBox, seller, items);
 
@@ -452,6 +452,7 @@ public class BlindBoxService : IBlindBoxService
         _logger.Success($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} submitted for approval.");
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
+
     public async Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -531,6 +532,7 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.SaveChangesAsync();
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
+
     public async Task<BlindBoxDetailDto> ClearItemsFromBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -575,6 +577,7 @@ public class BlindBoxService : IBlindBoxService
 
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
+
     public async Task<BlindBoxDetailDto> DeleteBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -678,6 +681,7 @@ public class BlindBoxService : IBlindBoxService
         if (totalDropRate >= 100)
             throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateExceeded);
     }
+
     private async Task ValidateSameRootCategoryAsync(List<Guid> productIds)
     {
         var products = await _unitOfWork.Products.GetQueryable()
@@ -701,6 +705,7 @@ public class BlindBoxService : IBlindBoxService
         if (distinctRootIds.Count > 1)
             throw ErrorHelper.BadRequest("Tất cả sản phẩm trong blind box phải cùng loại (cùng root category).");
     }
+
     private async Task ValidateLeafCategoryAsync(Guid categoryId)
     {
         var category = await _categoryService.GetWithParentAsync(categoryId);
@@ -713,6 +718,7 @@ public class BlindBoxService : IBlindBoxService
         if (hasChild)
             throw ErrorHelper.BadRequest(ErrorMessages.CategoryChildrenError);
     }
+
     private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId, Guid? sellerId = null)
     {
         await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxDetail(blindBoxId));
@@ -721,6 +727,7 @@ public class BlindBoxService : IBlindBoxService
         if (sellerId.HasValue)
             await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxSeller(sellerId.Value));
     }
+
     private static class BlindBoxCacheKeys
     {
         public const string BlindBoxAllPrefix = "blindbox:list:public";

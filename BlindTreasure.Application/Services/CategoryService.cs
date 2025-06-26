@@ -37,6 +37,7 @@ public class CategoryService : ICategoryService
         _blobService = blobService;
         _mapper = mapper;
     }
+
     public async Task<CategoryDto?> GetByIdAsync(Guid id)
     {
         var cacheKey = $"category:{id}";
@@ -62,6 +63,7 @@ public class CategoryService : ICategoryService
         _logger.Info($"[GetByIdAsync] Category {id} loaded from DB and cached.");
         return ToCategoryDto(category);
     }
+
     public async Task<Pagination<CategoryDto>> GetAllAsync(CategoryQueryParameter param)
     {
         _logger.Info(
@@ -99,6 +101,7 @@ public class CategoryService : ICategoryService
         _logger.Info("[GetAllAsync] Category list loaded from DB and cached.");
         return result;
     }
+
     public async Task<List<CategoryWithProductsDto>> GetCategoriesWithAllProductsAsync()
     {
         // Lấy tất cả category cấp cha
@@ -130,6 +133,7 @@ public class CategoryService : ICategoryService
 
         return result;
     }
+
     public async Task<CategoryDto> CreateAsync(CategoryCreateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
@@ -184,6 +188,7 @@ public class CategoryService : ICategoryService
         _logger.Success($"[CreateAsync] Category {category.Name} created.");
         return ToCategoryDto(category);
     }
+
     public async Task<CategoryDto> UpdateAsync(Guid id, CategoryUpdateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
@@ -288,6 +293,7 @@ public class CategoryService : ICategoryService
 
         return ToCategoryDto(category);
     }
+
     public async Task<CategoryDto> DeleteAsync(Guid id)
     {
         var userId = _claimsService.CurrentUserId;
@@ -321,7 +327,7 @@ public class CategoryService : ICategoryService
 
         return ToCategoryDto(category);
     }
-    
+
     public async Task<Category?> GetWithParentAsync(Guid categoryId)
     {
         return await _unitOfWork.Categories.GetQueryable()
@@ -355,6 +361,7 @@ public class CategoryService : ICategoryService
     }
 
     #region private methods
+
     private static CategoryDto ToCategoryDto(Category category)
     {
         return new CategoryDto
@@ -374,6 +381,7 @@ public class CategoryService : ICategoryService
                 : new List<CategoryDto>()
         };
     }
+
     private async Task<bool> IsDescendantAsync(Guid categoryId, Guid parentId)
     {
         var current = await _unitOfWork.Categories.GetByIdAsync(parentId);
@@ -386,11 +394,13 @@ public class CategoryService : ICategoryService
 
         return false;
     }
+
     private async Task RemoveCategoryCacheAsync(Guid categoryId)
     {
         await _cacheService.RemoveAsync($"category:{categoryId}");
         await _cacheService.RemoveByPatternAsync("category:all");
     }
+
     private IQueryable<Category> ApplySort(IQueryable<Category> query, CategoryQueryParameter param)
     {
         query = query.OrderByDescending(c => c.ParentId == null);
@@ -406,5 +416,6 @@ public class CategoryService : ICategoryService
                 : ((IOrderedQueryable<Category>)query).ThenBy(c => c.CreatedAt)
         };
     }
+
     #endregion
 }

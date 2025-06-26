@@ -184,10 +184,11 @@ public class AuthService : IAuthService
         return true;
     }
 
-    public async Task<LoginResponseDto?> RefreshTokenAsync(TokenRefreshRequestDto refreshTokenDto, IConfiguration configuration)
+    public async Task<LoginResponseDto?> RefreshTokenAsync(TokenRefreshRequestDto refreshTokenDto,
+        IConfiguration configuration)
     {
         var cacheKey = $"refresh:{refreshTokenDto.RefreshToken}";
-        User? user = await _cacheService.GetAsync<User>(cacheKey);
+        var user = await _cacheService.GetAsync<User>(cacheKey);
 
         if (user == null)
         {
@@ -199,9 +200,7 @@ public class AuthService : IAuthService
 
             // Chỉ cache nếu hợp lệ
             if (!string.IsNullOrEmpty(user.RefreshToken) && user.RefreshTokenExpiryTime >= DateTime.UtcNow)
-            {
                 await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromMinutes(10));
-            }
         }
 
         if (string.IsNullOrEmpty(user.RefreshToken))
@@ -240,7 +239,6 @@ public class AuthService : IAuthService
             RefreshToken = newRefreshToken
         };
     }
-
 
     #endregion
 

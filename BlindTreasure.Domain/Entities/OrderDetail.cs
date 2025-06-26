@@ -21,4 +21,6 @@ public class OrderDetail : BaseEntity
 
     // 1-n → Shipments
     public ICollection<Shipment> Shipments { get; set; }
+    public ICollection<CustomerInventory>? CustomerInventories { get; set; }
+
 }
