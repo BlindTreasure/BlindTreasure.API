@@ -100,8 +100,10 @@ public class InventoryItemService : IInventoryItemService
     public async Task<List<InventoryItemDto>> GetByUserIdAsync(Guid? userId = null)
     {
         var uid = userId ?? _claimsService.CurrentUserId;
-        var items = await _unitOfWork.InventoryItems.GetAllAsync(i => i.UserId == uid && !i.IsDeleted, i => i.Product);
-        return items.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
+        var items = await _unitOfWork.InventoryItems.GetAllAsync(
+             i => i.UserId == uid && !i.IsDeleted,
+             i => i.Product
+         ); return items.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
     }
 
     public async Task<InventoryItemDto> UpdateAsync(Guid id, UpdateInventoryItemDto dto)

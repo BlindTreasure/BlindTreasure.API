@@ -126,7 +126,7 @@ public class SellerController : ControllerBase
     /// </summary>
     [HttpGet("products")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResult<Pagination<ProducDetailstDto>>), 200)]
+    [ProducesResponseType(typeof(ApiResult<Pagination<ProducDetailDto>>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 404)]
     public async Task<IActionResult> GetAll([FromQuery] ProductQueryParameter param)
     {
@@ -158,8 +158,8 @@ public class SellerController : ControllerBase
     /// </summary>
     [HttpGet("products/{id}")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 200)]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 404)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 404)]
     public async Task<IActionResult> GetById(Guid id)
     {
         try
@@ -167,12 +167,12 @@ public class SellerController : ControllerBase
             var userId = _claimsService.CurrentUserId;
 
             var result = await _sellerService.GetProductByIdAsync(id, userId);
-            return Ok(ApiResult<ProducDetailstDto>.Success(result, "200", "Lấy thông tin sản phẩm thành công."));
+            return Ok(ApiResult<ProducDetailDto>.Success(result, "200", "Lấy thông tin sản phẩm thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailstDto>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailDto>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
@@ -182,19 +182,19 @@ public class SellerController : ControllerBase
     /// </summary>
     [HttpPost("products")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 200)]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 400)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 400)]
     public async Task<IActionResult> CreateProduct([FromForm] ProductSellerCreateDto dto)
     {
         try
         {
             var result = await _sellerService.CreateProductAsync(dto);
-            return Ok(ApiResult<ProducDetailstDto>.Success(result, "200", "Tạo sản phẩm thành công."));
+            return Ok(ApiResult<ProducDetailDto>.Success(result, "200", "Tạo sản phẩm thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailstDto>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailDto>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
@@ -204,20 +204,20 @@ public class SellerController : ControllerBase
     /// </summary>
     [HttpPut("products/{id}")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 200)]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 400)]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 404)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 400)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 404)]
     public async Task<IActionResult> UpdateProduct(Guid id, ProductUpdateDto dto)
     {
         try
         {
             var result = await _sellerService.UpdateProductAsync(id, dto);
-            return Ok(ApiResult<ProducDetailstDto>.Success(result, "200", "Cập nhật sản phẩm thành công."));
+            return Ok(ApiResult<ProducDetailDto>.Success(result, "200", "Cập nhật sản phẩm thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailstDto>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailDto>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
@@ -227,19 +227,19 @@ public class SellerController : ControllerBase
     /// </summary>
     [HttpDelete("products/{id}")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 200)]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 404)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 404)]
     public async Task<IActionResult> DeleteProduct(Guid id)
     {
         try
         {
             var result = await _sellerService.DeleteProductAsync(id);
-            return Ok(ApiResult<ProducDetailstDto>.Success(result, "200", "Xóa sản phẩm thành công."));
+            return Ok(ApiResult<ProducDetailDto>.Success(result, "200", "Xóa sản phẩm thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailstDto>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailDto>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
@@ -249,9 +249,9 @@ public class SellerController : ControllerBase
     /// </summary>
     [HttpPut("products/{id}/images")]
     [Authorize]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 200)]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 400)]
-    [ProducesResponseType(typeof(ApiResult<ProducDetailstDto>), 404)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 400)]
+    [ProducesResponseType(typeof(ApiResult<ProducDetailDto>), 404)]
     public async Task<IActionResult> UpdateProductImages(Guid id, [FromForm] List<IFormFile> images)
     {
         if (images == null || images.Count == 0)
@@ -260,12 +260,12 @@ public class SellerController : ControllerBase
         try
         {
             var result = await _sellerService.UpdateSellerProductImagesAsync(id, images);
-            return Ok(ApiResult<ProducDetailstDto>.Success(result, "200", "Cập nhật danh sách ảnh thành công."));
+            return Ok(ApiResult<ProducDetailDto>.Success(result, "200", "Cập nhật danh sách ảnh thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailstDto>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailDto>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }

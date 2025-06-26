@@ -12,11 +12,11 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Services
-{  
+{
     /// <summary>
-   /// Service quản lý kho BlindBox đã mua của user (CustomerInventory).
-   /// Lưu trữ các BlindBox đã thanh toán, hỗ trợ lấy danh sách, chi tiết, cập nhật trạng thái mở box, xóa mềm.
-   /// </summary>
+    /// Service quản lý kho BlindBox đã mua của user (CustomerInventory).
+    /// Lưu trữ các BlindBox đã thanh toán, hỗ trợ lấy danh sách, chi tiết, cập nhật trạng thái mở box, xóa mềm.
+    /// </summary>
     public class CustomerInventoryService : ICustomerInventoryService
     {
         private readonly ICacheService _cacheService;
@@ -86,7 +86,7 @@ namespace BlindTreasure.Application.Services
                 return CustomerInventoryMapper.ToCustomerInventoryBlindBoxDto(cached);
             }
 
-            var entity = await _unitOfWork.CustomerInventories.GetByIdAsync(id);
+            var entity = await _unitOfWork.CustomerInventories.GetByIdAsync(id, x => x.BlindBox, x => x.OrderDetail);
             if (entity == null || entity.IsDeleted)
                 return null;
 
@@ -102,7 +102,10 @@ namespace BlindTreasure.Application.Services
         {
             var uid = userId ?? _claimsService.CurrentUserId;
             var items = await _unitOfWork.CustomerInventories.GetAllAsync(
-                i => i.UserId == uid && !i.IsDeleted);
+            i => i.UserId == uid && !i.IsDeleted,
+            i => i.BlindBox,
+            i => i.OrderDetail
+    );
             return items.Select(CustomerInventoryMapper.ToCustomerInventoryBlindBoxDto).ToList();
         }
 

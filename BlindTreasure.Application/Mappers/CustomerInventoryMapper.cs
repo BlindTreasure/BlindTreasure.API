@@ -22,7 +22,10 @@ namespace BlindTreasure.Application.Mappers
                 CreatedAt = item.CreatedAt,
                 IsDeleted = item.IsDeleted,
                 OpenedAt = item.OpenedAt,
-                OrderDetailId = item.OrderDetailId
+                OrderDetailId = item.OrderDetailId,
+                BlindBox = item.BlindBox != null ? BlindBoxDtoMapper.ToBlindBoxDetailDto(item.BlindBox) : null,
+                OrderDetail = item.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(item.OrderDetail) : null
+
 
             };
         }

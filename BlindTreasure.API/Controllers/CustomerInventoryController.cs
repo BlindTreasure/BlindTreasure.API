@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -21,11 +22,13 @@ namespace BlindTreasure.API.Controllers
     {
         private readonly ICustomerInventoryService _customerInventoryService;
         private readonly ILoggerService _logger;
+        private readonly IClaimsService _claimsService;
 
-        public CustomerInventoryController(ICustomerInventoryService customerInventoryService, ILoggerService logger)
+        public CustomerInventoryController(ICustomerInventoryService customerInventoryService, ILoggerService logger, IClaimsService claimsService)
         {
             _customerInventoryService = customerInventoryService;
             _logger = logger;
+            _claimsService = claimsService;
         }
 
         /// <summary>
@@ -38,7 +41,13 @@ namespace BlindTreasure.API.Controllers
         {
             try
             {
-                var items = await _customerInventoryService.GetByUserIdAsync();
+                var uid =  _claimsService.CurrentUserId;
+                if (uid == Guid.Empty)
+                {
+                    _logger.Warn("[CustomerInventoryController][GetMyBlindBoxes] User ID không hợp lệ.");
+                    return BadRequest(ApiResult<List<CustomerInventoryDto>>.Failure("401", "User ID không hợp lệ."));
+                }
+                var items = await _customerInventoryService.GetByUserIdAsync(uid);
                 _logger.Info("[CustomerInventoryController][GetMyBlindBoxes] Lấy danh sách BlindBox thành công.");
                 return Ok(ApiResult<List<CustomerInventoryDto>>.Success(items, "200", "Lấy danh sách BlindBox thành công."));
             }

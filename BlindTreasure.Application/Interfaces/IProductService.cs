@@ -7,11 +7,11 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface IProductService
 {
-    Task<ProducDetailstDto> CreateAsync(ProductCreateDto dto);
-    Task<ProducDetailstDto> DeleteAsync(Guid id);
-    Task<Pagination<ProducDetailstDto>> GetAllAsync(ProductQueryParameter param);
-    Task<ProducDetailstDto?> GetByIdAsync(Guid id);
-    Task<ProducDetailstDto> UpdateAsync(Guid id, ProductUpdateDto dto);
-    Task<ProducDetailstDto> UpdateProductImagesAsync(Guid productId, List<IFormFile> images);
+    Task<ProducDetailDto> CreateAsync(ProductCreateDto dto);
+    Task<ProducDetailDto> DeleteAsync(Guid id);
+    Task<Pagination<ProducDetailDto>> GetAllAsync(ProductQueryParameter param);
+    Task<ProducDetailDto?> GetByIdAsync(Guid id);
+    Task<ProducDetailDto> UpdateAsync(Guid id, ProductUpdateDto dto);
+    Task<ProducDetailDto> UpdateProductImagesAsync(Guid productId, List<IFormFile> images);
     Task<string?> UploadProductImageAsync(Guid productId, IFormFile file);
 }

@@ -24,6 +24,10 @@ services:
       - MINIO_HOST=https://minio.fpt-devteam.fun
       - MINIO_ACCESS_KEY=minioadmin
       - MINIO_SECRET_KEY=minioadmin
+      - STRIPE__LocalWebhookSecret=whsec_1922024ed268f46c73bfac2bd2bab31e490189a882ec21e458c387b0f8ed8b13
+      - STRIPE__DeployWebhookSecret=whsec_uWjfI4fkQ7zbwE8VrWMcu2Ysyqm8heUh
+      - STRIPE__SuccessRedirectUrl=http://localhost:4040/thankyou
+      - STRIPE__FailRedirectUrl=http://localhost:4040/fail
 
     ports:
       - "5000:5000"
