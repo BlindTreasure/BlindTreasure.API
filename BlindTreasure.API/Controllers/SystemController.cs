@@ -36,7 +36,7 @@ public class SystemController : ControllerBase
 
             await SeedCategories();
             await SeedProducts();
-            await SeedBlindBoxes();
+            // await SeedBlindBoxes();
             return Ok(ApiResult<object>.Success(new
             {
                 Message = "Data seeded successfully."

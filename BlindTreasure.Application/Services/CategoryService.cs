@@ -321,6 +321,13 @@ public class CategoryService : ICategoryService
 
         return ToCategoryDto(category);
     }
+    
+    public async Task<Category?> GetWithParentAsync(Guid categoryId)
+    {
+        return await _unitOfWork.Categories.GetQueryable()
+            .Include(c => c.Parent)
+            .FirstOrDefaultAsync(c => c.Id == categoryId && !c.IsDeleted);
+    }
 
     public async Task<List<Guid>> GetAllChildCategoryIdsAsync(Guid parentId)
     {
@@ -348,7 +355,6 @@ public class CategoryService : ICategoryService
     }
 
     #region private methods
-
     private static CategoryDto ToCategoryDto(Category category)
     {
         return new CategoryDto
@@ -368,10 +374,6 @@ public class CategoryService : ICategoryService
                 : new List<CategoryDto>()
         };
     }
-
-    /// <summary>
-    ///     Kiểm tra xem parentId có nằm trong cây con của categoryId không (để tránh vòng lặp).
-    /// </summary>
     private async Task<bool> IsDescendantAsync(Guid categoryId, Guid parentId)
     {
         var current = await _unitOfWork.Categories.GetByIdAsync(parentId);
@@ -384,13 +386,11 @@ public class CategoryService : ICategoryService
 
         return false;
     }
-
     private async Task RemoveCategoryCacheAsync(Guid categoryId)
     {
         await _cacheService.RemoveAsync($"category:{categoryId}");
         await _cacheService.RemoveByPatternAsync("category:all");
     }
-
     private IQueryable<Category> ApplySort(IQueryable<Category> query, CategoryQueryParameter param)
     {
         query = query.OrderByDescending(c => c.ParentId == null);
@@ -406,6 +406,5 @@ public class CategoryService : ICategoryService
                 : ((IOrderedQueryable<Category>)query).ThenBy(c => c.CreatedAt)
         };
     }
-
     #endregion
 }

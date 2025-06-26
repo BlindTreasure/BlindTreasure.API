@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250619084926_addBrandBlindBox")]
-    partial class addBrandBlindBox
+    [Migration("20250626021718_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -103,8 +103,13 @@ namespace BlindTreasure.Domain.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BindBoxTags")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("Brand")
-                        .HasColumnType("text");
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid");
@@ -123,27 +128,31 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<bool>("HasSecretItem")
                         .HasColumnType("boolean");
 
                     b.Property<string>("ImageUrl")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric");
 
                     b.Property<string>("RejectReason")
-                        .HasColumnType("text");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTime>("ReleaseDate")
                         .HasColumnType("timestamp with time zone");

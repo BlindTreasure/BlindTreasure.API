@@ -140,6 +140,30 @@ public class BlindTreasureDbContext : DbContext
             .Property(p => p.Rarity)
             .HasConversion<string>()
             .HasMaxLength(32); // nếu cần giới hạn
+        
+        modelBuilder.Entity<BlindBox>(entity =>
+        {
+            entity.Property(b => b.Name)
+                .HasMaxLength(255)
+                .IsRequired();
+
+            entity.Property(b => b.Description)
+                .HasMaxLength(1000);
+
+            entity.Property(b => b.ImageUrl)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(b => b.BindBoxTags)
+                .HasMaxLength(1000);
+
+            entity.Property(b => b.Brand)
+                .HasMaxLength(255);
+
+            entity.Property(b => b.RejectReason)
+                .HasMaxLength(1000);
+        });
+
 
 
         // User ↔ Seller (1-1)

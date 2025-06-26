@@ -217,11 +217,17 @@ public class BlindBoxService : IBlindBoxService
         if (seller == null)
             throw ErrorHelper.Forbidden(ErrorMessages.BlindBoxSellerNotVerified);
 
-        //// Kiểm tra Category tồn tại
-        //var category = await _unitOfWork.Categories.FirstOrDefaultAsync(c =>
-        //    c.Id == dto.CategoryId && !c.IsDeleted);
-        //if (category == null)
-        //    throw ErrorHelper.BadRequest("Danh mục không tồn tại.");
+        // ✅ Kiểm tra Category tồn tại và là danh mục lá
+        var category = await _categoryService.GetWithParentAsync(dto.CategoryId);
+        if (category == null)
+            throw ErrorHelper.BadRequest("Danh mục không tồn tại.");
+
+        var hasChild = await _unitOfWork.Categories.GetQueryable()
+            .AnyAsync(c => c.ParentId == dto.CategoryId && !c.IsDeleted);
+
+        if (hasChild)
+            throw ErrorHelper.BadRequest("Chỉ được chọn danh mục cấp thấp nhất (không có danh mục con).");
+
 
         var fileName = $"blindbox-thumbnails/thumbnails-{Guid.NewGuid()}{Path.GetExtension(dto.ImageFile.FileName)}";
         await using var stream = dto.ImageFile.OpenReadStream();
@@ -237,10 +243,11 @@ public class BlindBoxService : IBlindBoxService
         {
             Id = Guid.NewGuid(),
             SellerId = seller.Id,
+            CategoryId = category.Id,
             Name = dto.Name.Trim(),
             Price = dto.Price,
             TotalQuantity = dto.TotalQuantity,
-            Description = dto.Description?.Trim(),
+            Description = dto.Description.Trim(),
             ImageUrl = imageUrl,
             ReleaseDate = releaseDateUtc,
             HasSecretItem = dto.HasSecretItem,
@@ -357,6 +364,9 @@ public class BlindBoxService : IBlindBoxService
         if (items.Count <= 0)
             throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxItemCountInvalid);
 
+        // Validate sản phẩm cùng root category
+        await ValidateSameRootCategoryAsync(items.Select(i => i.ProductId).ToList());
+        
         // Validate logic (dropRate, số lượng tồn kho, secret logic)
         await ValidateBlindBoxItemsAsync(blindBox, seller, items);
 
@@ -453,7 +463,6 @@ public class BlindBoxService : IBlindBoxService
         _logger.Success($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} submitted for approval.");
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
-
     public async Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -533,7 +542,6 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.SaveChangesAsync();
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
-
     public async Task<BlindBoxDetailDto> ClearItemsFromBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -578,7 +586,6 @@ public class BlindBoxService : IBlindBoxService
 
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
-
     public async Task<BlindBoxDetailDto> DeleteBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -682,7 +689,29 @@ public class BlindBoxService : IBlindBoxService
         if (totalDropRate >= 100)
             throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateExceeded);
     }
+    private async Task ValidateSameRootCategoryAsync(List<Guid> productIds)
+    {
+        var products = await _unitOfWork.Products.GetQueryable()
+            .Where(p => productIds.Contains(p.Id) && !p.IsDeleted)
+            .Include(p => p.Category)
+            .ThenInclude(c => c.Parent)
+            .ToListAsync();
 
+        Guid GetRootId(Category category)
+        {
+            while (category.Parent != null)
+                category = category.Parent;
+            return category.Id;
+        }
+
+        var distinctRootIds = products
+            .Select(p => GetRootId(p.Category))
+            .Distinct()
+            .ToList();
+
+        if (distinctRootIds.Count > 1)
+            throw ErrorHelper.BadRequest("Tất cả sản phẩm trong blind box phải cùng loại (cùng root category).");
+    }
     private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId, Guid? sellerId = null)
     {
         await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxDetail(blindBoxId));
