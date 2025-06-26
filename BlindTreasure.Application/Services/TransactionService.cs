@@ -71,7 +71,7 @@ public class TransactionService : ITransactionService
 
                 // 4. Lấy order details và tạo inventory item cho từng sản phẩm
                 var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(
-                    od => od.OrderId == transaction.Payment.OrderId && !od.IsDeleted);
+                    od => od.OrderId == transaction.Payment.OrderId);
               
                 if (orderDetails == null || !orderDetails.Any())
                 {
@@ -96,11 +96,27 @@ public class TransactionService : ITransactionService
                             Location = string.Empty,
                             Status = "Active"
                         };
-                        var result = await _inventoryItemService.CreateAsync(createDto);
+                        var result = await _inventoryItemService.CreateAsync(createDto, transaction.Payment.Order.UserId);
                         _loggerService.Success(
                             $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++count} cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
                     }
-                    // Nếu muốn hỗ trợ BlindBox, bổ sung logic ở đây
+                    //// Nếu muốn hỗ trợ BlindBox, bổ sung logic ở đây
+                    //if (od.BlindBoxId.HasValue)
+                    //{
+                    //    _loggerService.Info(
+                    //        $"[HandleSuccessfulPaymentAsync] Tạo inventory item cho BlindBox {od.BlindBoxId.Value} trong order {orderId}.");
+                    //    var createBlindBoxDto = new CreateInventoryItemDto
+                    //    {
+                    //        ProductId = null,
+                    //        BlindBoxId = od.BlindBoxId.Value,
+                    //        Quantity = od.Quantity,
+                    //        Location = string.Empty,
+                    //        Status = "Active"
+                    //    };
+                    //    var result = await _inventoryItemService.CreateAsync(createBlindBoxDto);
+                    //    _loggerService.Success(
+                    //        $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item cho BlindBox {od.BlindBoxId.Value} trong order {orderId}.");
+                    //}
                 }
             }
             await _unitOfWork.Transactions.Update(transaction);

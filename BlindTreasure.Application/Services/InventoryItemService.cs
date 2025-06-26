@@ -39,16 +39,27 @@ namespace BlindTreasure.Application.Services
             _orderService = orderService;
         }
 
-        public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto)
+        public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId) // specify userId if needed, otherwise use current user
         {
-            var userId = _claimsService.CurrentUserId;
+            if (userId.HasValue) 
+            { 
+                userId = userId.Value;
+            }
+            else
+            {
+                userId = _claimsService.CurrentUserId;
+                if(userId == Guid.Empty)
+                    throw ErrorHelper.Unauthorized("User ID is required for creating inventory item. Cannot found current user");
+            }
+
+            _loggerService.Info($"[CreateAsync] Creating inventory item for user {userId}, product {dto.ProductId}.");
             var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId);
             if (product == null || product.IsDeleted)
                 throw ErrorHelper.NotFound("Product not found.");
 
             var item = new InventoryItem
             {
-                UserId = userId,
+                UserId = userId.Value,
                 ProductId = dto.ProductId,
                 Quantity = dto.Quantity,
                 ReservedQuantity = 0,
