@@ -151,6 +151,7 @@ public static class ErrorMessages
     #region Category Error Message
 
     public const string CategoryNotFound = "Category not found.";
+    public const string CategoryChildrenError = "Chỉ được chọn danh mục cấp thấp nhất (không có danh mục con).";
     public const string CategoryNameRequired = "Category name is required.";
     public const string CategoryNameAlreadyExists = "Category name already exists.";
     public const string CategoryParentIdInvalid = "ParentId is invalid.";

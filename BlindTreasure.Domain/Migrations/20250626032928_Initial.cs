@@ -421,17 +421,19 @@ namespace BlindTreasure.Domain.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     SellerId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: false),
-                    Description = table.Column<string>(type: "text", nullable: false),
+                    BindBoxTags = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    Name = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: false),
+                    Description = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
                     Price = table.Column<decimal>(type: "numeric", nullable: false),
                     TotalQuantity = table.Column<int>(type: "integer", nullable: false),
-                    Brand = table.Column<string>(type: "text", nullable: false),
                     HasSecretItem = table.Column<bool>(type: "boolean", nullable: false),
                     SecretProbability = table.Column<int>(type: "integer", nullable: false),
                     Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    ImageUrl = table.Column<string>(type: "text", nullable: false),
+                    Brand = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    ImageUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     ReleaseDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    RejectReason = table.Column<string>(type: "text", nullable: true),
+                    RejectReason = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    CategoryId = table.Column<Guid>(type: "uuid", nullable: false),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
@@ -443,6 +445,12 @@ namespace BlindTreasure.Domain.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_BlindBoxes", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_BlindBoxes_Categories_CategoryId",
+                        column: x => x.CategoryId,
+                        principalTable: "Categories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_BlindBoxes_Sellers_SellerId",
                         column: x => x.SellerId,
@@ -656,10 +664,8 @@ namespace BlindTreasure.Domain.Migrations
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
                     ProductId = table.Column<Guid>(type: "uuid", nullable: false),
                     Quantity = table.Column<int>(type: "integer", nullable: false),
-                    ReservedQuantity = table.Column<int>(type: "integer", nullable: false),
-                    RestockThreshold = table.Column<int>(type: "integer", nullable: false),
-                    Location = table.Column<string>(type: "text", nullable: false),
-                    Status = table.Column<string>(type: "text", nullable: false),
+                    Location = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
@@ -878,6 +884,47 @@ namespace BlindTreasure.Domain.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CustomerInventories",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BlindBoxId = table.Column<Guid>(type: "uuid", nullable: false),
+                    IsOpened = table.Column<bool>(type: "boolean", nullable: false),
+                    OpenedAt = table.Column<DateTime>(type: "timestamp without time zone", nullable: true),
+                    OrderDetailId = table.Column<Guid>(type: "uuid", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DeletedBy = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CustomerInventories", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_CustomerInventories_BlindBoxes_BlindBoxId",
+                        column: x => x.BlindBoxId,
+                        principalTable: "BlindBoxes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_CustomerInventories_OrderDetails_OrderDetailId",
+                        column: x => x.OrderDetailId,
+                        principalTable: "OrderDetails",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_CustomerInventories_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Shipments",
                 columns: table => new
                 {
@@ -912,6 +959,11 @@ namespace BlindTreasure.Domain.Migrations
                 name: "IX_Addresses_UserId",
                 table: "Addresses",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_BlindBoxes_CategoryId",
+                table: "BlindBoxes",
+                column: "CategoryId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_BlindBoxes_SellerId",
@@ -967,6 +1019,21 @@ namespace BlindTreasure.Domain.Migrations
                 name: "IX_CustomerDiscounts_CustomerId",
                 table: "CustomerDiscounts",
                 column: "CustomerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CustomerInventories_BlindBoxId",
+                table: "CustomerInventories",
+                column: "BlindBoxId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CustomerInventories_OrderDetailId",
+                table: "CustomerInventories",
+                column: "OrderDetailId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CustomerInventories_UserId",
+                table: "CustomerInventories",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_InventoryItems_ProductId",
@@ -1122,6 +1189,9 @@ namespace BlindTreasure.Domain.Migrations
 
             migrationBuilder.DropTable(
                 name: "CustomerDiscounts");
+
+            migrationBuilder.DropTable(
+                name: "CustomerInventories");
 
             migrationBuilder.DropTable(
                 name: "Listings");

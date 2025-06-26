@@ -328,6 +328,13 @@ public class CategoryService : ICategoryService
         return ToCategoryDto(category);
     }
 
+    public async Task<Category?> GetWithParentAsync(Guid categoryId)
+    {
+        return await _unitOfWork.Categories.GetQueryable()
+            .Include(c => c.Parent)
+            .FirstOrDefaultAsync(c => c.Id == categoryId && !c.IsDeleted);
+    }
+
     public async Task<List<Guid>> GetAllChildCategoryIdsAsync(Guid parentId)
     {
         var allCategories = await _unitOfWork.Categories.GetQueryable()
@@ -375,9 +382,6 @@ public class CategoryService : ICategoryService
         };
     }
 
-    /// <summary>
-    ///     Kiểm tra xem parentId có nằm trong cây con của categoryId không (để tránh vòng lặp).
-    /// </summary>
     private async Task<bool> IsDescendantAsync(Guid categoryId, Guid parentId)
     {
         var current = await _unitOfWork.Categories.GetByIdAsync(parentId);

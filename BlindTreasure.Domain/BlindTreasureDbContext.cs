@@ -24,6 +24,8 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<BlindBoxItem> BlindBoxItems { get; set; }
     public DbSet<ProbabilityConfig> ProbabilityConfigs { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
+    
+    public DbSet<CustomerInventory> CustomerInventories { get; set; }
 
     public DbSet<OtpVerification> OtpVerifications { get; set; }
     public DbSet<Listing> Listings { get; set; }
@@ -129,8 +131,6 @@ public class BlindTreasureDbContext : DbContext
         #endregion
 
 
-
-
         modelBuilder.Entity<Product>()
             .Property(p => p.ImageUrls)
             .HasConversion(
@@ -138,11 +138,74 @@ public class BlindTreasureDbContext : DbContext
                 v => v.Split(";", StringSplitOptions.RemoveEmptyEntries).ToList()
             ).IsRequired(false);
 
+        modelBuilder.Entity<CustomerInventory>(entity =>
+        {
+            // Khóa ngoại: User (1-n)
+            entity.HasOne(ci => ci.User)
+                .WithMany(u => u.CustomerInventories)
+                .HasForeignKey(ci => ci.UserId)
+                .OnDelete(DeleteBehavior.Cascade); // hoặc Restrict tùy nhu cầu
+
+            // Khóa ngoại: BlindBox (1-n)
+            entity.HasOne(ci => ci.BlindBox)
+                .WithMany(b => b.CustomerInventories)
+                .HasForeignKey(ci => ci.BlindBoxId)
+                .OnDelete(DeleteBehavior.Restrict); // tránh xóa hộp → mất lịch sử
+
+            // Khóa ngoại: OrderDetail (1-n), optional
+            entity.HasOne(ci => ci.OrderDetail)
+                .WithMany(od => od.CustomerInventories)
+                .HasForeignKey(ci => ci.OrderDetailId)
+                .OnDelete(DeleteBehavior.SetNull); // mất đơn hàng vẫn giữ lịch sử hộp
+
+            // Định nghĩa bảng (nếu muốn đặt tên rõ ràng)
+            entity.ToTable("CustomerInventories");
+
+            // Cấu hình các cột
+            entity.Property(ci => ci.IsOpened)
+                .IsRequired();
+
+            entity.Property(ci => ci.OpenedAt)
+                .HasColumnType("timestamp without time zone");
+        });
+
+        
         modelBuilder.Entity<BlindBoxItem>()
             .Property(p => p.Rarity)
             .HasConversion<string>()
             .HasMaxLength(32); // nếu cần giới hạn
 
+        modelBuilder.Entity<BlindBox>(entity =>
+        {
+            entity.Property(b => b.Name)
+                .HasMaxLength(255)
+                .IsRequired();
+
+            entity.Property(b => b.Description)
+                .HasMaxLength(1000);
+
+            entity.Property(b => b.ImageUrl)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(b => b.BindBoxTags)
+                .HasMaxLength(1000);
+
+            entity.Property(b => b.Brand)
+                .HasMaxLength(255);
+
+            entity.Property(b => b.RejectReason)
+                .HasMaxLength(1000);
+        });
+        
+        modelBuilder.Entity<InventoryItem>(entity =>
+        {
+            entity.Property(ii => ii.Location)
+                .HasMaxLength(100);
+
+            entity.Property(ii => ii.Status)
+                .HasMaxLength(50);
+        });
 
         // User ↔ Seller (1-1)
         modelBuilder.Entity<User>()
