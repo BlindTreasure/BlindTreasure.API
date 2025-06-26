@@ -752,7 +752,7 @@ public class BlindBoxService : IBlindBoxService
     {
         var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
         dto.BlindBoxStockStatus = blindBox.TotalQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
-        dto.Brand = blindBox.Seller.CompanyName;
+        dto.Brand = blindBox.Seller?.CompanyName;
 
         // Gán danh sách item
         dto.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
@@ -765,10 +765,7 @@ public class BlindBoxService : IBlindBoxService
             Rarity = item.Rarity
         }).ToList();
 
-        // Lấy tên danh mục
-        //var category =
-        //    await _unitOfWork.Categories.FirstOrDefaultAsync(c => c.Id == blindBox.CategoryId && !c.IsDeleted);
-        //dto.CategoryName = category?.Name ?? "Không xác định";
+
 
         return dto;
     }
