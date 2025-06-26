@@ -51,8 +51,6 @@ public class InventoryItemService : IInventoryItemService
             UserId = userId,
             ProductId = dto.ProductId,
             Quantity = dto.Quantity,
-            ReservedQuantity = 0,
-            RestockThreshold = 0,
             Location = dto.Location ?? string.Empty,
             Status = dto.Status ?? "Active"
         };
@@ -102,10 +100,6 @@ public class InventoryItemService : IInventoryItemService
 
         if (dto.Quantity.HasValue)
             item.Quantity = dto.Quantity.Value;
-        if (dto.ReservedQuantity.HasValue)
-            item.ReservedQuantity = dto.ReservedQuantity.Value;
-        if (dto.RestockThreshold.HasValue)
-            item.RestockThreshold = dto.RestockThreshold.Value;
         if (!string.IsNullOrWhiteSpace(dto.Location))
             item.Location = dto.Location;
         if (!string.IsNullOrWhiteSpace(dto.Status))

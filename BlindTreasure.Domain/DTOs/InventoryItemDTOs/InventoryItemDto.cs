@@ -14,8 +14,6 @@ public class InventoryItemDto
     public string ProductName { get; set; }
     public List<string> ProductImages { get; set; }
     public int Quantity { get; set; }
-    public int ReservedQuantity { get; set; }
-    public int RestockThreshold { get; set; }
     public string Location { get; set; }
     public string Status { get; set; }
     public DateTime CreatedAt { get; set; }

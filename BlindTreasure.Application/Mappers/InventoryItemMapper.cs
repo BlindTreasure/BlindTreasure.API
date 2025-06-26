@@ -20,8 +20,6 @@ public static class InventoryItemMapper
             ProductName = item.Product?.Name ?? string.Empty,
             ProductImages = item.Product?.ImageUrls ?? new List<string>(),
             Quantity = item.Quantity,
-            ReservedQuantity = item.ReservedQuantity,
-            RestockThreshold = item.RestockThreshold,
             Location = item.Location,
             Status = item.Status,
             CreatedAt = item.CreatedAt
