@@ -184,19 +184,29 @@ public class AuthService : IAuthService
         return true;
     }
 
-    public async Task<LoginResponseDto?> RefreshTokenAsync(TokenRefreshRequestDto refreshTokenDto,
-        IConfiguration configuration)
+    public async Task<LoginResponseDto?> RefreshTokenAsync(TokenRefreshRequestDto refreshTokenDto, IConfiguration configuration)
     {
-        var user = await _unitOfWork.Users.FirstOrDefaultAsync(u =>
-            u.RefreshToken == refreshTokenDto.RefreshToken);
+        var cacheKey = $"refresh:{refreshTokenDto.RefreshToken}";
+        User? user = await _cacheService.GetAsync<User>(cacheKey);
 
         if (user == null)
-            throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
+        {
+            user = await _unitOfWork.Users.FirstOrDefaultAsync(u =>
+                u.RefreshToken == refreshTokenDto.RefreshToken);
+
+            if (user == null)
+                throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
+
+            // Chỉ cache nếu hợp lệ
+            if (!string.IsNullOrEmpty(user.RefreshToken) && user.RefreshTokenExpiryTime >= DateTime.UtcNow)
+            {
+                await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromMinutes(10));
+            }
+        }
 
         if (string.IsNullOrEmpty(user.RefreshToken))
             throw ErrorHelper.BadRequest(ErrorMessages.AccountAccesstokenInvalid);
 
-        // Kiểm tra Refresh Token có hợp lệ không (thời gian hết hạn)
         if (user.RefreshTokenExpiryTime < DateTime.UtcNow)
             throw ErrorHelper.Conflict(ErrorMessages.Jwt_RefreshTokenExpired);
 
@@ -217,6 +227,12 @@ public class AuthService : IAuthService
         await _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveChangesAsync();
 
+        // Cập nhật cache user
+        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+        // Cập nhật cache theo refresh token mới
+        await _cacheService.RemoveAsync(cacheKey); // xóa cache cũ
+        await _cacheService.SetAsync($"refresh:{newRefreshToken}", user, TimeSpan.FromMinutes(10));
 
         return new LoginResponseDto
         {
@@ -224,6 +240,7 @@ public class AuthService : IAuthService
             RefreshToken = newRefreshToken
         };
     }
+
 
     #endregion
 
