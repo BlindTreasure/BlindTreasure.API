@@ -1,0 +1,17 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BlindTreasure.Domain.DTOs.InventoryItemDTOs
+{
+    public class UpdateInventoryItemDto
+    {
+        public int? Quantity { get; set; }
+        public int? ReservedQuantity { get; set; }
+        public int? RestockThreshold { get; set; }
+        public string? Location { get; set; }
+        public string? Status { get; set; }
+    }
+}

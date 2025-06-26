@@ -19,6 +19,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<Transaction> Transactions { get; }
     IGenericRepository<Payment> Payments { get; }
     IGenericRepository<Address> Addresses { get; }
+    IGenericRepository<InventoryItem> InventoryItems { get; }
 
     Task<int> SaveChangesAsync();
 }

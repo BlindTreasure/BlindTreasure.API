@@ -11,9 +11,9 @@ public class InventoryItem : BaseEntity
     public Product Product { get; set; }
 
     public int Quantity { get; set; }
-    public int ReservedQuantity { get; set; }
-    public int RestockThreshold { get; set; }
-    public string Location { get; set; }
+    public int ReservedQuantity { get; set; } =0; // Số lượng đã được đặt trước, mặc định là 0
+    public int RestockThreshold { get; set; } = 0; // Ngưỡng tồn kho để cảnh báo restock, mặc định là 0
+    public string Location { get; set; } = "HCM"; // Vị trí kho, mặc định là "HCM"
     public string Status { get; set; }
 
     // 1-n → Listings
