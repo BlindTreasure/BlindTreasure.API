@@ -4,6 +4,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Stripe;
 using Stripe.Checkout;
 
@@ -14,15 +15,20 @@ public class StripeService : IStripeService
     private readonly IClaimsService _claimsService;
     private readonly IStripeClient _stripeClient;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly string failRedirectUrl = "http://localhost:4040/fail";
-    private readonly string succesRedirectUrl = "http://localhost:4040/thankyou";
+    private readonly IConfiguration _configuration;
+    private readonly string _successRedirectUrl;
+    private readonly string _failRedirectUrl;
 
     public StripeService(IUnitOfWork unitOfWork, IStripeClient stripeClient,
-        IClaimsService claimsService)
+        IClaimsService claimsService, IConfiguration configuration)
     {
         _unitOfWork = unitOfWork;
         _stripeClient = stripeClient;
         _claimsService = claimsService;
+        _configuration = configuration;
+
+        _successRedirectUrl = _configuration["STRIPE:SuccessRedirectUrl"] ?? "http://localhost:4040/thankyou";
+        _failRedirectUrl = _configuration["STRIPE:FailRedirectUrl"] ?? "http://localhost:4040/fail";
     }
 
     public async Task<string> GenerateExpressLoginLink()
@@ -127,9 +133,9 @@ public class StripeService : IStripeService
             LineItems = lineItems,
             Mode = "payment",
             SuccessUrl =
-                $"{succesRedirectUrl}?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+                $"{_successRedirectUrl}?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             CancelUrl =
-                $"{failRedirectUrl}?status=failed&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+                $"{_failRedirectUrl}?status=failed&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             ExpiresAt = DateTime.UtcNow.AddMinutes(30),
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {

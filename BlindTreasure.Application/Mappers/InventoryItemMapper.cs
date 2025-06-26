@@ -17,12 +17,14 @@ public static class InventoryItemMapper
             Id = item.Id,
             UserId = item.UserId,
             ProductId = item.ProductId,
-            ProductName = item.Product?.Name ?? string.Empty,
-            ProductImages = item.Product?.ImageUrls ?? new List<string>(),
+            //ProductName = item.Product?.Name ?? string.Empty,
+            //ProductImages = item.Product?.ImageUrls ?? new List<string>(),
             Quantity = item.Quantity,
             Location = item.Location,
             Status = item.Status,
-            CreatedAt = item.CreatedAt
+            CreatedAt = item.CreatedAt,
+            Product = item.Product != null ? ProductDtoMapper.ToProducDetailDto(item.Product) : null
+
         };
     }
 }

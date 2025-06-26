@@ -2,7 +2,7 @@
 
 namespace BlindTreasure.Domain.DTOs.ProductDTOs;
 
-public class ProducDetailstDto
+public class ProducDetailDto
 {
     public Guid Id { get; set; }
     public string? Name { get; set; }
