@@ -53,7 +53,7 @@ public class TransactionService : ITransactionService
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
             _loggerService.Info(
-               "OrderDetails count for this transaction =" + transaction.Payment.Order.OrderDetails.Count);
+                "OrderDetails count for this transaction =" + transaction.Payment.Order.OrderDetails.Count);
 
             if (transaction == null)
                 throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
@@ -70,21 +70,19 @@ public class TransactionService : ITransactionService
                 transaction.Payment.Order.CompletedAt = DateTime.UtcNow;
 
                 // 4. Lấy order details và tạo inventory item cho từng sản phẩm
-                var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(
-                    od => od.OrderId == transaction.Payment.OrderId && !od.IsDeleted);
-              
+                var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(od =>
+                    od.OrderId == transaction.Payment.OrderId && !od.IsDeleted);
+
                 if (orderDetails == null || !orderDetails.Any())
                 {
                     _loggerService.Warn(
                         $"[HandleSuccessfulPaymentAsync] Không tìm thấy order details cho order {orderId}.");
                     orderDetails = transaction.Payment.Order.OrderDetails.ToList();
                 }
-                    
-              
-                int count = 0;
+
+
+                var count = 0;
                 foreach (var od in orderDetails)
-                {
-                  
                     if (od.ProductId.HasValue)
                     {
                         _loggerService.Info(
@@ -100,9 +98,9 @@ public class TransactionService : ITransactionService
                         _loggerService.Success(
                             $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++count} cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
                     }
-                    // Nếu muốn hỗ trợ BlindBox, bổ sung logic ở đây
-                }
+                // Nếu muốn hỗ trợ BlindBox, bổ sung logic ở đây
             }
+
             await _unitOfWork.Transactions.Update(transaction);
             await _unitOfWork.Payments.Update(transaction.Payment);
             if (transaction.Payment.Order != null)

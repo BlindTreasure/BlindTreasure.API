@@ -19,7 +19,7 @@ public class BlindBox : BaseEntity
     public DateTime ReleaseDate { get; set; }
     public string? RejectReason { get; set; }
     public Guid CategoryId { get; set; }
-    
+
     public Category? Category { get; set; }
     public ICollection<BlindBoxItem>? BlindBoxItems { get; set; }
     public ICollection<CartItem>? CartItems { get; set; }

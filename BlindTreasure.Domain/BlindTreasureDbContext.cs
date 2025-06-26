@@ -140,7 +140,7 @@ public class BlindTreasureDbContext : DbContext
             .Property(p => p.Rarity)
             .HasConversion<string>()
             .HasMaxLength(32); // nếu cần giới hạn
-        
+
         modelBuilder.Entity<BlindBox>(entity =>
         {
             entity.Property(b => b.Name)
@@ -163,7 +163,6 @@ public class BlindTreasureDbContext : DbContext
             entity.Property(b => b.RejectReason)
                 .HasMaxLength(1000);
         });
-
 
 
         // User ↔ Seller (1-1)

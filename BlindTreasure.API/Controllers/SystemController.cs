@@ -141,6 +141,7 @@ public class SystemController : ControllerBase
     }
 
     #region data seeding
+
     private async Task SeedRolesAndUsers()
     {
         await SeedRoles();
@@ -153,6 +154,7 @@ public class SystemController : ControllerBase
 
         _logger.Success("Users and seller seeded successfully.");
     }
+
     private async Task SeedCategories()
     {
         if (_context.Categories.Any())
@@ -455,6 +457,7 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Success("[SeedProducts] Seed sản phẩm chuẩn thành công.");
     }
+
     private async Task SeedBlindBoxes()
     {
         var now = DateTime.UtcNow;
@@ -631,7 +634,8 @@ public class SystemController : ControllerBase
                 HasSecretItem = true,
                 SecretProbability = 5,
                 Status = BlindBoxStatus.Approved,
-                ImageUrl = "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box.webp&version_id=null",
+                ImageUrl =
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box.webp&version_id=null",
                 ReleaseDate = now,
                 CreatedAt = now
             };
@@ -648,7 +652,9 @@ public class SystemController : ControllerBase
     }
 
     #endregion
+
     #region private methods
+
     private async Task SeedRoles()
     {
         var roles = new List<Role>
@@ -684,6 +690,7 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Success("Roles seeded successfully.");
     }
+
     private List<User> GetPredefinedUsers()
     {
         var passwordHasher = new PasswordHasher();
@@ -733,6 +740,7 @@ public class SystemController : ControllerBase
             }
         };
     }
+
     private async Task SeedSellerForUser(string sellerEmail)
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == sellerEmail);
@@ -758,6 +766,7 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Info("Seller seeded successfully.");
     }
+
     private List<BlindBoxItem> GenerateBlindBoxItems(
         Guid blindBoxId,
         List<Product> products,
@@ -778,7 +787,7 @@ public class SystemController : ControllerBase
         // Các sản phẩm còn lại chia vào Common/Rare/Epic
         var remaining = products.Skip(4).ToList();
         var rotatingRarities = new[] { BlindBoxRarity.Common, BlindBoxRarity.Rare, BlindBoxRarity.Epic };
-        int rotateIndex = 0;
+        var rotateIndex = 0;
 
         foreach (var product in remaining)
         {
@@ -804,7 +813,6 @@ public class SystemController : ControllerBase
                 : remainingRate / nonSecretCount;
 
             foreach (var product in productList)
-            {
                 items.Add(new BlindBoxItem
                 {
                     Id = Guid.NewGuid(),
@@ -816,10 +824,10 @@ public class SystemController : ControllerBase
                     IsActive = true,
                     CreatedAt = now
                 });
-            }
         }
 
         return items;
     }
+
     #endregion
 }
