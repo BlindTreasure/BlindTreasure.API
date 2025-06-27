@@ -5,14 +5,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Application.Interfaces
+namespace BlindTreasure.Application.Interfaces;
+
+public interface IInventoryItemService
 {
-    public interface IInventoryItemService
-    {
-        Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId);
-        Task<bool> DeleteAsync(Guid id);
-        Task<List<InventoryItemDto>> GetByUserIdAsync(Guid? userId = null);
-        Task<InventoryItemDto> UpdateAsync(Guid id, UpdateInventoryItemDto dto);
-        Task<InventoryItemDto?> GetByIdAsync(Guid id);
-    }
+    Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId);
+    Task<bool> DeleteAsync(Guid id);
+    Task<List<InventoryItemDto>> GetByUserIdAsync(Guid? userId = null);
+    Task<InventoryItemDto> UpdateAsync(Guid id, UpdateInventoryItemDto dto);
+    Task<InventoryItemDto?> GetByIdAsync(Guid id);
 }

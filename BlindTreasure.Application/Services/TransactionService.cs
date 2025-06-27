@@ -74,8 +74,8 @@ public class TransactionService : ITransactionService
                 transaction.Payment.Order.CompletedAt = DateTime.UtcNow;
 
                 // 4. Lấy order details và tạo inventory item cho từng sản phẩm
-                var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(
-                    od => od.OrderId == transaction.Payment.OrderId);
+                var orderDetails =
+                    await _unitOfWork.OrderDetails.GetAllAsync(od => od.OrderId == transaction.Payment.OrderId);
 
                 if (orderDetails == null || !orderDetails.Any())
                 {
@@ -100,16 +100,18 @@ public class TransactionService : ITransactionService
                             Location = string.Empty,
                             Status = "Active"
                         };
-                        var result = await _inventoryItemService.CreateAsync(createDto, transaction.Payment.Order.UserId);
+                        var result =
+                            await _inventoryItemService.CreateAsync(createDto, transaction.Payment.Order.UserId);
                         _loggerService.Success(
                             $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++productCount} cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
                     }
+
                     if (od.BlindBoxId.HasValue)
                     {
                         _loggerService.Info(
                             $"[HandleSuccessfulPaymentAsync] Tạo customer inventory cho BlindBox {od.BlindBoxId.Value} trong order {orderId}.");
                         // Tạo 1 bản ghi CustomerInventory cho mỗi BlindBox đã mua (theo quantity)
-                        for (int i = 0; i < od.Quantity; i++)
+                        for (var i = 0; i < od.Quantity; i++)
                         {
                             var createBlindBoxDto = new CreateCustomerInventoryDto
                             {
@@ -126,7 +128,6 @@ public class TransactionService : ITransactionService
                         }
                     }
                 }
-
             }
 
             await _unitOfWork.Transactions.Update(transaction);

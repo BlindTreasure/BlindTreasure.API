@@ -77,15 +77,15 @@ public class StripeService : IStripeService
         }
 
         // Lấy thông tin promotion nếu có
-        string promotionDesc = "";
+        var promotionDesc = "";
         if (promotionId.HasValue)
         {
             var promotion = await _unitOfWork.Promotions.GetByIdAsync(promotionId.Value);
             if (promotion != null)
-            {
-                promotionDesc = $"[Voucher: {promotion.Code} - {promotion.Description}, Discount: {promotion.DiscountValue} ({promotion.DiscountType})]";
-            }
+                promotionDesc =
+                    $"[Voucher: {promotion.Code} - {promotion.Description}, Discount: {promotion.DiscountValue} ({promotion.DiscountType})]";
         }
+
         // Chuẩn bị line items cho Stripe
         var lineItems = new List<SessionLineItemOptions>();
         foreach (var item in order.OrderDetails)
@@ -121,7 +121,6 @@ public class StripeService : IStripeService
                                       $"Price: {unitPrice} VND\n" +
                                       $"Time: {item.CreatedAt}\n" +
                                       $"{(!string.IsNullOrEmpty(promotionDesc) ? promotionDesc : "")}"
-
                     },
                     UnitAmount = (long)unitPrice // Stripe expects amount in cents
                 },
@@ -138,7 +137,6 @@ public class StripeService : IStripeService
                 { "userId", userId.ToString() },
                 { "isRenew", isRenew.ToString() },
                 { "promotion", promotionDesc }
-
             },
 
             CustomerEmail = user.Email,
@@ -164,7 +162,6 @@ public class StripeService : IStripeService
                     { "currency", "vnd" },
                     { "isRenew", isRenew.ToString() },
                     { "promotion", promotionDesc }
-
                 }
             }
         };
