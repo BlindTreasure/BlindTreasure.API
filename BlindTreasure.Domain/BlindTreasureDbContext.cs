@@ -24,7 +24,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<BlindBoxItem> BlindBoxItems { get; set; }
     public DbSet<ProbabilityConfig> ProbabilityConfigs { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
-    
+
     public DbSet<CustomerInventory> CustomerInventories { get; set; }
 
     public DbSet<OtpVerification> OtpVerifications { get; set; }
@@ -169,7 +169,7 @@ public class BlindTreasureDbContext : DbContext
                 .HasColumnType("timestamp without time zone");
         });
 
-        
+
         modelBuilder.Entity<BlindBoxItem>()
             .Property(p => p.Rarity)
             .HasConversion<string>()
@@ -197,7 +197,7 @@ public class BlindTreasureDbContext : DbContext
             entity.Property(b => b.RejectReason)
                 .HasMaxLength(1000);
         });
-        
+
         modelBuilder.Entity<InventoryItem>(entity =>
         {
             entity.Property(ii => ii.Location)

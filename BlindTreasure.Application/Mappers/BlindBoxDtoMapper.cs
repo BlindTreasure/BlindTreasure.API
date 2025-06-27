@@ -34,7 +34,6 @@ public static class BlindBoxDtoMapper
                 .Select(ToBlindBoxItemDto)
                 .ToList()
         };
-
     }
 
     /// <summary>
