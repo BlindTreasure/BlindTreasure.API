@@ -20,17 +20,20 @@ public class AuthService : IAuthService
     private readonly IEmailService _emailService;
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
+
 
     public AuthService(
         ILoggerService logger,
         IUnitOfWork unitOfWork,
         ICacheService cacheService,
-        IEmailService emailService)
+        IEmailService emailService, INotificationService notificationService)
     {
         _logger = logger;
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
         _emailService = emailService;
+        _notificationService = notificationService;
     }
 
     #region Authen
@@ -146,6 +149,9 @@ public class AuthService : IAuthService
         await _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveChangesAsync();
         await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+
+
+        await _notificationService.SendWelcomeNotificationAsync(user.Id);
 
         _logger.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
 

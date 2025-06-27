@@ -138,6 +138,27 @@ public class BlindTreasureDbContext : DbContext
                 v => v.Split(";", StringSplitOptions.RemoveEmptyEntries).ToList()
             ).IsRequired(false);
 
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.Property(n => n.Type)
+                .HasConversion<string>() // Lưu dưới dạng chuỗi trong DB
+                .HasMaxLength(32)
+                .IsRequired();
+
+            entity.Property(n => n.Type)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(n => n.Title)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(n => n.Message)
+                .HasMaxLength(500)
+                .IsRequired();
+        });
+
+
         modelBuilder.Entity<CustomerInventory>(entity =>
         {
             // Khóa ngoại: User (1-n)

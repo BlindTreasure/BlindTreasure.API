@@ -22,8 +22,8 @@ public class UnitOfWork(
     IGenericRepository<Payment> payments,
     IGenericRepository<Address> addresses,
     IGenericRepository<InventoryItem> inventoryItems,
-    IGenericRepository<CustomerInventory> customerInventorys
-)
+    IGenericRepository<CustomerInventory> customerInventorys,
+    IGenericRepository<Notification> notifications)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
@@ -43,6 +43,7 @@ public class UnitOfWork(
     public IGenericRepository<Address> Addresses { get; } = addresses;
     public IGenericRepository<InventoryItem> InventoryItems { get; } = inventoryItems;
     public IGenericRepository<CustomerInventory> CustomerInventories { get; } = customerInventorys;
+    public IGenericRepository<Notification> Notifications { get; } = notifications;
 
     public void Dispose()
     {
