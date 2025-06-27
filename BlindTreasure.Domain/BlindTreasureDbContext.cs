@@ -137,6 +137,22 @@ public class BlindTreasureDbContext : DbContext
                 v => string.Join(";", v),
                 v => v.Split(";", StringSplitOptions.RemoveEmptyEntries).ToList()
             ).IsRequired(false);
+        
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.Property(n => n.Type)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(n => n.Title)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(n => n.Message)
+                .HasMaxLength(500)
+                .IsRequired();
+        });
+
 
         modelBuilder.Entity<CustomerInventory>(entity =>
         {

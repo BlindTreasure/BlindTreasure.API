@@ -405,7 +405,7 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.Products.UpdateRange(products);
         await _unitOfWork.SaveChangesAsync();
 
-        await RemoveBlindBoxCacheAsync(blindBoxId, seller?.Id);
+        await RemoveBlindBoxCacheAsync(blindBoxId, seller.Id);
 
 
         _logger.Success(
