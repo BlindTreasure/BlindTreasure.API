@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using BlindTreasure.API.Architecture;
 using BlindTreasure.API.ChatHub;
 using BlindTreasure.Domain.DTOs.StripeDTOs;
+using BlindTreasure.Infrastructure.Hubs;
 using Microsoft.AspNetCore.Diagnostics;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -139,6 +140,8 @@ app.MapControllers();
 app.MapHub<UserChatHub>("/hubs/user-chat");
 app.MapHub<SellerChatHub>("/hubs/seller-chat");
 app.MapHub<StaffChatHub>("/hubs/staff-chat");
+app.MapHub<NotificationHub>("/hubs/notification");
+
 
 app.UseAuthentication();
 app.UseAuthorization();

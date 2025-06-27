@@ -140,6 +140,12 @@ public class BlindTreasureDbContext : DbContext
         
         modelBuilder.Entity<Notification>(entity =>
         {
+            
+            entity.Property(n => n.Type)
+                .HasConversion<string>()       // Lưu dưới dạng chuỗi trong DB
+                .HasMaxLength(32)
+                .IsRequired();
+            
             entity.Property(n => n.Type)
                 .HasMaxLength(50)
                 .IsRequired();

@@ -21,6 +21,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<Address> Addresses { get; }
     IGenericRepository<InventoryItem> InventoryItems { get; }
     IGenericRepository<CustomerInventory> CustomerInventories { get; }
+    IGenericRepository<Notification> Notifications { get; }
 
     Task<int> SaveChangesAsync();
 }
