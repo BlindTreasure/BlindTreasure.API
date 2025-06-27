@@ -12,7 +12,7 @@ public class BlindBox : BaseEntity
     public decimal Price { get; set; }
     public int TotalQuantity { get; set; }
     public bool HasSecretItem { get; set; }
-    public int SecretProbability { get; set; }
+    public decimal SecretProbability { get; set; }
     public BlindBoxStatus Status { get; set; }
     public string? Brand { get; set; }
     public string? ImageUrl { get; set; }

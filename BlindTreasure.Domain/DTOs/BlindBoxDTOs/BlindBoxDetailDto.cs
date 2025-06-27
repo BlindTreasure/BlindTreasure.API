@@ -18,7 +18,7 @@ public class BlindBoxDetailDto
     public BlindBoxStatus Status { get; set; } //Draft, PendingApproval, Approved...
     public bool HasSecretItem { get; set; }
     public string? Brand { get; set; }
-    public int SecretProbability { get; set; }
+    public decimal SecretProbability { get; set; }
     public string? RejectReason { get; set; }
     public string? BindBoxTags { get; set; } // JSON string or array of tags
 
