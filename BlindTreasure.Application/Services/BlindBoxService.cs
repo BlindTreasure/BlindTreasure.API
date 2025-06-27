@@ -83,11 +83,11 @@ public class BlindBoxService : IBlindBoxService
         if (param.ReleaseDateTo.HasValue)
             query = query.Where(b => b.ReleaseDate <= param.ReleaseDateTo.Value);
 
-        //if (param.CategoryId.HasValue)
-        //{
-        //    var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
-        //    query = query.Where(b => categoryIds.Contains(b.CategoryId));
-        //}
+        if (param.CategoryId.HasValue)
+        {
+            var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
+            query = query.Where(b => categoryIds.Contains(b.CategoryId));
+        }
 
         if (param.HasItem == true)
         {
@@ -249,7 +249,7 @@ public class BlindBoxService : IBlindBoxService
             CreatedBy = currentUserId
         };
 
-        var result = await _unitOfWork.BlindBoxes.AddAsync(blindBox);
+        await _unitOfWork.BlindBoxes.AddAsync(blindBox);
         await _unitOfWork.SaveChangesAsync();
 
         _logger.Success($"[CreateBlindBoxAsync] Blind box {blindBox.Name} created by user {currentUserId}.");
@@ -452,7 +452,6 @@ public class BlindBoxService : IBlindBoxService
         _logger.Success($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} submitted for approval.");
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
-
     public async Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -532,7 +531,6 @@ public class BlindBoxService : IBlindBoxService
         await _unitOfWork.SaveChangesAsync();
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
-
     public async Task<BlindBoxDetailDto> ClearItemsFromBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -577,7 +575,6 @@ public class BlindBoxService : IBlindBoxService
 
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
-
     public async Task<BlindBoxDetailDto> DeleteBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(

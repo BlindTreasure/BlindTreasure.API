@@ -14,6 +14,7 @@ public class BlindBoxDetailDto
     public string? CategoryName { get; set; }
     public string? ImageUrl { get; set; }
     public DateTime ReleaseDate { get; set; }
+    public DateTime CreatedAt { get; set; }
     public BlindBoxStatus Status { get; set; } //Draft, PendingApproval, Approved...
     public bool HasSecretItem { get; set; }
     public string? Brand { get; set; }

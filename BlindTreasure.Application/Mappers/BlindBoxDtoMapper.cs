@@ -6,7 +6,7 @@ namespace BlindTreasure.Application.Mappers;
 
 public static class BlindBoxDtoMapper
 {
-    public static BlindBoxDetailDto ToBlindBoxDetailDto(BlindBox box)
+    public static BlindBoxDetailDto ToBlindBoxDetailDto(BlindBox? box)
     {
         if (box == null) return null!;
         return new BlindBoxDetailDto
@@ -21,6 +21,7 @@ public static class BlindBoxDtoMapper
             CategoryName = box.Category?.Name,
             ImageUrl = box.ImageUrl,
             ReleaseDate = box.ReleaseDate,
+            CreatedAt = box.CreatedAt,
             Status = box.Status,
             HasSecretItem = box.HasSecretItem,
             Brand = box.Brand,
