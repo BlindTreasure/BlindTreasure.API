@@ -4,6 +4,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Stripe;
 using Stripe.Checkout;
 
@@ -14,15 +15,20 @@ public class StripeService : IStripeService
     private readonly IClaimsService _claimsService;
     private readonly IStripeClient _stripeClient;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly string failRedirectUrl = "http://localhost:4040/fail";
-    private readonly string succesRedirectUrl = "http://localhost:4040/thankyou";
+    private readonly IConfiguration _configuration;
+    private readonly string _successRedirectUrl;
+    private readonly string _failRedirectUrl;
 
     public StripeService(IUnitOfWork unitOfWork, IStripeClient stripeClient,
-        IClaimsService claimsService)
+        IClaimsService claimsService, IConfiguration configuration)
     {
         _unitOfWork = unitOfWork;
         _stripeClient = stripeClient;
         _claimsService = claimsService;
+        _configuration = configuration;
+
+        _successRedirectUrl = _configuration["STRIPE:SuccessRedirectUrl"] ?? "http://localhost:4040/thankyou";
+        _failRedirectUrl = _configuration["STRIPE:FailRedirectUrl"] ?? "http://localhost:4040/fail";
     }
 
     public async Task<string> GenerateExpressLoginLink()
@@ -39,7 +45,7 @@ public class StripeService : IStripeService
         return loginLink.Url;
     }
 
-    public async Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false)
+    public async Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false, Guid? promotionId = null)
     {
         // Lấy user hiện tại
         var userId = _claimsService.CurrentUserId;
@@ -70,7 +76,16 @@ public class StripeService : IStripeService
                 throw ErrorHelper.BadRequest("Chỉ có thể gia hạn đơn hàng đã hoàn thành hoặc hết hạn.");
         }
 
-
+        // Lấy thông tin promotion nếu có
+        string promotionDesc = "";
+        if (promotionId.HasValue)
+        {
+            var promotion = await _unitOfWork.Promotions.GetByIdAsync(promotionId.Value);
+            if (promotion != null)
+            {
+                promotionDesc = $"[Voucher: {promotion.Code} - {promotion.Description}, Discount: {promotion.DiscountValue} ({promotion.DiscountType})]";
+            }
+        }
         // Chuẩn bị line items cho Stripe
         var lineItems = new List<SessionLineItemOptions>();
         foreach (var item in order.OrderDetails)
@@ -104,7 +119,9 @@ public class StripeService : IStripeService
                         Description = $"Product/BlindBox Name: {name}\n" +
                                       $"Quantity: {item.Quantity} / Total: {item.TotalPrice} \n" +
                                       $"Price: {unitPrice} VND\n" +
-                                      $"Time: {item.CreatedAt}"
+                                      $"Time: {item.CreatedAt}\n" +
+                                      $"{(!string.IsNullOrEmpty(promotionDesc) ? promotionDesc : "")}"
+
                     },
                     UnitAmount = (long)unitPrice // Stripe expects amount in cents
                 },
@@ -119,7 +136,9 @@ public class StripeService : IStripeService
             {
                 { "orderId", orderId.ToString() },
                 { "userId", userId.ToString() },
-                { "isRenew", isRenew.ToString() }
+                { "isRenew", isRenew.ToString() },
+                { "promotion", promotionDesc }
+
             },
 
             CustomerEmail = user.Email,
@@ -127,9 +146,9 @@ public class StripeService : IStripeService
             LineItems = lineItems,
             Mode = "payment",
             SuccessUrl =
-                $"{succesRedirectUrl}?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+                $"{_successRedirectUrl}?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             CancelUrl =
-                $"{failRedirectUrl}?status=failed&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+                $"{_failRedirectUrl}?status=failed&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             ExpiresAt = DateTime.UtcNow.AddMinutes(30),
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
@@ -143,7 +162,9 @@ public class StripeService : IStripeService
                     { "itemCount", order.OrderDetails.Count.ToString() },
                     { "totalAmount", order.TotalAmount.ToString() },
                     { "currency", "vnd" },
-                    { "isRenew", isRenew.ToString() }
+                    { "isRenew", isRenew.ToString() },
+                    { "promotion", promotionDesc }
+
                 }
             }
         };

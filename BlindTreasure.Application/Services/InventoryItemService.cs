@@ -39,21 +39,33 @@ public class InventoryItemService : IInventoryItemService
         _orderService = orderService;
     }
 
-    public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto)
-    {
-        var userId = _claimsService.CurrentUserId;
-        var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId);
-        if (product == null || product.IsDeleted)
-            throw ErrorHelper.NotFound("Product not found.");
-
-        var item = new InventoryItem
+        public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId) // specify userId if needed, otherwise use current user
         {
-            UserId = userId,
-            ProductId = dto.ProductId,
-            Quantity = dto.Quantity,
-            Location = dto.Location ?? string.Empty,
-            Status = dto.Status ?? "Active"
-        };
+            if (userId.HasValue) 
+            { 
+                userId = userId.Value;
+            }
+            else
+            {
+                userId = _claimsService.CurrentUserId;
+                if(userId == Guid.Empty)
+                    throw ErrorHelper.Unauthorized("User ID is required for creating inventory item. Cannot found current user");
+            }
+
+            _loggerService.Info($"[CreateAsync] Creating inventory item for user {userId}, product {dto.ProductId}.");
+            var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId);
+            if (product == null || product.IsDeleted)
+                throw ErrorHelper.NotFound("Product not found.");
+
+            var item = new InventoryItem
+            {
+                UserId = userId.Value,
+                ProductId = dto.ProductId,
+                Quantity = dto.Quantity,
+                Location = dto.Location ?? string.Empty,
+                Status = dto.Status ?? "Active",
+
+            };
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
         await _unitOfWork.SaveChangesAsync();
@@ -88,8 +100,10 @@ public class InventoryItemService : IInventoryItemService
     public async Task<List<InventoryItemDto>> GetByUserIdAsync(Guid? userId = null)
     {
         var uid = userId ?? _claimsService.CurrentUserId;
-        var items = await _unitOfWork.InventoryItems.GetAllAsync(i => i.UserId == uid && !i.IsDeleted, i => i.Product);
-        return items.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
+        var items = await _unitOfWork.InventoryItems.GetAllAsync(
+             i => i.UserId == uid && !i.IsDeleted,
+             i => i.Product
+         ); return items.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
     }
 
     public async Task<InventoryItemDto> UpdateAsync(Guid id, UpdateInventoryItemDto dto)

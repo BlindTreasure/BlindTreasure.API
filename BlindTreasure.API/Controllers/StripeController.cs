@@ -20,13 +20,6 @@ namespace BlindTreasure.API.Controllers;
 [ApiController]
 public class StripeController : ControllerBase
 {
-    private const string
-        LocalStripeSecret =
-            "whsec_1922024ed268f46c73bfac2bd2bab31e490189a882ec21e458c387b0f8ed8b13"; // Use Environment Variables in Production
-
-    private const string
-        DeployStripeSecret = "whsec_uWjfI4fkQ7zbwE8VrWMcu2Ysyqm8heUh"; // Use Environment Variables in Production
-
     private readonly IClaimsService _claimService;
     private readonly ILoggerService _logger;
     private readonly IOrderService _orderService;
@@ -35,6 +28,9 @@ public class StripeController : ControllerBase
     private readonly IStripeService _stripeService;
     private readonly ITransactionService _transactionService;
     private readonly IUserService _userService;
+    private readonly IConfiguration _configuration;
+    private readonly string _localStripeSecret;
+    private readonly string _deployStripeSecret;
 
     public StripeController(
         ISellerService sellerService,
@@ -44,7 +40,8 @@ public class StripeController : ControllerBase
         ILoggerService logger,
         IStripeClient stripeClient,
         IOrderService orderService,
-        ITransactionService transactionService)
+        ITransactionService transactionService,
+        IConfiguration configuration)
     {
         _claimService = claimService;
         _userService = userService;
@@ -54,6 +51,9 @@ public class StripeController : ControllerBase
         _orderService = orderService;
         _transactionService = transactionService;
         _sellerService = sellerService;
+        _configuration = configuration;
+        _localStripeSecret = _configuration["STRIPE:LocalWebhookSecret"] ?? "";
+        _deployStripeSecret = _configuration["STRIPE:DeployWebhookSecret"] ?? "";
     }
 
     /// <summary>
@@ -91,7 +91,7 @@ public class StripeController : ControllerBase
     [HttpPost("checkout")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> Checkout([FromBody] CreateOrderDto dto)
+    public async Task<IActionResult> Checkout([FromBody] CreateCheckoutRequestDto dto)
     {
         _logger.Info("[Stripe][Checkout] Bắt đầu tạo đơn hàng từ giỏ hàng.");
         try
@@ -123,7 +123,7 @@ public class StripeController : ControllerBase
         Event? stripeEvent = null;
         Exception? lastEx = null;
 
-        foreach (var secret in new[] { LocalStripeSecret, DeployStripeSecret })
+        foreach (var secret in new[] { _localStripeSecret, _deployStripeSecret })
             try
             {
                 stripeEvent = EventUtility.ConstructEvent(

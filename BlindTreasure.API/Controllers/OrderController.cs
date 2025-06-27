@@ -55,7 +55,7 @@ public class OrderController : ControllerBase
     [HttpPost("checkout")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> Checkout([FromBody] CreateOrderDto dto)
+    public async Task<IActionResult> Checkout([FromBody] CreateCheckoutRequestDto dto)
     {
         try
         {

@@ -1,8 +1,9 @@
-﻿namespace BlindTreasure.Domain.DTOs.CartItemDTOs;
+﻿using BlindTreasure.Domain.DTOs.OrderDTOs;
 
-public class DirectCartCheckoutDto
+namespace BlindTreasure.Domain.DTOs.CartItemDTOs;
+
+public class DirectCartCheckoutDto : CreateCheckoutRequestDto
 {
-    public Guid? ShippingAddressId { get; set; }
     public List<DirectCartItemDto> Items { get; set; } = new();
 }
 

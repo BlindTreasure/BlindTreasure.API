@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -19,6 +20,7 @@ public class TransactionService : ITransactionService
     private readonly IOrderService _orderService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IInventoryItemService _inventoryItemService;
+    private readonly ICustomerInventoryService _customerInventoryService;
 
 
     public TransactionService(
@@ -28,7 +30,8 @@ public class TransactionService : ITransactionService
         IMapperService mapper,
         IOrderService orderService,
         IUnitOfWork unitOfWork,
-        IInventoryItemService inventoryItemService)
+        IInventoryItemService inventoryItemService,
+        ICustomerInventoryService customerInventoryService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -37,6 +40,7 @@ public class TransactionService : ITransactionService
         _orderService = orderService;
         _unitOfWork = unitOfWork;
         _inventoryItemService = inventoryItemService;
+        _customerInventoryService = customerInventoryService;
     }
 
     /// <summary>
@@ -70,8 +74,8 @@ public class TransactionService : ITransactionService
                 transaction.Payment.Order.CompletedAt = DateTime.UtcNow;
 
                 // 4. Lấy order details và tạo inventory item cho từng sản phẩm
-                var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(od =>
-                    od.OrderId == transaction.Payment.OrderId && !od.IsDeleted);
+                var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(
+                    od => od.OrderId == transaction.Payment.OrderId);
 
                 if (orderDetails == null || !orderDetails.Any())
                 {
@@ -81,8 +85,10 @@ public class TransactionService : ITransactionService
                 }
 
 
-                var count = 0;
+                var productCount = 0;
+                var blindBoxCount = 0;
                 foreach (var od in orderDetails)
+                {
                     if (od.ProductId.HasValue)
                     {
                         _loggerService.Info(
@@ -94,11 +100,33 @@ public class TransactionService : ITransactionService
                             Location = string.Empty,
                             Status = "Active"
                         };
-                        var result = await _inventoryItemService.CreateAsync(createDto);
+                        var result = await _inventoryItemService.CreateAsync(createDto, transaction.Payment.Order.UserId);
                         _loggerService.Success(
-                            $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++count} cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
+                            $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++productCount} cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
                     }
-                // Nếu muốn hỗ trợ BlindBox, bổ sung logic ở đây
+                    if (od.BlindBoxId.HasValue)
+                    {
+                        _loggerService.Info(
+                            $"[HandleSuccessfulPaymentAsync] Tạo customer inventory cho BlindBox {od.BlindBoxId.Value} trong order {orderId}.");
+                        // Tạo 1 bản ghi CustomerInventory cho mỗi BlindBox đã mua (theo quantity)
+                        for (int i = 0; i < od.Quantity; i++)
+                        {
+                            var createBlindBoxDto = new CreateCustomerInventoryDto
+                            {
+                                BlindBoxId = od.BlindBoxId.Value,
+                                OrderDetailId = od.Id,
+                                IsOpened = false
+                            };
+                            var result = await _customerInventoryService.CreateAsync(
+                                createBlindBoxDto,
+                                transaction.Payment.Order.UserId
+                            );
+                            _loggerService.Success(
+                                $"[HandleSuccessfulPaymentAsync] Đã tạo customer inventory thứ {++blindBoxCount} cho BlindBox {od.BlindBoxId.Value} trong order {orderId}.");
+                        }
+                    }
+                }
+
             }
 
             await _unitOfWork.Transactions.Update(transaction);
