@@ -10,13 +10,13 @@ namespace BlindTreasure.Application.Services;
 
 public class NotificationService : INotificationService
 {
-    
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
     private readonly ICurrentTime _currentTime;
     private readonly IHubContext<NotificationHub> _hubContext;
-    
-    public NotificationService(ICacheService cacheService, IUnitOfWork unitOfWork, ICurrentTime currentTime, IHubContext<NotificationHub> hubContext)
+
+    public NotificationService(ICacheService cacheService, IUnitOfWork unitOfWork, ICurrentTime currentTime,
+        IHubContext<NotificationHub> hubContext)
     {
         _cacheService = cacheService;
         _unitOfWork = unitOfWork;
@@ -28,7 +28,7 @@ public class NotificationService : INotificationService
     {
         var now = _currentTime.GetCurrentTime();
 
-        var notification = new Notification()
+        var notification = new Notification
         {
             Id = Guid.NewGuid(),
             UserId = userId,
