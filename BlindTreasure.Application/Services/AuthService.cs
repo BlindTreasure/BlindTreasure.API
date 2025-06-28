@@ -151,7 +151,7 @@ public class AuthService : IAuthService
         await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
 
 
-        await _notificationService.SendWelcomeNotificationAsync(user.Id);
+        await _notificationService.SendWelcomeNotificationAsync(user.Email);
 
         _logger.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
 
