@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Domain.DTOs.PaymentDTOs;
+using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Domain.DTOs.OrderDTOs;
 
@@ -12,4 +13,8 @@ public class OrderDto
     public OrderAddressDto? ShippingAddress { get; set; }
     public List<OrderDetailDto> Details { get; set; }
     public PaymentDto? Payment { get; set; } // Thêm dòng này
+    public decimal FinalAmount { get; set; }
+    public Guid? PromotionId { get; set; }
+    public decimal? DiscountAmount { get; set; }
+    public string? PromotionNote { get; set; }
 }

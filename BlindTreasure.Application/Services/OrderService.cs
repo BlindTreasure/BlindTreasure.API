@@ -155,6 +155,7 @@ public class OrderService : IOrderService
 
         var orders = await _unitOfWork.Orders.GetQueryable().AsNoTracking()
             .Where(o => o.UserId == userId && !o.IsDeleted)
+            .Include(o => o.Promotion)
             .Include(o => o.OrderDetails)
             .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
@@ -306,9 +307,12 @@ public class OrderService : IOrderService
 
         // 3. Áp dụng promotion nếu có
         decimal discountAmount = 0;
+        string? promotionNote = null;
+        Promotion? promotion = null;
+
         if (promotionId.HasValue)
         {
-            var promotion = await _unitOfWork.Promotions.GetByIdAsync(promotionId.Value);
+            promotion = await _unitOfWork.Promotions.GetByIdAsync(promotionId.Value);
             if (promotion == null)
                 throw ErrorHelper.BadRequest("Voucher không tồn tại.");
 
@@ -325,6 +329,8 @@ public class OrderService : IOrderService
                 discountAmount = promotion.DiscountValue;
 
             discountAmount = Math.Min(discountAmount, totalPrice);
+            promotionNote = $"Áp dụng voucher {promotion.Code}, giảm {discountAmount:N0}đ";
+
         }
 
         // 5. Tạo order
@@ -333,9 +339,14 @@ public class OrderService : IOrderService
             UserId = userId,
             Status = OrderStatus.PENDING.ToString(),
             TotalAmount = totalPrice,
+            FinalAmount = totalPrice - discountAmount,
             PlacedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
             ShippingAddressId = shippingAddressId,
+            PromotionId = promotionId,
+            Promotion = promotion,
+            DiscountAmount = discountAmount > 0 ? discountAmount : null,
+            PromotionNote = promotionNote,
             OrderDetails = new List<OrderDetail>()
         };
 

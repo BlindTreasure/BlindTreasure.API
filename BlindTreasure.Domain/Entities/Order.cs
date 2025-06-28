@@ -16,8 +16,16 @@ public class Order : BaseEntity
 
     public string Status { get; set; }
     public decimal TotalAmount { get; set; }
+    public decimal? FinalAmount { get; set; } = 0;
     public DateTime PlacedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+
+    //promotion
+
+    public Guid? PromotionId { get; set; }
+    public Promotion Promotion { get; set; } = null!; // Should i add this navigation property? or optional not to beed needed
+    public decimal? DiscountAmount { get; set; } = 0;
+    public string? PromotionNote { get; set; }
 
     // 1-n → OrderDetails
     public ICollection<OrderDetail> OrderDetails { get; set; }
