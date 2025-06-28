@@ -24,7 +24,6 @@ public static class InventoryItemMapper
             Status = item.Status,
             CreatedAt = item.CreatedAt,
             Product = item.Product != null ? ProductDtoMapper.ToProducDetailDto(item.Product) : null
-
         };
     }
 }

@@ -21,6 +21,7 @@ public class AuthServiceTests
     private readonly Mock<IConfiguration> _configMock;
     private readonly Mock<IEmailService> _emailServiceMock;
     private readonly Mock<ILoggerService> _loggerServiceMock;
+    private readonly Mock<INotificationService> _notiService;
     private readonly Mock<IGenericRepository<OtpVerification>> _otpVerificationRepoMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
 
@@ -30,6 +31,7 @@ public class AuthServiceTests
         _emailServiceMock = new Mock<IEmailService>();
         _cacheServiceMock = new Mock<ICacheService>();
         _loggerServiceMock = new Mock<ILoggerService>();
+        _notiService = new Mock<INotificationService>();
         _configMock = new Mock<IConfiguration>();
         _otpVerificationRepoMock = new Mock<IGenericRepository<OtpVerification>>();
 
@@ -52,7 +54,8 @@ public class AuthServiceTests
             _loggerServiceMock.Object,
             _unitOfWorkMock.Object,
             _cacheServiceMock.Object,
-            _emailServiceMock.Object
+            _emailServiceMock.Object,
+            _notiService.Object
         );
     }
 

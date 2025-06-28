@@ -3,6 +3,7 @@ using System;
 using BlindTreasure.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    partial class BlindTreasureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250627034818_noti2")]
+    partial class noti2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -693,12 +696,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("DiscountAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("FinalAmount")
-                        .HasColumnType("numeric");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -707,12 +704,6 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<DateTime>("PlacedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("PromotionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PromotionNote")
-                        .HasColumnType("text");
 
                     b.Property<Guid?>("ShippingAddressId")
                         .HasColumnType("uuid");
@@ -737,8 +728,6 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.HasIndex("PaymentId")
                         .IsUnique();
-
-                    b.HasIndex("PromotionId");
 
                     b.HasIndex("ShippingAddressId");
 
@@ -1861,10 +1850,6 @@ namespace BlindTreasure.Domain.Migrations
                         .HasForeignKey("BlindTreasure.Domain.Entities.Order", "PaymentId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("BlindTreasure.Domain.Entities.Promotion", "Promotion")
-                        .WithMany()
-                        .HasForeignKey("PromotionId");
-
                     b.HasOne("BlindTreasure.Domain.Entities.Address", "ShippingAddress")
                         .WithMany("Orders")
                         .HasForeignKey("ShippingAddressId")
@@ -1877,8 +1862,6 @@ namespace BlindTreasure.Domain.Migrations
                         .IsRequired();
 
                     b.Navigation("Payment");
-
-                    b.Navigation("Promotion");
 
                     b.Navigation("ShippingAddress");
 

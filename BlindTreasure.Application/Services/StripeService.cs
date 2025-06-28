@@ -134,6 +134,7 @@ public class StripeService : IStripeService
                                       $"Price: {unitPrice} VND\n" +
                                       $"Time: {item.CreatedAt}\n" +
                                       (!string.IsNullOrEmpty(promotionDesc) ? promotionDesc : "")
+
                     },
                     UnitAmount = (long)unitPrice // Stripe expects amount in cents
                 },
@@ -143,7 +144,6 @@ public class StripeService : IStripeService
 
         var options = new SessionCreateOptions
         {
-            Metadata = new Dictionary<string, string>
         {
             { "orderId", orderId.ToString() },
             { "userId", userId.ToString() },
@@ -154,6 +154,7 @@ public class StripeService : IStripeService
             { "totalAmount", order.TotalAmount.ToString() },
             { "finalAmount", order.FinalAmount.ToString() }
         },
+            },
 
             CustomerEmail = user.Email,
             PaymentMethodTypes = new List<string> { "card" },
@@ -166,7 +167,6 @@ public class StripeService : IStripeService
             ExpiresAt = DateTime.UtcNow.AddMinutes(30),
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
-                Metadata = new Dictionary<string, string>
             {
                 { "orderId", orderId.ToString() },
                 { "userId", userId.ToString() },
@@ -181,6 +181,7 @@ public class StripeService : IStripeService
                 { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
                 { "promotionCode", order.Promotion?.Code ?? "" }
             }
+                }
             }
         };
 

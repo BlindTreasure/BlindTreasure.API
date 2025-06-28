@@ -24,7 +24,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<BlindBoxItem> BlindBoxItems { get; set; }
     public DbSet<ProbabilityConfig> ProbabilityConfigs { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
-    
+
     public DbSet<CustomerInventory> CustomerInventories { get; set; }
 
     public DbSet<OtpVerification> OtpVerifications { get; set; }
@@ -138,6 +138,27 @@ public class BlindTreasureDbContext : DbContext
                 v => v.Split(";", StringSplitOptions.RemoveEmptyEntries).ToList()
             ).IsRequired(false);
 
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.Property(n => n.Type)
+                .HasConversion<string>() // Lưu dưới dạng chuỗi trong DB
+                .HasMaxLength(32)
+                .IsRequired();
+
+            entity.Property(n => n.Type)
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(n => n.Title)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(n => n.Message)
+                .HasMaxLength(500)
+                .IsRequired();
+        });
+
+
         modelBuilder.Entity<CustomerInventory>(entity =>
         {
             // Khóa ngoại: User (1-n)
@@ -169,7 +190,7 @@ public class BlindTreasureDbContext : DbContext
                 .HasColumnType("timestamp without time zone");
         });
 
-        
+
         modelBuilder.Entity<BlindBoxItem>()
             .Property(p => p.Rarity)
             .HasConversion<string>()
@@ -197,7 +218,7 @@ public class BlindTreasureDbContext : DbContext
             entity.Property(b => b.RejectReason)
                 .HasMaxLength(1000);
         });
-        
+
         modelBuilder.Entity<InventoryItem>(entity =>
         {
             entity.Property(ii => ii.Location)
