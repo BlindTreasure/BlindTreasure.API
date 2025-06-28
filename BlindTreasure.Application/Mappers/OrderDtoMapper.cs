@@ -9,23 +9,33 @@ public static class OrderDtoMapper
 {
     public static OrderDto ToOrderDto(Order order)
     {
-        return new OrderDto
+        try
         {
-            Id = order.Id,
-            Status = order.Status,
-            TotalAmount = order.TotalAmount,
-            FinalAmount = order.TotalAmount - (order.DiscountAmount ?? 0),          
-            PlacedAt = order.PlacedAt,
-            CompletedAt = order.CompletedAt,
-            ShippingAddress = order.ShippingAddress != null
+            return new OrderDto
+            {
+                Id = order.Id,
+                Status = order.Status,
+                TotalAmount = order.TotalAmount,
+                FinalAmount = order.TotalAmount - (order.DiscountAmount ?? 0),
+                PlacedAt = order.PlacedAt,
+                CompletedAt = order.CompletedAt,
+                ShippingAddress = order.ShippingAddress != null
                 ? ToOrderAddressDto(order.ShippingAddress)
                 : null,
-            Details = order.OrderDetails?.Select(ToOrderDetailDto).ToList() ?? new List<OrderDetailDto>(),
-            Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
-            PromotionId = order.PromotionId,
-            DiscountAmount = order.DiscountAmount,
-            PromotionNote = order.PromotionNote != null ? order.PromotionNote : order.Promotion.Description
-        };
+                Details = order.OrderDetails?.Select(ToOrderDetailDto).ToList() ?? new List<OrderDetailDto>(),
+                Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
+                PromotionId = order.PromotionId,
+                DiscountAmount = order.DiscountAmount,
+                PromotionNote = order.PromotionNote
+                 ?? order.Promotion?.Description
+                ?? string.Empty,
+            };
+        }
+        catch (Exception ex)
+        {
+
+            throw new Exception(ex.Message);
+        }
     }
 
     public static OrderDetailDto ToOrderDetailDto(OrderDetail od)
@@ -55,8 +65,7 @@ public static class OrderDtoMapper
             Id = address.Id,
             FullName = address.FullName,
             Phone = address.Phone,
-            AddressLine1 = address.AddressLine1,
-            AddressLine2 = address.AddressLine2,
+            AddressLine = address.AddressLine,
             City = address.City,
             Province = address.Province,
             PostalCode = address.PostalCode,

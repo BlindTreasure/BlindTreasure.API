@@ -8,7 +8,7 @@ public class CreateAddressDto
 
     [DefaultValue("0123456789")] public string Phone { get; set; }
 
-    [DefaultValue("123 Le Loi")] public string AddressLine1 { get; set; }
+    [DefaultValue("123 Le Loi")] public string AddressLine { get; set; }
 
     [DefaultValue("HCM City")] public string City { get; set; }
 
