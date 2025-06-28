@@ -2,5 +2,5 @@
 
 public interface INotificationService
 {
-    Task SendWelcomeNotificationAsync(Guid userId);
+    Task SendWelcomeNotificationAsync(string userEmail);
 }
