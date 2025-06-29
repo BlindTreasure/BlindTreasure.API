@@ -55,6 +55,7 @@ public class StripeController : ControllerBase
         _localStripeSecret = _configuration["STRIPE:LocalWebhookSecret"] ?? "";
         _deployStripeSecret = _configuration["STRIPE:DeployWebhookSecret"] ?? "";
     }
+    [Authorize]
 
     /// <summary>
     ///     Tạo đơn hàng và trả về link thanh toán Stripe cho đơn hàng từ cart truyền lên từ client.
@@ -82,6 +83,7 @@ public class StripeController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+    [Authorize]
 
     /// <summary>
     ///     Tạo đơn hàng từ giỏ hàng hiện tại và trả về link thanh toán Stripe.
