@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
@@ -23,6 +24,7 @@ public class OrderController : ControllerBase
         _transactionService = transactionService ?? throw new ArgumentNullException(nameof(transactionService));
     }
 
+    [Authorize]
     /// <summary>
     ///     Đặt hàng (checkout) từ cart truyền lên từ client, trả về link thanh toán Stripe.
     /// </summary>
@@ -46,6 +48,7 @@ public class OrderController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+    [Authorize]
 
     /// <summary>
     ///     Đặt hàng (checkout) từ giỏ hàng hiện tại, trả về link thanh toán Stripe.
