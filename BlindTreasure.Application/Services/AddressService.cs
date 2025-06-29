@@ -73,7 +73,7 @@ public class AddressService : IAddressService
             UserId = userId,
             FullName = dto.FullName,
             Phone = dto.Phone,
-            AddressLine1 = dto.AddressLine1,
+            AddressLine = dto.AddressLine,
             //AddressLine2 = dto.AddressLine2,
             City = dto.City,
             Province = dto.Province,
@@ -122,8 +122,8 @@ public class AddressService : IAddressService
             address.FullName = dto.FullName;
         if (!string.IsNullOrWhiteSpace(dto.Phone))
             address.Phone = dto.Phone;
-        if (!string.IsNullOrWhiteSpace(dto.AddressLine1))
-            address.AddressLine1 = dto.AddressLine1;
+        if (!string.IsNullOrWhiteSpace(dto.AddressLine))
+            address.AddressLine = dto.AddressLine;
 
         if (!string.IsNullOrWhiteSpace(dto.City))
             address.City = dto.City;
@@ -204,8 +204,7 @@ public class AddressService : IAddressService
             UserId = address.UserId,
             FullName = address.FullName,
             Phone = address.Phone,
-            AddressLine1 = address.AddressLine1,
-            AddressLine2 = address.AddressLine2,
+            AddressLine = address.AddressLine,
             City = address.City,
             Province = address.Province,
             PostalCode = address.PostalCode,

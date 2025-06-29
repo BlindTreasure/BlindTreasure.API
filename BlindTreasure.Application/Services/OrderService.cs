@@ -258,6 +258,12 @@ public class OrderService : IOrderService
         Guid? promotionId = null)
     {
         var userId = _claimsService.CurrentUserId;
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null || user.IsDeleted)
+        {
+            _loggerService.Warn(ErrorMessages.AccountNotFound);
+            throw ErrorHelper.Forbidden(ErrorMessages.AccountNotFound);
+        }
         var itemList = items.ToList();
         if (!itemList.Any())
         {

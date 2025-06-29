@@ -20,4 +20,7 @@ public class Promotion : BaseEntity
 
     public Guid? SellerId { get; set; } // null = Global
     public Seller? Seller { get; set; }
+    //navigation property to Order
+    public ICollection<Order> Orders { get; set; }
+
 }
