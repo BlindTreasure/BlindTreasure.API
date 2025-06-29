@@ -78,27 +78,7 @@ public class StripeService : IStripeService
         }
 
         // Lấy thông tin promotion từ order nếu có
-        string promotionDesc = "";
-        if (order.Promotion != null)
-        {
-            promotionDesc =
-                $"[Voucher: {order.Promotion.Code} - {order.Promotion.Description}]\n" +
-                $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
-                $"Giảm giá: {order.DiscountAmount?.ToString("N0") ?? "0"}đ\n" +
-                $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
-        }
-        else if (!string.IsNullOrEmpty(order.PromotionNote))
-        {
-            promotionDesc = order.PromotionNote +
-                $"\nTổng tiền gốc: {order.TotalAmount:N0}đ" +
-                $"\nKhách cần thanh toán: {order.FinalAmount:N0}đ";
-        }
-        else
-        {
-            promotionDesc =
-                $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
-                $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
-        }
+        string promotionDesc = GetPromotionDescription(order);
 
         // Chuẩn bị line items cho Stripe
         var lineItems = new List<SessionLineItemOptions>();
@@ -188,6 +168,43 @@ public class StripeService : IStripeService
         var session = await service.CreateAsync(options);
 
         // Tạo Payment và Transaction như cũ
+        await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew);
+
+
+        await _unitOfWork.SaveChangesAsync();
+
+        return session.Url;
+    }
+
+    private string GetPromotionDescription(Order order)
+    {
+        if (order.Promotion != null)
+        {
+             return 
+                $"[Voucher: {order.Promotion.Code} - {order.Promotion.Description}]\n" +
+                $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
+                $"Giảm giá: {order.DiscountAmount?.ToString("N0") ?? "0"}đ\n" +
+                $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
+        }
+        else if (!string.IsNullOrEmpty(order.PromotionNote))
+        {
+            return order.PromotionNote +
+                $"\nTổng tiền gốc: {order.TotalAmount:N0}đ" +
+                $"\nKhách cần thanh toán: {order.FinalAmount:N0}đ";
+        }
+        else
+        {
+            return
+                $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
+                $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
+        }
+    }
+
+    private async Task UpsertPaymentAndTransactionForOrder(Order order, string sessionId, Guid userId, bool isRenew)
+    {
+        var transactionType = isRenew ? "Renew" : "Checkout";
+        var now = DateTime.UtcNow;
+
         if (order.Payment == null)
         {
             var payment = new Payment
@@ -199,9 +216,9 @@ public class StripeService : IStripeService
                 Method = "Stripe",
                 Status = "Pending",
                 TransactionId = "",
-                PaidAt = DateTime.UtcNow,
+                PaidAt = now,
                 RefundedAmount = 0,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = now,
                 CreatedBy = userId,
                 Transactions = new List<Transaction>()
             };
@@ -209,13 +226,13 @@ public class StripeService : IStripeService
             var transaction = new Transaction
             {
                 Payment = payment,
-                Type = isRenew ? "Renew" : "Checkout",
+                Type = transactionType,
                 Amount = order.TotalAmount,
                 Currency = "vnd",
                 Status = "Pending",
-                OccurredAt = DateTime.UtcNow,
-                ExternalRef = session.Id,
-                CreatedAt = DateTime.UtcNow,
+                OccurredAt = now,
+                ExternalRef = sessionId,
+                CreatedAt = now,
                 CreatedBy = userId
             };
 
@@ -228,23 +245,19 @@ public class StripeService : IStripeService
             var transaction = new Transaction
             {
                 Payment = order.Payment,
-                Type = isRenew ? "Renew" : "Checkout",
+                Type = transactionType,
                 Amount = order.TotalAmount,
                 Currency = "vnd",
                 Status = "Pending",
-                OccurredAt = DateTime.UtcNow,
-                ExternalRef = session.Id,
-                CreatedAt = DateTime.UtcNow,
+                OccurredAt = now,
+                ExternalRef = sessionId,
+                CreatedAt = now,
                 CreatedBy = userId
             };
             order.Payment.Transactions ??= new List<Transaction>();
             order.Payment.Transactions.Add(transaction);
             await _unitOfWork.Payments.Update(order.Payment);
         }
-
-        await _unitOfWork.SaveChangesAsync();
-
-        return session.Url;
     }
 
     // 1. Chuyển tiền payout cho seller (Stripe Connect)
@@ -273,7 +286,7 @@ public class StripeService : IStripeService
 
             var transaction = new Transaction
             {
-                Type = "Payout",
+                Type = TransactionType.Payout.ToString(),
                 Amount = amount,
                 Currency = currency,
                 ExternalRef = transfer.Id,
@@ -310,7 +323,7 @@ public class StripeService : IStripeService
             // TODO: Lưu transaction refund vào DB nếu cần
             var transaction = new Transaction
             {
-                Type = "Refund",
+                Type = TransactionType.Refund.ToString(),
                 Amount = amount,
                 Currency = refund.Currency,
                 ExternalRef = refund.Id,

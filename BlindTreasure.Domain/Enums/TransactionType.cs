@@ -2,9 +2,9 @@
 
 public enum TransactionType
 {
-    PAYOUT,
-    REFUND,
-    RENEW,
-    CHECKOUT,
-    TRANSFER
+    Payout,
+    Refund,
+    Renew,
+    Checkout,
+    Transfer
 }
