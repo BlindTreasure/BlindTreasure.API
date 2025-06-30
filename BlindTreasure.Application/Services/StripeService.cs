@@ -13,11 +13,11 @@ namespace BlindTreasure.Application.Services;
 public class StripeService : IStripeService
 {
     private readonly IClaimsService _claimsService;
-    private readonly IStripeClient _stripeClient;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IConfiguration _configuration;
-    private readonly string _successRedirectUrl;
     private readonly string _failRedirectUrl;
+    private readonly IStripeClient _stripeClient;
+    private readonly string _successRedirectUrl;
+    private readonly IUnitOfWork _unitOfWork;
 
     public StripeService(IUnitOfWork unitOfWork, IStripeClient stripeClient,
         IClaimsService claimsService, IConfiguration configuration)
@@ -177,84 +177,6 @@ public class StripeService : IStripeService
         return session.Url;
     }
 
-    private string GetPromotionDescription(Order order)
-    {
-        if (order.Promotion != null)
-            return
-                $"[Voucher: {order.Promotion.Code} - {order.Promotion.Description}]\n" +
-                $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
-                $"Giảm giá: {order.DiscountAmount?.ToString("N0") ?? "0"}đ\n" +
-                $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
-        else if (!string.IsNullOrEmpty(order.PromotionNote))
-            return order.PromotionNote +
-                   $"\nTổng tiền gốc: {order.TotalAmount:N0}đ" +
-                   $"\nKhách cần thanh toán: {order.FinalAmount:N0}đ";
-        else
-            return
-                $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
-                $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
-    }
-
-    private async Task UpsertPaymentAndTransactionForOrder(Order order, string sessionId, Guid userId, bool isRenew)
-    {
-        var transactionType = isRenew ? "Renew" : "Checkout";
-        var now = DateTime.UtcNow;
-
-        if (order.Payment == null)
-        {
-            var payment = new Payment
-            {
-                Order = order,
-                Amount = order.TotalAmount,
-                DiscountRate = 0,
-                NetAmount = order.TotalAmount,
-                Method = "Stripe",
-                Status = "Pending",
-                TransactionId = "",
-                PaidAt = now,
-                RefundedAmount = 0,
-                CreatedAt = now,
-                CreatedBy = userId,
-                Transactions = new List<Transaction>()
-            };
-
-            var transaction = new Transaction
-            {
-                Payment = payment,
-                Type = transactionType,
-                Amount = order.TotalAmount,
-                Currency = "vnd",
-                Status = "Pending",
-                OccurredAt = now,
-                ExternalRef = sessionId,
-                CreatedAt = now,
-                CreatedBy = userId
-            };
-
-            payment.Transactions.Add(transaction);
-            order.Payment = payment;
-            await _unitOfWork.Orders.Update(order);
-        }
-        else
-        {
-            var transaction = new Transaction
-            {
-                Payment = order.Payment,
-                Type = transactionType,
-                Amount = order.TotalAmount,
-                Currency = "vnd",
-                Status = "Pending",
-                OccurredAt = now,
-                ExternalRef = sessionId,
-                CreatedAt = now,
-                CreatedBy = userId
-            };
-            order.Payment.Transactions ??= new List<Transaction>();
-            order.Payment.Transactions.Add(transaction);
-            await _unitOfWork.Payments.Update(order.Payment);
-        }
-    }
-
     // 1. Chuyển tiền payout cho seller (Stripe Connect)
     public async Task<Transfer> PayoutToSellerAsync(string sellerStripeAccountId, decimal amount,
         string currency = "usd", string description = "Payout to seller")
@@ -404,5 +326,82 @@ public class StripeService : IStripeService
         var reversalService = new TransferReversalService(_stripeClient);
         var options = new TransferReversalCreateOptions();
         return await reversalService.CreateAsync(transferId, options);
+    }
+
+    private string GetPromotionDescription(Order order)
+    {
+        if (order.Promotion != null)
+            return
+                $"[Voucher: {order.Promotion.Code} - {order.Promotion.Description}]\n" +
+                $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
+                $"Giảm giá: {order.DiscountAmount?.ToString("N0") ?? "0"}đ\n" +
+                $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
+        if (!string.IsNullOrEmpty(order.PromotionNote))
+            return order.PromotionNote +
+                   $"\nTổng tiền gốc: {order.TotalAmount:N0}đ" +
+                   $"\nKhách cần thanh toán: {order.FinalAmount:N0}đ";
+        return
+            $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
+            $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
+    }
+
+    private async Task UpsertPaymentAndTransactionForOrder(Order order, string sessionId, Guid userId, bool isRenew)
+    {
+        var transactionType = isRenew ? "Renew" : "Checkout";
+        var now = DateTime.UtcNow;
+
+        if (order.Payment == null)
+        {
+            var payment = new Payment
+            {
+                Order = order,
+                Amount = order.TotalAmount,
+                DiscountRate = 0,
+                NetAmount = order.TotalAmount,
+                Method = "Stripe",
+                Status = "Pending",
+                TransactionId = "",
+                PaidAt = now,
+                RefundedAmount = 0,
+                CreatedAt = now,
+                CreatedBy = userId,
+                Transactions = new List<Transaction>()
+            };
+
+            var transaction = new Transaction
+            {
+                Payment = payment,
+                Type = transactionType,
+                Amount = order.TotalAmount,
+                Currency = "vnd",
+                Status = "Pending",
+                OccurredAt = now,
+                ExternalRef = sessionId,
+                CreatedAt = now,
+                CreatedBy = userId
+            };
+
+            payment.Transactions.Add(transaction);
+            order.Payment = payment;
+            await _unitOfWork.Orders.Update(order);
+        }
+        else
+        {
+            var transaction = new Transaction
+            {
+                Payment = order.Payment,
+                Type = transactionType,
+                Amount = order.TotalAmount,
+                Currency = "vnd",
+                Status = "Pending",
+                OccurredAt = now,
+                ExternalRef = sessionId,
+                CreatedAt = now,
+                CreatedBy = userId
+            };
+            order.Payment.Transactions ??= new List<Transaction>();
+            order.Payment.Transactions.Add(transaction);
+            await _unitOfWork.Payments.Update(order.Payment);
+        }
     }
 }

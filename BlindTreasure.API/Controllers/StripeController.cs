@@ -21,6 +21,9 @@ namespace BlindTreasure.API.Controllers;
 public class StripeController : ControllerBase
 {
     private readonly IClaimsService _claimService;
+    private readonly IConfiguration _configuration;
+    private readonly string _deployStripeSecret;
+    private readonly string _localStripeSecret;
     private readonly ILoggerService _logger;
     private readonly IOrderService _orderService;
     private readonly ISellerService _sellerService;
@@ -28,9 +31,6 @@ public class StripeController : ControllerBase
     private readonly IStripeService _stripeService;
     private readonly ITransactionService _transactionService;
     private readonly IUserService _userService;
-    private readonly IConfiguration _configuration;
-    private readonly string _localStripeSecret;
-    private readonly string _deployStripeSecret;
 
     public StripeController(
         ISellerService sellerService,

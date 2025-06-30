@@ -19,8 +19,8 @@ public class AuthService : IAuthService
     private readonly ICacheService _cacheService;
     private readonly IEmailService _emailService;
     private readonly ILoggerService _logger;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly IUnitOfWork _unitOfWork;
 
 
     public AuthService(

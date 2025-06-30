@@ -16,7 +16,8 @@ public class UnboxService : IUnboxService
     private readonly ILoggerService _loggerService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public UnboxService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService, ICurrentTime currentTime)
+    public UnboxService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
+        ICurrentTime currentTime)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;

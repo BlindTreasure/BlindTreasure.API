@@ -1,5 +1,4 @@
 ﻿using BlindTreasure.Domain.DTOs.PaymentDTOs;
-using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Domain.DTOs.OrderDTOs;
 

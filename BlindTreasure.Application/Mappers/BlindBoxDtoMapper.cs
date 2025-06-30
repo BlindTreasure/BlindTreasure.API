@@ -37,7 +37,7 @@ public static class BlindBoxDtoMapper
     }
 
     /// <summary>
-    /// Chuyển đổi BlindBoxItem entity sang BlindBoxItemDto.
+    ///     Chuyển đổi BlindBoxItem entity sang BlindBoxItemDto.
     /// </summary>
     public static BlindBoxItemDto ToBlindBoxItemDto(BlindBoxItem item)
     {

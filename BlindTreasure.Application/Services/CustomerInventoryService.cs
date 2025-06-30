@@ -5,26 +5,21 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Services;
 
 /// <summary>
-/// Service quản lý kho BlindBox đã mua của user (CustomerInventory).
-/// Lưu trữ các BlindBox đã thanh toán, hỗ trợ lấy danh sách, chi tiết, cập nhật trạng thái mở box, xóa mềm.
+///     Service quản lý kho BlindBox đã mua của user (CustomerInventory).
+///     Lưu trữ các BlindBox đã thanh toán, hỗ trợ lấy danh sách, chi tiết, cập nhật trạng thái mở box, xóa mềm.
 /// </summary>
 public class CustomerInventoryService : ICustomerInventoryService
 {
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _loggerService;
+    private readonly IOrderService _orderService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IOrderService _orderService;
 
     public CustomerInventoryService(
         ICacheService cacheService,
@@ -43,7 +38,7 @@ public class CustomerInventoryService : ICustomerInventoryService
     }
 
     /// <summary>
-    /// Thêm 1 BlindBox vào kho của user (sau khi thanh toán thành công).
+    ///     Thêm 1 BlindBox vào kho của user (sau khi thanh toán thành công).
     /// </summary>
     public async Task<CustomerInventoryDto> CreateAsync(CreateCustomerInventoryDto dto, Guid? userId = null)
     {
@@ -74,7 +69,7 @@ public class CustomerInventoryService : ICustomerInventoryService
     }
 
     /// <summary>
-    /// Lấy chi tiết 1 BlindBox trong kho user theo Id.
+    ///     Lấy chi tiết 1 BlindBox trong kho user theo Id.
     /// </summary>
     public async Task<CustomerInventoryDto?> GetByIdAsync(Guid id)
     {
@@ -96,7 +91,7 @@ public class CustomerInventoryService : ICustomerInventoryService
     }
 
     /// <summary>
-    /// Lấy toàn bộ BlindBox đã mua của user hiện tại.
+    ///     Lấy toàn bộ BlindBox đã mua của user hiện tại.
     /// </summary>
     public async Task<List<CustomerInventoryDto>> GetByUserIdAsync(Guid? userId = null)
     {
@@ -110,7 +105,7 @@ public class CustomerInventoryService : ICustomerInventoryService
     }
 
     /// <summary>
-    /// Đánh dấu BlindBox đã mở (IsOpened = true).
+    ///     Đánh dấu BlindBox đã mở (IsOpened = true).
     /// </summary>
     public async Task<CustomerInventoryDto> MarkAsOpenedAsync(Guid id)
     {
@@ -132,7 +127,7 @@ public class CustomerInventoryService : ICustomerInventoryService
     }
 
     /// <summary>
-    /// Xóa mềm 1 BlindBox khỏi kho user.
+    ///     Xóa mềm 1 BlindBox khỏi kho user.
     /// </summary>
     public async Task<bool> DeleteAsync(Guid id)
     {

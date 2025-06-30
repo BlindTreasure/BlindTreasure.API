@@ -2,7 +2,6 @@
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
@@ -450,7 +449,7 @@ public class BlindBoxService : IBlindBoxService
         {
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
-                throw ErrorHelper.BadRequest($"Không tìm thấy sản phẩm cho item trong BlindBox.");
+                throw ErrorHelper.BadRequest("Không tìm thấy sản phẩm cho item trong BlindBox.");
 
             if (item.Quantity > product.Stock)
                 throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho để submit BlindBox.");
@@ -798,7 +797,8 @@ public class BlindBoxService : IBlindBoxService
             Quantity = item.Quantity,
             ProductName = item.Product?.Name ?? string.Empty,
             ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
-            DropRate = item.ProbabilityConfigs?.OrderByDescending(p => p.ApprovedAt).FirstOrDefault()?.Probability ?? item.DropRate,
+            DropRate = item.ProbabilityConfigs?.OrderByDescending(p => p.ApprovedAt).FirstOrDefault()?.Probability ??
+                       item.DropRate,
             Rarity = item.Rarity
         }).ToList();
         return Task.FromResult(dto);

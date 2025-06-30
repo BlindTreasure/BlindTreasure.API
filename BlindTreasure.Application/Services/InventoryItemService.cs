@@ -5,11 +5,6 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Services;
 
@@ -18,9 +13,9 @@ public class InventoryItemService : IInventoryItemService
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _loggerService;
+    private readonly IOrderService _orderService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IOrderService _orderService;
 
 
     public InventoryItemService(

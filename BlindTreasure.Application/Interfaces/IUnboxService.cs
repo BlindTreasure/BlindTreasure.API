@@ -7,5 +7,4 @@ public interface IUnboxService
 {
     Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId);
     Task<List<ProbabilityConfig>> GetApprovedProbabilitiesAsync(Guid blindBoxId);
-
 }
