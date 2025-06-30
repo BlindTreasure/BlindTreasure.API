@@ -136,6 +136,7 @@ app.UseExceptionHandler(errorApp =>
 
 app.UseRouting();
 app.MapControllers();
+app.UseStaticFiles(); 
 
 app.MapHub<UserChatHub>("/hubs/user-chat");
 app.MapHub<SellerChatHub>("/hubs/seller-chat");
