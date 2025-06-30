@@ -1,6 +1,6 @@
 ﻿namespace BlindTreasure.Domain.Entities;
 
-public class CustomerInventory : BaseEntity
+public class CustomerBlindBox : BaseEntity
 {
     public Guid UserId { get; set; }
     public User? User { get; set; }

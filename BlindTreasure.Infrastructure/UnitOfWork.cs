@@ -22,7 +22,7 @@ public class UnitOfWork(
     IGenericRepository<Payment> payments,
     IGenericRepository<Address> addresses,
     IGenericRepository<InventoryItem> inventoryItems,
-    IGenericRepository<CustomerInventory> customerInventorys,
+    IGenericRepository<CustomerBlindBox> customerBlindboxes,
     IGenericRepository<Notification> notifications)
     : IUnitOfWork
 {
@@ -42,7 +42,7 @@ public class UnitOfWork(
     public IGenericRepository<Payment> Payments { get; } = payments;
     public IGenericRepository<Address> Addresses { get; } = addresses;
     public IGenericRepository<InventoryItem> InventoryItems { get; } = inventoryItems;
-    public IGenericRepository<CustomerInventory> CustomerInventories { get; } = customerInventorys;
+    public IGenericRepository<CustomerBlindBox> CustomerBlindBoxes { get; } = customerBlindboxes;
     public IGenericRepository<Notification> Notifications { get; } = notifications;
 
     public void Dispose()

@@ -55,7 +55,7 @@ public class CustomerInventoryService : ICustomerInventoryService
         if (blindBox == null || blindBox.IsDeleted)
             throw ErrorHelper.NotFound("BlindBox not found.");
 
-        var entity = new CustomerInventory
+        var entity = new CustomerBlindBox
         {
             UserId = uid,
             BlindBoxId = dto.BlindBoxId,
@@ -65,7 +65,7 @@ public class CustomerInventoryService : ICustomerInventoryService
             CreatedBy = uid
         };
 
-        var result = await _unitOfWork.CustomerInventories.AddAsync(entity);
+        var result = await _unitOfWork.CustomerBlindBoxes.AddAsync(entity);
         await _unitOfWork.SaveChangesAsync();
 
         await _cacheService.RemoveAsync(GetCacheKey(entity.Id));
@@ -79,14 +79,14 @@ public class CustomerInventoryService : ICustomerInventoryService
     public async Task<CustomerInventoryDto?> GetByIdAsync(Guid id)
     {
         var cacheKey = GetCacheKey(id);
-        var cached = await _cacheService.GetAsync<CustomerInventory>(cacheKey);
+        var cached = await _cacheService.GetAsync<CustomerBlindBox>(cacheKey);
         if (cached != null && !cached.IsDeleted)
         {
             _loggerService.Info($"[GetByIdAsync] Cache hit for customer inventory {id}");
             return CustomerInventoryMapper.ToCustomerInventoryBlindBoxDto(cached);
         }
 
-        var entity = await _unitOfWork.CustomerInventories.GetByIdAsync(id, x => x.BlindBox, x => x.OrderDetail);
+        var entity = await _unitOfWork.CustomerBlindBoxes.GetByIdAsync(id, x => x.BlindBox, x => x.OrderDetail);
         if (entity == null || entity.IsDeleted)
             return null;
 
@@ -101,7 +101,7 @@ public class CustomerInventoryService : ICustomerInventoryService
     public async Task<List<CustomerInventoryDto>> GetByUserIdAsync(Guid? userId = null)
     {
         var uid = userId ?? _claimsService.CurrentUserId;
-        var items = await _unitOfWork.CustomerInventories.GetAllAsync(
+        var items = await _unitOfWork.CustomerBlindBoxes.GetAllAsync(
             i => i.UserId == uid && !i.IsDeleted,
             i => i.BlindBox,
             i => i.OrderDetail
@@ -114,7 +114,7 @@ public class CustomerInventoryService : ICustomerInventoryService
     /// </summary>
     public async Task<CustomerInventoryDto> MarkAsOpenedAsync(Guid id)
     {
-        var entity = await _unitOfWork.CustomerInventories.GetByIdAsync(id);
+        var entity = await _unitOfWork.CustomerBlindBoxes.GetByIdAsync(id);
         if (entity == null || entity.IsDeleted)
             throw ErrorHelper.NotFound("Customer inventory not found.");
 
@@ -123,7 +123,7 @@ public class CustomerInventoryService : ICustomerInventoryService
         entity.UpdatedAt = DateTime.UtcNow;
         entity.UpdatedBy = _claimsService.CurrentUserId;
 
-        await _unitOfWork.CustomerInventories.Update(entity);
+        await _unitOfWork.CustomerBlindBoxes.Update(entity);
         await _unitOfWork.SaveChangesAsync();
 
         await _cacheService.RemoveAsync(GetCacheKey(id));
@@ -136,7 +136,7 @@ public class CustomerInventoryService : ICustomerInventoryService
     /// </summary>
     public async Task<bool> DeleteAsync(Guid id)
     {
-        var entity = await _unitOfWork.CustomerInventories.GetByIdAsync(id);
+        var entity = await _unitOfWork.CustomerBlindBoxes.GetByIdAsync(id);
         if (entity == null || entity.IsDeleted)
             throw ErrorHelper.NotFound("Customer inventory not found.");
 
@@ -144,7 +144,7 @@ public class CustomerInventoryService : ICustomerInventoryService
         entity.DeletedAt = DateTime.UtcNow;
         entity.DeletedBy = _claimsService.CurrentUserId;
 
-        await _unitOfWork.CustomerInventories.Update(entity);
+        await _unitOfWork.CustomerBlindBoxes.Update(entity);
         await _unitOfWork.SaveChangesAsync();
 
         await _cacheService.RemoveAsync(GetCacheKey(id));

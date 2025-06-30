@@ -24,9 +24,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<BlindBoxItem> BlindBoxItems { get; set; }
     public DbSet<ProbabilityConfig> ProbabilityConfigs { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
-
-    public DbSet<CustomerInventory> CustomerInventories { get; set; }
-
+    public DbSet<CustomerBlindBox> CustomerBlindBoxes { get; set; }
     public DbSet<OtpVerification> OtpVerifications { get; set; }
     public DbSet<Listing> Listings { get; set; }
     public DbSet<CustomerDiscount> CustomerDiscounts { get; set; }
@@ -159,29 +157,25 @@ public class BlindTreasureDbContext : DbContext
         });
 
 
-        modelBuilder.Entity<CustomerInventory>(entity =>
+        modelBuilder.Entity<CustomerBlindBox>(entity =>
         {
             // Khóa ngoại: User (1-n)
             entity.HasOne(ci => ci.User)
-                .WithMany(u => u.CustomerInventories)
+                .WithMany(u => u.CustomerBlindBoxes)
                 .HasForeignKey(ci => ci.UserId)
                 .OnDelete(DeleteBehavior.Cascade); // hoặc Restrict tùy nhu cầu
 
             // Khóa ngoại: BlindBox (1-n)
             entity.HasOne(ci => ci.BlindBox)
-                .WithMany(b => b.CustomerInventories)
+                .WithMany(b => b.CustomerBlindBoxes)
                 .HasForeignKey(ci => ci.BlindBoxId)
                 .OnDelete(DeleteBehavior.Restrict); // tránh xóa hộp → mất lịch sử
 
             // Khóa ngoại: OrderDetail (1-n), optional
             entity.HasOne(ci => ci.OrderDetail)
-                .WithMany(od => od.CustomerInventories)
+                .WithMany(od => od.CustomerBlindBoxes)
                 .HasForeignKey(ci => ci.OrderDetailId)
                 .OnDelete(DeleteBehavior.SetNull); // mất đơn hàng vẫn giữ lịch sử hộp
-
-            // Định nghĩa bảng (nếu muốn đặt tên rõ ràng)
-            entity.ToTable("CustomerInventories");
-
             // Cấu hình các cột
             entity.Property(ci => ci.IsOpened)
                 .IsRequired();

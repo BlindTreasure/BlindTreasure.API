@@ -23,7 +23,10 @@ public class Order : BaseEntity
     //promotion
 
     public Guid? PromotionId { get; set; }
-    public Promotion Promotion { get; set; } = null!; // Should i add this navigation property? or optional not to beed needed
+
+    public Promotion Promotion { get; set; } =
+        null!; // Should i add this navigation property? or optional not to beed needed
+
     public decimal? DiscountAmount { get; set; } = 0;
     public string? PromotionNote { get; set; }
 
