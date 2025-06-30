@@ -38,7 +38,7 @@ public class User : BaseEntity
     public ICollection<CartItem> CartItems { get; set; }
     public ICollection<InventoryItem> InventoryItems { get; set; }
     public ICollection<CustomerDiscount> CustomerDiscounts { get; set; }
-    public ICollection<CustomerInventory>? CustomerInventories { get; set; }
+    public ICollection<CustomerBlindBox>? CustomerBlindBoxes { get; set; }
 
     public ICollection<Order> Orders { get; set; }
     public ICollection<Address> Addresses { get; set; }

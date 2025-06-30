@@ -20,20 +20,19 @@ public static class OrderDtoMapper
                 PlacedAt = order.PlacedAt,
                 CompletedAt = order.CompletedAt,
                 ShippingAddress = order.ShippingAddress != null
-                ? ToOrderAddressDto(order.ShippingAddress)
-                : null,
+                    ? ToOrderAddressDto(order.ShippingAddress)
+                    : null,
                 Details = order.OrderDetails?.Select(ToOrderDetailDto).ToList() ?? new List<OrderDetailDto>(),
                 Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
                 PromotionId = order.PromotionId,
                 DiscountAmount = order.DiscountAmount,
                 PromotionNote = order.PromotionNote
-                 ?? order.Promotion?.Description
-                ?? string.Empty,
+                                ?? order.Promotion?.Description
+                                ?? string.Empty
             };
         }
         catch (Exception ex)
         {
-
             throw new Exception(ex.Message);
         }
     }

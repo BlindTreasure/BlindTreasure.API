@@ -11,7 +11,7 @@ namespace BlindTreasure.Application.Mappers;
 
 public static class CustomerInventoryMapper
 {
-    public static CustomerInventoryDto ToCustomerInventoryBlindBoxDto(CustomerInventory item)
+    public static CustomerInventoryDto ToCustomerInventoryBlindBoxDto(CustomerBlindBox item)
     {
         return new CustomerInventoryDto
         {

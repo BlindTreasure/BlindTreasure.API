@@ -48,8 +48,8 @@ public class OrderController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    [Authorize]
 
+    [Authorize]
     /// <summary>
     ///     Đặt hàng (checkout) từ giỏ hàng hiện tại, trả về link thanh toán Stripe.
     /// </summary>

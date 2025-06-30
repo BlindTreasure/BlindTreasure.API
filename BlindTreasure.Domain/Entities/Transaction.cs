@@ -20,6 +20,4 @@ public class Transaction : BaseEntity
     public decimal? RefundAmount { get; set; }
     public string? StripeTransactionId { get; set; } // Discount rate (percentage) applied to the subscription
     //public string? StripeSessionId { get; set; } // Discount rate (percentage) applied to the subscription
-
-
 }

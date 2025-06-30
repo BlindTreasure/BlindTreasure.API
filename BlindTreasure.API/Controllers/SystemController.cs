@@ -97,7 +97,7 @@ public class SystemController : ControllerBase
                     () => context.OrderDetails.ExecuteDeleteAsync(),
                     () => context.Listings.ExecuteDeleteAsync(),
                     () => context.InventoryItems.ExecuteDeleteAsync(),
-                    () => context.CustomerInventories.ExecuteDeleteAsync(),
+                    () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
                     () => context.WishlistItems.ExecuteDeleteAsync(),
                     () => context.SupportTickets.ExecuteDeleteAsync(),
                     () => context.Reviews.ExecuteDeleteAsync(),

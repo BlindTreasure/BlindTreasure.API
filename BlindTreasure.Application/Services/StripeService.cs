@@ -57,9 +57,9 @@ public class StripeService : IStripeService
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
+            .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
+            .ThenInclude(od => od.BlindBox)
             .Include(o => o.Promotion)
             .FirstOrDefaultAsync();
 
@@ -78,7 +78,7 @@ public class StripeService : IStripeService
         }
 
         // Lấy thông tin promotion từ order nếu có
-        string promotionDesc = GetPromotionDescription(order);
+        var promotionDesc = GetPromotionDescription(order);
 
         // Chuẩn bị line items cho Stripe
         var lineItems = new List<SessionLineItemOptions>();
@@ -108,7 +108,8 @@ public class StripeService : IStripeService
                     Currency = "vnd",
                     ProductData = new SessionLineItemPriceDataProductDataOptions
                     {
-                        Name = $"Product/Blindbox Name: {name} , Order Detail id {item.Id} belongs to Order {order.Id} paid by {user.Email}",
+                        Name =
+                            $"Product/Blindbox Name: {name} , Order Detail id {item.Id} belongs to Order {order.Id} paid by {user.Email}",
                         Description = $"Product/BlindBox Name: {name}\n" +
                                       $"Quantity: {item.Quantity} / Total: {item.TotalPrice} \n" +
                                       $"Price: {unitPrice} VND\n" +
@@ -124,16 +125,16 @@ public class StripeService : IStripeService
         var options = new SessionCreateOptions
         {
             Metadata = new Dictionary<string, string>
-        {
-            { "orderId", orderId.ToString() },
-            { "userId", userId.ToString() },
-            { "isRenew", isRenew.ToString() },
-            { "promotion", promotionDesc },
-            { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
-            { "promotionCode", order.Promotion?.Code ?? "" },
-            { "totalAmount", order.TotalAmount.ToString() },
-            { "finalAmount", order.FinalAmount.ToString() }
-        },
+            {
+                { "orderId", orderId.ToString() },
+                { "userId", userId.ToString() },
+                { "isRenew", isRenew.ToString() },
+                { "promotion", promotionDesc },
+                { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
+                { "promotionCode", order.Promotion?.Code ?? "" },
+                { "totalAmount", order.TotalAmount.ToString() },
+                { "finalAmount", order.FinalAmount.ToString() }
+            },
 
             CustomerEmail = user.Email,
             PaymentMethodTypes = new List<string> { "card" },
@@ -147,20 +148,20 @@ public class StripeService : IStripeService
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
                 Metadata = new Dictionary<string, string>
-            {
-                { "orderId", orderId.ToString() },
-                { "userId", userId.ToString() },
-                { "createdAt", DateTime.UtcNow.ToString("o") },
-                { "email", user.Email },
-                { "orderStatus", order.Status },
-                { "itemCount", order.OrderDetails.Count.ToString() },
-                { "totalAmount", order.TotalAmount.ToString() },
-                { "currency", "vnd" },
-                { "isRenew", isRenew.ToString() },
-                { "promotion", promotionDesc },
-                { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
-                { "promotionCode", order.Promotion?.Code ?? "" }
-            }
+                {
+                    { "orderId", orderId.ToString() },
+                    { "userId", userId.ToString() },
+                    { "createdAt", DateTime.UtcNow.ToString("o") },
+                    { "email", user.Email },
+                    { "orderStatus", order.Status },
+                    { "itemCount", order.OrderDetails.Count.ToString() },
+                    { "totalAmount", order.TotalAmount.ToString() },
+                    { "currency", "vnd" },
+                    { "isRenew", isRenew.ToString() },
+                    { "promotion", promotionDesc },
+                    { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
+                    { "promotionCode", order.Promotion?.Code ?? "" }
+                }
             }
         };
 
@@ -179,25 +180,19 @@ public class StripeService : IStripeService
     private string GetPromotionDescription(Order order)
     {
         if (order.Promotion != null)
-        {
-             return 
+            return
                 $"[Voucher: {order.Promotion.Code} - {order.Promotion.Description}]\n" +
                 $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
                 $"Giảm giá: {order.DiscountAmount?.ToString("N0") ?? "0"}đ\n" +
                 $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
-        }
         else if (!string.IsNullOrEmpty(order.PromotionNote))
-        {
             return order.PromotionNote +
-                $"\nTổng tiền gốc: {order.TotalAmount:N0}đ" +
-                $"\nKhách cần thanh toán: {order.FinalAmount:N0}đ";
-        }
+                   $"\nTổng tiền gốc: {order.TotalAmount:N0}đ" +
+                   $"\nKhách cần thanh toán: {order.FinalAmount:N0}đ";
         else
-        {
             return
                 $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
                 $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
-        }
     }
 
     private async Task UpsertPaymentAndTransactionForOrder(Order order, string sessionId, Guid userId, bool isRenew)

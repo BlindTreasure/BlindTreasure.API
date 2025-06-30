@@ -264,6 +264,7 @@ public class OrderService : IOrderService
             _loggerService.Warn(ErrorMessages.AccountNotFound);
             throw ErrorHelper.Forbidden(ErrorMessages.AccountNotFound);
         }
+
         var itemList = items.ToList();
         if (!itemList.Any())
         {
@@ -336,7 +337,6 @@ public class OrderService : IOrderService
 
             discountAmount = Math.Min(discountAmount, totalPrice);
             promotionNote = $"Áp dụng voucher {promotion.Code}, giảm {discountAmount:N0}đ";
-
         }
 
         // 5. Tạo order

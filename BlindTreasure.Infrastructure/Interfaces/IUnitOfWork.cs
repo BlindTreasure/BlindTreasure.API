@@ -20,7 +20,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<Payment> Payments { get; }
     IGenericRepository<Address> Addresses { get; }
     IGenericRepository<InventoryItem> InventoryItems { get; }
-    IGenericRepository<CustomerInventory> CustomerInventories { get; }
+    IGenericRepository<CustomerBlindBox> CustomerBlindBoxes { get; }
     IGenericRepository<Notification> Notifications { get; }
 
     Task<int> SaveChangesAsync();
