@@ -17,4 +17,5 @@ public class BlindBoxItemDto
     [DefaultValue("Common")] public BlindBoxRarity Rarity { get; set; }
 
     [JsonIgnore] public string? ImageUrl { get; set; }
+    
 }

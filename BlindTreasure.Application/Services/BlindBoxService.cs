@@ -117,6 +117,7 @@ public class BlindBoxService : IBlindBoxService
             var itemsGrouped = await _unitOfWork.BlindBoxItems.GetQueryable()
                 .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
                 .Include(i => i.Product)
+                .Include(i => i.ProbabilityConfigs)
                 .ToListAsync();
 
             foreach (var box in items) box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
@@ -177,6 +178,7 @@ public class BlindBoxService : IBlindBoxService
         var items = await _unitOfWork.BlindBoxItems.GetQueryable()
             .Where(i => i.BlindBoxId == blindBoxId && !i.IsDeleted)
             .Include(i => i.Product)
+            .Include(i => i.ProbabilityConfigs)
             .ToListAsync();
 
         blindBox.BlindBoxItems = items;
@@ -796,7 +798,7 @@ public class BlindBoxService : IBlindBoxService
             Quantity = item.Quantity,
             ProductName = item.Product?.Name ?? string.Empty,
             ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
-            DropRate = item.DropRate,
+            DropRate = item.ProbabilityConfigs?.OrderByDescending(p => p.ApprovedAt).FirstOrDefault()?.Probability ?? item.DropRate,
             Rarity = item.Rarity
         }).ToList();
         return Task.FromResult(dto);
