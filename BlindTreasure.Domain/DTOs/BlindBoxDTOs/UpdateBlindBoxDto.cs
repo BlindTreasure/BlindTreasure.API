@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using Microsoft.AspNetCore.Http;
 
-namespace BlindTreasure.Domain.DTOs;
+namespace BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 
 public class UpdateBlindBoxDto
 {
