@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
+﻿namespace BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
 
 public class CreateCustomerInventoryDto
 {

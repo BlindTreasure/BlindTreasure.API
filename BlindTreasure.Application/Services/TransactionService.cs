@@ -14,12 +14,12 @@ public class TransactionService : ITransactionService
 {
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
+    private readonly ICustomerInventoryService _customerInventoryService;
+    private readonly IInventoryItemService _inventoryItemService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
     private readonly IOrderService _orderService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IInventoryItemService _inventoryItemService;
-    private readonly ICustomerInventoryService _customerInventoryService;
 
     public TransactionService(
         ICacheService cacheService,
@@ -42,7 +42,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Xử lý khi thanh toán Stripe thành công (webhook).
+    ///     Xử lý khi thanh toán Stripe thành công (webhook).
     /// </summary>
     public async Task HandleSuccessfulPaymentAsync(string sessionId, string orderId)
     {
@@ -150,7 +150,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Xử lý khi thanh toán Stripe thất bại hoặc session hết hạn.
+    ///     Xử lý khi thanh toán Stripe thất bại hoặc session hết hạn.
     /// </summary>
     public async Task HandleFailedPaymentAsync(string sessionId)
     {
@@ -190,7 +190,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Xác nhận khi PaymentIntent được tạo (Stripe webhook).
+    ///     Xác nhận khi PaymentIntent được tạo (Stripe webhook).
     /// </summary>
     public async Task HandlePaymentIntentCreatedAsync(string paymentIntentId, string sessionId)
     {
@@ -219,7 +219,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Lấy danh sách transaction của user hiện tại.
+    ///     Lấy danh sách transaction của user hiện tại.
     /// </summary>
     public async Task<List<Transaction>> GetMyTransactionsAsync()
     {
@@ -231,7 +231,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Lấy danh sách transaction theo orderId.
+    ///     Lấy danh sách transaction theo orderId.
     /// </summary>
     public async Task<List<Transaction>> GetTransactionsByOrderIdAsync(Guid orderId)
     {
@@ -246,7 +246,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Lấy chi tiết transaction theo Id.
+    ///     Lấy chi tiết transaction theo Id.
     /// </summary>
     public async Task<Transaction?> GetTransactionByIdAsync(Guid transactionId)
     {

@@ -23,9 +23,9 @@ public class OrderService : IOrderService
     private readonly ILoggerService _loggerService;
     private readonly IMapperService _mapper;
     private readonly IProductService _productService;
+    private readonly IPromotionService _promotionService;
     private readonly IStripeService _stripeService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IPromotionService _promotionService;
 
 
     public OrderService(

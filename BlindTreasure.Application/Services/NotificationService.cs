@@ -1,5 +1,4 @@
-﻿using System.Reactive;
-using BlindTreasure.Application.Interfaces;
+﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Hubs;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -10,11 +9,11 @@ namespace BlindTreasure.Application.Services;
 
 public class NotificationService : INotificationService
 {
-    private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
-    private readonly IUserService _userService;
     private readonly ICurrentTime _currentTime;
     private readonly IHubContext<NotificationHub> _hubContext;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IUserService _userService;
 
     public NotificationService(ICacheService cacheService, IUnitOfWork unitOfWork, ICurrentTime currentTime,
         IHubContext<NotificationHub> hubContext, IUserService userService)

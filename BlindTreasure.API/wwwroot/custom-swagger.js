@@ -138,7 +138,7 @@ const addDarkModeToggle = () => {
 
 // Add the dark mode toggle after initialization
 setTimeout(() => {
-    myInitFunction();
+    InitFunction(); // ← Gọi đúng tên
     setTimeout(() => {
         addDarkModeToggle();
     }, 1000);

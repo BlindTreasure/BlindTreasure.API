@@ -2,10 +2,8 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
-using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
@@ -20,9 +18,9 @@ namespace BlindTreasure.API.Controllers;
 [Authorize]
 public class CustomerInventoryController : ControllerBase
 {
+    private readonly IClaimsService _claimsService;
     private readonly ICustomerInventoryService _customerInventoryService;
     private readonly ILoggerService _logger;
-    private readonly IClaimsService _claimsService;
 
     public CustomerInventoryController(ICustomerInventoryService customerInventoryService, ILoggerService logger,
         IClaimsService claimsService)
