@@ -1,10 +1,11 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json.Serialization;
 using BlindTreasure.API.Architecture;
-using BlindTreasure.API.ChatHub;
+using BlindTreasure.Application.SignalR;
+using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Domain.DTOs.StripeDTOs;
-using BlindTreasure.Infrastructure.Hubs;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Stripe;
@@ -34,7 +35,6 @@ builder.Services.AddCors(options =>
                 .AllowAnyHeader();
         });
 });
-
 
 builder.Services.AddControllers()
     .AddNewtonsoftJson(options =>
@@ -129,19 +129,18 @@ app.UseExceptionHandler(errorApp =>
         await context.Response.WriteAsync(result);
     });
 });
-
 app.UseRouting();
-app.MapControllers();
-app.UseStaticFiles();
 
+app.UseAuthentication();   
+app.UseAuthorization();
+
+app.MapControllers();      
 app.MapHub<UserChatHub>("/hubs/user-chat");
 app.MapHub<SellerChatHub>("/hubs/seller-chat");
 app.MapHub<StaffChatHub>("/hubs/staff-chat");
 app.MapHub<NotificationHub>("/hubs/notification");
 
-
-app.UseAuthentication();
-app.UseAuthorization();
+app.UseStaticFiles();
 
 
 app.Run();

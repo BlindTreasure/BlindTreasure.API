@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System.Security.Claims;
 using System.Text;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
@@ -6,12 +7,14 @@ using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Services.ThirdParty.AIModels;
+using BlindTreasure.Application.SignalR;
 using BlindTreasure.Domain;
 using BlindTreasure.Infrastructure;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using BlindTreasure.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -163,6 +166,7 @@ public static class IocContainer
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IBlindyService, BlindyService>();
+        services.AddSingleton<IUserIdProvider, UserIdProviderByGuid>();
         services.AddSignalR().AddJsonProtocol();
 
 
@@ -248,7 +252,23 @@ public static class IocContainer
                     ValidAudience = configuration["JWT:Audience"],
                     IssuerSigningKey =
                         new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:SecretKey"] ??
-                                                                        throw new InvalidOperationException()))
+                                                                        throw new InvalidOperationException())),
+                    // ✅ DÒNG NÀY RẤT QUAN TRỌNG
+                    NameClaimType = ClaimTypes.NameIdentifier
+                };
+                x.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notification"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    }
                 };
             });
         services.AddAuthorization(options =>
