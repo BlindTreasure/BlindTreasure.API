@@ -126,13 +126,12 @@ public class UnboxingService : IUnboxingService
         var selected = RandomByRarityAndProbability(items, probabilities);
 
         if (selected == null)
-        {
             _loggerService.Warn(
                 $"[Unbox] Không chọn được item từ BlindBox {blindBox.Id} sau khi random theo xác suất.");
-        }
 
         return selected;
     }
+
     private async Task<InventoryItem> GrantUnboxedItemToUser(
         BlindBoxItem selectedItem,
         CustomerBlindBox customerBox,
@@ -200,6 +199,7 @@ public class UnboxingService : IUnboxingService
 
         return WeightedRandom(itemDropRates);
     }
+
     private static T? WeightedRandom<T>(Dictionary<T, decimal> weightedDict)
     {
         var totalWeight = weightedDict.Values.Sum();
@@ -218,6 +218,7 @@ public class UnboxingService : IUnboxingService
 
         return default;
     }
+
     private async Task NotifyOutOfStockAsync(BlindBox blindBox, BlindBoxItem item)
     {
         blindBox.Status = BlindBoxStatus.Rejected; // hoặc enum riêng như Disabled/OutOfStock nếu có

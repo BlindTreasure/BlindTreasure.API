@@ -28,7 +28,7 @@ public class UnboxController : ControllerBase
         try
         {
             var result = await _unboxingService.UnboxAsync(customerBlindBoxId);
-            return Ok(ApiResult<UnboxResultDto>.Success(result));
+            return Ok(ApiResult<UnboxResultDto>.Success(result, "200", "Congratulation !"));
         }
         catch (Exception ex)
         {
