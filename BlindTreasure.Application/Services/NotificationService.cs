@@ -1,6 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Domain.Enums;
-using BlindTreasure.Infrastructure.Hubs;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Notification = BlindTreasure.Domain.Entities.Notification;
@@ -25,47 +25,45 @@ public class NotificationService : INotificationService
         _userService = userService;
     }
 
-    public async Task SendWelcomeNotificationAsync(string userEmail)
+    public async Task SendNotificationToUserAsync(Guid userId, string title, string message, NotificationType type, TimeSpan? cooldown = null)
     {
-        var cacheKey = $"noti:welcome:{userEmail}";
+        var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null) return;
 
-        // Check nếu đã gửi gần đây
-        if (await _cacheService.ExistsAsync(cacheKey))
-            return;
+        // var cacheKey = $"noti:{type}:{user.Email}";
+        // if (cooldown.HasValue && await _cacheService.ExistsAsync(cacheKey))
+        //     return;
 
         var now = _currentTime.GetCurrentTime();
-        var user = await _userService.GetUserByEmail(userEmail);
-        if (user != null)
+        var notification = new Notification
         {
-            var notification = new Notification
-            {
-                Id = Guid.NewGuid(),
-                UserId = user.Id,
-                Type = NotificationType.System,
-                Title = "Chào mừng!",
-                Message = $"Chào mừng {user?.FullName} đến với BlindTreasure.",
-                IsRead = false,
-                SentAt = now,
-                CreatedAt = now,
-                CreatedBy = user.Id
-            };
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Title = title,
+            Message = message,
+            Type = type,
+            IsRead = false,
+            SentAt = now,
+            CreatedAt = now,
+            CreatedBy = user.Id
+        };
 
-            await _unitOfWork.Notifications.AddAsync(notification);
-            await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.Notifications.AddAsync(notification);
+        await _unitOfWork.SaveChangesAsync();
 
-            var payload = new
-            {
-                notification.Id,
-                notification.Title,
-                notification.Message,
-                notification.SentAt,
-                notification.Type
-            };
+        var payload = new
+        {
+            notification.Id,
+            notification.Title,
+            notification.Message,
+            notification.SentAt,
+            notification.Type
+        };
 
-            await NotificationHub.SendToUser(_hubContext, userEmail, payload);
-        }
+        await NotificationHub.SendToUser(_hubContext, user.Id.ToString(), payload);
 
-        // Đánh dấu đã gửi, thời gian giữ key là 1 giờ (hoặc tuỳ chỉnh)
-        await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromSeconds(2));
+        // if (cooldown.HasValue)
+        //     await _cacheService.SetAsync(cacheKey, true, cooldown.Value);
     }
+
 }

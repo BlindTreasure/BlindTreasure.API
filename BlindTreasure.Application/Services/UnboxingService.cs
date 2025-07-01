@@ -174,9 +174,7 @@ public class UnboxingService : IUnboxingService
             .ToDictionary(g => g.Key, g => g.ToList());
 
         foreach (var group in rarityGroups)
-        {
             _loggerService.Info($"[Unbox] Tier {group.Key} có {group.Value.Count} item.");
-        }
 
         // Bước 2: Tính tổng xác suất cho mỗi tier
         var rarityDropRates = new Dictionary<BlindBoxRarity, decimal>();
@@ -219,10 +217,8 @@ public class UnboxingService : IUnboxingService
         var selectedItem = WeightedRandom(itemDropRates);
 
         if (selectedItem != null)
-        {
             _loggerService.Info(
                 $"[Unbox] Đã chọn item: ProductId={selectedItem.ProductId}, Tier={selectedItem.Rarity}");
-        }
 
         return selectedItem;
     }

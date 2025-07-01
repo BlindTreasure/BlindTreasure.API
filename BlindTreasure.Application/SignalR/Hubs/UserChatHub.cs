@@ -1,7 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 
-namespace BlindTreasure.API.ChatHub;
+namespace BlindTreasure.Application.SignalR.Hubs;
 
 public class UserChatHub : Hub
 {

@@ -81,4 +81,47 @@ public class PromotionController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
+
+    /// <summary>
+    /// STAFF cập nhật thông tin voucher
+    /// </summary>
+    [Authorize(Roles = "Staff,Admin")]
+    [HttpPut("{id}")]
+    [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UpdatePromotion(Guid id, [FromForm] CreatePromotionDto dto)
+    {
+        try
+        {
+            var result = await _promotionService.UpdatePromotionAsync(id, dto);
+            return Ok(ApiResult<PromotionDto>.Success(result, "200", "Cập nhật voucher thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<PromotionDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    /// STAFF xoá mềm voucher
+    /// </summary>
+    [Authorize(Roles = "Staff,Admin")]
+    [HttpDelete("{id}")]
+    [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DeletePromotion(Guid id)
+    {
+        try
+        {
+            var success = await _promotionService.DeletePromotionAsync(id);
+            return Ok(ApiResult<object>.Success(success, "200", "Xoá voucher thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
 }
