@@ -4,8 +4,10 @@ using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -149,27 +151,47 @@ public class OrderService : IOrderService
     /// <summary>
     ///     Lấy danh sách đơn hàng của user hiện tại.
     /// </summary>
-    public async Task<List<OrderDto>> GetMyOrdersAsync()
+    public async Task<Pagination<OrderDto>> GetMyOrdersAsync(OrderQueryParameter param)
     {
         var userId = _claimsService.CurrentUserId;
 
-        var orders = await _unitOfWork.Orders.GetQueryable().AsNoTracking()
+        var query = _unitOfWork.Orders.GetQueryable()
             .Where(o => o.UserId == userId && !o.IsDeleted)
             .Include(o => o.Promotion)
-            .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.Product)
-            .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.BlindBox)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
             .Include(o => o.ShippingAddress)
-            .Include(o => o.Payment)
-            .ThenInclude(p => p.Transactions)
-            .OrderByDescending(o => o.PlacedAt)
-            .ToListAsync();
+            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+            .AsNoTracking();
+
+        // Filter theo status nếu có
+        if (param.Status.HasValue)
+            query = query.Where(o => o.Status == param.Status.Value.ToString());
+
+        // Filter theo ngày đặt hàng nếu có
+        if (param.PlacedFrom.HasValue)
+            query = query.Where(o => o.PlacedAt >= param.PlacedFrom.Value);
+        if (param.PlacedTo.HasValue)
+            query = query.Where(o => o.PlacedAt <= param.PlacedTo.Value);
+
+        // Sắp xếp mặc định: mới nhất trước
+        query = query.OrderByDescending(o => o.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+
+        List<Order> orders;
+        if (param.PageIndex == 0)
+            orders = await query.ToListAsync();
+        else
+            orders = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
 
         var dtos = orders.Select(OrderDtoMapper.ToOrderDto).ToList();
 
         _loggerService.Info(ErrorMessages.OrderListLoadedLog);
-        return dtos;
+        return new Pagination<OrderDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
 
     /// <summary>
