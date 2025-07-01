@@ -2,6 +2,8 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,19 +15,19 @@ namespace BlindTreasure.API.Controllers;
 ///     Cho phép xem danh sách, chi tiết, đánh dấu mở box và xóa mềm.
 ///     Không cho phép tạo trực tiếp qua API (chỉ tạo qua luồng thanh toán).
 /// </summary>
-[Route("api/customer-inventories")]
+[Route("api/customer-blindboxes")]
 [ApiController]
 [Authorize]
-public class CustomerInventoryController : ControllerBase
+public class CustomerBlindBoxController : ControllerBase
 {
     private readonly IClaimsService _claimsService;
-    private readonly ICustomerInventoryService _customerInventoryService;
+    private readonly ICustomerBlindBoxService _customerBlindBoxService;
     private readonly ILoggerService _logger;
 
-    public CustomerInventoryController(ICustomerInventoryService customerInventoryService, ILoggerService logger,
+    public CustomerBlindBoxController(ICustomerBlindBoxService customerBlindBoxService, ILoggerService logger,
         IClaimsService claimsService)
     {
-        _customerInventoryService = customerInventoryService;
+        _customerBlindBoxService = customerBlindBoxService;
         _logger = logger;
         _claimsService = claimsService;
     }
@@ -35,28 +37,27 @@ public class CustomerInventoryController : ControllerBase
     /// </summary>
     /// <returns>Danh sách BlindBox trong kho</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResult<List<CustomerInventoryDto>>), 200)]
-    public async Task<IActionResult> GetMyBlindBoxes()
+    [ProducesResponseType(typeof(ApiResult<Pagination<CustomerInventoryDto>>), 200)]
+    public async Task<IActionResult> GetMyBlindBoxes([FromQuery] CustomerBlindBoxQueryParameter param)
     {
         try
         {
-            var uid = _claimsService.CurrentUserId;
-            if (uid == Guid.Empty)
+            var result = await _customerBlindBoxService.GetMyBlindBoxesAsync(param);
+            _logger.Info("[CustomerBlindBoxController][GetMyBlindBoxes] Lấy danh sách BlindBox thành công.");
+            return Ok(ApiResult<object>.Success(new
             {
-                _logger.Warn("[CustomerInventoryController][GetMyBlindBoxes] User ID không hợp lệ.");
-                return BadRequest(ApiResult<List<CustomerInventoryDto>>.Failure("401", "User ID không hợp lệ."));
-            }
-
-            var items = await _customerInventoryService.GetByUserIdAsync(uid);
-            _logger.Info("[CustomerInventoryController][GetMyBlindBoxes] Lấy danh sách BlindBox thành công.");
-            return Ok(ApiResult<List<CustomerInventoryDto>>.Success(items, "200",
-                "Lấy danh sách BlindBox thành công."));
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách BlindBox thành công."));
         }
         catch (Exception ex)
         {
-            _logger.Error($"[CustomerInventoryController][GetMyBlindBoxes] {ex.Message}");
+            _logger.Error($"[CustomerBlindBoxController][GetMyBlindBoxes] {ex.Message}");
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<List<CustomerInventoryDto>>(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, error);
         }
     }
@@ -73,7 +74,7 @@ public class CustomerInventoryController : ControllerBase
     {
         try
         {
-            var item = await _customerInventoryService.GetByIdAsync(id);
+            var item = await _customerBlindBoxService.GetByIdAsync(id);
             if (item == null)
             {
                 _logger.Warn($"[CustomerInventoryController][GetById] Không tìm thấy BlindBox {id}");
@@ -104,7 +105,7 @@ public class CustomerInventoryController : ControllerBase
     {
         try
         {
-            var result = await _customerInventoryService.MarkAsOpenedAsync(id);
+            var result = await _customerBlindBoxService.MarkAsOpenedAsync(id);
             _logger.Success($"[CustomerInventoryController][MarkAsOpened] Đánh dấu BlindBox {id} đã mở.");
             return Ok(ApiResult<CustomerInventoryDto>.Success(result, "200", "Đánh dấu BlindBox đã mở thành công."));
         }
@@ -128,7 +129,7 @@ public class CustomerInventoryController : ControllerBase
     {
         try
         {
-            var success = await _customerInventoryService.DeleteAsync(id);
+            var success = await _customerBlindBoxService.DeleteAsync(id);
             if (!success)
             {
                 _logger.Warn($"[CustomerInventoryController][Delete] Không tìm thấy BlindBox {id}");

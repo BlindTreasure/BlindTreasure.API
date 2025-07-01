@@ -3,8 +3,11 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
 
@@ -12,7 +15,7 @@ namespace BlindTreasure.Application.Services;
 ///     Service quản lý kho BlindBox đã mua của user (CustomerInventory).
 ///     Lưu trữ các BlindBox đã thanh toán, hỗ trợ lấy danh sách, chi tiết, cập nhật trạng thái mở box, xóa mềm.
 /// </summary>
-public class CustomerInventoryService : ICustomerInventoryService
+public class CustomerBlindBoxService : ICustomerBlindBoxService
 {
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
@@ -21,7 +24,7 @@ public class CustomerInventoryService : ICustomerInventoryService
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public CustomerInventoryService(
+    public CustomerBlindBoxService(
         ICacheService cacheService,
         IClaimsService claimsService,
         ILoggerService loggerService,
@@ -93,15 +96,46 @@ public class CustomerInventoryService : ICustomerInventoryService
     /// <summary>
     ///     Lấy toàn bộ BlindBox đã mua của user hiện tại.
     /// </summary>
-    public async Task<List<CustomerInventoryDto>> GetByUserIdAsync(Guid? userId = null)
+    public async Task<Pagination<CustomerInventoryDto>> GetMyBlindBoxesAsync(CustomerBlindBoxQueryParameter param)
     {
-        var uid = userId ?? _claimsService.CurrentUserId;
-        var items = await _unitOfWork.CustomerBlindBoxes.GetAllAsync(
-            i => i.UserId == uid && !i.IsDeleted,
-            i => i.BlindBox,
-            i => i.OrderDetail
-        );
-        return items.Select(CustomerInventoryMapper.ToCustomerInventoryBlindBoxDto).ToList();
+        var userId = _claimsService.CurrentUserId;
+
+        var query = _unitOfWork.CustomerBlindBoxes.GetQueryable()
+            .Where(i => i.UserId == userId && !i.IsDeleted)
+            .Include(i => i.BlindBox)
+            .Include(i => i.OrderDetail).AsNoTracking();
+
+        // Filter theo IsOpened
+        if (param.IsOpened.HasValue)
+            query = query.Where(i => i.IsOpened == param.IsOpened.Value);
+
+        // Filter theo tên BlindBox
+        if (!string.IsNullOrWhiteSpace(param.Search))
+        {
+            var keyword = param.Search.Trim().ToLower();
+            query = query.Where(i => i.BlindBox.Name.ToLower().Contains(keyword));
+        }
+
+        // Filter theo BlindBoxId
+        if (param.BlindBoxId.HasValue)
+            query = query.Where(i => i.BlindBoxId == param.BlindBoxId.Value);
+
+        // Sắp xếp mặc định: mới nhất trước
+        query = query.OrderByDescending(i => i.UpdatedAt ?? i.CreatedAt);
+
+        var count = await query.CountAsync();
+
+        List<CustomerBlindBox> items;
+        if (param.PageIndex == 0)
+            items = await query.ToListAsync();
+        else
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+
+        var dtos = items.Select(CustomerInventoryMapper.ToCustomerInventoryBlindBoxDto).ToList();
+        return new Pagination<CustomerInventoryDto>(dtos, count, param.PageIndex, param.PageSize);
     }
 
     /// <summary>
