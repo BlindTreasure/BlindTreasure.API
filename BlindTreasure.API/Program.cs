@@ -24,8 +24,6 @@ builder.Configuration
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
     .AddEnvironmentVariables(); // Cái này luôn phải nằm cuối
 
-builder.Configuration.AddJsonFile("appsettings.json", true, true);
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll",
@@ -81,8 +79,6 @@ builder.Services.SetupRedisService(builder.Configuration);
 var app = builder.Build();
 
 app.UseCors("AllowAll");
-//
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
@@ -136,7 +132,7 @@ app.UseExceptionHandler(errorApp =>
 
 app.UseRouting();
 app.MapControllers();
-app.UseStaticFiles(); 
+app.UseStaticFiles();
 
 app.MapHub<UserChatHub>("/hubs/user-chat");
 app.MapHub<SellerChatHub>("/hubs/seller-chat");
