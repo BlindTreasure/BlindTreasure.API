@@ -78,6 +78,54 @@ public class PromotionService : IPromotionService
         return _mapperService.Map<Promotion, PromotionDto>(promotion);
     }
 
+    public async Task<PromotionDto> UpdatePromotionAsync(Guid id, CreatePromotionDto dto)
+    {
+        var currentUserId = _claimsService.CurrentUserId;
+        var user = await _userService.GetUserById(currentUserId, true);
+
+        if (user == null || (user.RoleName != RoleType.Staff && user.RoleName != RoleType.Admin))
+            throw ErrorHelper.Forbidden("Bạn không có quyền cập nhật voucher.");
+
+        var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+        if (promotion == null)
+            throw ErrorHelper.NotFound("Không tìm thấy voucher.");
+
+        await ValidatePromotionInputAsync(dto);
+
+        promotion.Code = dto.Code.Trim().ToUpper();
+        promotion.Description = dto.Description;
+        promotion.DiscountType = dto.DiscountType;
+        promotion.DiscountValue = dto.DiscountValue;
+        promotion.StartDate = dto.StartDate;
+        promotion.EndDate = dto.EndDate;
+        promotion.UsageLimit = dto.UsageLimit;
+        promotion.UpdatedAt = DateTime.UtcNow;
+
+        await _unitOfWork.Promotions.Update(promotion);
+        await _unitOfWork.SaveChangesAsync();
+
+        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+    }
+
+    public async Task<PromotionDto> DeletePromotionAsync(Guid id)
+    {
+        var currentUserId = _claimsService.CurrentUserId;
+        var user = await _userService.GetUserById(currentUserId, true);
+
+        if (user == null || (user.RoleName != RoleType.Staff && user.RoleName != RoleType.Admin))
+            throw ErrorHelper.Forbidden("Bạn không có quyền xoá voucher.");
+
+        var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+        if (promotion == null)
+            throw ErrorHelper.NotFound("Không tìm thấy voucher.");
+
+        await _unitOfWork.Promotions.SoftRemove(promotion);
+        await _unitOfWork.SaveChangesAsync();
+
+        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+    }
+
+
     public async Task<PromotionDto> ReviewPromotionAsync(ReviewPromotionDto dto)
     {
         var currentUserId = _claimsService.CurrentUserId;
