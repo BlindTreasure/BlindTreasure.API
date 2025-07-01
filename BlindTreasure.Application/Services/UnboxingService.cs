@@ -9,14 +9,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
 
-public class UnboxService : IUnboxService
+public class UnboxingService : IUnboxingService
 {
     private readonly IClaimsService _claimsService;
     private readonly ICurrentTime _currentTime;
     private readonly ILoggerService _loggerService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public UnboxService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
+    public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
         ICurrentTime currentTime)
     {
         _loggerService = loggerService;
@@ -28,7 +28,7 @@ public class UnboxService : IUnboxService
     public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
     {
         var userId = _claimsService.CurrentUserId;
-        var now = _currentTime.GetCurrentTime();
+        var now = DateTime.UtcNow;
 
         // PHASE 1: Kiểm tra hộp có hợp lệ để mở không
         var customerBox = await GetValidCustomerBlindBoxAsync(customerBlindBoxId, userId);
@@ -37,12 +37,16 @@ public class UnboxService : IUnboxService
         // PHASE 2: Chọn ngẫu nhiên 1 item từ hộp theo tỷ lệ đã được duyệt
         var selectedItem = await SelectItemToUnbox(blindBox);
         if (selectedItem == null)
+        {
+            _loggerService.Warn(
+                $"[Unbox] Không thể chọn item từ hộp {customerBlindBoxId} (User {userId}) - Không có item hợp lệ.");
             throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
+        }
 
-        // PHASE 3: Gán item cho người dùng (tạo inventory, đánh dấu đã mở, xử lý hết hàng nếu cần)
+        // PHASE 3: Gán item cho người dùng
         await GrantUnboxedItemToUser(selectedItem, customerBox, userId, now);
 
-        // PHASE 4: Ghi log và trả về kết quả
+        // PHASE 4: Ghi log kết quả
         _loggerService.Info(
             $"[Unbox] User {userId} mở hộp {customerBlindBoxId} nhận được item {selectedItem.ProductId}");
 
@@ -53,7 +57,6 @@ public class UnboxService : IUnboxService
             UnboxedAt = now
         };
     }
-
 
     public async Task<List<ProbabilityConfig>> GetApprovedProbabilitiesAsync(Guid blindBoxId)
     {
@@ -76,10 +79,33 @@ public class UnboxService : IUnboxService
             .Include(cb => cb.BlindBox)
             .ThenInclude(bb => bb.BlindBoxItems)
             .ThenInclude(bbi => bbi.ProbabilityConfigs)
-            .FirstOrDefaultAsync(cb => cb.Id == id && cb.UserId == userId && !cb.IsOpened && !cb.IsDeleted);
+            .FirstOrDefaultAsync(cb => cb.Id == id);
 
         if (box == null)
+        {
+            _loggerService.Warn($"[Unbox] Hộp không tồn tại. BoxId={id}, UserId={userId}");
             throw ErrorHelper.BadRequest("Không tìm thấy hộp hợp lệ để mở.");
+        }
+
+        if (box.UserId != userId)
+        {
+            _loggerService.Warn(
+                $"[Unbox] Hộp không thuộc về người dùng. BoxId={id}, OwnerId={box.UserId}, RequesterId={userId}");
+            throw ErrorHelper.BadRequest("Không có quyền mở hộp này.");
+        }
+
+        if (box.IsDeleted)
+        {
+            _loggerService.Warn($"[Unbox] Hộp đã bị xóa. BoxId={id}, UserId={userId}");
+            throw ErrorHelper.BadRequest("Hộp không hợp lệ (đã bị xóa).");
+        }
+
+        if (box.IsOpened)
+        {
+            _loggerService.Warn(
+                $"[Unbox] Hộp đã được mở trước đó. BoxId={id}, UserId={userId}, OpenedAt={box.OpenedAt}");
+            throw ErrorHelper.BadRequest("Hộp đã được mở trước đó.");
+        }
 
         return box;
     }
@@ -91,12 +117,22 @@ public class UnboxService : IUnboxService
             .ToList();
 
         if (!items.Any())
+        {
+            _loggerService.Warn($"[Unbox] Hộp {blindBox.Id} không còn item hợp lệ để mở.");
             throw ErrorHelper.BadRequest("Hộp này không còn item nào để mở.");
+        }
 
         var probabilities = await GetApprovedProbabilitiesAsync(blindBox.Id);
-        return RandomByRarityAndProbability(items, probabilities);
-    }
+        var selected = RandomByRarityAndProbability(items, probabilities);
 
+        if (selected == null)
+        {
+            _loggerService.Warn(
+                $"[Unbox] Không chọn được item từ BlindBox {blindBox.Id} sau khi random theo xác suất.");
+        }
+
+        return selected;
+    }
     private async Task<InventoryItem> GrantUnboxedItemToUser(
         BlindBoxItem selectedItem,
         CustomerBlindBox customerBox,
@@ -164,7 +200,6 @@ public class UnboxService : IUnboxService
 
         return WeightedRandom(itemDropRates);
     }
-
     private static T? WeightedRandom<T>(Dictionary<T, decimal> weightedDict)
     {
         var totalWeight = weightedDict.Values.Sum();
@@ -183,7 +218,6 @@ public class UnboxService : IUnboxService
 
         return default;
     }
-
     private async Task NotifyOutOfStockAsync(BlindBox blindBox, BlindBoxItem item)
     {
         blindBox.Status = BlindBoxStatus.Rejected; // hoặc enum riêng như Disabled/OutOfStock nếu có

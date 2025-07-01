@@ -3,7 +3,7 @@ using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Application.Interfaces;
 
-public interface IUnboxService
+public interface IUnboxingService
 {
     Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId);
     Task<List<ProbabilityConfig>> GetApprovedProbabilitiesAsync(Guid blindBoxId);

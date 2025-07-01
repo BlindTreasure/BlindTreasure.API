@@ -12,11 +12,11 @@ namespace BlindTreasure.API.Controllers;
 // [Authorize(Roles = "Customer")]
 public class UnboxController : ControllerBase
 {
-    private readonly IUnboxService _unboxService;
+    private readonly IUnboxingService _unboxingService;
 
-    public UnboxController(IUnboxService unboxService)
+    public UnboxController(IUnboxingService unboxingService)
     {
-        _unboxService = unboxService;
+        _unboxingService = unboxingService;
     }
 
     /// <summary>
@@ -27,7 +27,7 @@ public class UnboxController : ControllerBase
     {
         try
         {
-            var result = await _unboxService.UnboxAsync(customerBlindBoxId);
+            var result = await _unboxingService.UnboxAsync(customerBlindBoxId);
             return Ok(ApiResult<UnboxResultDto>.Success(result));
         }
         catch (Exception ex)
@@ -46,7 +46,7 @@ public class UnboxController : ControllerBase
     {
         try
         {
-            var result = await _unboxService.GetApprovedProbabilitiesAsync(blindBoxId);
+            var result = await _unboxingService.GetApprovedProbabilitiesAsync(blindBoxId);
             return Ok(ApiResult<List<ProbabilityConfig>>.Success(result));
         }
         catch (Exception ex)

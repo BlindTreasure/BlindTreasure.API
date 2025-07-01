@@ -54,6 +54,61 @@ public class SystemController : ControllerBase
         }
     }
 
+    [HttpPost("dev/seed-user-blind-boxes")]
+    public async Task<IActionResult> SeedBlindBoxUsers()
+    {
+        try
+        {
+            var email = "trangiaphuc362003181@gmail.com";
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+            if (user == null)
+                return NotFound($"Không tìm thấy user với email: {email}");
+
+            var blindBoxes = await _context.BlindBoxes
+                .Include(b => b.BlindBoxItems!)
+                .ThenInclude(i => i.ProbabilityConfigs!)
+                .Where(b => b.Status == BlindBoxStatus.Approved && !b.IsDeleted)
+                .ToListAsync();
+
+            var validBlindBoxes = blindBoxes
+                .Where(b => b.BlindBoxItems != null && b.BlindBoxItems.Any(i =>
+                    !i.IsDeleted &&
+                    i.IsActive &&
+                    i.Quantity > 0 &&
+                    i.ProbabilityConfigs.Any(p =>
+                        p.EffectiveFrom <= DateTime.UtcNow &&
+                        p.EffectiveTo >= DateTime.UtcNow)))
+                .OrderBy(_ => Guid.NewGuid())
+                .Take(2)
+                .ToList();
+
+            if (!validBlindBoxes.Any())
+                return BadRequest("Không tìm thấy blind box hợp lệ để seed.");
+
+            var customerBoxes = validBlindBoxes.Select(b => new CustomerBlindBox
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                BlindBoxId = b.Id,
+                IsOpened = false,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }).ToList();
+
+            await _context.CustomerBlindBoxes.AddRangeAsync(customerBoxes);
+            await _context.SaveChangesAsync();
+
+            return Ok(ApiResult<object>.Success("200", $"Đã seed {customerBoxes.Count} hộp cho user {user.Email}."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
     [HttpDelete("clear-caching")]
     public async Task<IActionResult> ClearCaching()
     {
@@ -623,6 +678,7 @@ public class SystemController : ControllerBase
             await _context.Products.AddRangeAsync(blindBoxProducts);
             await _context.SaveChangesAsync();
 
+
             var blindBox = new BlindBox
             {
                 Id = Guid.NewGuid(),
@@ -642,7 +698,7 @@ public class SystemController : ControllerBase
             };
 
             // Tạo BlindBoxItem
-            var blindBoxItems = GenerateBlindBoxItems(blindBox.Id, blindBoxProducts, now);
+            var blindBoxItems = GenerateBlindBoxItems(blindBox.Id, blindBoxProducts, sellerUser.Id, now);
 
             await _context.BlindBoxes.AddAsync(blindBox);
             await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
@@ -771,12 +827,13 @@ public class SystemController : ControllerBase
     private List<BlindBoxItem> GenerateBlindBoxItems(
         Guid blindBoxId,
         List<Product> products,
+        Guid approvedByUserId,
         DateTime now)
     {
         if (products.Count < 4)
             throw new Exception("Cần ít nhất 4 sản phẩm để chia đủ các tier: Common, Rare, Epic, Secret.");
 
-        // Gán cứng 1 sản phẩm đầu tiên cho mỗi tier
+        // Gán 1 sản phẩm đầu tiên cho mỗi tier
         var rarityMap = new Dictionary<BlindBoxRarity, List<Product>>
         {
             { BlindBoxRarity.Common, new List<Product> { products[0] } },
@@ -785,7 +842,7 @@ public class SystemController : ControllerBase
             { BlindBoxRarity.Secret, new List<Product> { products[3] } }
         };
 
-        // Các sản phẩm còn lại chia vào Common/Rare/Epic
+        // Chia các sản phẩm còn lại vào Common/Rare/Epic
         var remaining = products.Skip(4).ToList();
         var rotatingRarities = new[] { BlindBoxRarity.Common, BlindBoxRarity.Rare, BlindBoxRarity.Epic };
         var rotateIndex = 0;
@@ -797,7 +854,7 @@ public class SystemController : ControllerBase
             rotateIndex++;
         }
 
-        // Phân chia tỷ lệ
+        // Phân chia tỷ lệ drop
         const decimal secretRate = 5m;
         const decimal remainingRate = 95m;
 
@@ -814,17 +871,35 @@ public class SystemController : ControllerBase
                 : remainingRate / nonSecretCount;
 
             foreach (var product in productList)
-                items.Add(new BlindBoxItem
+            {
+                var itemId = Guid.NewGuid();
+                var item = new BlindBoxItem
                 {
-                    Id = Guid.NewGuid(),
+                    Id = itemId,
                     BlindBoxId = blindBoxId,
                     ProductId = product.Id,
                     Quantity = 15,
                     DropRate = Math.Round(rate, 2),
                     Rarity = rarity,
                     IsActive = true,
-                    CreatedAt = now
-                });
+                    CreatedAt = now,
+                    ProbabilityConfigs = new List<ProbabilityConfig>
+                    {
+                        new()
+                        {
+                            Id = Guid.NewGuid(),
+                            BlindBoxItemId = itemId,
+                            Probability = Math.Round(rate, 2),
+                            EffectiveFrom = now,
+                            EffectiveTo = now.AddYears(1),
+                            ApprovedBy = approvedByUserId,
+                            ApprovedAt = now
+                        }
+                    }
+                };
+
+                items.Add(item);
+            }
         }
 
         return items;

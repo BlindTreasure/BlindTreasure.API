@@ -179,9 +179,6 @@ public class BlindTreasureDbContext : DbContext
             // Cấu hình các cột
             entity.Property(ci => ci.IsOpened)
                 .IsRequired();
-
-            entity.Property(ci => ci.OpenedAt)
-                .HasColumnType("timestamp without time zone");
         });
 
 
