@@ -168,12 +168,17 @@ public class UnboxingService : IUnboxingService
 
     private BlindBoxItem? RandomByRarityAndProbability(List<BlindBoxItem> items, List<ProbabilityConfig> probabilities)
     {
-        // Bước 1: Nhóm theo rarity
+        // Bước 1: Nhóm các item theo độ hiếm (rarity)
         var rarityGroups = items
             .GroupBy(i => i.Rarity)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        // Tính tổng drop rate cho mỗi rarity
+        foreach (var group in rarityGroups)
+        {
+            _loggerService.Info($"[Unbox] Tier {group.Key} có {group.Value.Count} item.");
+        }
+
+        // Bước 2: Tính tổng xác suất cho mỗi tier
         var rarityDropRates = new Dictionary<BlindBoxRarity, decimal>();
 
         foreach (var rarity in rarityGroups.Keys)
@@ -183,21 +188,43 @@ public class UnboxingService : IUnboxingService
                 .Sum();
 
             rarityDropRates[rarity] = total;
+            _loggerService.Info($"[Unbox] Tổng xác suất tier {rarity}: {total}%");
         }
 
-        // Bước 2: Random rarity
+        // Bước 3: Random tier theo xác suất tổng
         var selectedRarity = WeightedRandom(rarityDropRates);
-        if (!rarityGroups.ContainsKey(selectedRarity))
-            return null;
 
-        // Bước 3: Random item trong nhóm rarity đó
+        if (!rarityGroups.ContainsKey(selectedRarity))
+        {
+            _loggerService.Warn($"[Unbox] Không tìm thấy tier {selectedRarity} trong danh sách item.");
+            return null;
+        }
+
         var itemGroup = rarityGroups[selectedRarity];
 
+        _loggerService.Info(
+            $"[Unbox] Đã chọn tier: {selectedRarity} với {itemGroup.Count} item. Tổng xác suất tier: {rarityDropRates[selectedRarity]}%");
+
+        foreach (var item in itemGroup)
+        {
+            var p = probabilities.FirstOrDefault(pc => pc.BlindBoxItemId == item.Id)?.Probability ?? 0;
+            _loggerService.Info($"[Unbox] └─ ItemId={item.ProductId}, DropRate={p}%");
+        }
+
+        // Bước 4: Random item trong tier vừa chọn
         var itemDropRates = itemGroup.ToDictionary(
             i => i,
             i => probabilities.FirstOrDefault(p => p.BlindBoxItemId == i.Id)?.Probability ?? 0);
 
-        return WeightedRandom(itemDropRates);
+        var selectedItem = WeightedRandom(itemDropRates);
+
+        if (selectedItem != null)
+        {
+            _loggerService.Info(
+                $"[Unbox] Đã chọn item: ProductId={selectedItem.ProductId}, Tier={selectedItem.Rarity}");
+        }
+
+        return selectedItem;
     }
 
     private static T? WeightedRandom<T>(Dictionary<T, decimal> weightedDict)
