@@ -3,6 +3,8 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -98,22 +100,29 @@ public class OrderController : ControllerBase
     }
 
     /// <summary>
-    ///     Lấy danh sách đơn hàng của user hiện tại.
+    ///     Lấy danh sách đơn hàng của user hiện tại (có phân trang, filter).
     /// </summary>
-    /// <returns>Danh sách đơn hàng</returns>
+    /// <returns>Danh sách đơn hàng phân trang</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResult<List<OrderDto>>), 200)]
-    public async Task<IActionResult> GetMyOrders()
+    [ProducesResponseType(typeof(ApiResult<Pagination<OrderDto>>), 200)]
+    public async Task<IActionResult> GetMyOrders([FromQuery] OrderQueryParameter param)
     {
         try
         {
-            var result = await _orderService.GetMyOrdersAsync();
-            return Ok(ApiResult<List<OrderDto>>.Success(result, "200", "Lấy danh sách đơn hàng thành công."));
+            var result = await _orderService.GetMyOrdersAsync(param);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách đơn hàng thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDto>>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
