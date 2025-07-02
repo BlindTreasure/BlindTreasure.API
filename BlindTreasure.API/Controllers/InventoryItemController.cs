@@ -2,6 +2,8 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,20 +33,27 @@ public class InventoryItemController : ControllerBase
     /// </summary>
     /// <returns>Danh sách inventory item</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResult<List<InventoryItemDto>>), 200)]
-    public async Task<IActionResult> GetMyInventory()
+    [ProducesResponseType(typeof(ApiResult<Pagination<InventoryItemDto>>), 200)]
+    public async Task<IActionResult> GetMyInventory([FromQuery] InventoryItemQueryParameter param)
     {
         try
         {
-            var items = await _inventoryItemService.GetByUserIdAsync();
+            var result = await _inventoryItemService.GetMyInventoryAsync(param);
             _logger.Info("[InventoryItemController][GetMyInventory] Lấy danh sách inventory thành công.");
-            return Ok(ApiResult<List<InventoryItemDto>>.Success(items, "200", "Lấy danh sách inventory thành công."));
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách inventory thành công."));
         }
         catch (Exception ex)
         {
             _logger.Error($"[InventoryItemController][GetMyInventory] {ex.Message}");
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<List<InventoryItemDto>>(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, error);
         }
     }

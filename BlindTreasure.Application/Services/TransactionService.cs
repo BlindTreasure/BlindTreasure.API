@@ -14,7 +14,7 @@ public class TransactionService : ITransactionService
 {
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
-    private readonly ICustomerInventoryService _customerInventoryService;
+    private readonly ICustomerBlindBoxService _customerBlindBoxService;
     private readonly IInventoryItemService _inventoryItemService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
@@ -29,7 +29,7 @@ public class TransactionService : ITransactionService
         IOrderService orderService,
         IUnitOfWork unitOfWork,
         IInventoryItemService inventoryItemService,
-        ICustomerInventoryService customerInventoryService)
+        ICustomerBlindBoxService customerBlindBoxService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -38,7 +38,7 @@ public class TransactionService : ITransactionService
         _orderService = orderService;
         _unitOfWork = unitOfWork;
         _inventoryItemService = inventoryItemService;
-        _customerInventoryService = customerInventoryService;
+        _customerBlindBoxService = customerBlindBoxService;
     }
 
     /// <summary>
@@ -127,7 +127,7 @@ public class TransactionService : ITransactionService
                             OrderDetailId = od.Id,
                             IsOpened = false
                         };
-                        await _customerInventoryService.CreateAsync(createBlindBoxDto, order.UserId);
+                        await _customerBlindBoxService.CreateAsync(createBlindBoxDto, order.UserId);
                         _logger.Success(
                             $"[HandleSuccessfulPaymentAsync] Đã tạo customer inventory thứ {++blindBoxCount} cho BlindBox {od.BlindBoxId.Value} trong order {orderId}.");
                     }

@@ -3,8 +3,11 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
 
@@ -16,6 +19,7 @@ public class InventoryItemService : IInventoryItemService
     private readonly IOrderService _orderService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICategoryService _categoryService;
 
 
     public InventoryItemService(
@@ -24,7 +28,8 @@ public class InventoryItemService : IInventoryItemService
         ILoggerService loggerService,
         IProductService productService,
         IUnitOfWork unitOfWork,
-        IOrderService orderService)
+        IOrderService orderService,
+        ICategoryService categoryService) // added categoryService
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -32,6 +37,7 @@ public class InventoryItemService : IInventoryItemService
         _productService = productService;
         _unitOfWork = unitOfWork;
         _orderService = orderService;
+        _categoryService = categoryService; // initialize categoryService
     }
 
     public async Task<InventoryItemDto>
@@ -93,14 +99,50 @@ public class InventoryItemService : IInventoryItemService
         return InventoryItemMapper.ToInventoryItemDto(item);
     }
 
-    public async Task<List<InventoryItemDto>> GetByUserIdAsync(Guid? userId = null)
+    public async Task<Pagination<InventoryItemDto>> GetMyInventoryAsync(InventoryItemQueryParameter param)
     {
-        var uid = userId ?? _claimsService.CurrentUserId;
-        var items = await _unitOfWork.InventoryItems.GetAllAsync(
-            i => i.UserId == uid && !i.IsDeleted,
-            i => i.Product
-        );
-        return items.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
+        var userId = _claimsService.CurrentUserId;
+
+        var query = _unitOfWork.InventoryItems.GetQueryable()
+            .Where(i => i.UserId == userId && !i.IsDeleted)
+            .Include(i => i.Product)
+            .ThenInclude(p => p.Category).AsNoTracking();
+
+        // Filter theo tên sản phẩm
+        if (!string.IsNullOrWhiteSpace(param.Search))
+        {
+            var keyword = param.Search.Trim().ToLower();
+            query = query.Where(i => i.Product.Name.ToLower().Contains(keyword));
+        }
+
+        // Filter theo category
+        if (param.CategoryId.HasValue)
+        {
+            // Lấy tất cả category con nếu cần
+            var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
+            query = query.Where(i => categoryIds.Contains(i.Product.CategoryId));
+        }
+
+        // Filter theo status
+        if (!string.IsNullOrWhiteSpace(param.Status))
+            query = query.Where(i => i.Status == param.Status);
+
+        // Sắp xếp mặc định: mới nhất trước
+        query = query.OrderByDescending(i => i.UpdatedAt ?? i.CreatedAt);
+
+        var count = await query.CountAsync();
+
+        List<InventoryItem> items;
+        if (param.PageIndex == 0)
+            items = await query.ToListAsync();
+        else
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+
+        var dtos = items.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
+        return new Pagination<InventoryItemDto>(dtos, count, param.PageIndex, param.PageSize);
     }
 
     public async Task<InventoryItemDto> UpdateAsync(Guid id, UpdateInventoryItemDto dto)

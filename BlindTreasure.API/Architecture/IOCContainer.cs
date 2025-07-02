@@ -155,7 +155,7 @@ public static class IocContainer
         services.AddScoped<IAddressService, AddressService>();
         services.AddScoped<IListingService, ListingService>();
         services.AddScoped<IInventoryItemService, InventoryItemService>();
-        services.AddScoped<ICustomerInventoryService, CustomerInventoryService>();
+        services.AddScoped<ICustomerBlindBoxService, CustomerBlindBoxService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IUnboxingService, UnboxingService>();
 
