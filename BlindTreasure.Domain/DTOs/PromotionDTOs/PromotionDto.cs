@@ -14,4 +14,8 @@ public class PromotionDto
     public int UsageLimit { get; set; }
     public PromotionStatus Status { get; set; } // "Approved", "Pending", "Rejected"
     public Guid? SellerId { get; set; } // null nếu là global
+    
+    public string? CreatedByRole { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+
 }
