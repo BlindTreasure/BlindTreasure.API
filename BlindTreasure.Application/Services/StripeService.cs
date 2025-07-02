@@ -110,11 +110,9 @@ public class StripeService : IStripeService
                     {
                         Name =
                             $"Product/Blindbox Name: {name} , Order Detail id {item.Id} belongs to Order {order.Id} paid by {user.Email}",
-                        Description = $"Product/BlindBox Name: {name}\n" +
-                                      $"Quantity: {item.Quantity} / Total: {item.TotalPrice} \n" +
-                                      $"Price: {unitPrice} VND\n" +
-                                      $"Time: {item.CreatedAt}\n" +
-                                      (!string.IsNullOrEmpty(promotionDesc) ? promotionDesc : "")
+                        Description = $"Sản phẩm: {name}, Số lượng: {item.Quantity}, Tổng: {item.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
+                                      (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "")
+
                     },
                     UnitAmount = (long)unitPrice // Stripe expects amount in cents
                 },
