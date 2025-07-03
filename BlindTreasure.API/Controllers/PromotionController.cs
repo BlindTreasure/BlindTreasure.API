@@ -25,7 +25,7 @@ public class PromotionController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-    [Authorize(Roles = "Seller")]
+    [Authorize(Roles = "Seller,Staff")]
     public async Task<IActionResult> CreatePromotion([FromForm] CreatePromotionDto dto)
     {
         try
