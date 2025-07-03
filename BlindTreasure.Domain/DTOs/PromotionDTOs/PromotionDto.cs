@@ -16,7 +16,7 @@ public class PromotionDto
     public Guid? SellerId { get; set; } // null nếu là global
     public string? RejectReason { get; set; }
 
-    public string? CreatedByRole { get; set; }
+    public RoleType? CreatedByRole { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
 }

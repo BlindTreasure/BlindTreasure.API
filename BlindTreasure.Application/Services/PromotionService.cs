@@ -362,9 +362,9 @@ public class PromotionService : IPromotionService
         // Lấy user tạo promotion
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == promotion.CreatedBy);
         if (user != null)
-            dto.CreatedByRole = user?.RoleName.ToString() ?? "Unknown";
+            dto.CreatedByRole = user.RoleName;
         else
-            dto.CreatedByRole = null;
+            dto.CreatedByRole = null;   
 
         return dto;
     }
