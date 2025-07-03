@@ -25,6 +25,7 @@ public class PromotionController : ControllerBase
     [HttpPost]
     [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Seller")]
     public async Task<IActionResult> CreatePromotion([FromForm] CreatePromotionDto dto)
     {
         try
@@ -50,7 +51,33 @@ public class PromotionController : ControllerBase
         try
         {
             var result = await _promotionService.GetPromotionsAsync(param);
-            return Ok(ApiResult<Pagination<PromotionDto>>.Success(result, "200", "Lấy danh sách voucher thành công."));
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách voucher thành công."));        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<PromotionDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+    
+    /// <summary>
+    ///     Lấy details voucher
+    /// </summary>
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetMyPromotionById(Guid id)
+    {
+        try
+        {
+            var result = await _promotionService.GetPromotionByIdAsync(id);
+            return Ok(ApiResult<object>.Success(result, "200", "Lấy voucher thành công."));
         }
         catch (Exception ex)
         {

@@ -37,6 +37,7 @@ public class SystemController : ControllerBase
             await SeedCategories();
             await SeedProducts();
             await SeedBlindBoxes();
+            await SeedPromotions();
             return Ok(ApiResult<object>.Success(new
             {
                 Message = "Data seeded successfully."
@@ -706,6 +707,109 @@ public class SystemController : ControllerBase
 
             _logger.Success($"[SeedBlindBoxes] Đã seed blind box cho category {category.Name} thành công.");
         }
+    }
+
+    private async Task SeedPromotions()
+    {
+        if (_context.Promotions.Any())
+        {
+            _logger.Info("[SeedPromotions] Đã tồn tại promotions. Bỏ qua seed.");
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+
+        // Lấy seller mẫu
+        var seller = await _context.Sellers.FirstOrDefaultAsync();
+        if (seller == null)
+        {
+            _logger.Warn("[SeedPromotions] Không tìm thấy Seller để tạo promotion.");
+            return;
+        }
+
+        var promotions = new List<Promotion>
+        {
+            new Promotion
+            {
+                Id = Guid.NewGuid(),
+                Code = "SALE10",
+                Description = "Giảm 10% cho tất cả đơn hàng.",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 10,
+                StartDate = now,
+                EndDate = now.AddMonths(1),
+                Status = PromotionStatus.Approved,
+                SellerId = seller.Id,
+                UsageLimit = 200,
+                CreatedByRole = "Staff",
+                CreatedAt = now
+            },
+            new Promotion
+            {
+                Id = Guid.NewGuid(),
+                Code = "FREESH",
+                Description = "Giảm 50K cho đơn từ 500K.",
+                DiscountType = DiscountType.Fixed,
+                DiscountValue = 50000,
+                StartDate = now,
+                EndDate = now.AddMonths(2),
+                Status = PromotionStatus.Pending,
+                SellerId = seller.Id,
+                UsageLimit = 100,
+                CreatedByRole = "Seller",
+                CreatedAt = now
+            },
+            new Promotion
+            {
+                Id = Guid.NewGuid(),
+                Code = "LIMITED",
+                Description = "Voucher giới hạn cho khách VIP.",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 15,
+                StartDate = now,
+                EndDate = now.AddMonths(1),
+                Status = PromotionStatus.Approved,
+                SellerId = seller.Id,
+                UsageLimit = 10,
+                CreatedByRole = "Staff",
+                CreatedAt = now
+            },
+            new Promotion
+            {
+                Id = Guid.NewGuid(),
+                Code = "REJECT",
+                Description = "Voucher test bị từ chối.",
+                DiscountType = DiscountType.Fixed,
+                DiscountValue = 30000,
+                StartDate = now,
+                EndDate = now.AddMonths(1),
+                Status = PromotionStatus.Rejected,
+                SellerId = seller.Id,
+                RejectReason = "Sai thông tin khuyến mãi",
+                UsageLimit = 20,
+                CreatedByRole = "Seller",
+                CreatedAt = now
+            },
+            new Promotion
+            {
+                Id = Guid.NewGuid(),
+                Code = "GLOBAL1",
+                Description = "Voucher toàn sàn cho mọi khách hàng.",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 5,
+                StartDate = now,
+                EndDate = now.AddMonths(1),
+                Status = PromotionStatus.Approved,
+                SellerId = null, // Toàn sàn
+                UsageLimit = null,
+                CreatedByRole = "Admin",
+                CreatedAt = now
+            }
+        };
+
+        await _context.Promotions.AddRangeAsync(promotions);
+        await _context.SaveChangesAsync();
+        _logger.Success("[SeedPromotions] Đã seed 5 promotion mẫu.");
     }
 
     #endregion
