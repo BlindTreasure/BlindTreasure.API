@@ -7,6 +7,7 @@ namespace BlindTreasure.Application.Interfaces;
 public interface IPromotionService
 {
     Task<Pagination<PromotionDto>> GetPromotionsAsync(PromotionQueryParameter param);
+    Task<PromotionDto> GetPromotionByIdAsync(Guid id);
     Task<PromotionDto> CreatePromotionAsync(CreatePromotionDto dto);
     Task<PromotionDto> DeletePromotionAsync(Guid id);
     Task<PromotionDto> UpdatePromotionAsync(Guid id, CreatePromotionDto dto);

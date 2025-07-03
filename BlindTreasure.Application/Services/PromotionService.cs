@@ -34,7 +34,7 @@ public class PromotionService : IPromotionService
 
     public async Task<Pagination<PromotionDto>> GetPromotionsAsync(PromotionQueryParameter param)
     {
-        var query = _unitOfWork.Promotions.GetQueryable();
+        var query = _unitOfWork.Promotions.GetQueryable().Where(p => !p.IsDeleted); // THÊM WHERE
 
         if (param.SellerId.HasValue)
             query = query.Where(p => p.SellerId == param.SellerId.Value);
@@ -56,6 +56,16 @@ public class PromotionService : IPromotionService
 
         return new Pagination<PromotionDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
+    
+    public async Task<PromotionDto> GetPromotionByIdAsync(Guid id)
+    {
+        var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+        if (promotion == null)
+            throw ErrorHelper.NotFound("Không tìm thấy voucher.");
+        return MapPromotionToDto(promotion);
+    }
+
+
 
     public async Task<PromotionDto> CreatePromotionAsync(CreatePromotionDto dto)
     {
@@ -100,12 +110,15 @@ public class PromotionService : IPromotionService
         promotion.EndDate = dto.EndDate;
         promotion.UsageLimit = dto.UsageLimit;
         promotion.UpdatedAt = DateTime.UtcNow;
+        promotion.CreatedByRole = user.RoleName.ToString();
 
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
 
-        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+        // Gọi hàm get by id (sẽ gọi map luôn)
+        return await GetPromotionByIdAsync(id);
     }
+
 
     public async Task<PromotionDto> DeletePromotionAsync(Guid id)
     {
@@ -122,9 +135,9 @@ public class PromotionService : IPromotionService
         await _unitOfWork.Promotions.SoftRemove(promotion);
         await _unitOfWork.SaveChangesAsync();
 
-        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+        // Gọi lại hàm get by id để trả về dto
+        return await GetPromotionByIdAsync(id);
     }
-
 
     public async Task<PromotionDto> ReviewPromotionAsync(ReviewPromotionDto dto)
     {
@@ -219,8 +232,9 @@ public class PromotionService : IPromotionService
             o.Status != "Cancelled" &&
             o.UserId == order.UserId); // có thể tracking thêm bảng OrderPromotion nếu có
 
-        if (usageCount >= promotion.UsageLimit)
+        if (promotion.UsageLimit.HasValue && usageCount >= promotion.UsageLimit.Value)
             throw ErrorHelper.BadRequest("Voucher đã được sử dụng quá giới hạn.");
+
 
         // // 6. Kiểm tra phạm vi
         // if (promotion.SellerId.HasValue)
@@ -263,7 +277,8 @@ public class PromotionService : IPromotionService
             DiscountValue = dto.DiscountValue,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
-            UsageLimit = dto.UsageLimit
+            UsageLimit = dto.UsageLimit,
+            CreatedByRole = user.RoleName.ToString() // GÁN GIÁ TRỊ Ở ĐÂY
         };
 
         switch (user.RoleName)
@@ -338,6 +353,13 @@ public class PromotionService : IPromotionService
                 throw ErrorHelper.BadRequest("Giá trị giảm cố định phải lớn hơn 0.");
         }
     }
+
+
+    private PromotionDto MapPromotionToDto(Promotion promotion)
+    {
+        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+    }
+
 
     #endregion
 }

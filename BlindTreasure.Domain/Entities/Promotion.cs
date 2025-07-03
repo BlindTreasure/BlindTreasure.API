@@ -13,7 +13,7 @@ public class Promotion : BaseEntity
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
 
-    public int UsageLimit { get; set; }
+    public int? UsageLimit { get; set; }
     public string? RejectReason { get; set; }
 
     public PromotionStatus Status { get; set; } // Enum: [Pending, Approved, Rejected]
@@ -21,6 +21,8 @@ public class Promotion : BaseEntity
     public Guid? SellerId { get; set; } // null = Global
 
     public Seller? Seller { get; set; }
+    public string? CreatedByRole { get; set; }
+
 
     //navigation property to Order
     public ICollection<Order> Orders { get; set; }
