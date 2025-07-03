@@ -1072,7 +1072,8 @@ namespace BlindTreasure.Domain.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("CreatedByRole")
-                        .HasColumnType("text");
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");

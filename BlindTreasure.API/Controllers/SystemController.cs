@@ -741,7 +741,7 @@ public class SystemController : ControllerBase
                 Status = PromotionStatus.Approved,
                 SellerId = seller.Id,
                 UsageLimit = 200,
-                CreatedByRole = "Staff",
+                CreatedByRole = RoleType.Staff,
                 CreatedAt = now
             },
             new Promotion
@@ -756,7 +756,7 @@ public class SystemController : ControllerBase
                 Status = PromotionStatus.Pending,
                 SellerId = seller.Id,
                 UsageLimit = 100,
-                CreatedByRole = "Seller",
+                CreatedByRole = RoleType.Seller,
                 CreatedAt = now
             },
             new Promotion
@@ -771,7 +771,7 @@ public class SystemController : ControllerBase
                 Status = PromotionStatus.Approved,
                 SellerId = seller.Id,
                 UsageLimit = 10,
-                CreatedByRole = "Staff",
+                CreatedByRole = RoleType.Staff,
                 CreatedAt = now
             },
             new Promotion
@@ -787,7 +787,7 @@ public class SystemController : ControllerBase
                 SellerId = seller.Id,
                 RejectReason = "Sai thông tin khuyến mãi",
                 UsageLimit = 20,
-                CreatedByRole = "Seller",
+                CreatedByRole = RoleType.Seller,
                 CreatedAt = now
             },
             new Promotion
@@ -802,7 +802,7 @@ public class SystemController : ControllerBase
                 Status = PromotionStatus.Approved,
                 SellerId = null, // Toàn sàn
                 UsageLimit = null,
-                CreatedByRole = "Admin",
+                CreatedByRole = RoleType.Staff,
                 CreatedAt = now
             }
         };

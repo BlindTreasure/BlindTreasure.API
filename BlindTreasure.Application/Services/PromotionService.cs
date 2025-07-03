@@ -111,7 +111,7 @@ public class PromotionService : IPromotionService
         promotion.EndDate = dto.EndDate;
         promotion.UsageLimit = dto.UsageLimit;
         promotion.UpdatedAt = DateTime.UtcNow;
-        promotion.CreatedByRole = user.RoleName.ToString();
+        promotion.CreatedByRole = user.RoleName;
 
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
@@ -278,7 +278,7 @@ public class PromotionService : IPromotionService
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
             UsageLimit = dto.UsageLimit,
-            CreatedByRole = user.RoleName.ToString() // GÁN GIÁ TRỊ Ở ĐÂY
+            CreatedByRole = user.RoleName // GÁN GIÁ TRỊ Ở ĐÂY
         };
 
         switch (user.RoleName)
@@ -362,7 +362,7 @@ public class PromotionService : IPromotionService
         // Lấy user tạo promotion
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == promotion.CreatedBy);
         if (user != null)
-            dto.CreatedByRole = user.RoleName.ToString();
+            dto.CreatedByRole = user?.RoleName.ToString() ?? "Unknown";
         else
             dto.CreatedByRole = null;
 
