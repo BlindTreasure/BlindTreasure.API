@@ -56,15 +56,16 @@ public class PromotionService : IPromotionService
 
         return new Pagination<PromotionDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
-    
+
     public async Task<PromotionDto> GetPromotionByIdAsync(Guid id)
     {
         var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
         if (promotion == null)
             throw ErrorHelper.NotFound("Không tìm thấy voucher.");
-        return MapPromotionToDto(promotion);
-    }
 
+        var result = await MapPromotionToDto(promotion);
+        return result;
+    }
 
 
     public async Task<PromotionDto> CreatePromotionAsync(CreatePromotionDto dto)
@@ -85,7 +86,7 @@ public class PromotionService : IPromotionService
         await _unitOfWork.Promotions.AddAsync(promotion);
         await _unitOfWork.SaveChangesAsync();
 
-        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+        return await GetPromotionByIdAsync(promotion.Id);
     }
 
     public async Task<PromotionDto> UpdatePromotionAsync(Guid id, CreatePromotionDto dto)
@@ -115,8 +116,7 @@ public class PromotionService : IPromotionService
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
 
-        // Gọi hàm get by id (sẽ gọi map luôn)
-        return await GetPromotionByIdAsync(id);
+        return await GetPromotionByIdAsync(promotion.Id);
     }
 
 
@@ -199,7 +199,7 @@ public class PromotionService : IPromotionService
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
 
-        return _mapperService.Map<Promotion, PromotionDto>(promotion);
+        return await GetPromotionByIdAsync(promotion.Id);
     }
 
     public async Task<PromotionApplicationResultDto> ApplyVoucherAsync(string voucherCode, Guid orderId)
@@ -330,7 +330,7 @@ public class PromotionService : IPromotionService
     private async Task ValidatePromotionInputAsync(CreatePromotionDto dto)
     {
         // Validate format: 6 ký tự in hoa
-        if (!Regex.IsMatch(dto.Code ?? "", @"^[A-Z]{6}$"))
+        if (!Regex.IsMatch(dto.Code, @"^[A-Z]{6}$"))
             throw ErrorHelper.BadRequest("Mã voucher phải gồm đúng 6 ký tự in hoa (A-Z).");
 
         // Validate trùng mã
@@ -355,11 +355,19 @@ public class PromotionService : IPromotionService
     }
 
 
-    private PromotionDto MapPromotionToDto(Promotion promotion)
+    private async Task<PromotionDto> MapPromotionToDto(Promotion promotion)
     {
-        return _mapperService.Map<Promotion, PromotionDto>(promotion);
-    }
+        var dto = _mapperService.Map<Promotion, PromotionDto>(promotion);
 
+        // Lấy user tạo promotion
+        var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == promotion.CreatedBy);
+        if (user != null)
+            dto.CreatedByRole = user.RoleName.ToString();
+        else
+            dto.CreatedByRole = null;
+
+        return dto;
+    }
 
     #endregion
 }
