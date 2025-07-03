@@ -21,7 +21,7 @@ public class Promotion : BaseEntity
     public Guid? SellerId { get; set; } // null = Global
 
     public Seller? Seller { get; set; }
-    public string? CreatedByRole { get; set; }
+    public RoleType? CreatedByRole { get; set; }
 
 
     //navigation property to Order

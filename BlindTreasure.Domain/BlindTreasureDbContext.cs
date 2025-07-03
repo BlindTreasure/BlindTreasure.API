@@ -88,6 +88,13 @@ public class BlindTreasureDbContext : DbContext
                 .HasConversion<string>() // enum -> string
                 .HasMaxLength(32); // giới hạn độ dài nếu cần
         });
+        
+        modelBuilder.Entity<Promotion>(entity =>
+        {
+            entity.Property(e => e.CreatedByRole)
+                .HasConversion<string>() // enum -> string
+                .HasMaxLength(32); // giới hạn độ dài nếu cần
+        });
 
         modelBuilder.Entity<BlindBox>(entity =>
         {
