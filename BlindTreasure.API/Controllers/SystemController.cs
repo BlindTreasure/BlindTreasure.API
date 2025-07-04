@@ -122,6 +122,9 @@ public class SystemController : ControllerBase
             await _cacheService.RemoveByPatternAsync("blindbox:");
             await _cacheService.RemoveByPatternAsync("gemini:");
             await _cacheService.RemoveByPatternAsync("address:");
+            await _cacheService.RemoveByPatternAsync("inventoryitem:");
+            await _cacheService.RemoveByPatternAsync("Promotion:");
+            
 
             return Ok(ApiResult<object>.Success("200", "Clear caching thành công."));
         }
@@ -181,10 +184,7 @@ public class SystemController : ControllerBase
 
                 await transaction.CommitAsync();
 
-                await _cacheService.RemoveByPatternAsync("user:");
-                await _cacheService.RemoveByPatternAsync("seller:");
-                await _cacheService.RemoveByPatternAsync("product:");
-                await _cacheService.RemoveByPatternAsync("category:");
+
 
                 _logger.Success("Xóa sạch dữ liệu trong database thành công.");
             }
@@ -729,7 +729,7 @@ public class SystemController : ControllerBase
 
         var promotions = new List<Promotion>
         {
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "SALE10",
@@ -744,7 +744,7 @@ public class SystemController : ControllerBase
                 CreatedByRole = RoleType.Staff,
                 CreatedAt = now
             },
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "FREESH",
@@ -759,7 +759,7 @@ public class SystemController : ControllerBase
                 CreatedByRole = RoleType.Seller,
                 CreatedAt = now
             },
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "LIMITED",
@@ -774,7 +774,7 @@ public class SystemController : ControllerBase
                 CreatedByRole = RoleType.Staff,
                 CreatedAt = now
             },
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "REJECT",
@@ -790,7 +790,7 @@ public class SystemController : ControllerBase
                 CreatedByRole = RoleType.Seller,
                 CreatedAt = now
             },
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "GLOBAL1",

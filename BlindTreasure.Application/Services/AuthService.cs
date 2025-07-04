@@ -154,10 +154,10 @@ public class AuthService : IAuthService
         // Sau khi xác thực thành công
         await _notificationService.SendNotificationToUserAsync(
             user.Id,
-            title: "Chào mừng!",
-            message: $"Chào mừng {user.FullName} quay trở lại BlindTreasure.",
-            type: NotificationType.System,
-            cooldown: TimeSpan.FromHours(1) // chỉ gửi 1 lần mỗi giờ
+            "Chào mừng!",
+            $"Chào mừng {user.FullName} quay trở lại BlindTreasure.",
+            NotificationType.System,
+            TimeSpan.FromHours(1) // chỉ gửi 1 lần mỗi giờ
         );
 
         _logger.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");

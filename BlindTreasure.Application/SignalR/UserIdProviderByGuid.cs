@@ -8,7 +8,7 @@ public class UserIdProviderByGuid : IUserIdProvider
     public string? GetUserId(HubConnectionContext connection)
     {
         var id = connection.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        Console.WriteLine($"[SignalR] Connected with userId: {(id ?? "NULL")}");
+        Console.WriteLine($"[SignalR] Connected with userId: {id ?? "NULL"}");
         return id;
     }
 }

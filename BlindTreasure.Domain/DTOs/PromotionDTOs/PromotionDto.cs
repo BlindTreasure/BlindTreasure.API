@@ -11,12 +11,11 @@ public class PromotionDto
     public decimal DiscountValue { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
-    public int UsageLimit { get; set; }
+    public int? UsageLimit { get; set; }
     public PromotionStatus Status { get; set; } // "Approved", "Pending", "Rejected"
     public Guid? SellerId { get; set; } // null nếu là global
     public string? RejectReason { get; set; }
 
     public RoleType? CreatedByRole { get; set; }
     public DateTime? UpdatedAt { get; set; }
-
 }
