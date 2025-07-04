@@ -122,6 +122,9 @@ public class SystemController : ControllerBase
             await _cacheService.RemoveByPatternAsync("blindbox:");
             await _cacheService.RemoveByPatternAsync("gemini:");
             await _cacheService.RemoveByPatternAsync("address:");
+            await _cacheService.RemoveByPatternAsync("inventoryitem:");
+            await _cacheService.RemoveByPatternAsync("Promotion:");
+            
 
             return Ok(ApiResult<object>.Success("200", "Clear caching thành công."));
         }
@@ -181,10 +184,7 @@ public class SystemController : ControllerBase
 
                 await transaction.CommitAsync();
 
-                await _cacheService.RemoveByPatternAsync("user:");
-                await _cacheService.RemoveByPatternAsync("seller:");
-                await _cacheService.RemoveByPatternAsync("product:");
-                await _cacheService.RemoveByPatternAsync("category:");
+
 
                 _logger.Success("Xóa sạch dữ liệu trong database thành công.");
             }

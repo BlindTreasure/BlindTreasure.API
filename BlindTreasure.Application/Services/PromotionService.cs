@@ -20,9 +20,10 @@ public class PromotionService : IPromotionService
     private readonly IMapperService _mapperService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserService _userService;
+    private readonly ICacheService _cacheService;
 
     public PromotionService(IUnitOfWork unitOfWork, ILoggerService loggerService, IMapperService mapperService,
-        IClaimsService claimsService, IUserService userService, IEmailService emailService)
+        IClaimsService claimsService, IUserService userService, IEmailService emailService, ICacheService cacheService)
     {
         _unitOfWork = unitOfWork;
         _loggerService = loggerService;
@@ -30,6 +31,7 @@ public class PromotionService : IPromotionService
         _claimsService = claimsService;
         _userService = userService;
         _emailService = emailService;
+        _cacheService = cacheService;
     }
 
     public async Task<Pagination<PromotionDto>> GetPromotionsAsync(PromotionQueryParameter param)
@@ -64,11 +66,17 @@ public class PromotionService : IPromotionService
 
     public async Task<PromotionDto> GetPromotionByIdAsync(Guid id)
     {
+        var cacheKey = $"Promotion:Detail:{id}";
+        var cached = await _cacheService.GetAsync<PromotionDto>(cacheKey);
+        if (cached != null) return cached;
+
         var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
         if (promotion == null)
             throw ErrorHelper.NotFound("Không tìm thấy voucher.");
 
         var result = await MapPromotionToDto(promotion);
+
+        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         return result;
     }
 
@@ -120,6 +128,10 @@ public class PromotionService : IPromotionService
 
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
+
+        // Xóa cache detail và list
+        await _cacheService.RemoveAsync($"Promotion:Detail:{id}");
+        await _cacheService.RemoveByPatternAsync("Promotion:List:*");
 
         return await GetPromotionByIdAsync(promotion.Id);
     }
@@ -325,7 +337,7 @@ public class PromotionService : IPromotionService
 
             var count = await _unitOfWork.Promotions.CountAsync(p =>
                 p.SellerId == seller.Id &&
-                (p.Status == PromotionStatus.Pending || p.Status == PromotionStatus.Approved));
+                p.Status == PromotionStatus.Pending);
 
             if (count >= 3)
                 throw ErrorHelper.BadRequest("Bạn chỉ được tạo tối đa 3 voucher đang chờ duyệt hoặc đã duyệt.");
