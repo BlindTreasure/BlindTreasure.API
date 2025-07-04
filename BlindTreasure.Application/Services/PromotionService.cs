@@ -36,13 +36,30 @@ public class PromotionService : IPromotionService
 
     public async Task<Pagination<PromotionDto>> GetPromotionsAsync(PromotionQueryParameter param)
     {
-        var query = _unitOfWork.Promotions.GetQueryable().Where(p => !p.IsDeleted); // THÊM WHERE
+        var currentUserId = _claimsService.CurrentUserId;
+        var currentUser = await _userService.GetUserById(currentUserId, true);
+        if (currentUser == null)
+            throw ErrorHelper.Unauthorized("Không tìm thấy thông tin người dùng.");
 
+        var query = _unitOfWork.Promotions.GetQueryable().Where(p => !p.IsDeleted);
+
+        // Nếu có sellerId → ưu tiên lọc theo seller (bỏ qua status)
         if (param.SellerId.HasValue)
+        {
             query = query.Where(p => p.SellerId == param.SellerId.Value);
-
-        if (param.Status.HasValue)
-            query = query.Where(p => p.Status == param.Status.Value);
+        }
+        else if (currentUser.RoleName != RoleType.Staff && currentUser.RoleName != RoleType.Admin)
+        {
+            // Nếu không phải staff/admin, lọc theo status nếu có
+            if (param.Status.HasValue)
+                query = query.Where(p => p.Status == param.Status.Value);
+        }
+        else
+        {
+            // Là staff/admin → không lọc seller, lọc status nếu có
+            if (param.Status.HasValue)
+                query = query.Where(p => p.Status == param.Status.Value);
+        }
 
         var totalCount = await query.CountAsync();
 
@@ -55,7 +72,6 @@ public class PromotionService : IPromotionService
             .Skip((param.PageIndex - 1) * param.PageSize)
             .Take(param.PageSize)
             .ToListAsync();
-
 
         var dtos = items
             .Select(p => _mapperService.Map<Promotion, PromotionDto>(p))
