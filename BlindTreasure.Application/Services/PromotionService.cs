@@ -98,6 +98,7 @@ public class PromotionService : IPromotionService
         var promotion = await SetPromotionDataAsync(dto, user);
         await _unitOfWork.Promotions.AddAsync(promotion);
         await _unitOfWork.SaveChangesAsync();
+        await _cacheService.RemoveByPatternAsync("Promotion:List:*");
 
         return await GetPromotionByIdAsync(promotion.Id);
     }
@@ -151,7 +152,8 @@ public class PromotionService : IPromotionService
 
         await _unitOfWork.Promotions.SoftRemove(promotion);
         await _unitOfWork.SaveChangesAsync();
-
+        await _cacheService.RemoveAsync($"Promotion:Detail:{id}");
+        await _cacheService.RemoveByPatternAsync("Promotion:List:*");
         // Gọi lại hàm get by id để trả về dto
         return await GetPromotionByIdAsync(id);
     }
@@ -215,7 +217,8 @@ public class PromotionService : IPromotionService
 
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
-
+        await _cacheService.RemoveAsync($"Promotion:Detail:{promotion.Id}");
+        await _cacheService.RemoveByPatternAsync("Promotion:List:*");
         return await GetPromotionByIdAsync(promotion.Id);
     }
 
