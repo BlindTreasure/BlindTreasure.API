@@ -137,7 +137,6 @@ public class PromotionService : IPromotionService
         return await GetPromotionByIdAsync(promotion.Id);
     }
 
-
     public async Task<PromotionDto> DeletePromotionAsync(Guid id)
     {
         var currentUserId = _claimsService.CurrentUserId;
@@ -154,8 +153,11 @@ public class PromotionService : IPromotionService
         await _unitOfWork.SaveChangesAsync();
         await _cacheService.RemoveAsync($"Promotion:Detail:{id}");
         await _cacheService.RemoveByPatternAsync("Promotion:List:*");
-        // Gọi lại hàm get by id để trả về dto
-        return await GetPromotionByIdAsync(id);
+
+        _loggerService.Success($"[DeleteBlindBoxAsync] Đã xoá Blind Box {promotion.Id}.");
+        var result = _mapperService.Map<Promotion, PromotionDto>(promotion);
+
+        return result;
     }
 
     public async Task<PromotionDto> ReviewPromotionAsync(ReviewPromotionDto dto)
@@ -323,6 +325,11 @@ public class PromotionService : IPromotionService
         }
 
         return promotion;
+    }
+
+    private async Task<Promotion?> GetPromotionByIdRawAsync(Guid id)
+    {
+        return await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == id);
     }
 
     private async Task ValidateCreatePromotionAsync(User user)
