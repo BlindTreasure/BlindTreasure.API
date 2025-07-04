@@ -10,6 +10,4 @@ public class NotificationHub : Hub
         Console.WriteLine($"[Hub] Gửi noti đến userId={userId}, payload={JsonSerializer.Serialize(payload)}");
         await hubContext.Clients.User(userId).SendAsync("ReceiveNotification", payload);
     }
-
-
 }

@@ -58,7 +58,8 @@ public class PromotionController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách voucher thành công."));        }
+            }, "200", "Lấy danh sách voucher thành công."));
+        }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
@@ -66,7 +67,7 @@ public class PromotionController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-    
+
     /// <summary>
     ///     Lấy details voucher
     /// </summary>

@@ -45,10 +45,15 @@ public class PromotionService : IPromotionService
         var totalCount = await query.CountAsync();
 
         var items = await query
-            .OrderByDescending(p => p.CreatedAt)
+            .OrderBy(p =>
+                p.Status == PromotionStatus.Pending ? 0 :
+                p.Status == PromotionStatus.Approved ? 1 :
+                2)
+            .ThenByDescending(p => p.CreatedAt)
             .Skip((param.PageIndex - 1) * param.PageSize)
             .Take(param.PageSize)
             .ToListAsync();
+
 
         var dtos = items
             .Select(p => _mapperService.Map<Promotion, PromotionDto>(p))
@@ -277,8 +282,8 @@ public class PromotionService : IPromotionService
             DiscountValue = dto.DiscountValue,
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
-            UsageLimit = dto.UsageLimit,
-            CreatedByRole = user.RoleName // GÁN GIÁ TRỊ Ở ĐÂY
+            UsageLimit = dto.UsageLimit > 0 ? dto.UsageLimit : null,
+            CreatedByRole = user.RoleName
         };
 
         switch (user.RoleName)
@@ -364,7 +369,7 @@ public class PromotionService : IPromotionService
         if (user != null)
             dto.CreatedByRole = user.RoleName;
         else
-            dto.CreatedByRole = null;   
+            dto.CreatedByRole = null;
 
         return dto;
     }

@@ -729,7 +729,7 @@ public class SystemController : ControllerBase
 
         var promotions = new List<Promotion>
         {
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "SALE10",
@@ -744,7 +744,7 @@ public class SystemController : ControllerBase
                 CreatedByRole = RoleType.Staff,
                 CreatedAt = now
             },
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "FREESH",
@@ -759,7 +759,7 @@ public class SystemController : ControllerBase
                 CreatedByRole = RoleType.Seller,
                 CreatedAt = now
             },
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "LIMITED",
@@ -774,7 +774,7 @@ public class SystemController : ControllerBase
                 CreatedByRole = RoleType.Staff,
                 CreatedAt = now
             },
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "REJECT",
@@ -790,7 +790,7 @@ public class SystemController : ControllerBase
                 CreatedByRole = RoleType.Seller,
                 CreatedAt = now
             },
-            new Promotion
+            new()
             {
                 Id = Guid.NewGuid(),
                 Code = "GLOBAL1",

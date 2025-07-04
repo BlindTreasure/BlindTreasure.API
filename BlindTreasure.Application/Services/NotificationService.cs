@@ -25,7 +25,8 @@ public class NotificationService : INotificationService
         _userService = userService;
     }
 
-    public async Task SendNotificationToUserAsync(Guid userId, string title, string message, NotificationType type, TimeSpan? cooldown = null)
+    public async Task SendNotificationToUserAsync(Guid userId, string title, string message, NotificationType type,
+        TimeSpan? cooldown = null)
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null) return;
@@ -65,5 +66,4 @@ public class NotificationService : INotificationService
         // if (cooldown.HasValue)
         //     await _cacheService.SetAsync(cacheKey, true, cooldown.Value);
     }
-
 }
