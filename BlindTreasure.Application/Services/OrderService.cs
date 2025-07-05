@@ -174,8 +174,11 @@ public class OrderService : IOrderService
         if (param.PlacedTo.HasValue)
             query = query.Where(o => o.PlacedAt <= param.PlacedTo.Value);
 
-        // Sắp xếp mặc định: mới nhất trước
-        query = query.OrderByDescending(o => o.CreatedAt);
+        // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
+        if (param.Desc)
+            query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
+        else
+            query = query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
 
         var totalCount = await query.CountAsync();
 

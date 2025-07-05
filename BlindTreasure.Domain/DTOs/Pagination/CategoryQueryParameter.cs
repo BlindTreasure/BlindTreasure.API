@@ -12,10 +12,7 @@ public class CategoryQueryParameter : PaginationParameter
     /// </summary>
     public CategorySortField SortBy { get; set; } = CategorySortField.CreatedAt;
 
-    /// <summary>
-    ///     Sắp xếp giảm dần (true) hay tăng dần (false).
-    /// </summary>
-    public bool Desc { get; set; } = true;
+    
 }
 
 public enum CategorySortField
