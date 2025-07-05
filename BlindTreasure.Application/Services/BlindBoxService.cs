@@ -99,8 +99,11 @@ public class BlindBoxService : IBlindBoxService
         }
 
 
-        // Sort: UpdatedAt desc, CreatedAt desc
-        query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
+        // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
+        if (param.Desc)
+            query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
+        else
+            query = query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
 
         var count = await query.CountAsync();
 

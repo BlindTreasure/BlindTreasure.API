@@ -120,8 +120,11 @@ public class CustomerBlindBoxService : ICustomerBlindBoxService
         if (param.BlindBoxId.HasValue)
             query = query.Where(i => i.BlindBoxId == param.BlindBoxId.Value);
 
-        // Sắp xếp mặc định: mới nhất trước
-        query = query.OrderByDescending(i => i.UpdatedAt ?? i.CreatedAt);
+        // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
+        if (param.Desc)
+            query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
+        else
+            query = query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
 
         var count = await query.CountAsync();
 
