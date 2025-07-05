@@ -13,8 +13,9 @@ public class BlindBoxItem : BaseEntity
     public int Quantity { get; set; }
     public decimal DropRate { get; set; }
 
-    public BlindBoxRarity Rarity { get; set; }
-    public bool IsSecret => Rarity == BlindBoxRarity.Secret;
+    public Guid RarityId { get; set; }
+    public RarityConfig Rarity { get; set; }
+    public bool IsSecret { get; set; }
 
     public bool IsActive { get; set; }
 
