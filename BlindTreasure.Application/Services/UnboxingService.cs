@@ -25,38 +25,37 @@ public class UnboxingService : IUnboxingService
         _currentTime = currentTime;
     }
 
-    public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
-    {
-        var userId = _claimsService.CurrentUserId;
-        var now = DateTime.UtcNow;
-
-        // PHASE 1: Kiểm tra hộp có hợp lệ để mở không
-        var customerBox = await GetValidCustomerBlindBoxAsync(customerBlindBoxId, userId);
-        var blindBox = customerBox.BlindBox;
-
-        // PHASE 2: Chọn ngẫu nhiên 1 item từ hộp theo tỷ lệ đã được duyệt
-        var selectedItem = await SelectItemToUnbox(blindBox);
-        if (selectedItem == null)
-        {
-            _loggerService.Warn(
-                $"[Unbox] Không thể chọn item từ hộp {customerBlindBoxId} (User {userId}) - Không có item hợp lệ.");
-            throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
-        }
-
-        // PHASE 3: Gán item cho người dùng
-        await GrantUnboxedItemToUser(selectedItem, customerBox, userId, now);
-
-        // PHASE 4: Ghi log kết quả
-        _loggerService.Info(
-            $"[Unbox] User {userId} mở hộp {customerBlindBoxId} nhận được item {selectedItem.ProductId}");
-
-        return new UnboxResultDto
-        {
-            ProductId = selectedItem.ProductId,
-            Rarity = selectedItem.Rarity,
-            UnboxedAt = now
-        };
-    }
+    // public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
+    // {
+    //     var userId = _claimsService.CurrentUserId;
+    //     var now = DateTime.UtcNow;
+    //
+    //     // PHASE 1: Kiểm tra hộp có hợp lệ để mở không
+    //     var customerBox = await GetValidCustomerBlindBoxAsync(customerBlindBoxId, userId);
+    //     var blindBox = customerBox.BlindBox;
+    //
+    //     // PHASE 2: Chọn ngẫu nhiên 1 item từ hộp theo tỷ lệ đã được duyệt
+    //     var selectedItem = await SelectItemToUnbox(blindBox);
+    //     if (selectedItem == null)
+    //     {
+    //         _loggerService.Warn(
+    //             $"[Unbox] Không thể chọn item từ hộp {customerBlindBoxId} (User {userId}) - Không có item hợp lệ.");
+    //         throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
+    //     }
+    //
+    //     // PHASE 3: Gán item cho người dùng
+    //     await GrantUnboxedItemToUser(selectedItem, customerBox, userId, now);
+    //
+    //     // PHASE 4: Ghi log kết quả
+    //     _loggerService.Info(
+    //         $"[Unbox] User {userId} mở hộp {customerBlindBoxId} nhận được item {selectedItem.ProductId}");
+    //
+    //     return new UnboxResultDto
+    //     {
+    //         ProductId = selectedItem.ProductId,
+    //         UnboxedAt = now
+    //     };
+    // }
 
     public async Task<List<ProbabilityConfig>> GetApprovedProbabilitiesAsync(Guid blindBoxId)
     {
@@ -110,27 +109,27 @@ public class UnboxingService : IUnboxingService
         return box;
     }
 
-    private async Task<BlindBoxItem?> SelectItemToUnbox(BlindBox blindBox)
-    {
-        var items = blindBox.BlindBoxItems
-            .Where(i => !i.IsDeleted && i.IsActive && i.Quantity > 0)
-            .ToList();
-
-        if (!items.Any())
-        {
-            _loggerService.Warn($"[Unbox] Hộp {blindBox.Id} không còn item hợp lệ để mở.");
-            throw ErrorHelper.BadRequest("Hộp này không còn item nào để mở.");
-        }
-
-        var probabilities = await GetApprovedProbabilitiesAsync(blindBox.Id);
-        var selected = RandomByRarityAndProbability(items, probabilities);
-
-        if (selected == null)
-            _loggerService.Warn(
-                $"[Unbox] Không chọn được item từ BlindBox {blindBox.Id} sau khi random theo xác suất.");
-
-        return selected;
-    }
+    // private async Task<BlindBoxItem?> SelectItemToUnbox(BlindBox blindBox)
+    // {
+    //     var items = blindBox.BlindBoxItems
+    //         .Where(i => !i.IsDeleted && i.IsActive && i.Quantity > 0)
+    //         .ToList();
+    //
+    //     if (!items.Any())
+    //     {
+    //         _loggerService.Warn($"[Unbox] Hộp {blindBox.Id} không còn item hợp lệ để mở.");
+    //         throw ErrorHelper.BadRequest("Hộp này không còn item nào để mở.");
+    //     }
+    //
+    //     var probabilities = await GetApprovedProbabilitiesAsync(blindBox.Id);
+    //     var selected = RandomByRarityAndProbability(items, probabilities);
+    //
+    //     if (selected == null)
+    //         _loggerService.Warn(
+    //             $"[Unbox] Không chọn được item từ BlindBox {blindBox.Id} sau khi random theo xác suất.");
+    //
+    //     return selected;
+    // }
 
     private async Task<InventoryItem> GrantUnboxedItemToUser(
         BlindBoxItem selectedItem,
@@ -166,62 +165,62 @@ public class UnboxingService : IUnboxingService
         return inventory;
     }
 
-    private BlindBoxItem? RandomByRarityAndProbability(List<BlindBoxItem> items, List<ProbabilityConfig> probabilities)
-    {
-        // Bước 1: Nhóm các item theo độ hiếm (rarity)
-        var rarityGroups = items
-            .GroupBy(i => i.Rarity)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        foreach (var group in rarityGroups)
-            _loggerService.Info($"[Unbox] Tier {group.Key} có {group.Value.Count} item.");
-
-        // Bước 2: Tính tổng xác suất cho mỗi tier
-        var rarityDropRates = new Dictionary<BlindBoxRarity, decimal>();
-
-        foreach (var rarity in rarityGroups.Keys)
-        {
-            var total = rarityGroups[rarity]
-                .Select(i => probabilities.FirstOrDefault(p => p.BlindBoxItemId == i.Id)?.Probability ?? 0)
-                .Sum();
-
-            rarityDropRates[rarity] = total;
-            _loggerService.Info($"[Unbox] Tổng xác suất tier {rarity}: {total}%");
-        }
-
-        // Bước 3: Random tier theo xác suất tổng
-        var selectedRarity = WeightedRandom(rarityDropRates);
-
-        if (!rarityGroups.ContainsKey(selectedRarity))
-        {
-            _loggerService.Warn($"[Unbox] Không tìm thấy tier {selectedRarity} trong danh sách item.");
-            return null;
-        }
-
-        var itemGroup = rarityGroups[selectedRarity];
-
-        _loggerService.Info(
-            $"[Unbox] Đã chọn tier: {selectedRarity} với {itemGroup.Count} item. Tổng xác suất tier: {rarityDropRates[selectedRarity]}%");
-
-        foreach (var item in itemGroup)
-        {
-            var p = probabilities.FirstOrDefault(pc => pc.BlindBoxItemId == item.Id)?.Probability ?? 0;
-            _loggerService.Info($"[Unbox] └─ ItemId={item.ProductId}, DropRate={p}%");
-        }
-
-        // Bước 4: Random item trong tier vừa chọn
-        var itemDropRates = itemGroup.ToDictionary(
-            i => i,
-            i => probabilities.FirstOrDefault(p => p.BlindBoxItemId == i.Id)?.Probability ?? 0);
-
-        var selectedItem = WeightedRandom(itemDropRates);
-
-        if (selectedItem != null)
-            _loggerService.Info(
-                $"[Unbox] Đã chọn item: ProductId={selectedItem.ProductId}, Tier={selectedItem.Rarity}");
-
-        return selectedItem;
-    }
+    // private BlindBoxItem? RandomByRarityAndProbability(List<BlindBoxItem> items, List<ProbabilityConfig> probabilities)
+    // {
+    //     // Bước 1: Nhóm các item theo độ hiếm (rarity)
+    //     var rarityGroups = items
+    //         .GroupBy(i => i.Rarity)
+    //         .ToDictionary(g => g.Key, g => g.ToList());
+    //
+    //     foreach (var group in rarityGroups)
+    //         _loggerService.Info($"[Unbox] Tier {group.Key} có {group.Value.Count} item.");
+    //
+    //     // Bước 2: Tính tổng xác suất cho mỗi tier
+    //     var rarityDropRates = new Dictionary<BlindBoxRarity, decimal>();
+    //
+    //     foreach (var rarity in rarityGroups.Keys)
+    //     {
+    //         var total = rarityGroups[rarity]
+    //             .Select(i => probabilities.FirstOrDefault(p => p.BlindBoxItemId == i.Id)?.Probability ?? 0)
+    //             .Sum();
+    //
+    //         rarityDropRates[rarity] = total;
+    //         _loggerService.Info($"[Unbox] Tổng xác suất tier {rarity}: {total}%");
+    //     }
+    //
+    //     // Bước 3: Random tier theo xác suất tổng
+    //     var selectedRarity = WeightedRandom(rarityDropRates);
+    //
+    //     if (!rarityGroups.ContainsKey(selectedRarity))
+    //     {
+    //         _loggerService.Warn($"[Unbox] Không tìm thấy tier {selectedRarity} trong danh sách item.");
+    //         return null;
+    //     }
+    //
+    //     var itemGroup = rarityGroups[selectedRarity];
+    //
+    //     _loggerService.Info(
+    //         $"[Unbox] Đã chọn tier: {selectedRarity} với {itemGroup.Count} item. Tổng xác suất tier: {rarityDropRates[selectedRarity]}%");
+    //
+    //     foreach (var item in itemGroup)
+    //     {
+    //         var p = probabilities.FirstOrDefault(pc => pc.BlindBoxItemId == item.Id)?.Probability ?? 0;
+    //         _loggerService.Info($"[Unbox] └─ ItemId={item.ProductId}, DropRate={p}%");
+    //     }
+    //
+    //     // Bước 4: Random item trong tier vừa chọn
+    //     var itemDropRates = itemGroup.ToDictionary(
+    //         i => i,
+    //         i => probabilities.FirstOrDefault(p => p.BlindBoxItemId == i.Id)?.Probability ?? 0);
+    //
+    //     var selectedItem = WeightedRandom(itemDropRates);
+    //
+    //     if (selectedItem != null)
+    //         _loggerService.Info(
+    //             $"[Unbox] Đã chọn item: ProductId={selectedItem.ProductId}, Tier={selectedItem.Rarity}");
+    //
+    //     return selectedItem;
+    // }
 
     private static T? WeightedRandom<T>(Dictionary<T, decimal> weightedDict)
     {

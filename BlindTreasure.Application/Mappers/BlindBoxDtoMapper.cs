@@ -48,7 +48,6 @@ public static class BlindBoxDtoMapper
             ProductName = item.Product?.Name,
             Quantity = item.Quantity,
             DropRate = item.DropRate,
-            Rarity = item.Rarity,
             ImageUrl = item.Product?.ImageUrls?.FirstOrDefault()
         };
     }

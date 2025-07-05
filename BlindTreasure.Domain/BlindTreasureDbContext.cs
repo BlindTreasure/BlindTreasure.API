@@ -22,6 +22,10 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<Category> Categories { get; set; }
     public DbSet<BlindBox> BlindBoxes { get; set; }
     public DbSet<BlindBoxItem> BlindBoxItems { get; set; }
+    
+    public DbSet<RarityConfig> RarityConfigs { get; set; }
+    
+    
     public DbSet<ProbabilityConfig> ProbabilityConfigs { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
     public DbSet<CustomerBlindBox> CustomerBlindBoxes { get; set; }
@@ -188,12 +192,6 @@ public class BlindTreasureDbContext : DbContext
                 .IsRequired();
         });
 
-
-        modelBuilder.Entity<BlindBoxItem>()
-            .Property(p => p.Rarity)
-            .HasConversion<string>()
-            .HasMaxLength(32); // nếu cần giới hạn
-
         modelBuilder.Entity<BlindBox>(entity =>
         {
             entity.Property(b => b.Name)
@@ -287,6 +285,13 @@ public class BlindTreasureDbContext : DbContext
             .HasOne(pc => pc.BlindBoxItem)
             .WithMany(i => i.ProbabilityConfigs)
             .HasForeignKey(pc => pc.BlindBoxItemId);
+        
+        modelBuilder.Entity<BlindBoxItem>()
+            .HasOne(bi => bi.Rarity)
+            .WithMany()
+            .HasForeignKey(bi => bi.RarityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
 
         // ProbabilityConfig ↔ ApprovedByUser (1-n, restrict)
         modelBuilder.Entity<ProbabilityConfig>()

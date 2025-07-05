@@ -23,7 +23,8 @@ public class UnitOfWork(
     IGenericRepository<Address> addresses,
     IGenericRepository<InventoryItem> inventoryItems,
     IGenericRepository<CustomerBlindBox> customerBlindboxes,
-    IGenericRepository<Notification> notifications)
+    IGenericRepository<Notification> notifications,
+    IGenericRepository<RarityConfig> rarityConfigs)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
@@ -33,6 +34,7 @@ public class UnitOfWork(
     public IGenericRepository<Product> Products { get; } = products;
     public IGenericRepository<BlindBox> BlindBoxes { get; } = blindBoxes;
     public IGenericRepository<BlindBoxItem> BlindBoxItems { get; } = blindBoxItems;
+    public IGenericRepository<RarityConfig> RarityConfigs { get; } = rarityConfigs;
     public IGenericRepository<ProbabilityConfig> ProbabilityConfigs { get; } = probabilityConfigs;
     public IGenericRepository<Promotion> Promotions { get; } = promotions;
     public IGenericRepository<CartItem> CartItems { get; } = cartItems;

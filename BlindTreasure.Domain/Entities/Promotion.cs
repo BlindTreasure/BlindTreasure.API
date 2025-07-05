@@ -4,7 +4,7 @@ namespace BlindTreasure.Domain.Entities;
 
 public class Promotion : BaseEntity
 {
-    public string Code { get; set; }
+    public string Code { get; set; } 
     public string Description { get; set; }
 
     public DiscountType DiscountType { get; set; } // Enum: [Percentage, Fixed]
