@@ -18,4 +18,9 @@ public class PaginationParameter
         get => _pageSize;
         set => _pageSize = value > MaxPageSize ? MaxPageSize : value;
     }
+
+    /// <summary>
+    ///     Sắp xếp giảm dần (true) hay tăng dần (false).
+    /// </summary>
+    public bool Desc { get; set; } = true;
 }

@@ -63,12 +63,18 @@ public class PromotionService : IPromotionService
 
         var totalCount = await query.CountAsync();
 
-        var items = await query
-            .OrderBy(p =>
-                p.Status == PromotionStatus.Pending ? 0 :
-                p.Status == PromotionStatus.Approved ? 1 :
-                2)
-            .ThenByDescending(p => p.CreatedAt)
+        var orderedQuery = query
+    .OrderBy(p =>
+        p.Status == PromotionStatus.Pending ? 0 :
+        p.Status == PromotionStatus.Approved ? 1 :
+        2);
+
+        if (param.Desc)
+            orderedQuery = orderedQuery.ThenByDescending(p => p.CreatedAt);
+        else
+            orderedQuery = orderedQuery.ThenBy(p => p.CreatedAt);
+
+        var items = await orderedQuery
             .Skip((param.PageIndex - 1) * param.PageSize)
             .Take(param.PageSize)
             .ToListAsync();

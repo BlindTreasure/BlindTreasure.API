@@ -24,8 +24,5 @@ public class UserQueryParameter : PaginationParameter
     /// </summary>
     public UserSortField SortBy { get; set; } = UserSortField.CreatedAt;
 
-    /// <summary>
-    ///     Sắp xếp giảm dần (true) hay tăng dần (false).
-    /// </summary>
-    public bool Desc { get; set; } = true;
+    // Có field Desc đã bỏ vào pagination
 }

@@ -115,7 +115,11 @@ public class ProductService : IProductService
             query = query.Where(p => p.CreatedAt <= param.ReleaseDateTo.Value);
 
         // Sort: UpdatedAt desc, CreatedAt desc
-        query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
+        // Sort: UpdatedAt desc, CreatedAt desc (now respects param.Desc)
+        if (param.Desc)
+            query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
+        else
+            query = query.OrderBy(p => p.UpdatedAt ?? p.CreatedAt);
 
         var count = await query.CountAsync();
 

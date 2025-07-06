@@ -145,8 +145,11 @@ public class UserService : IUserService
         if (param.RoleName.HasValue)
             query = query.Where(u => u.RoleName == param.RoleName.Value);
 
-        // Sort: UpdatedAt desc, CreatedAt desc
-        query = query.OrderByDescending(u => u.UpdatedAt ?? u.CreatedAt);
+        // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
+        if (param.Desc)
+            query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
+        else
+            query = query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
 
         var total = await query.CountAsync();
         if (total == 0)
