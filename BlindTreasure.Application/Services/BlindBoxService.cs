@@ -759,16 +759,23 @@ public class BlindBoxService : IBlindBoxService
         dto.Brand = blindBox.Seller?.CompanyName;
 
         // Gán danh sách item
-        dto.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
+        if (blindBox.BlindBoxItems != null) dto.Items = MapToBlindBoxItemDtos(blindBox.BlindBoxItems);
+
+        return Task.FromResult(dto);
+    }
+
+    
+    private List<BlindBoxItemDto> MapToBlindBoxItemDtos(IEnumerable<BlindBoxItem> items)
+    {
+        return items.Select(item => new BlindBoxItemDto
         {
             ProductId = item.ProductId,
-            Quantity = item.Quantity,
             ProductName = item.Product?.Name ?? string.Empty,
-            ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
-            DropRate = item.ProbabilityConfigs?.OrderByDescending(p => p.ApprovedAt).FirstOrDefault()?.Probability ??
-                       item.DropRate,
+            DropRate = item.DropRate,
+            ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
+            Quantity = item.Quantity,
+            Rarity = item.RarityConfig.Name
         }).ToList();
-        return Task.FromResult(dto);
     }
 
     #endregion
