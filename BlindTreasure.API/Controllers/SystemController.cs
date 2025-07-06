@@ -937,6 +937,25 @@ public class SystemController : ControllerBase
             await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
             await _context.RarityConfigs.AddRangeAsync(rarityConfigs);
             await _context.SaveChangesAsync();
+            
+            // Sau khi SaveChanges xong BlindBox và BlindBoxItems:
+            foreach (var item in blindBoxItems)
+            {
+                var probCfg = new ProbabilityConfig
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxItemId = item.Id,
+                    Probability = item.DropRate,
+                    EffectiveFrom = now,
+                    EffectiveTo = now.AddYears(1), // đảm bảo NOW nằm trong range này
+                    ApprovedBy = sellerUser.Id, // hoặc Id của user staff test (nếu có)
+                    ApprovedAt = now,
+                    CreatedAt = now
+                };
+                await _context.ProbabilityConfigs.AddAsync(probCfg);
+            }
+            await _context.SaveChangesAsync();
+    
 
             _logger.Success($"[SeedBlindBoxes] Đã seed blind box cho category {category.Name} thành công.");
         }
