@@ -18,8 +18,11 @@ public class Seller : BaseEntity
     public string? StripeAccountId { get; set; }
 
 
-    public User User { get; set; }
-    public ICollection<Certificate> Certificates { get; set; }
-    public ICollection<Product> Products { get; set; }
-    public ICollection<BlindBox> BlindBoxes { get; set; }
+    public User? User { get; set; }
+    public ICollection<Certificate>? Certificates { get; set; }
+    public ICollection<Product>? Products { get; set; }
+    public ICollection<BlindBox>? BlindBoxes { get; set; }
+    
+    public ICollection<PromotionParticipant>? PromotionParticipants { get; set; }
+
 }

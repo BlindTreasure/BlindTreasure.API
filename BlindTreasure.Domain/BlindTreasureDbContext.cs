@@ -144,6 +144,24 @@ public class BlindTreasureDbContext : DbContext
                 .HasMaxLength(16);
         });
 
+        modelBuilder.Entity<PromotionParticipant>(entity =>
+        {
+            entity.HasKey(pp => pp.Id);
+
+            entity.HasOne(pp => pp.Promotion)
+                .WithMany(p => p.PromotionParticipants)
+                .HasForeignKey(pp => pp.PromotionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(pp => pp.Seller)
+                .WithMany(s => s.PromotionParticipants)
+                .HasForeignKey(pp => pp.SellerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(pp => new { pp.PromotionId, pp.SellerId }).IsUnique();
+        });
+
+        
         #endregion
 
 
