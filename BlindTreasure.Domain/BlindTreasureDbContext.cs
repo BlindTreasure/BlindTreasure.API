@@ -106,6 +106,13 @@ public class BlindTreasureDbContext : DbContext
                 .HasConversion<string>() // enum -> string
                 .HasMaxLength(32); // giới hạn độ dài nếu cần
         });
+        
+        modelBuilder.Entity<RarityConfig>(entity =>
+        {
+            entity.Property(e => e.Name)
+                .HasConversion<string>() // enum -> string
+                .HasMaxLength(32); // giới hạn độ dài nếu cần
+        });
 
         modelBuilder.Entity<Seller>(entity =>
         {
@@ -286,6 +293,12 @@ public class BlindTreasureDbContext : DbContext
             .WithMany(i => i.ProbabilityConfigs)
             .HasForeignKey(pc => pc.BlindBoxItemId);
 
+        modelBuilder.Entity<BlindBoxItem>()
+            .HasOne(bi => bi.RarityConfig)
+            .WithOne(rc => rc.BlindBoxItem)
+            .HasForeignKey<RarityConfig>(rc => rc.BlindBoxItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+        
         // ProbabilityConfig ↔ ApprovedByUser (1-n, restrict)
         modelBuilder.Entity<ProbabilityConfig>()
             .HasOne(pc => pc.ApprovedByUser)
