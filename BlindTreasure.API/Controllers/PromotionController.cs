@@ -111,7 +111,7 @@ public class PromotionController : ControllerBase
     }
 
     /// <summary>
-    /// STAFF cập nhật thông tin voucher
+    ///     STAFF cập nhật thông tin voucher
     /// </summary>
     [Authorize(Roles = "Staff,Admin")]
     [HttpPut("{id}")]
@@ -133,7 +133,7 @@ public class PromotionController : ControllerBase
     }
 
     /// <summary>
-    /// STAFF xoá mềm voucher
+    ///     STAFF xoá mềm voucher
     /// </summary>
     [Authorize(Roles = "Staff,Admin")]
     [HttpDelete("{id}")]

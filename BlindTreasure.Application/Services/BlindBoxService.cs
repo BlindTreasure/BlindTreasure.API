@@ -438,7 +438,6 @@ public class BlindBoxService : IBlindBoxService
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
-
     public async Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -457,10 +456,6 @@ public class BlindBoxService : IBlindBoxService
         {
             if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
                 throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxNoItems);
-
-            var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
-            if (totalDropRate != 100)
-                throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateMustBe100);
 
             blindBox.Status = BlindBoxStatus.Approved;
             blindBox.UpdatedAt = now;
@@ -667,10 +662,10 @@ public class BlindBoxService : IBlindBoxService
         }
 
         // Phải có ít nhất 1 Secret
-        int countSecret = items.Count(i => i.Rarity == RarityName.Secret);
+        var countSecret = items.Count(i => i.Rarity == RarityName.Secret);
         if (countSecret < 1)
         {
-            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Không có item Secret trong danh sách.");
+            _logger.Warn("[ValidateBlindBoxItemsFullRule] Lỗi: Không có item Secret trong danh sách.");
             throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
         }
 
@@ -706,17 +701,14 @@ public class BlindBoxService : IBlindBoxService
             .Select(r => items.Where(i => i.Rarity == r).Sum(i => i.Weight))
             .ToList();
 
-        for (int i = 1; i < groupWeights.Count; i++)
-        {
+        for (var i = 1; i < groupWeights.Count; i++)
             if (groupWeights[i] > groupWeights[i - 1])
             {
                 _logger.Warn(
                     $"[ValidateBlindBoxItemsFullRule] Lỗi: Tổng weight tier {rarityOrder[i]} = {groupWeights[i]} > {rarityOrder[i - 1]} = {groupWeights[i - 1]}.");
                 throw ErrorHelper.BadRequest("Tổng trọng số của các tier sau không được lớn hơn tier trước.");
             }
-        }
     }
-
 
     private Dictionary<BlindBoxItemDto, decimal> CalculateDropRates(List<BlindBoxItemDto> items)
     {
@@ -745,7 +737,8 @@ public class BlindBoxService : IBlindBoxService
 
         if (hasChild)
         {
-            _logger.Warn($"[ValidateLeafCategoryAsync] Lỗi: Category Id = {categoryId} vẫn còn category con, không được chọn.");
+            _logger.Warn(
+                $"[ValidateLeafCategoryAsync] Lỗi: Category Id = {categoryId} vẫn còn category con, không được chọn.");
             throw ErrorHelper.BadRequest(ErrorMessages.CategoryChildrenError);
         }
     }
@@ -800,7 +793,8 @@ public class BlindBoxService : IBlindBoxService
             DropRate = item.DropRate,
             ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
             Quantity = item.Quantity,
-            Rarity = item.RarityConfig?.Name ?? default
+            Rarity = item.RarityConfig?.Name ?? default,
+            Weight = item.RarityConfig?.Weight ?? 0
         }).ToList();
     }
 

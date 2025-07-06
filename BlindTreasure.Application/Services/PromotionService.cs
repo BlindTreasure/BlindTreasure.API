@@ -14,13 +14,13 @@ namespace BlindTreasure.Application.Services;
 
 public class PromotionService : IPromotionService
 {
+    private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly IEmailService _emailService;
     private readonly ILoggerService _loggerService;
     private readonly IMapperService _mapperService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserService _userService;
-    private readonly ICacheService _cacheService;
 
     public PromotionService(IUnitOfWork unitOfWork, ILoggerService loggerService, IMapperService mapperService,
         IClaimsService claimsService, IUserService userService, IEmailService emailService, ICacheService cacheService)
@@ -64,10 +64,10 @@ public class PromotionService : IPromotionService
         var totalCount = await query.CountAsync();
 
         var orderedQuery = query
-    .OrderBy(p =>
-        p.Status == PromotionStatus.Pending ? 0 :
-        p.Status == PromotionStatus.Approved ? 1 :
-        2);
+            .OrderBy(p =>
+                p.Status == PromotionStatus.Pending ? 0 :
+                p.Status == PromotionStatus.Approved ? 1 :
+                2);
 
         if (param.Desc)
             orderedQuery = orderedQuery.ThenByDescending(p => p.CreatedAt);

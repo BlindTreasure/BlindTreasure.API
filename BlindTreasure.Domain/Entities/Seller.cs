@@ -22,7 +22,6 @@ public class Seller : BaseEntity
     public ICollection<Certificate>? Certificates { get; set; }
     public ICollection<Product>? Products { get; set; }
     public ICollection<BlindBox>? BlindBoxes { get; set; }
-    
-    public ICollection<PromotionParticipant>? PromotionParticipants { get; set; }
 
+    public ICollection<PromotionParticipant>? PromotionParticipants { get; set; }
 }

@@ -1,6 +1,4 @@
-﻿using BlindTreasure.Domain.Enums;
-
-namespace BlindTreasure.Domain.Entities;
+﻿namespace BlindTreasure.Domain.Entities;
 
 public class BlindBoxItem : BaseEntity
 {
