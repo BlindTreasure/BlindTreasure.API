@@ -22,10 +22,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<Category> Categories { get; set; }
     public DbSet<BlindBox> BlindBoxes { get; set; }
     public DbSet<BlindBoxItem> BlindBoxItems { get; set; }
-    
     public DbSet<RarityConfig> RarityConfigs { get; set; }
-    
-    
     public DbSet<ProbabilityConfig> ProbabilityConfigs { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
     public DbSet<CustomerBlindBox> CustomerBlindBoxes { get; set; }
@@ -43,6 +40,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<SupportTicket> SupportTickets { get; set; }
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<Promotion> Promotions { get; set; }
+    public DbSet<PromotionParticipant> PromotionParticipants { get; set; }
     public DbSet<Wishlist> Wishlists { get; set; }
     public DbSet<WishlistItem> WishlistItems { get; set; }
 
