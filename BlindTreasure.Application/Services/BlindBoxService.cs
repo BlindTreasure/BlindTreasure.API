@@ -164,11 +164,9 @@ public class BlindBoxService : IBlindBoxService
             return cached;
         }
 
-        // Lấy BlindBox, không include BlindBoxItems
-        var blindBox = await _unitOfWork.BlindBoxes.GetQueryable()
-            .Include(b => b.Seller)
-            .Where(x => x.Id == blindBoxId && !x.IsDeleted)
-            .FirstOrDefaultAsync();
+        // 1. Lấy BlindBox (không include navigation sâu)
+        var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(b => b.Id == blindBoxId && !b.IsDeleted
+        );
 
         if (blindBox == null)
         {
@@ -176,11 +174,11 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
         }
 
-        // Load BlindBoxItems lọc isDeleted = false
+        // 2. Lấy danh sách BlindBoxItems kèm Product và RarityConfig
         var items = await _unitOfWork.BlindBoxItems.GetQueryable()
             .Where(i => i.BlindBoxId == blindBoxId && !i.IsDeleted)
             .Include(i => i.Product)
-            .Include(i => i.ProbabilityConfigs)
+            .Include(i => i.RarityConfig)
             .ToListAsync();
 
         blindBox.BlindBoxItems = items;
@@ -346,9 +344,9 @@ public class BlindBoxService : IBlindBoxService
 
         if (items == null || items.Count == 0)
             throw ErrorHelper.BadRequest("Blind Box cần có ít nhất 1 sản phẩm.");
-        
-        ValidateBlindBoxItemsFullRule(items);     
-        
+
+        ValidateBlindBoxItemsFullRule(items);
+
         // Lấy product & kiểm tra tồn kho
         var products = await _unitOfWork.Products.GetAllAsync(p =>
             items.Select(i => i.ProductId).Contains(p.Id) && p.SellerId == seller.Id && !p.IsDeleted);
@@ -683,7 +681,8 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
 
         // Validate tổng weight giảm dần theo tier
-        var rarityOrder = new List<RarityName> { RarityName.Common, RarityName.Rare, RarityName.Epic, RarityName.Secret };
+        var rarityOrder = new List<RarityName>
+            { RarityName.Common, RarityName.Rare, RarityName.Epic, RarityName.Secret };
         var groupWeights = rarityOrder
             .Select(r => items.Where(i => i.Rarity == r).Sum(i => i.Weight))
             .ToList();
@@ -772,7 +771,7 @@ public class BlindBoxService : IBlindBoxService
             DropRate = item.DropRate,
             ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
             Quantity = item.Quantity,
-            Rarity = item.RarityConfig.Name
+            Rarity = item.RarityConfig?.Name ?? default
         }).ToList();
     }
 

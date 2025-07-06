@@ -21,7 +21,7 @@ public class BlindBox : BaseEntity
     public Guid CategoryId { get; set; }
 
     public Category? Category { get; set; }
-    public ICollection<BlindBoxItem>? BlindBoxItems { get; set; }
+    public ICollection<BlindBoxItem> BlindBoxItems { get; set; } = null!;
     public ICollection<CustomerBlindBox>? CustomerBlindBoxes { get; set; }
     public ICollection<CartItem>? CartItems { get; set; }
     public ICollection<OrderDetail>? OrderDetails { get; set; }
