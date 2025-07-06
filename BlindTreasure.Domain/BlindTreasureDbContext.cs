@@ -106,6 +106,13 @@ public class BlindTreasureDbContext : DbContext
                 .HasConversion<string>() // enum -> string
                 .HasMaxLength(32); // giới hạn độ dài nếu cần
         });
+        
+        modelBuilder.Entity<RarityConfig>(entity =>
+        {
+            entity.Property(e => e.Name)
+                .HasConversion<string>() // enum -> string
+                .HasMaxLength(32); // giới hạn độ dài nếu cần
+        });
 
         modelBuilder.Entity<Seller>(entity =>
         {
@@ -137,6 +144,24 @@ public class BlindTreasureDbContext : DbContext
                 .HasMaxLength(16);
         });
 
+        modelBuilder.Entity<PromotionParticipant>(entity =>
+        {
+            entity.HasKey(pp => pp.Id);
+
+            entity.HasOne(pp => pp.Promotion)
+                .WithMany(p => p.PromotionParticipants)
+                .HasForeignKey(pp => pp.PromotionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(pp => pp.Seller)
+                .WithMany(s => s.PromotionParticipants)
+                .HasForeignKey(pp => pp.SellerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(pp => new { pp.PromotionId, pp.SellerId }).IsUnique();
+        });
+
+        
         #endregion
 
 
@@ -285,14 +310,13 @@ public class BlindTreasureDbContext : DbContext
             .HasOne(pc => pc.BlindBoxItem)
             .WithMany(i => i.ProbabilityConfigs)
             .HasForeignKey(pc => pc.BlindBoxItemId);
-        
+
         modelBuilder.Entity<BlindBoxItem>()
-            .HasOne(bi => bi.Rarity)
-            .WithMany()
-            .HasForeignKey(bi => bi.RarityId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-
+            .HasOne(bi => bi.RarityConfig)
+            .WithOne(rc => rc.BlindBoxItem)
+            .HasForeignKey<RarityConfig>(rc => rc.BlindBoxItemId)
+            .OnDelete(DeleteBehavior.Cascade);
+        
         // ProbabilityConfig ↔ ApprovedByUser (1-n, restrict)
         modelBuilder.Entity<ProbabilityConfig>()
             .HasOne(pc => pc.ApprovedByUser)

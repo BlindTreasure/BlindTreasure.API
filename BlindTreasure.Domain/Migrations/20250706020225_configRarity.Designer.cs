@@ -3,6 +3,7 @@ using System;
 using BlindTreasure.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    partial class BlindTreasureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250706020225_configRarity")]
+    partial class configRarity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1127,52 +1130,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.ToTable("Promotions");
                 });
 
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.PromotionParticipant", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("JoinedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("PromotionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("SellerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SellerId");
-
-                    b.HasIndex("PromotionId", "SellerId")
-                        .IsUnique();
-
-                    b.ToTable("PromotionParticipant");
-                });
-
             modelBuilder.Entity("BlindTreasure.Domain.Entities.RarityConfig", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2062,25 +2019,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Seller");
                 });
 
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.PromotionParticipant", b =>
-                {
-                    b.HasOne("BlindTreasure.Domain.Entities.Promotion", "Promotion")
-                        .WithMany("PromotionParticipants")
-                        .HasForeignKey("PromotionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("BlindTreasure.Domain.Entities.Seller", "Seller")
-                        .WithMany("PromotionParticipants")
-                        .HasForeignKey("SellerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Promotion");
-
-                    b.Navigation("Seller");
-                });
-
             modelBuilder.Entity("BlindTreasure.Domain.Entities.RarityConfig", b =>
                 {
                     b.HasOne("BlindTreasure.Domain.Entities.BlindBoxItem", "BlindBoxItem")
@@ -2297,8 +2235,6 @@ namespace BlindTreasure.Domain.Migrations
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Promotion", b =>
                 {
                     b.Navigation("Orders");
-
-                    b.Navigation("PromotionParticipants");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Role", b =>
@@ -2313,8 +2249,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Certificates");
 
                     b.Navigation("Products");
-
-                    b.Navigation("PromotionParticipants");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.User", b =>

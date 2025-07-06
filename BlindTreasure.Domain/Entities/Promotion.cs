@@ -22,6 +22,7 @@ public class Promotion : BaseEntity
 
     public Seller? Seller { get; set; }
     public RoleType? CreatedByRole { get; set; }
+    public ICollection<PromotionParticipant> PromotionParticipants { get; set; }
 
 
     //navigation property to Order
