@@ -660,34 +660,38 @@ public class BlindBoxService : IBlindBoxService
 
     private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemDto> items)
     {
-        // 1. Số lượng phải đúng 6 hoặc 12
+        // Số lượng phải đúng 6 hoặc 12
         if (items.Count != 6 && items.Count != 12)
             throw ErrorHelper.BadRequest("Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
 
-        // 2. Phải có ít nhất 1 Secret
+        // Phải có ít nhất 1 Secret
         if (!items.Any(i => i.Rarity == RarityName.Secret))
             throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
 
-        // 3. Không được có nhiều hơn 1 Secret
+        // Không được có nhiều hơn 1 Secret
         if (items.Count(i => i.Rarity == RarityName.Secret) > 1)
             throw ErrorHelper.BadRequest("Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
 
-        // 4. Chỉ cho phép các giá trị enum hợp lệ
+        // Giá trị rarity hợp lệ
         var validRarities = Enum.GetValues(typeof(RarityName)).Cast<RarityName>().ToList();
         if (items.Any(i => !validRarities.Contains(i.Rarity)))
             throw ErrorHelper.BadRequest("Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
 
-        // 5. Tổng trọng số (weight) = 100 (integer)
+        // Tổng trọng số (weight) = 100 (integer)
         var totalWeight = items.Sum(i => i.Weight);
         if (totalWeight != 100)
             throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
 
-        // 6. Validate thứ tự giảm dần (Common ≥ Rare ≥ Epic ≥ Secret)
-        var ordered = items.OrderBy(i => (int)i.Rarity).ToList();
-        for (var i = 1; i < ordered.Count; i++)
+        // Validate tổng weight giảm dần theo tier
+        var rarityOrder = new List<RarityName> { RarityName.Common, RarityName.Rare, RarityName.Epic, RarityName.Secret };
+        var groupWeights = rarityOrder
+            .Select(r => items.Where(i => i.Rarity == r).Sum(i => i.Weight))
+            .ToList();
+
+        for (int i = 1; i < groupWeights.Count; i++)
         {
-            if (ordered[i].Weight >= ordered[i - 1].Weight)
-                throw ErrorHelper.BadRequest("Trọng số các rarity phải giảm dần từ Common đến Secret.");
+            if (groupWeights[i] > groupWeights[i - 1])
+                throw ErrorHelper.BadRequest("Tổng trọng số của các tier sau không được lớn hơn tier trước.");
         }
     }
 
