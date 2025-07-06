@@ -2,7 +2,6 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.UnboxDTOs;
 using BlindTreasure.Domain.Entities;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;

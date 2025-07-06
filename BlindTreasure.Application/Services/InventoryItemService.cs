@@ -14,12 +14,12 @@ namespace BlindTreasure.Application.Services;
 public class InventoryItemService : IInventoryItemService
 {
     private readonly ICacheService _cacheService;
+    private readonly ICategoryService _categoryService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _loggerService;
     private readonly IOrderService _orderService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ICategoryService _categoryService;
 
 
     public InventoryItemService(

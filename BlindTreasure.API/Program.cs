@@ -1,11 +1,9 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json.Serialization;
 using BlindTreasure.API.Architecture;
-using BlindTreasure.Application.SignalR;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Domain.DTOs.StripeDTOs;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Stripe;

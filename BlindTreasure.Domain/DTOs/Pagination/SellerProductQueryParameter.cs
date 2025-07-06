@@ -24,5 +24,4 @@ public class SellerProductQueryParameter
     public ProductSortField SortBy { get; set; } = ProductSortField.CreatedAt;
 
     // Có field Desc đã bỏ vào pagination
-
 }

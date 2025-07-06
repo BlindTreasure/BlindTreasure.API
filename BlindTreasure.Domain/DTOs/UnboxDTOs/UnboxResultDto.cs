@@ -7,5 +7,6 @@ public class UnboxResultDto
     public Guid ProductId { get; set; }
     public RarityName? Rarity { get; set; }
     public int Weight { get; set; }
+    public decimal DropRate { get; set; }
     public DateTime UnboxedAt { get; set; }
 }
