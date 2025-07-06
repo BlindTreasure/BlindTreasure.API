@@ -343,10 +343,9 @@ public class BlindBoxService : IBlindBoxService
 
         if (items == null || items.Count == 0)
             throw ErrorHelper.BadRequest("Blind Box cần có ít nhất 1 sản phẩm.");
-
-        // Validate dữ liệu items (tách method riêng)
-        ValidateBlindBoxItems(items);
-
+        
+        ValidateBlindBoxItemsFullRule(items);     
+        
         // Lấy product & kiểm tra tồn kho
         var products = await _unitOfWork.Products.GetAllAsync(p =>
             items.Select(i => i.ProductId).Contains(p.Id) && p.SellerId == seller.Id && !p.IsDeleted);
@@ -408,12 +407,7 @@ public class BlindBoxService : IBlindBoxService
         );
 
         if (blindBox == null)
-        {
-            _logger.Warn($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} not found.");
             throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
-        }
-
-        ValidateBlindBoxBeforeSubmit(blindBox);
 
         blindBox.UpdatedAt = _time.GetCurrentTime();
         blindBox.Status = BlindBoxStatus.PendingApproval;
@@ -661,53 +655,39 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.BadRequest("Tất cả sản phẩm trong blind box phải cùng loại (cùng root category).");
     }
 
-    private void ValidateBlindBoxItems(List<BlindBoxItemDto> items)
+    private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemDto> items)
     {
-        // Chỉ cho phép tối đa 1 Secret
+        // 1. Số lượng phải đúng 6 hoặc 12
+        if (items.Count != 6 && items.Count != 12)
+            throw ErrorHelper.BadRequest("Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
+
+        // 2. Phải có ít nhất 1 Secret
+        if (!items.Any(i => i.Rarity == RarityName.Secret))
+            throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
+
+        // 3. Không được có nhiều hơn 1 Secret
         if (items.Count(i => i.Rarity == RarityName.Secret) > 1)
             throw ErrorHelper.BadRequest("Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
 
-        // Chỉ cho phép các giá trị enum hợp lệ
+        // 4. Chỉ cho phép các giá trị enum hợp lệ
         var validRarities = Enum.GetValues(typeof(RarityName)).Cast<RarityName>().ToList();
         if (items.Any(i => !validRarities.Contains(i.Rarity)))
             throw ErrorHelper.BadRequest("Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
 
-        // Tổng trọng số = 100
-        var weightTotal = items.Sum(i => i.Weight);
-        if (weightTotal != 100)
-            throw ErrorHelper.BadRequest("Tổng trọng số của các rarity phải bằng 100.");
-
-        // Validate thứ tự giảm dần (Common ≥ Rare ≥ Epic ≥ Secret)
-        var ordered = items.OrderBy(i => (int)i.Rarity).ToList();
-        for (var i = 1; i < ordered.Count; i++)
-            if (ordered[i].Weight >= ordered[i - 1].Weight)
-                throw ErrorHelper.BadRequest("Trọng số các rarity phải giảm dần từ Common đến Secret.");
-    }
-
-    private void ValidateBlindBoxBeforeSubmit(BlindBox blindBox)
-    {
-        if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
-            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxAtLeastOneItem);
-
-        // 1. Validate số lượng item phải là 6 hoặc 12
-        var itemCount = blindBox.BlindBoxItems.Count;
-        if (itemCount != 6 && itemCount != 12)
-            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxItemCountInvalid);
-
-        // 2. Phải có ít nhất 1 item Secret
-        if (blindBox.BlindBoxItems.All(i => i.RarityConfig.Name != RarityName.Secret))
-            throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
-
-        // 3. Tổng trọng số Weight phải bằng 100
-        var totalWeight = blindBox.BlindBoxItems.Sum(i => i.RarityConfig.Weight);
+        // 5. Tổng trọng số (weight) = 100 (integer)
+        var totalWeight = items.Sum(i => i.Weight);
         if (totalWeight != 100)
             throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
 
-        // 4. Tổng DropRate phải đúng 100%
-        var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
-        if (totalDropRate != 100)
-            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateMustBe100);
+        // 6. Validate thứ tự giảm dần (Common ≥ Rare ≥ Epic ≥ Secret)
+        var ordered = items.OrderBy(i => (int)i.Rarity).ToList();
+        for (var i = 1; i < ordered.Count; i++)
+        {
+            if (ordered[i].Weight >= ordered[i - 1].Weight)
+                throw ErrorHelper.BadRequest("Trọng số các rarity phải giảm dần từ Common đến Secret.");
+        }
     }
+
 
     private Dictionary<BlindBoxItemDto, decimal> CalculateDropRates(List<BlindBoxItemDto> items)
     {
