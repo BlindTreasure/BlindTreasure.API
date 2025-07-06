@@ -209,6 +209,7 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
 
         await SeedSellerForUser("blindtreasurefpt@gmail.com");
+        await SeedSellerForUser("hanhnthse170189@fpt.edu.vn");
 
         _logger.Success("Users and seller seeded successfully.");
     }
@@ -937,7 +938,7 @@ public class SystemController : ControllerBase
             await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
             await _context.RarityConfigs.AddRangeAsync(rarityConfigs);
             await _context.SaveChangesAsync();
-            
+
             // Sau khi SaveChanges xong BlindBox và BlindBoxItems:
             foreach (var item in blindBoxItems)
             {
@@ -954,8 +955,9 @@ public class SystemController : ControllerBase
                 };
                 await _context.ProbabilityConfigs.AddAsync(probCfg);
             }
+
             await _context.SaveChangesAsync();
-    
+
 
             _logger.Success($"[SeedBlindBoxes] Đã seed blind box cho category {category.Name} thành công.");
         }
@@ -1108,6 +1110,7 @@ public class SystemController : ControllerBase
     {
         var passwordHasher = new PasswordHasher();
         var now = DateTime.UtcNow;
+        var defaultAvatar = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg";
 
         return new List<User>
         {
@@ -1119,7 +1122,19 @@ public class SystemController : ControllerBase
                 Phone = "0900000002",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Customer,
-                CreatedAt = now
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
+            },
+            new()
+            {
+                Email = "quanghnse170229@fpt.edu.vn",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Qang",
+                Phone = "0900000001",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Seller,
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -1129,7 +1144,8 @@ public class SystemController : ControllerBase
                 Phone = "0900000003",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Staff,
-                CreatedAt = now
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -1139,7 +1155,8 @@ public class SystemController : ControllerBase
                 Phone = "0900000004",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Admin,
-                CreatedAt = now
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -1149,7 +1166,19 @@ public class SystemController : ControllerBase
                 Phone = "0900000001",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
-                CreatedAt = now
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
+            },
+            new()
+            {
+                Email = "hanhnthse170189@fpt.edu.vn",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Official Brand Seller",
+                Phone = "0900000001",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Seller,
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
             }
         };
     }
