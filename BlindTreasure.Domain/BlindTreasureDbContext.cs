@@ -285,13 +285,6 @@ public class BlindTreasureDbContext : DbContext
             .HasOne(pc => pc.BlindBoxItem)
             .WithMany(i => i.ProbabilityConfigs)
             .HasForeignKey(pc => pc.BlindBoxItemId);
-        
-        modelBuilder.Entity<BlindBoxItem>()
-            .HasOne(bi => bi.Rarity)
-            .WithMany()
-            .HasForeignKey(bi => bi.RarityId)
-            .OnDelete(DeleteBehavior.Restrict);
-
 
         // ProbabilityConfig ↔ ApprovedByUser (1-n, restrict)
         modelBuilder.Entity<ProbabilityConfig>()

@@ -13,11 +13,10 @@ public class BlindBoxItem : BaseEntity
     public int Quantity { get; set; }
     public decimal DropRate { get; set; }
 
-    public Guid RarityId { get; set; }
-    public RarityConfig Rarity { get; set; }
     public bool IsSecret { get; set; }
 
     public bool IsActive { get; set; }
 
     public ICollection<ProbabilityConfig> ProbabilityConfigs { get; set; }
+    public RarityConfig RarityConfig { get; set; } // navigation ngược
 }
