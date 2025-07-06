@@ -362,7 +362,7 @@ public class BlindBoxService : IBlindBoxService
         {
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
-                throw ErrorHelper.BadRequest($"Sản phẩm không hợp lệ.");
+                throw ErrorHelper.BadRequest("Sản phẩm không hợp lệ.");
             if (item.Quantity > product.Stock)
                 throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho.");
 
@@ -413,16 +413,7 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
         }
 
-        if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
-            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxAtLeastOneItem);
-
-        var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
-        if (totalDropRate != 100)
-            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateMustBe100);
-
-        var itemCount = blindBox.BlindBoxItems.Count;
-        if (itemCount != 6 && itemCount != 12)
-            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxItemCountInvalid);
+        ValidateBlindBoxBeforeSubmit(blindBox);
 
         blindBox.UpdatedAt = _time.GetCurrentTime();
         blindBox.Status = BlindBoxStatus.PendingApproval;
@@ -444,17 +435,14 @@ public class BlindBoxService : IBlindBoxService
         }
 
         await _unitOfWork.Products.UpdateRange(products);
-
-
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
-
-
         await RemoveBlindBoxCacheAsync(blindBoxId);
 
         _logger.Success($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} submitted for approval.");
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
+
 
     public async Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null)
     {
@@ -641,7 +629,7 @@ public class BlindBoxService : IBlindBoxService
             ProductName = item.Product?.Name ?? string.Empty,
             DropRate = item.DropRate,
             ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
-            Quantity = item.Quantity,
+            Quantity = item.Quantity
         }).ToList();
 
         return result;
@@ -691,13 +679,36 @@ public class BlindBoxService : IBlindBoxService
 
         // Validate thứ tự giảm dần (Common ≥ Rare ≥ Epic ≥ Secret)
         var ordered = items.OrderBy(i => (int)i.Rarity).ToList();
-        for (int i = 1; i < ordered.Count; i++)
-        {
+        for (var i = 1; i < ordered.Count; i++)
             if (ordered[i].Weight >= ordered[i - 1].Weight)
                 throw ErrorHelper.BadRequest("Trọng số các rarity phải giảm dần từ Common đến Secret.");
-        }
     }
-    
+
+    private void ValidateBlindBoxBeforeSubmit(BlindBox blindBox)
+    {
+        if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxAtLeastOneItem);
+
+        // 1. Validate số lượng item phải là 6 hoặc 12
+        var itemCount = blindBox.BlindBoxItems.Count;
+        if (itemCount != 6 && itemCount != 12)
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxItemCountInvalid);
+
+        // 2. Phải có ít nhất 1 item Secret
+        if (blindBox.BlindBoxItems.All(i => i.RarityConfig.Name != RarityName.Secret))
+            throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
+
+        // 3. Tổng trọng số Weight phải bằng 100
+        var totalWeight = blindBox.BlindBoxItems.Sum(i => i.RarityConfig.Weight);
+        if (totalWeight != 100)
+            throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
+
+        // 4. Tổng DropRate phải đúng 100%
+        var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
+        if (totalDropRate != 100)
+            throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateMustBe100);
+    }
+
     private Dictionary<BlindBoxItemDto, decimal> CalculateDropRates(List<BlindBoxItemDto> items)
     {
         var result = new Dictionary<BlindBoxItemDto, decimal>();
@@ -707,9 +718,10 @@ public class BlindBoxService : IBlindBoxService
             var dropRate = Math.Round((decimal)(item.Quantity * item.Weight) / totalWeightQuantity * 100m, 2);
             result[item] = dropRate;
         }
+
         return result;
     }
-    
+
     private async Task ValidateLeafCategoryAsync(Guid categoryId)
     {
         var category = await _categoryService.GetWithParentAsync(categoryId);
@@ -764,7 +776,6 @@ public class BlindBoxService : IBlindBoxService
         return Task.FromResult(dto);
     }
 
-    
     private List<BlindBoxItemDto> MapToBlindBoxItemDtos(IEnumerable<BlindBoxItem> items)
     {
         return items.Select(item => new BlindBoxItemDto
