@@ -36,7 +36,7 @@ public class SystemController : ControllerBase
 
             await SeedCategories();
             await SeedProducts();
-            // await SeedBlindBoxes();
+            await SeedBlindBoxes();
             await SeedPromotions();
             return Ok(ApiResult<object>.Success(new
             {
@@ -124,7 +124,7 @@ public class SystemController : ControllerBase
             await _cacheService.RemoveByPatternAsync("address:");
             await _cacheService.RemoveByPatternAsync("inventoryitem:");
             await _cacheService.RemoveByPatternAsync("Promotion:");
-            
+
 
             return Ok(ApiResult<object>.Success("200", "Clear caching thành công."));
         }
@@ -151,6 +151,7 @@ public class SystemController : ControllerBase
                 var tablesToDelete = new List<Func<Task>>
                 {
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
+                    () => context.RarityConfigs.ExecuteDeleteAsync(),
                     () => context.BlindBoxItems.ExecuteDeleteAsync(),
                     () => context.CartItems.ExecuteDeleteAsync(),
                     () => context.OrderDetails.ExecuteDeleteAsync(),
@@ -170,6 +171,7 @@ public class SystemController : ControllerBase
                     () => context.Orders.ExecuteDeleteAsync(),
                     () => context.Payments.ExecuteDeleteAsync(),
                     () => context.Promotions.ExecuteDeleteAsync(),
+                    () => context.PromotionParticipants.ExecuteDeleteAsync(),
                     () => context.Addresses.ExecuteDeleteAsync(),
                     () => context.Products.ExecuteDeleteAsync(),
                     () => context.BlindBoxes.ExecuteDeleteAsync(),
@@ -183,7 +185,6 @@ public class SystemController : ControllerBase
                 foreach (var deleteFunc in tablesToDelete) await deleteFunc();
 
                 await transaction.CommitAsync();
-
 
 
                 _logger.Success("Xóa sạch dữ liệu trong database thành công.");
@@ -208,6 +209,7 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
 
         await SeedSellerForUser("blindtreasurefpt@gmail.com");
+        await SeedSellerForUser("hanhnthse170189@fpt.edu.vn");
 
         _logger.Success("Users and seller seeded successfully.");
     }
@@ -709,6 +711,258 @@ public class SystemController : ControllerBase
     //     }
     // }
 
+    private async Task SeedBlindBoxes()
+    {
+        var now = DateTime.UtcNow;
+        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
+        if (sellerUser == null)
+        {
+            _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo blind box.");
+            return;
+        }
+
+        var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == sellerUser.Id);
+        if (seller == null)
+        {
+            _logger.Error("User này chưa có Seller tương ứng.");
+            return;
+        }
+
+        // Lấy tất cả category con (ParentId != null)
+        var categories = await _context.Categories
+            .Where(c => !c.IsDeleted && c.ParentId != null)
+            .ToListAsync();
+
+        if (!categories.Any())
+        {
+            _logger.Warn("[SeedBlindBoxes] Không tìm thấy category con để tạo blind box.");
+            return;
+        }
+
+        foreach (var category in categories)
+        {
+            // Tạo mới 6 sản phẩm cho mỗi category, ProductSaleType là BlindBoxOnly
+            var blindBoxProducts = new List<Product>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = $"HACIPUPU Snuggle With You Series Figure 1 ({category.Name})",
+                    Description = "Mô hình đặc biệt dành cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fca-sau-sao-chep.webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = $"HACIPUPU Snuggle With You Series Figure 2 ({category.Name})",
+                    Description = "Mô hình đặc biệt dành cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fcanh-cut-sao-chep.webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = $"HACIPUPU Snuggle With You Series Figure 3 ({category.Name})",
+                    Description = "Mô hình đặc biệt dành cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-hong-sao-chep.jpg&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = $"HACIPUPU Snuggle With You Series Figure 4 ({category.Name})",
+                    Description = "Mô hình đặc biệt dành cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fkhung-moi-khong-website-sao-chep.webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = $"HACIPUPU Snuggle With You Series Figure 5 ({category.Name})",
+                    Description = "Mô hình đặc biệt dành cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Ftim-sao-chep%20(1).webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = $"HACIPUPU Snuggle With You Series Figure 6 ({category.Name})",
+                    Description = "Mô hình đặc biệt dành cho blindbox.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 320000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-sao-chep.webp&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "PVC",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                }
+            };
+
+            await _context.Products.AddRangeAsync(blindBoxProducts);
+            await _context.SaveChangesAsync();
+
+            // Rarity cấu hình cho từng item (chuẩn theo enum RarityName)
+            var rarityArr = new[]
+            {
+                new { Rarity = RarityName.Common, Weight = 40, Quantity = 10 },
+                new { Rarity = RarityName.Rare, Weight = 25, Quantity = 8 },
+                new { Rarity = RarityName.Rare, Weight = 10, Quantity = 8 },
+                new { Rarity = RarityName.Epic, Weight = 10, Quantity = 5 },
+                new { Rarity = RarityName.Epic, Weight = 10, Quantity = 4 },
+                new { Rarity = RarityName.Secret, Weight = 5, Quantity = 2 }
+            };
+
+            // Tổng quantity * weight để tính drop rate
+            var totalWeightQty = rarityArr.Sum(x => x.Quantity * x.Weight);
+
+            var blindBox = new BlindBox
+            {
+                Id = Guid.NewGuid(),
+                SellerId = seller.Id,
+                CategoryId = category.Id,
+                Name = $"Blind Box - {category.Name}",
+                Description = $"Blindbox mẫu chứa 6 sản phẩm thuộc {category.Name}",
+                Price = 500000,
+                TotalQuantity = 30,
+                HasSecretItem = true,
+                SecretProbability = 5,
+                Status = BlindBoxStatus.Approved,
+                ImageUrl = blindBoxProducts[0].ImageUrls.FirstOrDefault() ?? "",
+                ReleaseDate = now,
+                CreatedAt = now
+            };
+
+            var blindBoxItems = new List<BlindBoxItem>();
+            var rarityConfigs = new List<RarityConfig>();
+
+            for (var i = 0; i < 6; i++)
+            {
+                var r = rarityArr[i];
+                var product = blindBoxProducts[i];
+
+                var dropRate = Math.Round((decimal)(r.Quantity * r.Weight) / totalWeightQty * 100m, 2);
+                var itemId = Guid.NewGuid();
+
+                blindBoxItems.Add(new BlindBoxItem
+                {
+                    Id = itemId,
+                    BlindBoxId = blindBox.Id,
+                    ProductId = product.Id,
+                    Quantity = r.Quantity,
+                    DropRate = dropRate,
+                    IsSecret = r.Rarity == RarityName.Secret,
+                    IsActive = true,
+                    CreatedAt = now
+                });
+
+                rarityConfigs.Add(new RarityConfig
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxItemId = itemId,
+                    Name = r.Rarity,
+                    Weight = r.Weight,
+                    IsSecret = r.Rarity == RarityName.Secret,
+                    CreatedAt = now
+                });
+            }
+
+            await _context.BlindBoxes.AddAsync(blindBox);
+            await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
+            await _context.RarityConfigs.AddRangeAsync(rarityConfigs);
+            await _context.SaveChangesAsync();
+
+            // Sau khi SaveChanges xong BlindBox và BlindBoxItems:
+            foreach (var item in blindBoxItems)
+            {
+                var probCfg = new ProbabilityConfig
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxItemId = item.Id,
+                    Probability = item.DropRate,
+                    EffectiveFrom = now,
+                    EffectiveTo = now.AddYears(1), // đảm bảo NOW nằm trong range này
+                    ApprovedBy = sellerUser.Id, // hoặc Id của user staff test (nếu có)
+                    ApprovedAt = now,
+                    CreatedAt = now
+                };
+                await _context.ProbabilityConfigs.AddAsync(probCfg);
+            }
+
+            await _context.SaveChangesAsync();
+
+
+            _logger.Success($"[SeedBlindBoxes] Đã seed blind box cho category {category.Name} thành công.");
+        }
+    }
+
     private async Task SeedPromotions()
     {
         if (_context.Promotions.Any())
@@ -856,6 +1110,7 @@ public class SystemController : ControllerBase
     {
         var passwordHasher = new PasswordHasher();
         var now = DateTime.UtcNow;
+        var defaultAvatar = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg";
 
         return new List<User>
         {
@@ -867,7 +1122,19 @@ public class SystemController : ControllerBase
                 Phone = "0900000002",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Customer,
-                CreatedAt = now
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
+            },
+            new()
+            {
+                Email = "quanghnse170229@fpt.edu.vn",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Qang",
+                Phone = "0900000001",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Seller,
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -877,7 +1144,8 @@ public class SystemController : ControllerBase
                 Phone = "0900000003",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Staff,
-                CreatedAt = now
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -887,7 +1155,8 @@ public class SystemController : ControllerBase
                 Phone = "0900000004",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Admin,
-                CreatedAt = now
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -897,7 +1166,19 @@ public class SystemController : ControllerBase
                 Phone = "0900000001",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
-                CreatedAt = now
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
+            },
+            new()
+            {
+                Email = "hanhnthse170189@fpt.edu.vn",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Official Brand Seller",
+                Phone = "0900000001",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Seller,
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
             }
         };
     }

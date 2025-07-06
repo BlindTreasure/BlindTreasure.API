@@ -164,11 +164,9 @@ public class BlindBoxService : IBlindBoxService
             return cached;
         }
 
-        // Lấy BlindBox, không include BlindBoxItems
-        var blindBox = await _unitOfWork.BlindBoxes.GetQueryable()
-            .Include(b => b.Seller)
-            .Where(x => x.Id == blindBoxId && !x.IsDeleted)
-            .FirstOrDefaultAsync();
+        // 1. Lấy BlindBox (không include navigation sâu)
+        var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(b => b.Id == blindBoxId && !b.IsDeleted
+        );
 
         if (blindBox == null)
         {
@@ -176,11 +174,11 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.NotFound(ErrorMessages.BlindBoxNotFound);
         }
 
-        // Load BlindBoxItems lọc isDeleted = false
+        // 2. Lấy danh sách BlindBoxItems kèm Product và RarityConfig
         var items = await _unitOfWork.BlindBoxItems.GetQueryable()
             .Where(i => i.BlindBoxId == blindBoxId && !i.IsDeleted)
             .Include(i => i.Product)
-            .Include(i => i.ProbabilityConfigs)
+            .Include(i => i.RarityConfig)
             .ToListAsync();
 
         blindBox.BlindBoxItems = items;
@@ -346,9 +344,9 @@ public class BlindBoxService : IBlindBoxService
 
         if (items == null || items.Count == 0)
             throw ErrorHelper.BadRequest("Blind Box cần có ít nhất 1 sản phẩm.");
-        
-        ValidateBlindBoxItemsFullRule(items);     
-        
+
+        ValidateBlindBoxItemsFullRule(items);
+
         // Lấy product & kiểm tra tồn kho
         var products = await _unitOfWork.Products.GetAllAsync(p =>
             items.Select(i => i.ProductId).Contains(p.Id) && p.SellerId == seller.Id && !p.IsDeleted);
@@ -660,34 +658,62 @@ public class BlindBoxService : IBlindBoxService
 
     private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemDto> items)
     {
-        // 1. Số lượng phải đúng 6 hoặc 12
+        // Số lượng phải đúng 6 hoặc 12
         if (items.Count != 6 && items.Count != 12)
+        {
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Lỗi: Số lượng item = {items.Count}, yêu cầu đúng 6 hoặc 12.");
             throw ErrorHelper.BadRequest("Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
+        }
 
-        // 2. Phải có ít nhất 1 Secret
-        if (!items.Any(i => i.Rarity == RarityName.Secret))
+        // Phải có ít nhất 1 Secret
+        int countSecret = items.Count(i => i.Rarity == RarityName.Secret);
+        if (countSecret < 1)
+        {
+            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Không có item Secret trong danh sách.");
             throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
+        }
 
-        // 3. Không được có nhiều hơn 1 Secret
-        if (items.Count(i => i.Rarity == RarityName.Secret) > 1)
+        // Không được có nhiều hơn 1 Secret
+        if (countSecret > 1)
+        {
+            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Có {countSecret} item Secret, yêu cầu tối đa 1.");
             throw ErrorHelper.BadRequest("Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
+        }
 
-        // 4. Chỉ cho phép các giá trị enum hợp lệ
+        // Giá trị rarity hợp lệ
         var validRarities = Enum.GetValues(typeof(RarityName)).Cast<RarityName>().ToList();
-        if (items.Any(i => !validRarities.Contains(i.Rarity)))
+        var invalids = items.Where(i => !validRarities.Contains(i.Rarity)).ToList();
+        if (invalids.Any())
+        {
+            var invalidList = string.Join(", ", invalids.Select(i => $"{i.Rarity}"));
+            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Phát hiện rarity không hợp lệ: {invalidList}.");
             throw ErrorHelper.BadRequest("Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
+        }
 
-        // 5. Tổng trọng số (weight) = 100 (integer)
+        // Tổng trọng số (weight) = 100 (integer)
         var totalWeight = items.Sum(i => i.Weight);
         if (totalWeight != 100)
-            throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
-
-        // 6. Validate thứ tự giảm dần (Common ≥ Rare ≥ Epic ≥ Secret)
-        var ordered = items.OrderBy(i => (int)i.Rarity).ToList();
-        for (var i = 1; i < ordered.Count; i++)
         {
-            if (ordered[i].Weight >= ordered[i - 1].Weight)
-                throw ErrorHelper.BadRequest("Trọng số các rarity phải giảm dần từ Common đến Secret.");
+            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Tổng trọng số = {totalWeight}, yêu cầu đúng bằng 100.");
+            throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
+        }
+
+        // Validate tổng weight giảm dần theo tier
+        var rarityOrder = new List<RarityName>
+            { RarityName.Common, RarityName.Rare, RarityName.Epic, RarityName.Secret };
+        var groupWeights = rarityOrder
+            .Select(r => items.Where(i => i.Rarity == r).Sum(i => i.Weight))
+            .ToList();
+
+        for (int i = 1; i < groupWeights.Count; i++)
+        {
+            if (groupWeights[i] > groupWeights[i - 1])
+            {
+                _logger.Warn(
+                    $"[ValidateBlindBoxItemsFullRule] Lỗi: Tổng weight tier {rarityOrder[i]} = {groupWeights[i]} > {rarityOrder[i - 1]} = {groupWeights[i - 1]}.");
+                throw ErrorHelper.BadRequest("Tổng trọng số của các tier sau không được lớn hơn tier trước.");
+            }
         }
     }
 
@@ -709,13 +735,19 @@ public class BlindBoxService : IBlindBoxService
     {
         var category = await _categoryService.GetWithParentAsync(categoryId);
         if (category == null)
+        {
+            _logger.Warn($"[ValidateLeafCategoryAsync] Lỗi: Không tìm thấy category với Id = {categoryId}.");
             throw ErrorHelper.BadRequest(ErrorMessages.CategoryNotFound);
+        }
 
         var hasChild = await _unitOfWork.Categories.GetQueryable()
             .AnyAsync(c => c.ParentId == categoryId && !c.IsDeleted);
 
         if (hasChild)
+        {
+            _logger.Warn($"[ValidateLeafCategoryAsync] Lỗi: Category Id = {categoryId} vẫn còn category con, không được chọn.");
             throw ErrorHelper.BadRequest(ErrorMessages.CategoryChildrenError);
+        }
     }
 
     private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId, Guid? sellerId = null)
@@ -768,7 +800,7 @@ public class BlindBoxService : IBlindBoxService
             DropRate = item.DropRate,
             ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
             Quantity = item.Quantity,
-            Rarity = item.RarityConfig.Name
+            Rarity = item.RarityConfig?.Name ?? default
         }).ToList();
     }
 
