@@ -244,12 +244,11 @@ public class BlindBoxService : IBlindBoxService
             Description = dto.Description.Trim(),
             ImageUrl = imageUrl,
             ReleaseDate = releaseDateUtc,
-            HasSecretItem = dto.HasSecretItem,
-            SecretProbability = dto.SecretProbability,
             Status = BlindBoxStatus.Draft,
             CreatedAt = _time.GetCurrentTime(),
             CreatedBy = currentUserId
         };
+
 
         await _unitOfWork.BlindBoxes.AddAsync(blindBox);
         await _unitOfWork.SaveChangesAsync();
@@ -394,6 +393,13 @@ public class BlindBoxService : IBlindBoxService
 
         await _unitOfWork.BlindBoxItems.AddRangeAsync(blindBoxItems);
         await _unitOfWork.RarityConfigs.AddRangeAsync(rarityConfigs);
+
+        blindBox.HasSecretItem = items.Any(i => i.Rarity == RarityName.Secret);
+        blindBox.SecretProbability = blindBoxItems
+            .Where(i => i.IsSecret)
+            .Sum(i => i.DropRate);
+
+        await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
 
         return await GetBlindBoxByIdAsync(blindBoxId);
@@ -653,61 +659,26 @@ public class BlindBoxService : IBlindBoxService
 
     private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemDto> items)
     {
-        // Số lượng phải đúng 6 hoặc 12
         if (items.Count != 6 && items.Count != 12)
-        {
-            _logger.Warn(
-                $"[ValidateBlindBoxItemsFullRule] Lỗi: Số lượng item = {items.Count}, yêu cầu đúng 6 hoặc 12.");
             throw ErrorHelper.BadRequest("Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
-        }
 
-        // Phải có ít nhất 1 Secret
+        // Phải có đúng 1 Secret
         var countSecret = items.Count(i => i.Rarity == RarityName.Secret);
         if (countSecret < 1)
-        {
-            _logger.Warn("[ValidateBlindBoxItemsFullRule] Lỗi: Không có item Secret trong danh sách.");
             throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
-        }
-
-        // Không được có nhiều hơn 1 Secret
         if (countSecret > 1)
-        {
-            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Có {countSecret} item Secret, yêu cầu tối đa 1.");
             throw ErrorHelper.BadRequest("Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
-        }
 
         // Giá trị rarity hợp lệ
         var validRarities = Enum.GetValues(typeof(RarityName)).Cast<RarityName>().ToList();
         var invalids = items.Where(i => !validRarities.Contains(i.Rarity)).ToList();
         if (invalids.Any())
-        {
-            var invalidList = string.Join(", ", invalids.Select(i => $"{i.Rarity}"));
-            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Phát hiện rarity không hợp lệ: {invalidList}.");
             throw ErrorHelper.BadRequest("Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
-        }
 
         // Tổng trọng số (weight) = 100 (integer)
         var totalWeight = items.Sum(i => i.Weight);
         if (totalWeight != 100)
-        {
-            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Tổng trọng số = {totalWeight}, yêu cầu đúng bằng 100.");
             throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
-        }
-
-        // Validate tổng weight giảm dần theo tier
-        var rarityOrder = new List<RarityName>
-            { RarityName.Common, RarityName.Rare, RarityName.Epic, RarityName.Secret };
-        var groupWeights = rarityOrder
-            .Select(r => items.Where(i => i.Rarity == r).Sum(i => i.Weight))
-            .ToList();
-
-        for (var i = 1; i < groupWeights.Count; i++)
-            if (groupWeights[i] > groupWeights[i - 1])
-            {
-                _logger.Warn(
-                    $"[ValidateBlindBoxItemsFullRule] Lỗi: Tổng weight tier {rarityOrder[i]} = {groupWeights[i]} > {rarityOrder[i - 1]} = {groupWeights[i - 1]}.");
-                throw ErrorHelper.BadRequest("Tổng trọng số của các tier sau không được lớn hơn tier trước.");
-            }
     }
 
     private Dictionary<BlindBoxItemDto, decimal> CalculateDropRates(List<BlindBoxItemDto> items)
