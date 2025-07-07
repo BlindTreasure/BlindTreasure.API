@@ -660,25 +660,63 @@ public class BlindBoxService : IBlindBoxService
     private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemDto> items)
     {
         if (items.Count != 6 && items.Count != 12)
+        {
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Số lượng item không hợp lệ [ActualCount={items.Count}]. Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
             throw ErrorHelper.BadRequest("Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
+        }
 
-        // Phải có đúng 1 Secret
         var countSecret = items.Count(i => i.Rarity == RarityName.Secret);
         if (countSecret < 1)
+        {
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Không có item Secret [SecretCount={countSecret}]. Blind Box phải có ít nhất 1 item Secret.");
             throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
-        if (countSecret > 1)
-            throw ErrorHelper.BadRequest("Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
+        }
 
-        // Giá trị rarity hợp lệ
+        if (countSecret > 1)
+        {
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Có nhiều hơn 1 item Secret [SecretCount={countSecret}]. Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
+            throw ErrorHelper.BadRequest("Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
+        }
+
         var validRarities = Enum.GetValues(typeof(RarityName)).Cast<RarityName>().ToList();
         var invalids = items.Where(i => !validRarities.Contains(i.Rarity)).ToList();
         if (invalids.Any())
+        {
+            var invalidList = string.Join(", ", invalids.Select(i => $"{i.Rarity}"));
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Phát hiện rarity không hợp lệ [InvalidRarity={invalidList}]. Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
             throw ErrorHelper.BadRequest("Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
+        }
 
-        // Tổng trọng số (weight) = 100 (integer)
         var totalWeight = items.Sum(i => i.Weight);
         if (totalWeight != 100)
+        {
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Tổng trọng số không hợp lệ [TotalWeight={totalWeight}]. Tổng trọng số (Weight) phải đúng bằng 100.");
             throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
+        }
+
+        // Validate thứ tự weight: Common >= Rare >= Epic >= Secret
+        var tierOrder = new List<RarityName> { RarityName.Common, RarityName.Rare, RarityName.Epic, RarityName.Secret };
+        var groupWeights = tierOrder
+            .Select(tier => items.Where(i => i.Rarity == tier).Sum(i => i.Weight))
+            .ToList();
+
+        for (int i = 1; i < groupWeights.Count; i++)
+        {
+            if (groupWeights[i] > 0 && groupWeights[i - 1] > 0 && groupWeights[i] > groupWeights[i - 1])
+            {
+                var detail = string.Join(", ",
+                    tierOrder.Select((r, idx) => $"{r}={groupWeights[idx]}"));
+                _logger.Warn(
+                    $"[ValidateBlindBoxItemsFullRule] Tổng trọng số tier sau lớn hơn tier trước [TierOrder={detail}]. Không cho phép trọng số của tier sau lớn hơn tier trước.");
+                throw ErrorHelper.BadRequest(
+                    "Không cho phép trọng số của tier sau lớn hơn tier trước (Common ≥ Rare ≥ Epic ≥ Secret).");
+            }
+        }
     }
 
     private Dictionary<BlindBoxItemDto, decimal> CalculateDropRates(List<BlindBoxItemDto> items)
