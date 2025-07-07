@@ -111,18 +111,7 @@ public class BlindBoxService : IBlindBoxService
         if (param.PageIndex == 0)
         {
             items = await query.ToListAsync();
-
-            var blindBoxIds = items.Select(b => b.Id).ToList();
-
-            var itemsGrouped = await _unitOfWork.BlindBoxItems.GetQueryable()
-                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
-                .Include(i => i.Product)
-                .Include(i => i.RarityConfig)
-                .Include(i => i.ProbabilityConfigs)
-                .ToListAsync();
-
-            foreach (var box in items)
-                box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
+            await LoadBlindBoxItemsAsync(items, true);
         }
         else
         {
@@ -130,18 +119,9 @@ public class BlindBoxService : IBlindBoxService
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-
-            var blindBoxIds = items.Select(b => b.Id).ToList();
-
-            var itemsGrouped = await _unitOfWork.BlindBoxItems.GetQueryable()
-                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
-                .Include(i => i.Product)
-                .Include(i => i.RarityConfig) // THÊM DÒNG NÀY
-                .ToListAsync();
-
-            foreach (var box in items)
-                box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
+            await LoadBlindBoxItemsAsync(items);
         }
+
 
         var dtos = new List<BlindBoxDetailDto>();
         foreach (var b in items)
@@ -805,6 +785,30 @@ public class BlindBoxService : IBlindBoxService
             Rarity = item.RarityConfig?.Name ?? default,
             Weight = item.RarityConfig?.Weight ?? 0
         }).ToList();
+    }
+
+    private async Task LoadBlindBoxItemsAsync(List<BlindBox> blindBoxes, bool includeProbabilityConfigs = false)
+    {
+        var blindBoxIds = blindBoxes.Select(b => b.Id).ToList();
+
+        IQueryable<BlindBoxItem> query;
+
+        if (includeProbabilityConfigs)
+            query = _unitOfWork.BlindBoxItems.GetQueryable()
+                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
+                .Include(i => i.Product)
+                .Include(i => i.RarityConfig)
+                .Include(i => i.ProbabilityConfigs); // đây là ICollection
+        else
+            query = _unitOfWork.BlindBoxItems.GetQueryable()
+                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
+                .Include(i => i.Product)
+                .Include(i => i.RarityConfig);
+
+        var itemsGrouped = await query.ToListAsync();
+
+        foreach (var box in blindBoxes)
+            box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
     }
 
     #endregion
