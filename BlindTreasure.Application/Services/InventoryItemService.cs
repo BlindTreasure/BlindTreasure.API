@@ -40,8 +40,26 @@ public class InventoryItemService : IInventoryItemService
         _categoryService = categoryService; // initialize categoryService
     }
 
-    public async Task<InventoryItemDto>
-        CreateAsync(CreateInventoryItemDto dto, Guid? userId) // specify userId if needed, otherwise use current user
+    public async Task<List<InventoryItemDto>> GetMyUnboxedItemsFromBlindBoxAsync(Guid blindBoxId)
+    {
+        var userId = _claimsService.CurrentUserId;
+
+        var query = _unitOfWork.InventoryItems.GetQueryable()
+            .Where(i => i.UserId == userId
+                        && i.IsFromBlindBox
+                        && !i.IsDeleted
+                        && i.SourceCustomerBlindBox != null
+                        && i.SourceCustomerBlindBox.BlindBoxId == blindBoxId)
+            .Include(i => i.Product)
+            .Include(i => i.SourceCustomerBlindBox)
+            .AsNoTracking();
+
+        var result = await query.ToListAsync();
+
+        return result.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
+    }
+    
+    public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId)
     {
         if (userId.HasValue)
         {
@@ -122,6 +140,9 @@ public class InventoryItemService : IInventoryItemService
             var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
             query = query.Where(i => categoryIds.Contains(i.Product.CategoryId));
         }
+        
+        if (param.IsFromBlindBox.HasValue)
+            query = query.Where(i => i.IsFromBlindBox == param.IsFromBlindBox.Value);
 
         // Filter theo status
         if (param.Status.HasValue)
