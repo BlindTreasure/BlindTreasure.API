@@ -110,19 +110,19 @@ public class BlindBoxService : IBlindBoxService
         List<BlindBox> items;
         if (param.PageIndex == 0)
         {
-            // Lấy BlindBox trước
             items = await query.ToListAsync();
 
-            // Load BlindBoxItems có IsDeleted = false cho từng BlindBox
             var blindBoxIds = items.Select(b => b.Id).ToList();
 
             var itemsGrouped = await _unitOfWork.BlindBoxItems.GetQueryable()
                 .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
                 .Include(i => i.Product)
+                .Include(i => i.RarityConfig)
                 .Include(i => i.ProbabilityConfigs)
                 .ToListAsync();
 
-            foreach (var box in items) box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
+            foreach (var box in items)
+                box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
         }
         else
         {
@@ -136,9 +136,11 @@ public class BlindBoxService : IBlindBoxService
             var itemsGrouped = await _unitOfWork.BlindBoxItems.GetQueryable()
                 .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
                 .Include(i => i.Product)
+                .Include(i => i.RarityConfig) // THÊM DÒNG NÀY
                 .ToListAsync();
 
-            foreach (var box in items) box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
+            foreach (var box in items)
+                box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
         }
 
         var dtos = new List<BlindBoxDetailDto>();
@@ -324,7 +326,7 @@ public class BlindBoxService : IBlindBoxService
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
 
-    public async Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemDto> items)
+    public async Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemRequestDto> items)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
             x => x.Id == blindBoxId && !x.IsDeleted,
@@ -619,7 +621,7 @@ public class BlindBoxService : IBlindBoxService
         _logger.Success($"[DeleteBlindBoxAsync] Đã xoá Blind Box {blindBoxId}.");
 
         var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
-        result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
+        result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemResponseDto
         {
             ProductId = item.ProductId,
             ProductName = item.Product?.Name ?? string.Empty,
@@ -657,7 +659,7 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.BadRequest("Tất cả sản phẩm trong blind box phải cùng loại (cùng root category).");
     }
 
-    private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemDto> items)
+    private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemRequestDto> items)
     {
         if (items.Count != 6 && items.Count != 12)
         {
@@ -717,9 +719,9 @@ public class BlindBoxService : IBlindBoxService
             }
     }
 
-    private Dictionary<BlindBoxItemDto, decimal> CalculateDropRates(List<BlindBoxItemDto> items)
+    private Dictionary<BlindBoxItemRequestDto, decimal> CalculateDropRates(List<BlindBoxItemRequestDto> items)
     {
-        var result = new Dictionary<BlindBoxItemDto, decimal>();
+        var result = new Dictionary<BlindBoxItemRequestDto, decimal>();
         var totalWeightQuantity = items.Sum(i => i.Quantity * i.Weight);
         foreach (var item in items)
         {
@@ -791,9 +793,9 @@ public class BlindBoxService : IBlindBoxService
         return Task.FromResult(dto);
     }
 
-    private List<BlindBoxItemDto> MapToBlindBoxItemDtos(IEnumerable<BlindBoxItem> items)
+    private List<BlindBoxItemResponseDto> MapToBlindBoxItemDtos(IEnumerable<BlindBoxItem> items)
     {
-        return items.Select(item => new BlindBoxItemDto
+        return items.Select(item => new BlindBoxItemResponseDto
         {
             ProductId = item.ProductId,
             ProductName = item.Product?.Name ?? string.Empty,

@@ -131,7 +131,7 @@ public class BlindBoxesController : ControllerBase
     [Authorize(Roles = "Seller")]
     [ProducesResponseType(typeof(BlindBoxDetailDto), 200)]
     [ProducesResponseType(400)]
-    public async Task<ActionResult<BlindBoxDetailDto>> AddItems(Guid id, [FromBody] List<BlindBoxItemDto> items)
+    public async Task<ActionResult<BlindBoxDetailDto>> AddItems(Guid id, [FromBody] List<BlindBoxItemRequestDto> items)
     {
         try
         {

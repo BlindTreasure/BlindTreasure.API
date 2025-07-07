@@ -39,10 +39,10 @@ public static class BlindBoxDtoMapper
     /// <summary>
     ///     Chuyển đổi BlindBoxItem entity sang BlindBoxItemDto.
     /// </summary>
-    public static BlindBoxItemDto ToBlindBoxItemDto(BlindBoxItem item)
+    public static BlindBoxItemResponseDto ToBlindBoxItemDto(BlindBoxItem item)
     {
         if (item == null) return null!;
-        return new BlindBoxItemDto
+        return new BlindBoxItemResponseDto
         {
             ProductId = item.ProductId,
             ProductName = item.Product?.Name,

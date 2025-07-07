@@ -35,11 +35,11 @@ public class UnboxingService : IUnboxingService
         var blindBox = customerBox.BlindBox;
 
         // 2. Lấy danh sách item hợp lệ
-        var items = blindBox.BlindBoxItems
+        var items = blindBox?.BlindBoxItems
             .Where(i => !i.IsDeleted && i.IsActive && i.Quantity > 0)
             .ToList();
 
-        if (!items.Any())
+        if (items != null && !items.Any())
             throw ErrorHelper.BadRequest("Hộp này không còn item nào để mở.");
 
         // 3 & 4. Random item theo xác suất (dùng hàm mới)
@@ -88,7 +88,6 @@ public class UnboxingService : IUnboxingService
             .ThenInclude(bb => bb.BlindBoxItems)
             .ThenInclude(bbi => bbi.Product)
             .FirstOrDefaultAsync(cb => cb.Id == id);
-
 
         if (customerBox == null)
         {
