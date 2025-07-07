@@ -40,8 +40,7 @@ public class InventoryItemService : IInventoryItemService
         _categoryService = categoryService; // initialize categoryService
     }
 
-    public async Task<InventoryItemDto>
-        CreateAsync(CreateInventoryItemDto dto, Guid? userId) // specify userId if needed, otherwise use current user
+    public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId)
     {
         if (userId.HasValue)
         {
@@ -122,6 +121,9 @@ public class InventoryItemService : IInventoryItemService
             var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
             query = query.Where(i => categoryIds.Contains(i.Product.CategoryId));
         }
+        
+        if (param.IsFromBlindBox.HasValue)
+            query = query.Where(i => i.IsFromBlindBox == param.IsFromBlindBox.Value);
 
         // Filter theo status
         if (param.Status.HasValue)

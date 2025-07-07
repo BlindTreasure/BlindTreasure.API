@@ -14,4 +14,8 @@ public class InventoryItemDto
     public string Location { get; set; }
     public InventoryItemStatus Status { get; set; } // enum
     public DateTime CreatedAt { get; set; }
+    
+    public bool IsFromBlindBox { get; set; }
+    public Guid? SourceCustomerBlindBoxId { get; set; }
+
 }

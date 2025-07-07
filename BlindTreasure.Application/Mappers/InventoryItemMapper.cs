@@ -18,7 +18,9 @@ public static class InventoryItemMapper
             Location = item.Location,
             Status = item.Status,
             CreatedAt = item.CreatedAt,
-            Product = item.Product != null ? ProductDtoMapper.ToProducDetailDto(item.Product) : null
+            Product = item.Product != null ? ProductDtoMapper.ToProducDetailDto(item.Product) : null,
+            IsFromBlindBox = item.IsFromBlindBox,
+            SourceCustomerBlindBoxId = item.SourceCustomerBlindBoxId,
         };
     }
 }
