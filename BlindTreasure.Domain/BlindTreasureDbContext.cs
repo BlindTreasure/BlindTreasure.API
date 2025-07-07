@@ -246,6 +246,23 @@ public class BlindTreasureDbContext : DbContext
                 .HasMaxLength(50);
         });
 
+        modelBuilder.Entity<InventoryItem>(entity =>
+        {
+            entity.Property(ii => ii.Location)
+                .HasMaxLength(100);
+
+            entity.Property(ii => ii.Status)
+                .HasConversion<string>() // enum lưu dạng string
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.HasOne(ii => ii.Address)
+                .WithMany()
+                .HasForeignKey(ii => ii.AddressId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+
         // User ↔ Seller (1-1)
         modelBuilder.Entity<User>()
             .HasOne(u => u.Seller)

@@ -66,7 +66,7 @@ public class InventoryItemService : IInventoryItemService
             ProductId = dto.ProductId,
             Quantity = dto.Quantity,
             Location = dto.Location ?? string.Empty,
-            Status = dto.Status ?? "Active"
+            Status = dto.Status
         };
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
@@ -124,8 +124,8 @@ public class InventoryItemService : IInventoryItemService
         }
 
         // Filter theo status
-        if (!string.IsNullOrWhiteSpace(param.Status))
-            query = query.Where(i => i.Status == param.Status);
+        if (param.Status.HasValue)
+            query = query.Where(i => i.Status == param.Status.Value);
 
         // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
         if (param.Desc)
@@ -158,8 +158,8 @@ public class InventoryItemService : IInventoryItemService
             item.Quantity = dto.Quantity.Value;
         if (!string.IsNullOrWhiteSpace(dto.Location))
             item.Location = dto.Location;
-        if (!string.IsNullOrWhiteSpace(dto.Status))
-            item.Status = dto.Status;
+        if (dto.Status.HasValue)
+            item.Status = dto.Status.Value;
 
         item.UpdatedAt = DateTime.UtcNow;
         item.UpdatedBy = _claimsService.CurrentUserId;
