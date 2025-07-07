@@ -40,6 +40,25 @@ public class InventoryItemService : IInventoryItemService
         _categoryService = categoryService; // initialize categoryService
     }
 
+    public async Task<List<InventoryItemDto>> GetMyUnboxedItemsFromBlindBoxAsync(Guid blindBoxId)
+    {
+        var userId = _claimsService.CurrentUserId;
+
+        var query = _unitOfWork.InventoryItems.GetQueryable()
+            .Where(i => i.UserId == userId
+                        && i.IsFromBlindBox
+                        && !i.IsDeleted
+                        && i.SourceCustomerBlindBox != null
+                        && i.SourceCustomerBlindBox.BlindBoxId == blindBoxId)
+            .Include(i => i.Product)
+            .Include(i => i.SourceCustomerBlindBox)
+            .AsNoTracking();
+
+        var result = await query.ToListAsync();
+
+        return result.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
+    }
+    
     public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId)
     {
         if (userId.HasValue)
