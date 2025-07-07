@@ -108,7 +108,7 @@ public class TransactionService : ITransactionService
                         ProductId = od.ProductId.Value,
                         Quantity = od.Quantity,
                         Location = string.Empty,
-                        Status = "Active"
+                        Status = InventoryItemStatus.Available
                     };
                     await _inventoryItemService.CreateAsync(createDto, order.UserId);
                     _logger.Success(

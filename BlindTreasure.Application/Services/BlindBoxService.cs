@@ -705,8 +705,7 @@ public class BlindBoxService : IBlindBoxService
             .Select(tier => items.Where(i => i.Rarity == tier).Sum(i => i.Weight))
             .ToList();
 
-        for (int i = 1; i < groupWeights.Count; i++)
-        {
+        for (var i = 1; i < groupWeights.Count; i++)
             if (groupWeights[i] > 0 && groupWeights[i - 1] > 0 && groupWeights[i] > groupWeights[i - 1])
             {
                 var detail = string.Join(", ",
@@ -716,7 +715,6 @@ public class BlindBoxService : IBlindBoxService
                 throw ErrorHelper.BadRequest(
                     "Không cho phép trọng số của tier sau lớn hơn tier trước (Common ≥ Rare ≥ Epic ≥ Secret).");
             }
-        }
     }
 
     private Dictionary<BlindBoxItemDto, decimal> CalculateDropRates(List<BlindBoxItemDto> items)

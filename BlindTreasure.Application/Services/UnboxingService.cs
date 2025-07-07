@@ -119,7 +119,7 @@ public class UnboxingService : IUnboxingService
         return customerBox;
     }
 
-    private async Task<InventoryItem> GrantUnboxedItemToUser(
+    private async Task GrantUnboxedItemToUser(
         BlindBoxItem selectedItem,
         CustomerBlindBox customerBox,
         Guid userId,
@@ -130,14 +130,20 @@ public class UnboxingService : IUnboxingService
         if (selectedItem.Quantity == 0)
             await NotifyOutOfStockAsync(customerBox.BlindBox, selectedItem);
 
+        var defaultAddress = await _unitOfWork.Addresses.GetQueryable()
+            .FirstOrDefaultAsync(a => a.UserId == userId && a.IsDefault && !a.IsDeleted);
+
         var inventory = new InventoryItem
         {
             Id = Guid.NewGuid(),
             ProductId = selectedItem.ProductId,
             UserId = userId,
             Quantity = 1,
-            Location = "HCM",
-            Status = "Available",
+            Location = defaultAddress?.Province ?? "HCM", // giữ "HCM" nếu không có
+            Status = InventoryItemStatus.Available,
+            AddressId = defaultAddress?.Id,
+            IsFromBlindBox = true,
+            SourceCustomerBlindBoxId = customerBox.Id,
             CreatedAt = now,
             CreatedBy = userId
         };
@@ -149,28 +155,6 @@ public class UnboxingService : IUnboxingService
         await _unitOfWork.CustomerBlindBoxes.Update(customerBox);
         await _unitOfWork.BlindBoxItems.Update(selectedItem);
         await _unitOfWork.SaveChangesAsync();
-
-        return inventory;
-    }
-
-
-    private static T? WeightedRandom<T>(Dictionary<T, decimal> weightedDict)
-    {
-        var totalWeight = weightedDict.Values.Sum();
-        if (totalWeight <= 0) return default;
-
-        var rand = new Random();
-        var roll = (decimal)rand.NextDouble() * totalWeight;
-        decimal cumulative = 0;
-
-        foreach (var kvp in weightedDict)
-        {
-            cumulative += kvp.Value;
-            if (roll <= cumulative)
-                return kvp.Key;
-        }
-
-        return default;
     }
 
     private async Task NotifyOutOfStockAsync(BlindBox blindBox, BlindBoxItem item)
