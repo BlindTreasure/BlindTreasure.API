@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Web;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
@@ -384,18 +385,19 @@ public class SellerService : ISellerService
 
         // Xóa ảnh cũ nếu có (trừ ảnh mặc định)
         if (!string.IsNullOrEmpty(seller.User.AvatarUrl) && !seller.User.AvatarUrl.Contains("free-psd/3d-illustration"))
-        {
             try
             {
                 var oldUrl = seller.User.AvatarUrl;
                 var uri = new Uri(oldUrl);
-                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                var query = HttpUtility.ParseQueryString(uri.Query);
                 var prefix = query.Get("prefix");
                 if (!string.IsNullOrEmpty(prefix))
                     await _blobService.DeleteFileAsync(prefix);
             }
-            catch { /* ignore */ }
-        }
+            catch
+            {
+                /* ignore */
+            }
 
         seller.User.AvatarUrl = avatarUrl;
         await _unitOfWork.Users.Update(seller.User);

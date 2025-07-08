@@ -14,6 +14,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<RarityConfig> RarityConfigs { get; }
     IGenericRepository<ProbabilityConfig> ProbabilityConfigs { get; }
     IGenericRepository<Promotion> Promotions { get; }
+    IGenericRepository<PromotionParticipant> PromotionParticipants { get; }
     IGenericRepository<Order> Orders { get; }
     IGenericRepository<CartItem> CartItems { get; }
     IGenericRepository<OrderDetail> OrderDetails { get; }

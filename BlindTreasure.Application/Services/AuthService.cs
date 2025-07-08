@@ -155,7 +155,8 @@ public class AuthService : IAuthService
         // Sau khi xác thực thành công
         await _notificationService.PushNotificationToUser(
             user.Id,
-            new NotificationDTO {
+            new NotificationDTO
+            {
                 Title = "Chào mừng!",
                 Message = $"Chào mừng {user.FullName} quay trở lại BlindTreasure.",
                 Type = NotificationType.System

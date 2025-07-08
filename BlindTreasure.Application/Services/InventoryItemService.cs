@@ -58,7 +58,7 @@ public class InventoryItemService : IInventoryItemService
 
         return result.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
     }
-    
+
     public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId)
     {
         if (userId.HasValue)
@@ -140,7 +140,7 @@ public class InventoryItemService : IInventoryItemService
             var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
             query = query.Where(i => categoryIds.Contains(i.Product.CategoryId));
         }
-        
+
         if (param.IsFromBlindBox.HasValue)
             query = query.Where(i => i.IsFromBlindBox == param.IsFromBlindBox.Value);
 

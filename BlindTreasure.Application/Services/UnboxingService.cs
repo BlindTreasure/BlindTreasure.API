@@ -15,8 +15,8 @@ public class UnboxingService : IUnboxingService
     private readonly IClaimsService _claimsService;
     private readonly ICurrentTime _currentTime;
     private readonly ILoggerService _loggerService;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
         ICurrentTime currentTime, INotificationService notificationService)
@@ -168,7 +168,8 @@ public class UnboxingService : IUnboxingService
         if (sellerUser != null)
             await _notificationService.PushNotificationToUser(
                 sellerUser.Id,
-                new NotificationDTO {
+                new NotificationDTO
+                {
                     Title = $"Item hết hàng trong {blindBox.Name}",
                     Message = $"Sản phẩm '{item.Product.Name}' trong blind box đã hết số lượng.",
                     Type = NotificationType.System

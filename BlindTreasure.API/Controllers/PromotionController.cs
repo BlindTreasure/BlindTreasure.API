@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PromotionDTOs;
+using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -149,6 +150,78 @@ public class PromotionController : ControllerBase
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     Tham gia voucher toàn sàn
+    /// </summary>
+    [HttpPost("{id}")]
+    [ProducesResponseType(typeof(ApiResult<ParticipantPromotionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Seller")]
+    public async Task<IActionResult> ParticipatePromotion(Guid id)
+    {
+        try
+        {
+            var result = await _promotionService.ParticipatePromotionAsync(id);
+            return Ok(ApiResult<ParticipantPromotionDto>.Success(result, "200", "Tham gia chiến dịch voucher thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<ParticipantPromotionDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     Rút khỏi voucher toàn sàn
+    /// </summary>
+    [HttpDelete("withdraw")]
+    [ProducesResponseType(typeof(ApiResult<ParticipantPromotionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
+    [Authorize(Roles = "Seller")]
+    public async Task<IActionResult> WithdrawPromotion([FromForm] WithdrawParticipantPromotionDto dto)
+    {
+        try
+        {
+            var result = await _promotionService.WithdrawPromotionAsync(dto);
+            return Ok(ApiResult<ParticipantPromotionDto>.Success(result, "200", "Rút khỏi chiến dịch voucher thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<ParticipantPromotionDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     (Staff) Xem tất cả seller tham gia vào promotion global
+    /// </summary>
+    [HttpGet("participant")]
+    [ProducesResponseType(typeof(ApiResult<Pagination<SellerParticipantDto>>), StatusCodes.Status200OK)]
+    [Authorize(Roles = "Staff")]
+    public async Task<IActionResult> GetPromotionParticipants([FromQuery] SellerParticipantPromotionParameter param)
+    {
+        try
+        {
+            var result = await _promotionService.GetPromotionParticipantsAsync(param);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Danh sách seller tham gia chiến dịch voucher."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<ParticipantPromotionDto>(ex);
             return StatusCode(statusCode, error);
         }
     }

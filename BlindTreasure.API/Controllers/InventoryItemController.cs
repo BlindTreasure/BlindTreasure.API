@@ -57,14 +57,15 @@ public class InventoryItemController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-    
+
     [HttpGet("by-blindbox/{blindBoxId}")]
     public async Task<IActionResult> GetUnboxedItemsByBlindBox(Guid blindBoxId)
     {
         try
         {
             var result = await _inventoryItemService.GetMyUnboxedItemsFromBlindBoxAsync(blindBoxId);
-            return Ok(ApiResult<List<InventoryItemDto>>.Success(result, "200", "Lấy sản phẩm đã mở từ blind box thành công."));
+            return Ok(ApiResult<List<InventoryItemDto>>.Success(result, "200",
+                "Lấy sản phẩm đã mở từ blind box thành công."));
         }
         catch (Exception ex)
         {
