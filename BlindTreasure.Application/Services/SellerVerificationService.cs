@@ -9,9 +9,9 @@ namespace BlindTreasure.Application.Services;
 
 public class SellerVerificationService : ISellerVerificationService
 {
+    private readonly ICacheService _cacheService;
     private readonly IEmailService _emailService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ICacheService _cacheService;
 
     public SellerVerificationService(IUnitOfWork unitOfWork, IEmailService emailService, ICacheService cacheService)
     {

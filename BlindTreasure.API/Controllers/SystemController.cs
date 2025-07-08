@@ -555,9 +555,7 @@ public class SystemController : ControllerBase
             .FirstOrDefaultAsync(a => a.UserId == customer.Id && a.IsDefault);
 
         if (defaultAddress == null)
-        {
             _logger.Warn("[SeedPurchasedProducts] Không tìm thấy địa chỉ mặc định của customer.");
-        }
 
         // Select 4 products to mark as purchased (2 from each category if possible)
         var purchasedProducts = products
@@ -576,7 +574,6 @@ public class SystemController : ControllerBase
         var inventoryItems = new List<InventoryItem>();
 
         foreach (var product in purchasedProducts)
-        {
             inventoryItems.Add(new InventoryItem
             {
                 Id = Guid.NewGuid(),
@@ -587,9 +584,8 @@ public class SystemController : ControllerBase
                 Status = InventoryItemStatus.Available,
                 IsFromBlindBox = false,
                 AddressId = defaultAddress?.Id,
-                CreatedAt = now.AddDays(-Random.Shared.Next(1, 30)), // Random purchase date in the last month
+                CreatedAt = now.AddDays(-Random.Shared.Next(1, 30)) // Random purchase date in the last month
             });
-        }
 
         await _context.InventoryItems.AddRangeAsync(inventoryItems);
         await _context.SaveChangesAsync();
@@ -1002,7 +998,6 @@ public class SystemController : ControllerBase
         var customerUsers = users.Where(u => u.RoleName == RoleType.Customer);
 
         foreach (var user in customerUsers)
-        {
             addresses.Add(new Address
             {
                 Id = Guid.NewGuid(),
@@ -1018,7 +1013,6 @@ public class SystemController : ControllerBase
                 CreatedAt = now,
                 CreatedBy = user.Id
             });
-        }
 
         if (addresses.Any())
         {
@@ -1137,26 +1131,17 @@ public class SystemController : ControllerBase
 
         // Find the seller
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
-        if (sellerUser == null)
-        {
-            throw new Exception("Không tìm thấy seller để tạo special blind box");
-        }
+        if (sellerUser == null) throw new Exception("Không tìm thấy seller để tạo special blind box");
 
         var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == sellerUser.Id);
-        if (seller == null)
-        {
-            throw new Exception("Không tìm thấy seller info để tạo special blind box");
-        }
+        if (seller == null) throw new Exception("Không tìm thấy seller info để tạo special blind box");
 
         // Get first category
         var category = await _context.Categories
             .Where(c => !c.IsDeleted && c.ParentId != null)
             .FirstOrDefaultAsync();
 
-        if (category == null)
-        {
-            throw new Exception("Không tìm thấy category để tạo special blind box");
-        }
+        if (category == null) throw new Exception("Không tìm thấy category để tạo special blind box");
 
         // Create special blind box products
         var specialProducts = new List<Product>

@@ -24,7 +24,8 @@ public class UnitOfWork(
     IGenericRepository<InventoryItem> inventoryItems,
     IGenericRepository<CustomerBlindBox> customerBlindboxes,
     IGenericRepository<Notification> notifications,
-    IGenericRepository<RarityConfig> rarityConfigs)
+    IGenericRepository<RarityConfig> rarityConfigs,
+    IGenericRepository<PromotionParticipant> promotionParticipants)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
@@ -46,6 +47,7 @@ public class UnitOfWork(
     public IGenericRepository<InventoryItem> InventoryItems { get; } = inventoryItems;
     public IGenericRepository<CustomerBlindBox> CustomerBlindBoxes { get; } = customerBlindboxes;
     public IGenericRepository<Notification> Notifications { get; } = notifications;
+    public IGenericRepository<PromotionParticipant> PromotionParticipants { get; } = promotionParticipants;
 
     public void Dispose()
     {

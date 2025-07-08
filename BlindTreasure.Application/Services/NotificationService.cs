@@ -55,6 +55,7 @@ public class NotificationService : INotificationService
             n.ReadAt = _currentTime.GetCurrentTime();
             await _unitOfWork.Notifications.Update(n);
         }
+
         await _unitOfWork.SaveChangesAsync();
     }
 
@@ -77,6 +78,7 @@ public class NotificationService : INotificationService
             var notification = await PushNotificationToUser(user.Id, notificationDTO);
             lastNotification = notification;
         }
+
         return lastNotification!;
     }
 
@@ -120,6 +122,7 @@ public class NotificationService : INotificationService
             var notification = await PushNotificationToUser(user.Id, notificationDTO);
             lastNotification = notification;
         }
+
         return lastNotification!;
     }
 }

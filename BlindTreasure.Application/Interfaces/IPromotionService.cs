@@ -13,4 +13,7 @@ public interface IPromotionService
     Task<PromotionDto> UpdatePromotionAsync(Guid id, CreatePromotionDto dto);
     Task<PromotionDto> ReviewPromotionAsync(ReviewPromotionDto dto);
     Task<PromotionApplicationResultDto> ApplyVoucherAsync(string voucherCode, Guid orderId);
+    Task<ParticipantPromotionDto> ParticipatePromotionAsync(Guid id);
+    Task<ParticipantPromotionDto> WithdrawPromotionAsync(WithdrawParticipantPromotionDto dto);
+    Task<Pagination<SellerParticipantDto>> GetPromotionParticipantsAsync(SellerParticipantPromotionParameter param);
 }

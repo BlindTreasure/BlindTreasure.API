@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-using System.Text.Json.Serialization;
-using BlindTreasure.Domain.Enums;
+﻿using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 
@@ -14,7 +12,6 @@ public class BlindBoxItemResponseDto
     public int Weight { get; set; }
     public decimal DropRate { get; set; }
 }
-
 
 public class BlindBoxItemRequestDto
 {

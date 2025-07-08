@@ -79,7 +79,7 @@ public class ProductService : IProductService
 
         // Tạo cache key dựa trên các tham số query
         var cacheKey = $"products:list:{param.GetHashCode()}";
-        
+
         // Thử lấy từ cache trước
         var cachedResult = await _cacheService.GetAsync<Pagination<ProducDetailDto>>(cacheKey);
         if (cachedResult != null)
@@ -87,7 +87,7 @@ public class ProductService : IProductService
             _logger.Info($"[GetAllAsync] Cache hit for products list with parameters: {param.GetHashCode()}");
             return cachedResult;
         }
-        
+
         var query = _unitOfWork.Products.GetQueryable()
             .Include(p => p.Seller)
             .Where(p => !p.IsDeleted && p.ProductType == ProductSaleType.DirectSale)
@@ -128,19 +128,19 @@ public class ProductService : IProductService
         // Sort based on SortBy field and Desc parameter
         query = param.SortBy switch
         {
-            ProductSortField.Name => param.Desc 
+            ProductSortField.Name => param.Desc
                 ? query.OrderByDescending(p => p.Name)
                 : query.OrderBy(p => p.Name),
-            ProductSortField.Price => param.Desc 
+            ProductSortField.Price => param.Desc
                 ? query.OrderByDescending(p => p.Price)
                 : query.OrderBy(p => p.Price),
-            ProductSortField.Stock => param.Desc 
+            ProductSortField.Stock => param.Desc
                 ? query.OrderByDescending(p => p.Stock)
                 : query.OrderBy(p => p.Stock),
-            ProductSortField.CreatedAt => param.Desc 
+            ProductSortField.CreatedAt => param.Desc
                 ? query.OrderByDescending(p => p.CreatedAt)
                 : query.OrderBy(p => p.CreatedAt),
-            _ => param.Desc 
+            _ => param.Desc
                 ? query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
                 : query.OrderBy(p => p.UpdatedAt ?? p.CreatedAt)
         };
@@ -266,6 +266,7 @@ public class ProductService : IProductService
             else if (dto.Stock.Value > 0 && product.Status == ProductStatus.OutOfStock)
                 product.Status = ProductStatus.Active;
         }
+
         if (dto.Height.HasValue)
             product.Height = dto.Height.Value;
         if (dto.Material != null)
@@ -280,7 +281,7 @@ public class ProductService : IProductService
 
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
-        
+
         // Xóa cache liên quan
         await RemoveProductCacheAsync(product.Id, product.SellerId);
 
@@ -410,10 +411,10 @@ public class ProductService : IProductService
     {
         // Xóa cache chi tiết sản phẩm
         await _cacheService.RemoveAsync($"product:{productId}");
-        
+
         // Xóa cache danh sách sản phẩm của seller
         await _cacheService.RemoveByPatternAsync($"product:all:{sellerId}");
-        
+
         // Xóa cache danh sách sản phẩm (tất cả các pattern có thể)
         await _cacheService.RemoveByPatternAsync("products:list:*");
     }
