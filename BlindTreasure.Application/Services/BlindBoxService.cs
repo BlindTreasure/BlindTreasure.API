@@ -262,7 +262,16 @@ public class BlindBoxService : IBlindBoxService
             blindBox.Price = dto.Price.Value;
 
         if (dto.TotalQuantity.HasValue)
+        {
             blindBox.TotalQuantity = dto.TotalQuantity.Value;
+            
+            // Cập nhật status dựa trên số lượng
+            if (dto.TotalQuantity.Value <= 0 && blindBox.Status == BlindBoxStatus.Approved)
+            {
+                blindBox.Status = BlindBoxStatus.Rejected; // Hoặc enum OutOfStock nếu có
+                _logger.Info($"[UpdateBlindBoxAsync] BlindBox {blindBoxId} đã hết hàng, cập nhật status thành Rejected");
+            }
+        }
 
         if (dto.ReleaseDate.HasValue)
             blindBox.ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate.Value, DateTimeKind.Utc);
@@ -456,6 +465,10 @@ public class BlindBoxService : IBlindBoxService
                 throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho để submit BlindBox.");
 
             product.Stock -= item.Quantity;
+            
+            // Cập nhật status của product nếu stock = 0
+            if (product.Stock == 0 && product.Status != ProductStatus.InActive)
+                product.Status = ProductStatus.OutOfStock;
         }
 
         await _unitOfWork.Products.UpdateRange(products);
@@ -821,7 +834,17 @@ public class BlindBoxService : IBlindBoxService
     private Task<BlindBoxDetailDto> MapBlindBoxToDtoAsync(BlindBox blindBox)
     {
         var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
+        
+        // Cập nhật stock status
         dto.BlindBoxStockStatus = blindBox.TotalQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
+        
+        // Nếu BlindBox hết hàng nhưng status không phản ánh điều đó, cập nhật trong DB
+        if (blindBox.TotalQuantity <= 0 && blindBox.Status == BlindBoxStatus.Approved)
+        {
+            // Chỉ log thông báo, việc cập nhật sẽ được thực hiện ở nơi khác để tránh side effect
+            _logger.Warn($"[MapBlindBoxToDtoAsync] BlindBox {blindBox.Id} đã hết hàng nhưng status vẫn là Approved");
+        }
+        
         dto.Brand = blindBox.Seller?.CompanyName;
 
         // Gán danh sách item
