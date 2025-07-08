@@ -25,12 +25,17 @@ builder.Configuration
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-        hehe =>
+    options.AddPolicy("AllowFrontend",
+        builder =>
         {
-            hehe.AllowAnyOrigin()
+            builder
+                .WithOrigins(
+                    "http://localhost:4040",
+                    "https://blindtreasure.vercel.app"
+                )
                 .AllowAnyMethod()
-                .AllowAnyHeader();
+                .AllowAnyHeader()
+                .AllowCredentials();
         });
 });
 
@@ -76,7 +81,7 @@ builder.Services.SetupRedisService(builder.Configuration);
 
 var app = builder.Build();
 
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
 if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
