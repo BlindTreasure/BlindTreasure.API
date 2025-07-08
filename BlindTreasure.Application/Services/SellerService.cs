@@ -367,6 +367,47 @@ public class SellerService : ISellerService
         return result;
     }
 
+    public async Task<string> UpdateSellerAvatarAsync(Guid userId, IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            throw ErrorHelper.BadRequest("File không hợp lệ.");
+
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);
+        if (seller == null || seller.User == null)
+            throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
+
+        // Upload file
+        var fileName = $"seller-avatars/{userId}-{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+        await using var stream = file.OpenReadStream();
+        await _blobService.UploadFileAsync(fileName, stream);
+        var avatarUrl = await _blobService.GetPreviewUrlAsync(fileName);
+
+        // Xóa ảnh cũ nếu có (trừ ảnh mặc định)
+        if (!string.IsNullOrEmpty(seller.User.AvatarUrl) && !seller.User.AvatarUrl.Contains("free-psd/3d-illustration"))
+        {
+            try
+            {
+                var oldUrl = seller.User.AvatarUrl;
+                var uri = new Uri(oldUrl);
+                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                var prefix = query.Get("prefix");
+                if (!string.IsNullOrEmpty(prefix))
+                    await _blobService.DeleteFileAsync(prefix);
+            }
+            catch { /* ignore */ }
+        }
+
+        seller.User.AvatarUrl = avatarUrl;
+        await _unitOfWork.Users.Update(seller.User);
+        await _unitOfWork.SaveChangesAsync();
+
+        // Xóa cache
+        await _cacheService.RemoveAsync($"seller:{seller.Id}");
+        await _cacheService.RemoveAsync($"seller:user:{userId}");
+
+        return avatarUrl;
+    }
+
     private async Task RemoveSellerCacheAsync(Guid sellerId, Guid userId)
     {
         await _cacheService.RemoveAsync($"seller:{sellerId}");

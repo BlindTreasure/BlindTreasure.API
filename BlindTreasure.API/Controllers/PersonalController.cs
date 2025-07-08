@@ -278,4 +278,27 @@ public class PersonalController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
+
+    /// <summary>
+    ///     Seller cập nhật avatar riêng.
+    /// </summary>
+    [Authorize(Roles = "Seller")]
+    [HttpPut("seller-avatar")]
+    [ProducesResponseType(typeof(ApiResult<string>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> UpdateSellerAvatar(IFormFile file)
+    {
+        try
+        {
+            var userId = _claimsService.CurrentUserId;
+            var avatarUrl = await _sellerService.UpdateSellerAvatarAsync(userId, file);
+            return Ok(ApiResult<string>.Success(avatarUrl, "200", "Cập nhật avatar Seller thành công."));
+        }
+        catch (Exception ex)
+        {
+            var status = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(status, error);
+        }
+    }
 }

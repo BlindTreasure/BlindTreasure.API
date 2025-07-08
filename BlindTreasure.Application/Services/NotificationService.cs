@@ -1,9 +1,11 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.SignalR.Hubs;
+using BlindTreasure.Domain.DTOs;
+using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.SignalR;
-using Notification = BlindTreasure.Domain.Entities.Notification;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
 
@@ -25,33 +27,78 @@ public class NotificationService : INotificationService
         _userService = userService;
     }
 
-    public async Task SendNotificationToUserAsync(Guid userId, string title, string message, NotificationType type,
-        TimeSpan? cooldown = null)
+    public async Task<int> GetUnreadNotificationsCount(Guid userId)
+    {
+        return await _unitOfWork.Notifications.GetQueryable()
+            .CountAsync(n => n.UserId == userId && !n.IsRead && !n.IsDeleted);
+    }
+
+    public async Task<Notification> ReadNotification(Guid notificationId)
+    {
+        var notification = await _unitOfWork.Notifications.FirstOrDefaultAsync(n => n.Id == notificationId);
+        if (notification == null) throw new Exception("Notification not found");
+        notification.IsRead = true;
+        notification.ReadAt = _currentTime.GetCurrentTime();
+        await _unitOfWork.Notifications.Update(notification);
+        await _unitOfWork.SaveChangesAsync();
+        return notification;
+    }
+
+    public async Task ReadAllNotifications(Guid userId)
+    {
+        var notifications = await _unitOfWork.Notifications.GetQueryable()
+            .Where(n => n.UserId == userId && !n.IsRead && !n.IsDeleted)
+            .ToListAsync();
+        foreach (var n in notifications)
+        {
+            n.IsRead = true;
+            n.ReadAt = _currentTime.GetCurrentTime();
+            await _unitOfWork.Notifications.Update(n);
+        }
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task DeleteNotification(Guid notificationId)
+    {
+        var notification = await _unitOfWork.Notifications.FirstOrDefaultAsync(n => n.Id == notificationId);
+        if (notification == null) throw new Exception("Notification not found");
+        notification.IsDeleted = true;
+        notification.DeletedAt = _currentTime.GetCurrentTime();
+        await _unitOfWork.Notifications.Update(notification);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task<Notification> PushNotificationToAll(NotificationDTO notificationDTO)
+    {
+        var users = await _unitOfWork.Users.GetQueryable().Where(u => !u.IsDeleted).ToListAsync();
+        Notification? lastNotification = null;
+        foreach (var user in users)
+        {
+            var notification = await PushNotificationToUser(user.Id, notificationDTO);
+            lastNotification = notification;
+        }
+        return lastNotification!;
+    }
+
+    public async Task<Notification> PushNotificationToUser(Guid userId, NotificationDTO notificationDTO)
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (user == null) return;
-
-        // var cacheKey = $"noti:{type}:{user.Email}";
-        // if (cooldown.HasValue && await _cacheService.ExistsAsync(cacheKey))
-        //     return;
-
+        if (user == null) throw new Exception("User not found");
         var now = _currentTime.GetCurrentTime();
         var notification = new Notification
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
-            Title = title,
-            Message = message,
-            Type = type,
+            Title = notificationDTO.Title,
+            Message = notificationDTO.Message,
+            Type = notificationDTO.Type,
             IsRead = false,
             SentAt = now,
             CreatedAt = now,
             CreatedBy = user.Id
         };
-
         await _unitOfWork.Notifications.AddAsync(notification);
         await _unitOfWork.SaveChangesAsync();
-
         var payload = new
         {
             notification.Id,
@@ -60,10 +107,19 @@ public class NotificationService : INotificationService
             notification.SentAt,
             notification.Type
         };
-
         await NotificationHub.SendToUser(_hubContext, user.Id.ToString(), payload);
+        return notification;
+    }
 
-        // if (cooldown.HasValue)
-        //     await _cacheService.SetAsync(cacheKey, true, cooldown.Value);
+    public async Task<Notification> PushNotificationToRole(RoleType role, NotificationDTO notificationDTO)
+    {
+        var users = await _unitOfWork.Users.GetQueryable().Where(u => u.RoleName == role && !u.IsDeleted).ToListAsync();
+        Notification? lastNotification = null;
+        foreach (var user in users)
+        {
+            var notification = await PushNotificationToUser(user.Id, notificationDTO);
+            lastNotification = notification;
+        }
+        return lastNotification!;
     }
 }
