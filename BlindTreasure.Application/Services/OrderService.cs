@@ -408,6 +408,14 @@ public class OrderService : IOrderService
             {
                 var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value);
                 blindBox.TotalQuantity -= item.Quantity;
+                
+                // Cập nhật status nếu hết hàng
+                if (blindBox.TotalQuantity <= 0 && blindBox.Status == BlindBoxStatus.Approved)
+                {
+                    blindBox.Status = BlindBoxStatus.Rejected; // Hoặc tạo một enum mới như OutOfStock
+                    _loggerService.Info($"BlindBox {blindBox.Id} đã hết hàng, cập nhật status thành Rejected");
+                }
+                
                 await _unitOfWork.BlindBoxes.Update(blindBox);
             }
         }
