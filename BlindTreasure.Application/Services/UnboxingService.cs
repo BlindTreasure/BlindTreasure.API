@@ -83,43 +83,38 @@ public class UnboxingService : IUnboxingService
         var customerBox = await _unitOfWork.CustomerBlindBoxes.GetQueryable()
             .Include(cb => cb.BlindBox)
             .ThenInclude(bb => bb.BlindBoxItems)
-            .ThenInclude(bbi => bbi.RarityConfig)
-            .Include(cb => cb.BlindBox)
-            .ThenInclude(bb => bb.BlindBoxItems)
             .ThenInclude(bbi => bbi.ProbabilityConfigs)
             .Include(cb => cb.BlindBox)
             .ThenInclude(bb => bb.BlindBoxItems)
             .ThenInclude(bbi => bbi.Product)
             .FirstOrDefaultAsync(cb => cb.Id == id);
 
-        if (customerBox == null)
+        if (customerBox == null || customerBox.UserId != userId || customerBox.IsDeleted || customerBox.IsOpened)
         {
-            _loggerService.Warn($"[Unbox] Hộp không tồn tại. BoxId={id}, UserId={userId}");
-            throw ErrorHelper.BadRequest("Không tìm thấy hộp hợp lệ để mở.");
+            var msg = customerBox == null
+                ? "Không tìm thấy hộp hợp lệ để mở."
+                : customerBox.IsDeleted
+                    ? "Hộp không hợp lệ (đã bị xóa)."
+                    : customerBox.IsOpened
+                        ? "Hộp đã được mở trước đó."
+                        : "Không có quyền mở hộp này.";
+            throw ErrorHelper.BadRequest(msg);
         }
 
-        if (customerBox.UserId != userId)
-        {
-            _loggerService.Warn(
-                $"[Unbox] Hộp không thuộc về người dùng. BoxId={id}, OwnerId={customerBox.UserId}, RequesterId={userId}");
-            throw ErrorHelper.BadRequest("Không có quyền mở hộp này.");
-        }
+        // Load thêm RarityConfig cho từng BlindBoxItem (manual)
+        var itemIds = customerBox.BlindBox.BlindBoxItems.Select(i => i.Id).ToList();
+        var rarities = await _unitOfWork.RarityConfigs.GetQueryable()
+            .Where(r => itemIds.Contains(r.BlindBoxItemId))
+            .ToListAsync();
 
-        if (customerBox.IsDeleted)
+        foreach (var item in customerBox.BlindBox.BlindBoxItems)
         {
-            _loggerService.Warn($"[Unbox] Hộp đã bị xóa. BoxId={id}, UserId={userId}");
-            throw ErrorHelper.BadRequest("Hộp không hợp lệ (đã bị xóa).");
-        }
-
-        if (customerBox.IsOpened)
-        {
-            _loggerService.Warn(
-                $"[Unbox] Hộp đã được mở trước đó. BoxId={id}, UserId={userId}, OpenedAt={customerBox.OpenedAt}");
-            throw ErrorHelper.BadRequest("Hộp đã được mở trước đó.");
+            item.RarityConfig = rarities.FirstOrDefault(r => r.BlindBoxItemId == item.Id);
         }
 
         return customerBox;
     }
+
 
     private async Task GrantUnboxedItemToUser(
         BlindBoxItem selectedItem,
