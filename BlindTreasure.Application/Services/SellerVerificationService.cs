@@ -11,11 +11,13 @@ public class SellerVerificationService : ISellerVerificationService
 {
     private readonly IEmailService _emailService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cacheService;
 
-    public SellerVerificationService(IUnitOfWork unitOfWork, IEmailService emailService)
+    public SellerVerificationService(IUnitOfWork unitOfWork, IEmailService emailService, ICacheService cacheService)
     {
         _unitOfWork = unitOfWork;
         _emailService = emailService;
+        _cacheService = cacheService;
     }
 
     public async Task<bool> VerifySellerAsync(Guid sellerId, SellerVerificationDto dto)
@@ -33,6 +35,10 @@ public class SellerVerificationService : ISellerVerificationService
 
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
+
+        // XÓA CACHE
+        await _cacheService.RemoveAsync($"seller:{seller.Id}");
+        await _cacheService.RemoveAsync($"seller:user:{seller.UserId}");
 
         // Gửi email chúc mừng nếu được duyệt
         if (dto.IsApproved)
