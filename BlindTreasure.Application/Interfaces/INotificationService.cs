@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Application.Interfaces;
 
