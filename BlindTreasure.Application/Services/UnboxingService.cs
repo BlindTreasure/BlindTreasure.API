@@ -15,14 +15,16 @@ public class UnboxingService : IUnboxingService
     private readonly ICurrentTime _currentTime;
     private readonly ILoggerService _loggerService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
-        ICurrentTime currentTime)
+        ICurrentTime currentTime, INotificationService notificationService)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
         _currentTime = currentTime;
+        _notificationService = notificationService;
     }
 
     public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
@@ -163,16 +165,14 @@ public class UnboxingService : IUnboxingService
 
         var sellerUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
         if (sellerUser != null)
-            await _unitOfWork.Notifications.AddAsync(new Notification
-            {
-                Id = Guid.NewGuid(),
-                UserId = sellerUser.Id,
-                Title = $"Item hết hàng trong {blindBox.Name}",
-                Message = $"Sản phẩm '{item.Product.Name}' trong blind box đã hết số lượng.",
-                Type = NotificationType.System,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = _claimsService.CurrentUserId
-            });
+            await _notificationService.PushNotificationToUser(
+                sellerUser.Id,
+                new NotificationDTO {
+                    Title = $"Item hết hàng trong {blindBox.Name}",
+                    Message = $"Sản phẩm '{item.Product.Name}' trong blind box đã hết số lượng.",
+                    Type = NotificationType.System
+                }
+            );
         // TODO: Gửi email qua EmailService nếu có
     }
 
