@@ -114,12 +114,25 @@ public class ProductService : IProductService
         if (param.ReleaseDateTo.HasValue)
             query = query.Where(p => p.CreatedAt <= param.ReleaseDateTo.Value);
 
-        // Sort: UpdatedAt desc, CreatedAt desc
-        // Sort: UpdatedAt desc, CreatedAt desc (now respects param.Desc)
-        if (param.Desc)
-            query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
-        else
-            query = query.OrderBy(p => p.UpdatedAt ?? p.CreatedAt);
+        // Sort based on SortBy field and Desc parameter
+        query = param.SortBy switch
+        {
+            ProductSortField.Name => param.Desc 
+                ? query.OrderByDescending(p => p.Name)
+                : query.OrderBy(p => p.Name),
+            ProductSortField.Price => param.Desc 
+                ? query.OrderByDescending(p => p.Price)
+                : query.OrderBy(p => p.Price),
+            ProductSortField.Stock => param.Desc 
+                ? query.OrderByDescending(p => p.Stock)
+                : query.OrderBy(p => p.Stock),
+            ProductSortField.CreatedAt => param.Desc 
+                ? query.OrderByDescending(p => p.CreatedAt)
+                : query.OrderBy(p => p.CreatedAt),
+            _ => param.Desc 
+                ? query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+                : query.OrderBy(p => p.UpdatedAt ?? p.CreatedAt)
+        };
 
         var count = await query.CountAsync();
 
