@@ -61,15 +61,21 @@ public class SystemController : ControllerBase
         try
         {
             var email = "trangiaphuc362003181@gmail.com";
+            _logger.Info($"[SeedUserBoxes] Bắt đầu seed blind box cho user: {email}");
 
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (user == null)
+            {
+                _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với email: {email}");
                 return NotFound($"Không tìm thấy user với email: {email}");
+            }
 
-            // Ensure high secret blind boxes exist
+            // Gọi hàm seed hộp (nếu chưa có)
+            _logger.Info("[SeedUserBoxes] Gọi SeedHighSecretBlindBoxes()");
             await SeedHighSecretBlindBoxes();
 
-            // Get regular blind boxes
+            // Lấy blind box thường
+            _logger.Info("[SeedUserBoxes] Truy vấn hộp thường (SecretProbability <= 5)");
             var regularBlindBoxes = await _context.BlindBoxes
                 .Include(b => b.BlindBoxItems!)
                 .ThenInclude(i => i.ProbabilityConfigs!)
@@ -88,7 +94,10 @@ public class SystemController : ControllerBase
                 .Take(2)
                 .ToList();
 
-            // Get high secret blind boxes
+            _logger.Info($"[SeedUserBoxes] Tìm thấy {validRegularBoxes.Count} hộp thường hợp lệ");
+
+            // Lấy hộp có tỉ lệ secret cao
+            _logger.Info("[SeedUserBoxes] Truy vấn hộp secret cao (SecretProbability == 25)");
             var highSecretBlindBoxes = await _context.BlindBoxes
                 .Include(b => b.BlindBoxItems!)
                 .ThenInclude(i => i.ProbabilityConfigs!)
@@ -107,11 +116,17 @@ public class SystemController : ControllerBase
                 .Take(2)
                 .ToList();
 
-            // Combine both types of blind boxes
+            _logger.Info($"[SeedUserBoxes] Tìm thấy {validHighSecretBoxes.Count} hộp secret cao hợp lệ");
+
+            // Tổng hợp
             var allBoxes = validRegularBoxes.Concat(validHighSecretBoxes).ToList();
 
             if (allBoxes.Count < 4)
+            {
+                _logger.Warn(
+                    $"[SeedUserBoxes] Không đủ blind box hợp lệ để seed. Yêu cầu 4 hộp, hiện có {allBoxes.Count}");
                 return BadRequest($"Không đủ blind box hợp lệ để seed. Cần 4 box, hiện có {allBoxes.Count} box.");
+            }
 
             var customerBoxes = allBoxes.Select(b => new CustomerBlindBox
             {
@@ -126,17 +141,20 @@ public class SystemController : ControllerBase
             await _context.CustomerBlindBoxes.AddRangeAsync(customerBoxes);
             await _context.SaveChangesAsync();
 
-            return Ok(ApiResult<object>.Success("200", $"Đã seed {customerBoxes.Count} hộp cho user {user.Email} (2 hộp thường, 2 hộp có tỉ lệ secret cao 25%)."));
+            _logger.Success($"[SeedUserBoxes] Seed thành công {customerBoxes.Count} hộp cho user {user.Email}");
+
+            return Ok(ApiResult<object>.Success("200",
+                $"Đã seed {customerBoxes.Count} hộp cho user {user.Email} (2 hộp thường, 2 hộp có tỉ lệ secret cao 25%)."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            _logger.Error($"[SeedUserBoxes] Exception: {ex.Message}");
             return StatusCode(statusCode, errorResponse);
         }
     }
 
-    // Add a new method to seed blind boxes with high secret probability
     private async Task SeedHighSecretBlindBoxes()
     {
         // Check if high secret blind boxes already exist
@@ -395,7 +413,8 @@ public class SystemController : ControllerBase
 
             await _context.SaveChangesAsync();
 
-            _logger.Success($"[SeedHighSecretBlindBoxes] Đã seed high secret blind box cho category {category.Name} thành công.");
+            _logger.Success(
+                $"[SeedHighSecretBlindBoxes] Đã seed high secret blind box cho category {category.Name} thành công.");
         }
     }
 
