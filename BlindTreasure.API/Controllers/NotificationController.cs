@@ -43,6 +43,24 @@ public class NotificationController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+    
+    [HttpGet("unread-count")]
+    public async Task<IActionResult> GetUnreadCount()
+    {
+        try
+        {
+            var userId = _claimsService.CurrentUserId;
+            var count = await _notificationService.GetUnreadNotificationsCount(userId);
+            return Ok(ApiResult<int>.Success(count));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
 
 
     [HttpPost("read-all")]
