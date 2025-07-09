@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
@@ -23,6 +24,7 @@ public class SellerService : ISellerService
     private readonly IEmailService _emailService;
     private readonly ILoggerService _loggerService;
     private readonly IMapperService _mapper;
+    private readonly INotificationService _notificationService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -34,7 +36,7 @@ public class SellerService : ISellerService
         ICacheService cacheService,
         IMapperService mapper,
         IClaimsService claimsService,
-        IProductService productService)
+        IProductService productService, INotificationService notificationService)
     {
         _blobService = blobService;
         _emailService = emailService;
@@ -44,6 +46,7 @@ public class SellerService : ISellerService
         _mapper = mapper;
         _claimsService = claimsService;
         _productService = productService;
+        _notificationService = notificationService;
     }
 
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
@@ -79,8 +82,20 @@ public class SellerService : ISellerService
 
         seller.Status = SellerStatus.WaitingReview;
 
+
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
+
+        await _notificationService.PushNotificationToUser(
+            seller.UserId,
+            new NotificationDTO
+            {
+                Title = "Hồ sơ đã gửi",
+                Message = "Hồ sơ của bạn đang chờ xét duyệt bởi quản trị viên.",
+                Type = NotificationType.System
+            }
+        );
+
 
         // Xóa cache trước khi set lại
         await RemoveSellerCacheAsync(seller.Id, userId);
@@ -125,8 +140,19 @@ public class SellerService : ISellerService
         seller.CoaDocumentUrl = fileUrl;
         seller.Status = SellerStatus.WaitingReview;
 
+
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
+
+        await _notificationService.PushNotificationToUser(
+            seller.UserId,
+            new NotificationDTO
+            {
+                Title = "Tài liệu đã nộp",
+                Message = "Tài liệu xác minh của bạn đã được gửi và đang chờ xét duyệt.",
+                Type = NotificationType.System
+            }
+        );
 
         // Cập nhật cache
         await _cacheService.SetAsync($"seller:{seller.Id}", seller, TimeSpan.FromHours(1));

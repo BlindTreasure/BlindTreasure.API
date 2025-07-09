@@ -145,5 +145,4 @@ app.MapHub<NotificationHub>("/hubs/notification");
 
 app.UseStaticFiles();
 
-
 app.Run();

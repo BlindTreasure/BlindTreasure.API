@@ -151,17 +151,7 @@ public class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync();
         await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
 
-
-        // Sau khi xác thực thành công
-        await _notificationService.PushNotificationToUser(
-            user.Id,
-            new NotificationDTO
-            {
-                Title = "Chào mừng!",
-                Message = $"Chào mừng {user.FullName} quay trở lại BlindTreasure.",
-                Type = NotificationType.System
-            }
-        );
+        await SendWelcomeNotificationIfNotSentAsync(user);
 
         _logger.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
 
@@ -562,6 +552,25 @@ public class AuthService : IAuthService
             RoleName = user.RoleName,
             CreatedAt = user.CreatedAt
         };
+    }
+
+
+    private async Task SendWelcomeNotificationIfNotSentAsync(User user)
+    {
+        var cacheKey = $"noti:welcome:{user.Id}";
+        if (await _cacheService.ExistsAsync(cacheKey)) return;
+
+        await _notificationService.PushNotificationToUser(
+            user.Id,
+            new NotificationDTO
+            {
+                Title = "Chào mừng!",
+                Message = $"Chào mừng {user.FullName} quay trở lại BlindTreasure.",
+                Type = NotificationType.System
+            }
+        );
+
+        await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
     }
 
     #endregion
