@@ -27,6 +27,23 @@ public class NotificationService : INotificationService
         _userService = userService;
     }
 
+    public async Task<List<Notification>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize)
+    {
+        return await _unitOfWork.Notifications.GetQueryable()
+            .Where(n => n.UserId == userId && !n.IsDeleted)
+            .OrderByDescending(n => n.SentAt)
+            .Skip(pageIndex * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+    }
+
+    public async Task<int> CountNotificationsAsync(Guid userId)
+    {
+        return await _unitOfWork.Notifications.GetQueryable()
+            .CountAsync(n => n.UserId == userId && !n.IsDeleted);
+    }
+    
+
     public async Task<int> GetUnreadNotificationsCount(Guid userId)
     {
         return await _unitOfWork.Notifications.GetQueryable()
