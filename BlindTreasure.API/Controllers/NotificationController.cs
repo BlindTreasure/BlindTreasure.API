@@ -1,6 +1,5 @@
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +19,6 @@ public class NotificationController : ControllerBase
         _notificationService = notificationService;
         _claimsService = claimsService;
     }
-
     [HttpGet]
     public async Task<IActionResult> GetNotifications([FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 10)
     {
@@ -30,15 +28,13 @@ public class NotificationController : ControllerBase
             var items = await _notificationService.GetNotificationsAsync(userId, pageIndex, pageSize);
             var totalCount = await _notificationService.CountNotificationsAsync(userId);
 
-            var result = new
+            return Ok(ApiResult<object>.Success(new
             {
                 totalCount,
                 pageIndex,
                 pageSize,
                 items
-            };
-
-            return Ok(ApiResult<object>.Success(result));
+            }));
         }
         catch (Exception ex)
         {
@@ -47,6 +43,7 @@ public class NotificationController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
 
     [HttpPost("read-all")]
     public async Task<IActionResult> ReadAll()
