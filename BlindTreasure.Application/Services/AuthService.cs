@@ -123,6 +123,12 @@ public class AuthService : IAuthService
 
         // Get user from cache or DBB
         var user = await GetUserByEmailAsync(loginDto.Email!, true);
+        var seller = new Seller();
+        if (user.RoleName == RoleType.Seller)
+        {
+            seller = await GetSellerByUserIdAsync(user.Id);
+            user.Seller = seller;
+        }
         if (user == null)
             throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
 
@@ -131,6 +137,7 @@ public class AuthService : IAuthService
 
         if (user.Status != UserStatus.Active)
             throw ErrorHelper.Forbidden(ErrorMessages.AccountNotVerified);
+
 
         _logger.Success($"[LoginAsync] User {loginDto.Email} authenticated successfully.");
 
@@ -440,6 +447,11 @@ public class AuthService : IAuthService
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
     }
 
+    private async Task<Seller?> GetSellerByUserIdAsync(Guid userId)
+    {
+        return await _unitOfWork.Sellers.FirstOrDefaultAsync(u => u.UserId == userId);
+    }
+
     /// <summary>
     ///     Gets a user by id
     /// </summary>
@@ -547,6 +559,7 @@ public class AuthService : IAuthService
     /// </summary>
     private static UserDto ToUserDto(User user)
     {
+        if(user.Seller != null)
         return new UserDto
         {
             UserId = user.Id,
@@ -557,7 +570,22 @@ public class AuthService : IAuthService
             Status = user.Status,
             PhoneNumber = user.Phone,
             RoleName = user.RoleName,
-            CreatedAt = user.CreatedAt
+            CreatedAt = user.CreatedAt,
+            SellerId = user.Seller.Id
+        };
+
+
+        return new UserDto
+        {
+            UserId = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            DateOfBirth = user.DateOfBirth,
+            AvatarUrl = user.AvatarUrl,
+            Status = user.Status,
+            PhoneNumber = user.Phone,
+            RoleName = user.RoleName,
+            CreatedAt = user.CreatedAt,
         };
     }
 
