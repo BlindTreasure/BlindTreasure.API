@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
@@ -23,7 +24,7 @@ public class BlindBoxService : IBlindBoxService
     private readonly IMapperService _mapperService;
     private readonly ICurrentTime _time;
     private readonly IUnitOfWork _unitOfWork;
-
+    private readonly INotificationService _notificationService;
 
     public BlindBoxService(
         IUnitOfWork unitOfWork,
@@ -32,7 +33,7 @@ public class BlindBoxService : IBlindBoxService
         IMapperService mapperService,
         IBlobService blobService,
         ICacheService cacheService,
-        ILoggerService logger, IEmailService emailService, ICategoryService categoryService)
+        ILoggerService logger, IEmailService emailService, ICategoryService categoryService, INotificationService notificationService)
     {
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
@@ -43,6 +44,7 @@ public class BlindBoxService : IBlindBoxService
         _logger = logger;
         _emailService = emailService;
         _categoryService = categoryService;
+        _notificationService = notificationService;
     }
 
     public async Task<Pagination<BlindBoxDetailDto>> GetAllBlindBoxesAsync(BlindBoxQueryParameter param)
@@ -568,6 +570,20 @@ public class BlindBoxService : IBlindBoxService
         }
 
         await _unitOfWork.SaveChangesAsync();
+        
+        await _notificationService.PushNotificationToUser(
+            blindBox.Seller.UserId,
+            new NotificationDTO
+            {
+                Title = approve ? "Blind Box được duyệt" : "Blind Box bị từ chối",
+                Message = approve
+                    ? $"Blind Box \"{blindBox.Name}\" của bạn đã được duyệt thành công."
+                    : $"Blind Box \"{blindBox.Name}\" đã bị từ chối. Lý do: {rejectReason}",
+                Type = NotificationType.System
+            }
+        );
+
+        
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
