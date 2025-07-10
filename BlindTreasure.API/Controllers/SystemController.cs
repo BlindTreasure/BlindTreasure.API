@@ -37,6 +37,7 @@ public class SystemController : ControllerBase
             await SeedCategories();
             await SeedProducts();
             await SeedBlindBoxes();
+            await SeedCounterStrikeCases();
             await SeedPromotions();
             return Ok(ApiResult<object>.Success(new
             {
@@ -56,18 +57,34 @@ public class SystemController : ControllerBase
     }
 
     [HttpPost("dev/seed-user-blind-boxes")]
-    public async Task<IActionResult> SeedBlindBoxUsers()
+    public async Task<IActionResult> SeedBlindBoxUsers([FromQuery] Guid? userId = null)
     {
         try
         {
-            var email = "trangiaphuc362003181@gmail.com";
-            _logger.Info($"[SeedUserBoxes] Bắt đầu seed blind box cho user: {email}");
+            User? user;
 
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null)
+            if (userId.HasValue)
             {
-                _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với email: {email}");
-                return NotFound($"Không tìm thấy user với email: {email}");
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với Id: {userId}");
+                    return NotFound($"Không tìm thấy user với Id: {userId}");
+                }
+
+                _logger.Info($"[SeedUserBoxes] Bắt đầu seed blind box cho user Id: {userId}");
+            }
+            else
+            {
+                var email = "trangiaphuc362003181@gmail.com";
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với email: {email}");
+                    return NotFound($"Không tìm thấy user với email: {email}");
+                }
+
+                _logger.Info($"[SeedUserBoxes] Bắt đầu seed blind box cho user: {email}");
             }
 
             // Gọi hàm seed hộp (nếu chưa có)
@@ -155,6 +172,73 @@ public class SystemController : ControllerBase
         }
     }
 
+    [HttpPost("dev/seed-cs-cases")]
+    public async Task<IActionResult> SeedCasesForUsers([FromQuery] Guid? userId = null)
+    {
+        try
+        {
+            User? user;
+
+            if (userId.HasValue)
+            {
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với Id: {userId}");
+                    return NotFound($"Không tìm thấy user với Id: {userId}");
+                }
+
+                _logger.Info($"[SeedUserBoxes] Bắt đầu seed CS case cho user Id: {userId}");
+            }
+            else
+            {
+                var email = "trangiaphuc362003181@gmail.com";
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với email: {email}");
+                    return NotFound($"Không tìm thấy user với email: {email}");
+                }
+
+                _logger.Info($"[SeedUserBoxes] Bắt đầu seed CS case cho user: {email}");
+            }
+
+            // 2. Lấy tất cả blind box theo tên chứa "Counter-Strike Midnight Case"
+            var csBoxes = await _context.BlindBoxes
+                .Where(b => !b.IsDeleted
+                            && b.Status == BlindBoxStatus.Approved
+                            && b.Name.Contains("Counter-Strike Midnight Case"))
+                .ToListAsync();
+
+            if (!csBoxes.Any()) return BadRequest("Không tìm thấy hộp Counter-Strike Midnight Case nào để seed.");
+
+            // 3. Seed cho user
+            var customerBoxes = csBoxes.Select(b => new CustomerBlindBox
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                BlindBoxId = b.Id,
+                IsOpened = false,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }).ToList();
+
+            await _context.CustomerBlindBoxes.AddRangeAsync(customerBoxes);
+            await _context.SaveChangesAsync();
+
+            _logger.Success($"[SeedUserBoxes] Đã seed {customerBoxes.Count} hộp CS cho user {user.Email}");
+
+            return Ok(ApiResult<object>.Success("200",
+                $"Đã seed {customerBoxes.Count} hộp Counter-Strike Midnight Case cho user {user.Email}."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            _logger.Error($"[SeedUserBoxes] Exception: {ex.Message}");
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 
     [HttpDelete("clear-caching")]
     public async Task<IActionResult> ClearCaching()
@@ -181,7 +265,6 @@ public class SystemController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
 
     private List<User> GetPredefinedUsers()
     {
@@ -890,6 +973,257 @@ public class SystemController : ControllerBase
 
 
             _logger.Success($"[SeedBlindBoxes] Đã seed blind box cho category {category.Name} thành công.");
+        }
+    }
+
+    private async Task SeedCounterStrikeCases()
+    {
+        var now = DateTime.UtcNow;
+        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
+        if (sellerUser == null)
+        {
+            _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo blind box.");
+            return;
+        }
+
+        var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == sellerUser.Id);
+        if (seller == null)
+        {
+            _logger.Error("User này chưa có Seller tương ứng.");
+            return;
+        }
+
+        // Lấy tất cả category con (ParentId != null)
+        var categories = await _context.Categories
+            .Where(c => !c.IsDeleted && c.ParentId != null)
+            .ToListAsync();
+
+        if (!categories.Any())
+        {
+            _logger.Warn("[SeedBlindBoxes] Không tìm thấy category con để tạo blind box.");
+            return;
+        }
+
+
+        foreach (var category in categories)
+        {
+            // Tạo mới 6 sản phẩm cho mỗi category, ProductSaleType là BlindBoxOnly
+            var gunsItems = new List<Product>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "AWP LIGHTNING STRIKE",
+                    Description = "Skin súng huyền thoại AWP với thiết kế tia sét ánh tím.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 820000,
+                    Stock = 40,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FAWP%20LIGHTNING%20STRIKE.png&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "Digital",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "AWP MEDUSA",
+                    Description = "AWP phiên bản Medusa, hoa văn rắn cổ điển cực hiếm.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 1250000,
+                    Stock = 35,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FAWP%20Medusa.png&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "Digital",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "GLOCK-18 FADE",
+                    Description = "Skin Glock-18 với hiệu ứng chuyển màu mượt mà FADE.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 480000,
+                    Stock = 50,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FGLOCK-18%20FADE.png&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "Digital",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "M4A4 ICARUS FELL",
+                    Description = "Skin M4A4 với chủ đề Icarus xanh đậm độc đáo.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 950000,
+                    Stock = 30,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FM4A4%20ICARUS%20FELL.png&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "Digital",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "M4A4 POSEIDON",
+                    Description = "Skin M4A4 với biểu tượng thần biển Poseidon.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 1350000,
+                    Stock = 25,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FM4A4%20POSEIDON.png&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "Digital",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                },
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "★ Karambit Doppler",
+                    Description = "Dao Karambit Doppler với hiệu ứng galaxy nổi bật, vật phẩm cực hiếm.",
+                    CategoryId = category.Id,
+                    SellerId = seller.Id,
+                    Price = 1750000,
+                    Stock = 20,
+                    Status = ProductStatus.Active,
+                    CreatedAt = now,
+                    ImageUrls = new List<string>
+                    {
+                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2F%E2%98%85%20Karambit%20Doppler.png&version_id=null"
+                    },
+                    Brand = seller.CompanyName,
+                    Material = "Digital",
+                    ProductType = ProductSaleType.BlindBoxOnly,
+                    Height = 12
+                }
+            };
+
+
+            await _context.Products.AddRangeAsync(gunsItems);
+            await _context.SaveChangesAsync();
+
+            var blindBox = new BlindBox
+            {
+                Id = Guid.NewGuid(),
+                SellerId = seller.Id,
+                CategoryId = category.Id,
+                Name = "Counter-Strike Midnight Case",
+                Description = "Blind box gồm các skin súng Counter-Strike hiếm và độc quyền.",
+                Price = 850000,
+                TotalQuantity = 30,
+                HasSecretItem = true,
+                SecretProbability = 0, // sẽ cập nhật bên dưới
+                Status = BlindBoxStatus.Approved,
+                ImageUrl =
+                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FMidnight%20Race%20Case.png&version_id=null",
+                ReleaseDate = now,
+                CreatedAt = now
+            };
+
+            var blindBoxItems = new List<BlindBoxItem>();
+            var rarityConfigs = new List<RarityConfig>();
+            var probabilityConfigs = new List<ProbabilityConfig>();
+
+            var rarityArr = new[]
+            {
+                new { Name = "AWP LIGHTNING STRIKE", Rarity = RarityName.Epic, Weight = 15, Quantity = 5 },
+                new { Name = "AWP MEDUSA", Rarity = RarityName.Epic, Weight = 15, Quantity = 4 },
+                new { Name = "GLOCK-18 FADE", Rarity = RarityName.Common, Weight = 30, Quantity = 8 },
+                new { Name = "M4A4 ICARUS FELL", Rarity = RarityName.Common, Weight = 30, Quantity = 8 },
+                new { Name = "M4A4 POSEIDON", Rarity = RarityName.Epic, Weight = 10, Quantity = 3 },
+                new { Name = "★ Karambit Doppler", Rarity = RarityName.Secret, Weight = 100, Quantity = 2 }
+            };
+
+            var totalWeightQty = rarityArr.Sum(x => x.Quantity * x.Weight);
+
+            foreach (var itemConfig in rarityArr)
+            {
+                var product = gunsItems.First(p => p.Name == itemConfig.Name);
+                var dropRate = Math.Round((decimal)(itemConfig.Quantity * itemConfig.Weight) / totalWeightQty * 100m,
+                    2);
+                var itemId = Guid.NewGuid();
+
+                blindBoxItems.Add(new BlindBoxItem
+                {
+                    Id = itemId,
+                    BlindBoxId = blindBox.Id,
+                    ProductId = product.Id,
+                    Quantity = itemConfig.Quantity,
+                    DropRate = dropRate,
+                    IsSecret = itemConfig.Rarity == RarityName.Secret,
+                    IsActive = true,
+                    CreatedAt = now
+                });
+
+                rarityConfigs.Add(new RarityConfig
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxItemId = itemId,
+                    Name = itemConfig.Rarity,
+                    Weight = itemConfig.Weight,
+                    IsSecret = itemConfig.Rarity == RarityName.Secret,
+                    CreatedAt = now
+                });
+
+                probabilityConfigs.Add(new ProbabilityConfig
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxItemId = itemId,
+                    Probability = dropRate,
+                    EffectiveFrom = now,
+                    EffectiveTo = now.AddYears(1),
+                    ApprovedBy = sellerUser.Id,
+                    ApprovedAt = now,
+                    CreatedAt = now
+                });
+            }
+
+            blindBox.SecretProbability = blindBoxItems
+                .Where(i => i.IsSecret)
+                .Sum(i => Math.Round(i.DropRate, 2));
+            
+            await _context.BlindBoxes.AddAsync(blindBox);
+            await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
+            await _context.RarityConfigs.AddRangeAsync(rarityConfigs);
+            await _context.ProbabilityConfigs.AddRangeAsync(probabilityConfigs);
+            await _context.SaveChangesAsync();
+
+            _logger.Success(
+                $"[SeedCounterStrikeCases] Đã seed Counter-Strike blind box cho category {category.Name} thành công.");
         }
     }
 
