@@ -48,41 +48,15 @@ public class BlindTreasureDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Role ↔ User (1-n)
-        modelBuilder.Entity<User>()
-            .HasOne(u => u.Role)
-            .WithMany(r => r.Users)
-            .HasForeignKey(u => u.RoleName)
-            .IsRequired();
+        #region enums converter
 
-        modelBuilder.Entity<User>()
-            .Property(u => u.Status)
-            .HasConversion<string>();
+        modelBuilder.Entity<Listing>(entity =>
+        {
+            entity.Property(l => l.Status)
+                .HasConversion<string>() // Enum sẽ lưu dưới dạng chuỗi
+                .HasMaxLength(32);
+        });
 
-        modelBuilder.Entity<Role>()
-            .Property(r => r.Type)
-            .HasConversion<string>()
-            .HasMaxLength(50)
-            .IsRequired();
-
-        // --- Cấu hình User.RoleName làm FK trỏ vào Role.Type ---
-        modelBuilder.Entity<User>()
-            .Property(u => u.RoleName)
-            .HasConversion<string>()
-            .HasMaxLength(50)
-            .IsRequired();
-
-        modelBuilder.Entity<User>()
-            .HasOne(u => u.Role)
-            .WithMany(r => r.Users)
-            .HasForeignKey(u => u.RoleName)
-            .HasPrincipalKey(r => r.Type);
-
-        // --- Định nghĩa Alternate Key trên Role.Type ---
-        modelBuilder.Entity<Role>()
-            .HasAlternateKey(r => r.Type);
-
-        #region MyRegion
 
         modelBuilder.Entity<OtpVerification>(entity =>
         {
@@ -160,6 +134,41 @@ public class BlindTreasureDbContext : DbContext
         });
 
         #endregion
+
+
+        // Role ↔ User (1-n)
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Role)
+            .WithMany(r => r.Users)
+            .HasForeignKey(u => u.RoleName)
+            .IsRequired();
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.Status)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<Role>()
+            .Property(r => r.Type)
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired();
+
+        // --- Cấu hình User.RoleName làm FK trỏ vào Role.Type ---
+        modelBuilder.Entity<User>()
+            .Property(u => u.RoleName)
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired();
+
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Role)
+            .WithMany(r => r.Users)
+            .HasForeignKey(u => u.RoleName)
+            .HasPrincipalKey(r => r.Type);
+
+        // --- Định nghĩa Alternate Key trên Role.Type ---
+        modelBuilder.Entity<Role>()
+            .HasAlternateKey(r => r.Type);
 
 
         modelBuilder.Entity<Product>()
