@@ -203,9 +203,6 @@ public class SystemController : ControllerBase
                 _logger.Info($"[SeedUserBoxes] Bắt đầu seed CS case cho user: {email}");
             }
 
-            // 1. Gọi seed CS cases
-            await SeedCounterStrikeCases();
-
             // 2. Lấy tất cả blind box theo tên chứa "Counter-Strike Midnight Case"
             var csBoxes = await _context.BlindBoxes
                 .Where(b => !b.IsDeleted
