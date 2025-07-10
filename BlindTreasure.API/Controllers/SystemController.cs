@@ -56,18 +56,34 @@ public class SystemController : ControllerBase
     }
 
     [HttpPost("dev/seed-user-blind-boxes")]
-    public async Task<IActionResult> SeedBlindBoxUsers()
+    public async Task<IActionResult> SeedBlindBoxUsers([FromQuery] Guid? userId = null)
     {
         try
         {
-            var email = "trangiaphuc362003181@gmail.com";
-            _logger.Info($"[SeedUserBoxes] Bắt đầu seed blind box cho user: {email}");
+            User? user;
 
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null)
+            if (userId.HasValue)
             {
-                _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với email: {email}");
-                return NotFound($"Không tìm thấy user với email: {email}");
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với Id: {userId}");
+                    return NotFound($"Không tìm thấy user với Id: {userId}");
+                }
+
+                _logger.Info($"[SeedUserBoxes] Bắt đầu seed blind box cho user Id: {userId}");
+            }
+            else
+            {
+                var email = "trangiaphuc362003181@gmail.com";
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với email: {email}");
+                    return NotFound($"Không tìm thấy user với email: {email}");
+                }
+
+                _logger.Info($"[SeedUserBoxes] Bắt đầu seed blind box cho user: {email}");
             }
 
             // Gọi hàm seed hộp (nếu chưa có)
