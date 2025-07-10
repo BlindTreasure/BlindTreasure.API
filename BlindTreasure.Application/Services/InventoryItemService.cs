@@ -14,12 +14,12 @@ namespace BlindTreasure.Application.Services;
 public class InventoryItemService : IInventoryItemService
 {
     private readonly ICacheService _cacheService;
+    private readonly ICategoryService _categoryService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _loggerService;
     private readonly IOrderService _orderService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ICategoryService _categoryService;
 
 
     public InventoryItemService(
@@ -40,8 +40,26 @@ public class InventoryItemService : IInventoryItemService
         _categoryService = categoryService; // initialize categoryService
     }
 
-    public async Task<InventoryItemDto>
-        CreateAsync(CreateInventoryItemDto dto, Guid? userId) // specify userId if needed, otherwise use current user
+    public async Task<List<InventoryItemDto>> GetMyUnboxedItemsFromBlindBoxAsync(Guid blindBoxId)
+    {
+        var userId = _claimsService.CurrentUserId;
+
+        var query = _unitOfWork.InventoryItems.GetQueryable()
+            .Where(i => i.UserId == userId
+                        && i.IsFromBlindBox
+                        && !i.IsDeleted
+                        && i.SourceCustomerBlindBox != null
+                        && i.SourceCustomerBlindBox.BlindBoxId == blindBoxId)
+            .Include(i => i.Product)
+            .Include(i => i.SourceCustomerBlindBox)
+            .AsNoTracking();
+
+        var result = await query.ToListAsync();
+
+        return result.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
+    }
+
+    public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId)
     {
         if (userId.HasValue)
         {
@@ -66,7 +84,7 @@ public class InventoryItemService : IInventoryItemService
             ProductId = dto.ProductId,
             Quantity = dto.Quantity,
             Location = dto.Location ?? string.Empty,
-            Status = dto.Status ?? "Active"
+            Status = dto.Status
         };
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
@@ -123,9 +141,12 @@ public class InventoryItemService : IInventoryItemService
             query = query.Where(i => categoryIds.Contains(i.Product.CategoryId));
         }
 
+        if (param.IsFromBlindBox.HasValue)
+            query = query.Where(i => i.IsFromBlindBox == param.IsFromBlindBox.Value);
+
         // Filter theo status
-        if (!string.IsNullOrWhiteSpace(param.Status))
-            query = query.Where(i => i.Status == param.Status);
+        if (param.Status.HasValue)
+            query = query.Where(i => i.Status == param.Status.Value);
 
         // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
         if (param.Desc)
@@ -158,8 +179,8 @@ public class InventoryItemService : IInventoryItemService
             item.Quantity = dto.Quantity.Value;
         if (!string.IsNullOrWhiteSpace(dto.Location))
             item.Location = dto.Location;
-        if (!string.IsNullOrWhiteSpace(dto.Status))
-            item.Status = dto.Status;
+        if (dto.Status.HasValue)
+            item.Status = dto.Status.Value;
 
         item.UpdatedAt = DateTime.UtcNow;
         item.UpdatedBy = _claimsService.CurrentUserId;

@@ -23,6 +23,8 @@ public class SellerServiceTests
     private readonly Mock<IGenericRepository<Seller>> _sellerRepoMock;
     private readonly SellerService _sellerService;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+    private readonly Mock<INotificationService> _notificationServiceMock; // thêm dòng này
+
 
     public SellerServiceTests()
     {
@@ -34,6 +36,7 @@ public class SellerServiceTests
         _mapperServiceMock = new Mock<IMapperService>();
         _claimsServiceMock = new Mock<IClaimsService>();
         _productServiceMock = new Mock<IProductService>();
+        _notificationServiceMock = new Mock<INotificationService>(); // thêm dòng này
         _sellerRepoMock = new Mock<IGenericRepository<Seller>>();
         _productRepoMock = new Mock<IGenericRepository<Product>>();
 
@@ -48,7 +51,9 @@ public class SellerServiceTests
             _cacheServiceMock.Object,
             _mapperServiceMock.Object,
             _claimsServiceMock.Object,
-            _productServiceMock.Object
+            _productServiceMock.Object,
+            _notificationServiceMock.Object // thêm dòng này
+
         );
     }
 

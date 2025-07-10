@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
@@ -23,7 +24,7 @@ public class BlindBoxService : IBlindBoxService
     private readonly IMapperService _mapperService;
     private readonly ICurrentTime _time;
     private readonly IUnitOfWork _unitOfWork;
-
+    private readonly INotificationService _notificationService;
 
     public BlindBoxService(
         IUnitOfWork unitOfWork,
@@ -32,7 +33,7 @@ public class BlindBoxService : IBlindBoxService
         IMapperService mapperService,
         IBlobService blobService,
         ICacheService cacheService,
-        ILoggerService logger, IEmailService emailService, ICategoryService categoryService)
+        ILoggerService logger, IEmailService emailService, ICategoryService categoryService, INotificationService notificationService)
     {
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
@@ -43,6 +44,7 @@ public class BlindBoxService : IBlindBoxService
         _logger = logger;
         _emailService = emailService;
         _categoryService = categoryService;
+        _notificationService = notificationService;
     }
 
     public async Task<Pagination<BlindBoxDetailDto>> GetAllBlindBoxesAsync(BlindBoxQueryParameter param)
@@ -110,19 +112,8 @@ public class BlindBoxService : IBlindBoxService
         List<BlindBox> items;
         if (param.PageIndex == 0)
         {
-            // Lấy BlindBox trước
             items = await query.ToListAsync();
-
-            // Load BlindBoxItems có IsDeleted = false cho từng BlindBox
-            var blindBoxIds = items.Select(b => b.Id).ToList();
-
-            var itemsGrouped = await _unitOfWork.BlindBoxItems.GetQueryable()
-                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
-                .Include(i => i.Product)
-                .Include(i => i.ProbabilityConfigs)
-                .ToListAsync();
-
-            foreach (var box in items) box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
+            await LoadBlindBoxItemsAsync(items, true);
         }
         else
         {
@@ -130,16 +121,9 @@ public class BlindBoxService : IBlindBoxService
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-
-            var blindBoxIds = items.Select(b => b.Id).ToList();
-
-            var itemsGrouped = await _unitOfWork.BlindBoxItems.GetQueryable()
-                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
-                .Include(i => i.Product)
-                .ToListAsync();
-
-            foreach (var box in items) box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
+            await LoadBlindBoxItemsAsync(items);
         }
+
 
         var dtos = new List<BlindBoxDetailDto>();
         foreach (var b in items)
@@ -244,12 +228,11 @@ public class BlindBoxService : IBlindBoxService
             Description = dto.Description.Trim(),
             ImageUrl = imageUrl,
             ReleaseDate = releaseDateUtc,
-            HasSecretItem = dto.HasSecretItem,
-            SecretProbability = dto.SecretProbability,
             Status = BlindBoxStatus.Draft,
             CreatedAt = _time.GetCurrentTime(),
             CreatedBy = currentUserId
         };
+
 
         await _unitOfWork.BlindBoxes.AddAsync(blindBox);
         await _unitOfWork.SaveChangesAsync();
@@ -281,7 +264,17 @@ public class BlindBoxService : IBlindBoxService
             blindBox.Price = dto.Price.Value;
 
         if (dto.TotalQuantity.HasValue)
+        {
             blindBox.TotalQuantity = dto.TotalQuantity.Value;
+
+            // Cập nhật status dựa trên số lượng
+            if (dto.TotalQuantity.Value <= 0 && blindBox.Status == BlindBoxStatus.Approved)
+            {
+                blindBox.Status = BlindBoxStatus.Rejected; // Hoặc enum OutOfStock nếu có
+                _logger.Info(
+                    $"[UpdateBlindBoxAsync] BlindBox {blindBoxId} đã hết hàng, cập nhật status thành Rejected");
+            }
+        }
 
         if (dto.ReleaseDate.HasValue)
             blindBox.ReleaseDate = DateTime.SpecifyKind(dto.ReleaseDate.Value, DateTimeKind.Utc);
@@ -325,8 +318,14 @@ public class BlindBoxService : IBlindBoxService
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
 
-    public async Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemDto> items)
+    public async Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemRequestDto> items)
     {
+        if (items == null || items.Count == 0)
+            throw ErrorHelper.BadRequest("Blind Box cần có ít nhất 1 sản phẩm.");
+
+        if (items.Count != 6 && items.Count != 12)
+            throw ErrorHelper.BadRequest("Mỗi Blind Box chỉ được chứa 6 hoặc 12 sản phẩm.");
+
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
             x => x.Id == blindBoxId && !x.IsDeleted,
             b => b.BlindBoxItems
@@ -342,59 +341,101 @@ public class BlindBoxService : IBlindBoxService
         if (seller == null)
             throw ErrorHelper.Forbidden("Bạn không có quyền chỉnh sửa Blind Box này.");
 
-        if (items == null || items.Count == 0)
-            throw ErrorHelper.BadRequest("Blind Box cần có ít nhất 1 sản phẩm.");
-
         ValidateBlindBoxItemsFullRule(items);
 
-        // Lấy product & kiểm tra tồn kho
         var products = await _unitOfWork.Products.GetAllAsync(p =>
             items.Select(i => i.ProductId).Contains(p.Id) && p.SellerId == seller.Id && !p.IsDeleted);
 
-        var now = _time.GetCurrentTime();
-        var blindBoxItems = new List<BlindBoxItem>();
-        var rarityConfigs = new List<RarityConfig>();
-
-        // Tính toán drop rate cho từng item (tách method riêng)
         var dropRates = CalculateDropRates(items);
+        var now = _time.GetCurrentTime();
 
-        foreach (var item in items)
+        if (blindBox.BlindBoxItems == null)
+            blindBox.BlindBoxItems = new List<BlindBoxItem>();
+
+        var existingItems = blindBox.BlindBoxItems.Where(i => !i.IsDeleted).ToList();
+        var newBlindBoxItems = new List<BlindBoxItem>();
+        var newRarityConfigs = new List<RarityConfig>();
+
+        for (var i = 0; i < items.Count; i++)
         {
+            var item = items[i];
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
-                throw ErrorHelper.BadRequest("Sản phẩm không hợp lệ.");
+                throw ErrorHelper.BadRequest($"Sản phẩm tại vị trí {i + 1} không hợp lệ.");
             if (item.Quantity > product.Stock)
                 throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho.");
 
-            var blindBoxItem = new BlindBoxItem
-            {
-                Id = Guid.NewGuid(),
-                BlindBoxId = blindBoxId,
-                ProductId = item.ProductId,
-                Quantity = item.Quantity,
-                DropRate = dropRates[item], // DropRate tính tự động
-                IsSecret = item.Rarity == RarityName.Secret,
-                IsActive = true,
-                CreatedAt = now,
-                CreatedBy = currentUserId
-            };
-            blindBoxItems.Add(blindBoxItem);
+            var dropRate = dropRates[item];
 
-            rarityConfigs.Add(new RarityConfig
+            if (i < existingItems.Count)
             {
-                Id = Guid.NewGuid(),
-                BlindBoxItemId = blindBoxItem.Id,
-                Name = item.Rarity,
-                Weight = item.Weight,
-                IsSecret = item.Rarity == RarityName.Secret,
-                CreatedAt = now,
-                CreatedBy = currentUserId
-            });
+                var existing = existingItems[i];
+                existing.ProductId = item.ProductId;
+                existing.Quantity = item.Quantity;
+                existing.DropRate = dropRate;
+                existing.IsSecret = item.Rarity == RarityName.Secret;
+                existing.IsActive = true;
+                existing.UpdatedAt = now;
+                existing.UpdatedBy = currentUserId;
+
+                await _unitOfWork.BlindBoxItems.Update(existing);
+
+                var rarity = await _unitOfWork.RarityConfigs.FirstOrDefaultAsync(r =>
+                    r.BlindBoxItemId == existing.Id && !r.IsDeleted);
+
+                if (rarity != null)
+                {
+                    rarity.Name = item.Rarity;
+                    rarity.Weight = item.Weight;
+                    rarity.IsSecret = item.Rarity == RarityName.Secret;
+                    rarity.UpdatedAt = now;
+                    rarity.UpdatedBy = currentUserId;
+                    await _unitOfWork.RarityConfigs.Update(rarity);
+                }
+            }
+            else
+            {
+                var newItem = new BlindBoxItem
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxId = blindBoxId,
+                    ProductId = item.ProductId,
+                    Quantity = item.Quantity,
+                    DropRate = dropRate,
+                    IsSecret = item.Rarity == RarityName.Secret,
+                    IsActive = true,
+                    CreatedAt = now,
+                    CreatedBy = currentUserId
+                };
+                newBlindBoxItems.Add(newItem);
+
+                newRarityConfigs.Add(new RarityConfig
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxItemId = newItem.Id,
+                    Name = item.Rarity,
+                    Weight = item.Weight,
+                    IsSecret = item.Rarity == RarityName.Secret,
+                    CreatedAt = now,
+                    CreatedBy = currentUserId
+                });
+            }
         }
 
-        await _unitOfWork.BlindBoxItems.AddRangeAsync(blindBoxItems);
-        await _unitOfWork.RarityConfigs.AddRangeAsync(rarityConfigs);
+        if (newBlindBoxItems.Any())
+            await _unitOfWork.BlindBoxItems.AddRangeAsync(newBlindBoxItems);
+        if (newRarityConfigs.Any())
+            await _unitOfWork.RarityConfigs.AddRangeAsync(newRarityConfigs);
+
+        blindBox.HasSecretItem = items.Any(i => i.Rarity == RarityName.Secret);
+        blindBox.SecretProbability = dropRates
+            .Where(kv => kv.Key.Rarity == RarityName.Secret)
+            .Sum(kv => kv.Value);
+
+        await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
+
+        await RemoveBlindBoxCacheAsync(blindBoxId, seller.Id);
 
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
@@ -427,6 +468,10 @@ public class BlindBoxService : IBlindBoxService
                 throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho để submit BlindBox.");
 
             product.Stock -= item.Quantity;
+
+            // Cập nhật status của product nếu stock = 0
+            if (product.Stock == 0 && product.Status != ProductStatus.InActive)
+                product.Status = ProductStatus.OutOfStock;
         }
 
         await _unitOfWork.Products.UpdateRange(products);
@@ -437,7 +482,6 @@ public class BlindBoxService : IBlindBoxService
         _logger.Success($"[SubmitBlindBoxAsync] Blind Box {blindBoxId} submitted for approval.");
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
-
 
     public async Task<BlindBoxDetailDto> ReviewBlindBoxAsync(Guid blindBoxId, bool approve, string? rejectReason = null)
     {
@@ -457,10 +501,6 @@ public class BlindBoxService : IBlindBoxService
         {
             if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
                 throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxNoItems);
-
-            var totalDropRate = blindBox.BlindBoxItems.Sum(i => i.DropRate);
-            if (totalDropRate != 100)
-                throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDropRateMustBe100);
 
             blindBox.Status = BlindBoxStatus.Approved;
             blindBox.UpdatedAt = now;
@@ -530,6 +570,20 @@ public class BlindBoxService : IBlindBoxService
         }
 
         await _unitOfWork.SaveChangesAsync();
+        
+        await _notificationService.PushNotificationToUser(
+            blindBox.Seller.UserId,
+            new NotificationDTO
+            {
+                Title = approve ? "Blind Box được duyệt" : "Blind Box bị từ chối",
+                Message = approve
+                    ? $"Blind Box \"{blindBox.Name}\" của bạn đã được duyệt thành công."
+                    : $"Blind Box \"{blindBox.Name}\" đã bị từ chối. Lý do: {rejectReason}",
+                Type = NotificationType.System
+            }
+        );
+
+        
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
@@ -618,7 +672,7 @@ public class BlindBoxService : IBlindBoxService
         _logger.Success($"[DeleteBlindBoxAsync] Đã xoá Blind Box {blindBoxId}.");
 
         var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
-        result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemDto
+        result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemResponseDto
         {
             ProductId = item.ProductId,
             ProductName = item.Product?.Name ?? string.Empty,
@@ -656,76 +710,87 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.BadRequest("Tất cả sản phẩm trong blind box phải cùng loại (cùng root category).");
     }
 
-    private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemDto> items)
+    private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemRequestDto> items)
     {
-        // Số lượng phải đúng 6 hoặc 12
         if (items.Count != 6 && items.Count != 12)
         {
             _logger.Warn(
-                $"[ValidateBlindBoxItemsFullRule] Lỗi: Số lượng item = {items.Count}, yêu cầu đúng 6 hoặc 12.");
+                $"[ValidateBlindBoxItemsFullRule] Số lượng item không hợp lệ [ActualCount={items.Count}]. Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
             throw ErrorHelper.BadRequest("Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
         }
 
-        // Phải có ít nhất 1 Secret
-        int countSecret = items.Count(i => i.Rarity == RarityName.Secret);
+        var countSecret = items.Count(i => i.Rarity == RarityName.Secret);
         if (countSecret < 1)
         {
-            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Không có item Secret trong danh sách.");
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Không có item Secret [SecretCount={countSecret}]. Blind Box phải có ít nhất 1 item Secret.");
             throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
         }
 
-        // Không được có nhiều hơn 1 Secret
         if (countSecret > 1)
         {
-            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Có {countSecret} item Secret, yêu cầu tối đa 1.");
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Có nhiều hơn 1 item Secret [SecretCount={countSecret}]. Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
             throw ErrorHelper.BadRequest("Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
         }
 
-        // Giá trị rarity hợp lệ
         var validRarities = Enum.GetValues(typeof(RarityName)).Cast<RarityName>().ToList();
         var invalids = items.Where(i => !validRarities.Contains(i.Rarity)).ToList();
         if (invalids.Any())
         {
             var invalidList = string.Join(", ", invalids.Select(i => $"{i.Rarity}"));
-            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Phát hiện rarity không hợp lệ: {invalidList}.");
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Phát hiện rarity không hợp lệ [InvalidRarity={invalidList}]. Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
             throw ErrorHelper.BadRequest("Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
         }
 
-        // Tổng trọng số (weight) = 100 (integer)
         var totalWeight = items.Sum(i => i.Weight);
         if (totalWeight != 100)
         {
-            _logger.Warn($"[ValidateBlindBoxItemsFullRule] Lỗi: Tổng trọng số = {totalWeight}, yêu cầu đúng bằng 100.");
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Tổng trọng số không hợp lệ [TotalWeight={totalWeight}]. Tổng trọng số (Weight) phải đúng bằng 100.");
             throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
         }
 
-        // Validate tổng weight giảm dần theo tier
-        var rarityOrder = new List<RarityName>
-            { RarityName.Common, RarityName.Rare, RarityName.Epic, RarityName.Secret };
-        var groupWeights = rarityOrder
-            .Select(r => items.Where(i => i.Rarity == r).Sum(i => i.Weight))
+        // Validate thứ tự weight: Common >= Rare >= Epic >= Secret
+        var tierOrder = new List<RarityName> { RarityName.Common, RarityName.Rare, RarityName.Epic, RarityName.Secret };
+        var groupWeights = tierOrder
+            .Select(tier => items.Where(i => i.Rarity == tier).Sum(i => i.Weight))
             .ToList();
 
-        for (int i = 1; i < groupWeights.Count; i++)
-        {
-            if (groupWeights[i] > groupWeights[i - 1])
+        for (var i = 1; i < groupWeights.Count; i++)
+            if (groupWeights[i] > 0 && groupWeights[i - 1] > 0 && groupWeights[i] > groupWeights[i - 1])
             {
+                var detail = string.Join(", ",
+                    tierOrder.Select((r, idx) => $"{r}={groupWeights[idx]}"));
                 _logger.Warn(
-                    $"[ValidateBlindBoxItemsFullRule] Lỗi: Tổng weight tier {rarityOrder[i]} = {groupWeights[i]} > {rarityOrder[i - 1]} = {groupWeights[i - 1]}.");
-                throw ErrorHelper.BadRequest("Tổng trọng số của các tier sau không được lớn hơn tier trước.");
+                    $"[ValidateBlindBoxItemsFullRule] Tổng trọng số tier sau lớn hơn tier trước [TierOrder={detail}]. Không cho phép trọng số của tier sau lớn hơn tier trước.");
+                throw ErrorHelper.BadRequest(
+                    "Không cho phép trọng số của tier sau lớn hơn tier trước (Common ≥ Rare ≥ Epic ≥ Secret).");
             }
-        }
     }
 
-
-    private Dictionary<BlindBoxItemDto, decimal> CalculateDropRates(List<BlindBoxItemDto> items)
+    private Dictionary<BlindBoxItemRequestDto, decimal> CalculateDropRates(List<BlindBoxItemRequestDto> items)
     {
-        var result = new Dictionary<BlindBoxItemDto, decimal>();
-        var totalWeightQuantity = items.Sum(i => i.Quantity * i.Weight);
-        foreach (var item in items)
+        var result = new Dictionary<BlindBoxItemRequestDto, decimal>();
+        var total = items.Sum(i => i.Quantity * i.Weight);
+
+        var temp = items.Select(i => new
         {
-            var dropRate = Math.Round((decimal)(item.Quantity * item.Weight) / totalWeightQuantity * 100m, 2);
-            result[item] = dropRate;
+            Item = i,
+            RawRate = (decimal)(i.Quantity * i.Weight) / total * 100m
+        }).ToList();
+
+        foreach (var t in temp) result[t.Item] = Math.Round(t.RawRate, 2, MidpointRounding.AwayFromZero);
+
+        var diff = 100.00m - result.Values.Sum();
+        if (Math.Abs(diff) >= 0.01m)
+        {
+            var target = diff > 0
+                ? result.OrderByDescending(x => x.Value).First()
+                : result.OrderBy(x => x.Value).First();
+
+            result[target.Key] = Math.Round(target.Value + diff, 2);
         }
 
         return result;
@@ -745,7 +810,8 @@ public class BlindBoxService : IBlindBoxService
 
         if (hasChild)
         {
-            _logger.Warn($"[ValidateLeafCategoryAsync] Lỗi: Category Id = {categoryId} vẫn còn category con, không được chọn.");
+            _logger.Warn(
+                $"[ValidateLeafCategoryAsync] Lỗi: Category Id = {categoryId} vẫn còn category con, không được chọn.");
             throw ErrorHelper.BadRequest(ErrorMessages.CategoryChildrenError);
         }
     }
@@ -782,7 +848,15 @@ public class BlindBoxService : IBlindBoxService
     private Task<BlindBoxDetailDto> MapBlindBoxToDtoAsync(BlindBox blindBox)
     {
         var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
+
+        // Cập nhật stock status
         dto.BlindBoxStockStatus = blindBox.TotalQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
+
+        // Nếu BlindBox hết hàng nhưng status không phản ánh điều đó, cập nhật trong DB
+        if (blindBox.TotalQuantity <= 0 && blindBox.Status == BlindBoxStatus.Approved)
+            // Chỉ log thông báo, việc cập nhật sẽ được thực hiện ở nơi khác để tránh side effect
+            _logger.Warn($"[MapBlindBoxToDtoAsync] BlindBox {blindBox.Id} đã hết hàng nhưng status vẫn là Approved");
+
         dto.Brand = blindBox.Seller?.CompanyName;
 
         // Gán danh sách item
@@ -791,17 +865,42 @@ public class BlindBoxService : IBlindBoxService
         return Task.FromResult(dto);
     }
 
-    private List<BlindBoxItemDto> MapToBlindBoxItemDtos(IEnumerable<BlindBoxItem> items)
+    private List<BlindBoxItemResponseDto> MapToBlindBoxItemDtos(IEnumerable<BlindBoxItem> items)
     {
-        return items.Select(item => new BlindBoxItemDto
+        return items.Select(item => new BlindBoxItemResponseDto
         {
             ProductId = item.ProductId,
             ProductName = item.Product?.Name ?? string.Empty,
             DropRate = item.DropRate,
             ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
             Quantity = item.Quantity,
-            Rarity = item.RarityConfig?.Name ?? default
+            Rarity = item.RarityConfig?.Name ?? default,
+            Weight = item.RarityConfig?.Weight ?? 0
         }).ToList();
+    }
+
+    private async Task LoadBlindBoxItemsAsync(List<BlindBox> blindBoxes, bool includeProbabilityConfigs = false)
+    {
+        var blindBoxIds = blindBoxes.Select(b => b.Id).ToList();
+
+        IQueryable<BlindBoxItem> query;
+
+        if (includeProbabilityConfigs)
+            query = _unitOfWork.BlindBoxItems.GetQueryable()
+                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
+                .Include(i => i.Product)
+                .Include(i => i.RarityConfig)
+                .Include(i => i.ProbabilityConfigs); // đây là ICollection
+        else
+            query = _unitOfWork.BlindBoxItems.GetQueryable()
+                .Where(i => blindBoxIds.Contains(i.BlindBoxId) && !i.IsDeleted)
+                .Include(i => i.Product)
+                .Include(i => i.RarityConfig);
+
+        var itemsGrouped = await query.ToListAsync();
+
+        foreach (var box in blindBoxes)
+            box.BlindBoxItems = itemsGrouped.Where(i => i.BlindBoxId == box.Id).ToList();
     }
 
     #endregion

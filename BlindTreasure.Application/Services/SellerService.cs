@@ -1,7 +1,9 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Web;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
@@ -22,6 +24,7 @@ public class SellerService : ISellerService
     private readonly IEmailService _emailService;
     private readonly ILoggerService _loggerService;
     private readonly IMapperService _mapper;
+    private readonly INotificationService _notificationService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -33,7 +36,7 @@ public class SellerService : ISellerService
         ICacheService cacheService,
         IMapperService mapper,
         IClaimsService claimsService,
-        IProductService productService)
+        IProductService productService, INotificationService notificationService)
     {
         _blobService = blobService;
         _emailService = emailService;
@@ -43,6 +46,7 @@ public class SellerService : ISellerService
         _mapper = mapper;
         _claimsService = claimsService;
         _productService = productService;
+        _notificationService = notificationService;
     }
 
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
@@ -78,8 +82,20 @@ public class SellerService : ISellerService
 
         seller.Status = SellerStatus.WaitingReview;
 
+
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
+
+        await _notificationService.PushNotificationToUser(
+            seller.UserId,
+            new NotificationDTO
+            {
+                Title = "Hồ sơ đã gửi",
+                Message = "Hồ sơ của bạn đang chờ xét duyệt bởi quản trị viên.",
+                Type = NotificationType.System
+            }
+        );
+
 
         // Xóa cache trước khi set lại
         await RemoveSellerCacheAsync(seller.Id, userId);
@@ -124,8 +140,19 @@ public class SellerService : ISellerService
         seller.CoaDocumentUrl = fileUrl;
         seller.Status = SellerStatus.WaitingReview;
 
+
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
+
+        await _notificationService.PushNotificationToUser(
+            seller.UserId,
+            new NotificationDTO
+            {
+                Title = "Tài liệu đã nộp",
+                Message = "Tài liệu xác minh của bạn đã được gửi và đang chờ xét duyệt.",
+                Type = NotificationType.System
+            }
+        );
 
         // Cập nhật cache
         await _cacheService.SetAsync($"seller:{seller.Id}", seller, TimeSpan.FromHours(1));
@@ -365,6 +392,48 @@ public class SellerService : ISellerService
         var result = await _productService.UpdateProductImagesAsync(productId, images);
 
         return result;
+    }
+
+    public async Task<string> UpdateSellerAvatarAsync(Guid userId, IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            throw ErrorHelper.BadRequest("File không hợp lệ.");
+
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);
+        if (seller == null || seller.User == null)
+            throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
+
+        // Upload file
+        var fileName = $"seller-avatars/{userId}-{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+        await using var stream = file.OpenReadStream();
+        await _blobService.UploadFileAsync(fileName, stream);
+        var avatarUrl = await _blobService.GetPreviewUrlAsync(fileName);
+
+        // Xóa ảnh cũ nếu có (trừ ảnh mặc định)
+        if (!string.IsNullOrEmpty(seller.User.AvatarUrl) && !seller.User.AvatarUrl.Contains("free-psd/3d-illustration"))
+            try
+            {
+                var oldUrl = seller.User.AvatarUrl;
+                var uri = new Uri(oldUrl);
+                var query = HttpUtility.ParseQueryString(uri.Query);
+                var prefix = query.Get("prefix");
+                if (!string.IsNullOrEmpty(prefix))
+                    await _blobService.DeleteFileAsync(prefix);
+            }
+            catch
+            {
+                /* ignore */
+            }
+
+        seller.User.AvatarUrl = avatarUrl;
+        await _unitOfWork.Users.Update(seller.User);
+        await _unitOfWork.SaveChangesAsync();
+
+        // Xóa cache
+        await _cacheService.RemoveAsync($"seller:{seller.Id}");
+        await _cacheService.RemoveAsync($"seller:user:{userId}");
+
+        return avatarUrl;
     }
 
     private async Task RemoveSellerCacheAsync(Guid sellerId, Guid userId)

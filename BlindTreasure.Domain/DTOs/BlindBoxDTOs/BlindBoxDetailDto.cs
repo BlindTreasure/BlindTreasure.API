@@ -24,5 +24,5 @@ public class BlindBoxDetailDto
 
 
     public bool IsDeleted { get; set; }
-    public List<BlindBoxItemDto>? Items { get; set; }
+    public List<BlindBoxItemResponseDto>? Items { get; set; }
 }

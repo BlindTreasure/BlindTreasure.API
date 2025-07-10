@@ -1,11 +1,9 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json.Serialization;
 using BlindTreasure.API.Architecture;
-using BlindTreasure.Application.SignalR;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Domain.DTOs.StripeDTOs;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Stripe;
@@ -27,12 +25,17 @@ builder.Configuration
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-        hehe =>
+    options.AddPolicy("AllowFrontend",
+        builder =>
         {
-            hehe.AllowAnyOrigin()
+            builder
+                .WithOrigins(
+                    "http://localhost:4040",
+                    "https://blindtreasure.vercel.app"
+                )
                 .AllowAnyMethod()
-                .AllowAnyHeader();
+                .AllowAnyHeader()
+                .AllowCredentials();
         });
 });
 
@@ -78,7 +81,7 @@ builder.Services.SetupRedisService(builder.Configuration);
 
 var app = builder.Build();
 
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
 if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
@@ -141,6 +144,5 @@ app.MapHub<StaffChatHub>("/hubs/staff-chat");
 app.MapHub<NotificationHub>("/hubs/notification");
 
 app.UseStaticFiles();
-
 
 app.Run();

@@ -11,8 +11,6 @@ public class CategoryQueryParameter : PaginationParameter
     ///     Sắp xếp theo trường nào. Mặc định: CreatedAt.
     /// </summary>
     public CategorySortField SortBy { get; set; } = CategorySortField.CreatedAt;
-
-    
 }
 
 public enum CategorySortField

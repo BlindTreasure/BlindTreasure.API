@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.EmailDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.Enums;
@@ -9,13 +10,17 @@ namespace BlindTreasure.Application.Services;
 
 public class SellerVerificationService : ISellerVerificationService
 {
+    private readonly ICacheService _cacheService;
     private readonly IEmailService _emailService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
-    public SellerVerificationService(IUnitOfWork unitOfWork, IEmailService emailService)
+    public SellerVerificationService(IUnitOfWork unitOfWork, IEmailService emailService, ICacheService cacheService, INotificationService notificationService)
     {
         _unitOfWork = unitOfWork;
         _emailService = emailService;
+        _cacheService = cacheService;
+        _notificationService = notificationService;
     }
 
     public async Task<bool> VerifySellerAsync(Guid sellerId, SellerVerificationDto dto)
@@ -33,6 +38,23 @@ public class SellerVerificationService : ISellerVerificationService
 
         await _unitOfWork.Sellers.Update(seller);
         await _unitOfWork.SaveChangesAsync();
+
+        await _notificationService.PushNotificationToUser(
+            seller.UserId,
+            new NotificationDTO
+            {
+                Title = dto.IsApproved ? "Đã duyệt hồ sơ" : "Hồ sơ bị từ chối",
+                Message = dto.IsApproved
+                    ? "Hồ sơ seller của bạn đã được duyệt thành công. Bạn có thể bắt đầu kinh doanh."
+                    : $"Hồ sơ seller của bạn đã bị từ chối. Lý do: {dto.RejectReason}",
+                Type = NotificationType.System
+            }
+        );
+
+        
+        // XÓA CACHE
+        await _cacheService.RemoveAsync($"seller:{seller.Id}");
+        await _cacheService.RemoveAsync($"seller:user:{seller.UserId}");
 
         // Gửi email chúc mừng nếu được duyệt
         if (dto.IsApproved)

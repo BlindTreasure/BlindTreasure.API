@@ -77,8 +77,19 @@ public class ProductService : IProductService
     {
         _logger.Info($"[GetAllAsync] Public requests product list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
+        // Tạo cache key dựa trên các tham số query
+        var cacheKey = $"products:list:{param.GetHashCode()}";
+
+        // Thử lấy từ cache trước
+        var cachedResult = await _cacheService.GetAsync<Pagination<ProducDetailDto>>(cacheKey);
+        if (cachedResult != null)
+        {
+            _logger.Info($"[GetAllAsync] Cache hit for products list with parameters: {param.GetHashCode()}");
+            return cachedResult;
+        }
+
         var query = _unitOfWork.Products.GetQueryable()
-            .Include(p => p.Seller) // Thêm dòng này
+            .Include(p => p.Seller)
             .Where(p => !p.IsDeleted && p.ProductType == ProductSaleType.DirectSale)
             .AsNoTracking();
 
@@ -114,12 +125,25 @@ public class ProductService : IProductService
         if (param.ReleaseDateTo.HasValue)
             query = query.Where(p => p.CreatedAt <= param.ReleaseDateTo.Value);
 
-        // Sort: UpdatedAt desc, CreatedAt desc
-        // Sort: UpdatedAt desc, CreatedAt desc (now respects param.Desc)
-        if (param.Desc)
-            query = query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt);
-        else
-            query = query.OrderBy(p => p.UpdatedAt ?? p.CreatedAt);
+        // Sort based on SortBy field and Desc parameter
+        query = param.SortBy switch
+        {
+            ProductSortField.Name => param.Desc
+                ? query.OrderByDescending(p => p.Name)
+                : query.OrderBy(p => p.Name),
+            ProductSortField.Price => param.Desc
+                ? query.OrderByDescending(p => p.Price)
+                : query.OrderBy(p => p.Price),
+            ProductSortField.Stock => param.Desc
+                ? query.OrderByDescending(p => p.Stock)
+                : query.OrderBy(p => p.Stock),
+            ProductSortField.CreatedAt => param.Desc
+                ? query.OrderByDescending(p => p.CreatedAt)
+                : query.OrderBy(p => p.CreatedAt),
+            _ => param.Desc
+                ? query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+                : query.OrderBy(p => p.UpdatedAt ?? p.CreatedAt)
+        };
 
         var count = await query.CountAsync();
 
@@ -134,6 +158,10 @@ public class ProductService : IProductService
 
         var dtos = items.Select(MapProductToDetailDto).ToList();
         var result = new Pagination<ProducDetailDto>(dtos, count, param.PageIndex, param.PageSize);
+
+        // Lưu kết quả vào cache với thời gian hết hạn là 5 phút
+        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(5));
+        _logger.Info($"[GetAllAsync] Products list cached with key: {cacheKey}");
 
         return result;
     }
@@ -155,6 +183,11 @@ public class ProductService : IProductService
 
         await ValidateProductDto(dto);
 
+        // Xác định status dựa trên stock
+        var status = dto.Status;
+        if (dto.Stock == 0 && dto.Status != ProductStatus.InActive)
+            status = ProductStatus.OutOfStock;
+
         var product = new Product
         {
             Name = dto.Name.Trim(),
@@ -164,7 +197,7 @@ public class ProductService : IProductService
             Stock = dto.Stock,
             Height = dto.Height,
             Material = dto.Material,
-            ProductType = dto.ProductType,
+            ProductType = dto.ProductType ?? ProductSaleType.DirectSale,
             Brand = seller.CompanyName ?? "Unknown",
             ImageUrls = new List<string>(),
             SellerId = seller.Id,
@@ -172,7 +205,7 @@ public class ProductService : IProductService
             CreatedAt = DateTime.UtcNow,
             CreatedBy = userId,
             IsDeleted = false,
-            Status = dto.Status
+            Status = status
         };
 
         var result = await _unitOfWork.Products.AddAsync(product);
@@ -224,7 +257,16 @@ public class ProductService : IProductService
         if (dto.Price.HasValue)
             product.Price = dto.Price.Value;
         if (dto.Stock.HasValue)
+        {
             product.Stock = dto.Stock.Value;
+            // Tự động cập nhật status khi stock = 0
+            if (dto.Stock.Value == 0 && product.Status != ProductStatus.InActive)
+                product.Status = ProductStatus.OutOfStock;
+            // Tự động cập nhật status khi stock > 0 và status hiện tại là OutOfStock
+            else if (dto.Stock.Value > 0 && product.Status == ProductStatus.OutOfStock)
+                product.Status = ProductStatus.Active;
+        }
+
         if (dto.Height.HasValue)
             product.Height = dto.Height.Value;
         if (dto.Material != null)
@@ -233,8 +275,15 @@ public class ProductService : IProductService
             product.ProductType = dto.ProductType.Value;
         if (dto.ProductStatus.HasValue) product.Status = dto.ProductStatus.Value;
 
+        // Cập nhật thông tin UpdatedAt và UpdatedBy
+        product.UpdatedAt = DateTime.UtcNow;
+        product.UpdatedBy = userId;
+
         await _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
+
+        // Xóa cache liên quan
+        await RemoveProductCacheAsync(product.Id, product.SellerId);
 
         _logger.Success(string.Format(ErrorMessages.ProductUpdateSuccessLog, id, userId));
         return await GetByIdAsync(product.Id);
@@ -360,8 +409,14 @@ public class ProductService : IProductService
 
     private async Task RemoveProductCacheAsync(Guid productId, Guid sellerId)
     {
+        // Xóa cache chi tiết sản phẩm
         await _cacheService.RemoveAsync($"product:{productId}");
+
+        // Xóa cache danh sách sản phẩm của seller
         await _cacheService.RemoveByPatternAsync($"product:all:{sellerId}");
+
+        // Xóa cache danh sách sản phẩm (tất cả các pattern có thể)
+        await _cacheService.RemoveByPatternAsync("products:list:*");
     }
 
     private ProducDetailDto MapProductToDetailDto(Product product)

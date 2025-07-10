@@ -48,41 +48,15 @@ public class BlindTreasureDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Role ↔ User (1-n)
-        modelBuilder.Entity<User>()
-            .HasOne(u => u.Role)
-            .WithMany(r => r.Users)
-            .HasForeignKey(u => u.RoleName)
-            .IsRequired();
+        #region enums converter
 
-        modelBuilder.Entity<User>()
-            .Property(u => u.Status)
-            .HasConversion<string>();
+        modelBuilder.Entity<Listing>(entity =>
+        {
+            entity.Property(l => l.Status)
+                .HasConversion<string>() // Enum sẽ lưu dưới dạng chuỗi
+                .HasMaxLength(32);
+        });
 
-        modelBuilder.Entity<Role>()
-            .Property(r => r.Type)
-            .HasConversion<string>()
-            .HasMaxLength(50)
-            .IsRequired();
-
-        // --- Cấu hình User.RoleName làm FK trỏ vào Role.Type ---
-        modelBuilder.Entity<User>()
-            .Property(u => u.RoleName)
-            .HasConversion<string>()
-            .HasMaxLength(50)
-            .IsRequired();
-
-        modelBuilder.Entity<User>()
-            .HasOne(u => u.Role)
-            .WithMany(r => r.Users)
-            .HasForeignKey(u => u.RoleName)
-            .HasPrincipalKey(r => r.Type);
-
-        // --- Định nghĩa Alternate Key trên Role.Type ---
-        modelBuilder.Entity<Role>()
-            .HasAlternateKey(r => r.Type);
-
-        #region MyRegion
 
         modelBuilder.Entity<OtpVerification>(entity =>
         {
@@ -104,7 +78,7 @@ public class BlindTreasureDbContext : DbContext
                 .HasConversion<string>() // enum -> string
                 .HasMaxLength(32); // giới hạn độ dài nếu cần
         });
-        
+
         modelBuilder.Entity<RarityConfig>(entity =>
         {
             entity.Property(e => e.Name)
@@ -159,8 +133,42 @@ public class BlindTreasureDbContext : DbContext
             entity.HasIndex(pp => new { pp.PromotionId, pp.SellerId }).IsUnique();
         });
 
-        
         #endregion
+
+
+        // Role ↔ User (1-n)
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Role)
+            .WithMany(r => r.Users)
+            .HasForeignKey(u => u.RoleName)
+            .IsRequired();
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.Status)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<Role>()
+            .Property(r => r.Type)
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired();
+
+        // --- Cấu hình User.RoleName làm FK trỏ vào Role.Type ---
+        modelBuilder.Entity<User>()
+            .Property(u => u.RoleName)
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired();
+
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Role)
+            .WithMany(r => r.Users)
+            .HasForeignKey(u => u.RoleName)
+            .HasPrincipalKey(r => r.Type);
+
+        // --- Định nghĩa Alternate Key trên Role.Type ---
+        modelBuilder.Entity<Role>()
+            .HasAlternateKey(r => r.Type);
 
 
         modelBuilder.Entity<Product>()
@@ -247,6 +255,23 @@ public class BlindTreasureDbContext : DbContext
                 .HasMaxLength(50);
         });
 
+        modelBuilder.Entity<InventoryItem>(entity =>
+        {
+            entity.Property(ii => ii.Location)
+                .HasMaxLength(100);
+
+            entity.Property(ii => ii.Status)
+                .HasConversion<string>() // enum lưu dạng string
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.HasOne(ii => ii.Address)
+                .WithMany()
+                .HasForeignKey(ii => ii.AddressId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+
         // User ↔ Seller (1-1)
         modelBuilder.Entity<User>()
             .HasOne(u => u.Seller)
@@ -314,7 +339,7 @@ public class BlindTreasureDbContext : DbContext
             .WithOne(rc => rc.BlindBoxItem)
             .HasForeignKey<RarityConfig>(rc => rc.BlindBoxItemId)
             .OnDelete(DeleteBehavior.Cascade);
-        
+
         // ProbabilityConfig ↔ ApprovedByUser (1-n, restrict)
         modelBuilder.Entity<ProbabilityConfig>()
             .HasOne(pc => pc.ApprovedByUser)

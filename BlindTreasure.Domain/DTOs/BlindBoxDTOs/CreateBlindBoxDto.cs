@@ -18,6 +18,4 @@ public class CreateBlindBoxDto
     public required Guid CategoryId { get; set; }
     [DefaultValue("Mô tả cho blind box")] public required string Description { get; set; }
     public required IFormFile ImageFile { get; set; }
-    [DefaultValue(false)] public bool HasSecretItem { get; set; } = false;
-    [DefaultValue(5.0)] public decimal SecretProbability { get; set; }
 }

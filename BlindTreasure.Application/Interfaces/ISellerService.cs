@@ -20,4 +20,5 @@ public interface ISellerService
     Task<ProducDetailDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto);
     Task<ProducDetailDto> DeleteProductAsync(Guid productId);
     Task<ProducDetailDto> UpdateSellerProductImagesAsync(Guid productId, List<IFormFile> images);
+    Task<string> UpdateSellerAvatarAsync(Guid userId, IFormFile file);
 }
