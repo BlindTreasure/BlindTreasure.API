@@ -108,9 +108,7 @@ public class UnboxingService : IUnboxingService
             .ToListAsync();
 
         foreach (var item in customerBox.BlindBox.BlindBoxItems)
-        {
             item.RarityConfig = rarities.FirstOrDefault(r => r.BlindBoxItemId == item.Id);
-        }
 
         return customerBox;
     }

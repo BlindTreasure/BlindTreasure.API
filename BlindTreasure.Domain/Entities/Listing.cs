@@ -10,5 +10,5 @@ public class Listing : BaseEntity
 
     public decimal Price { get; set; }
     public DateTime ListedAt { get; set; }
-    public ListingStatus  Status { get; set; }
+    public ListingStatus Status { get; set; }
 }
