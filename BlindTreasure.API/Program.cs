@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json.Serialization;
 using BlindTreasure.API.Architecture;
+using BlindTreasure.Application.GHTK.Authorization;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Domain.DTOs.StripeDTOs;
 using Microsoft.AspNetCore.Diagnostics;
@@ -74,6 +75,8 @@ builder.Services.AddTransient<IStripeClient, StripeClient>(s =>
 });
 
 #endregion
+
+
 
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 builder.Services.AddEndpointsApiExplorer();
