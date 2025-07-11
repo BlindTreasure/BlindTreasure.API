@@ -17,7 +17,8 @@ public class ListingService : IListingService
     private readonly IMapperService _mapper;
     private readonly IUnitOfWork _unitOfWork;
 
-    public ListingService(ICacheService cacheService, IClaimsService claimsService, ILoggerService logger, IMapperService mapper, IUnitOfWork unitOfWork)
+    public ListingService(ICacheService cacheService, IClaimsService claimsService, ILoggerService logger,
+        IMapperService mapper, IUnitOfWork unitOfWork)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -25,7 +26,7 @@ public class ListingService : IListingService
         _mapper = mapper;
         _unitOfWork = unitOfWork;
     }
-    
+
     public async Task<ListingDto> CreateListingAsync(CreateListingRequestDto dto)
     {
         var userId = _claimsService.CurrentUserId;
@@ -65,7 +66,7 @@ public class ListingService : IListingService
 
         return listingDto;
     }
-    
+
     public async Task<List<InventoryItemDto>> GetAvailableItemsForListingAsync()
     {
         var userId = _claimsService.CurrentUserId;
@@ -82,7 +83,7 @@ public class ListingService : IListingService
 
         return items.Select(item => _mapper.Map<InventoryItem, InventoryItemDto>(item)).ToList();
     }
-    
+
     public async Task<decimal> GetSuggestedPriceAsync(Guid productId)
     {
         var listings = await _unitOfWork.Listings.GetAllAsync(
@@ -97,7 +98,7 @@ public class ListingService : IListingService
 
         return Math.Round(listings.Average(x => x.Price), 2);
     }
-    
+
     public async Task<List<PricePointDto>> GetPriceHistoryAsync(Guid productId)
     {
         var key = $"price-history:{productId}";
@@ -107,6 +108,7 @@ public class ListingService : IListingService
     }
 
     #region private methods
+
     private async Task TrackPriceChangeAsync(Guid productId, decimal price)
     {
         var key = $"price-history:{productId}";
@@ -129,17 +131,16 @@ public class ListingService : IListingService
 
         await _cacheService.SetAsync(key, history, TimeSpan.FromDays(7));
     }
-    
+
     public async Task<int> ExpireOldListingsAsync()
     {
         var now = DateTime.UtcNow;
         var expiredThreshold = now.AddDays(-30);
 
         // Truy vấn các listing Active quá 30 ngày
-        var expiredListings = await _unitOfWork.Listings.GetAllAsync(
-            l => l.Status == ListingStatus.Active &&
-                 l.ListedAt < expiredThreshold &&
-                 !l.IsDeleted
+        var expiredListings = await _unitOfWork.Listings.GetAllAsync(l => l.Status == ListingStatus.Active &&
+                                                                          l.ListedAt < expiredThreshold &&
+                                                                          !l.IsDeleted
         );
 
         if (!expiredListings.Any())
@@ -158,7 +159,5 @@ public class ListingService : IListingService
         return expiredListings.Count;
     }
 
-
     #endregion
-
 }

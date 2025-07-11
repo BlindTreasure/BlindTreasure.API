@@ -11,14 +11,15 @@ namespace BlindTreasure.API.Controllers;
 [Authorize]
 public class NotificationController : ControllerBase
 {
-    private readonly INotificationService _notificationService;
     private readonly IClaimsService _claimsService;
+    private readonly INotificationService _notificationService;
 
     public NotificationController(INotificationService notificationService, IClaimsService claimsService)
     {
         _notificationService = notificationService;
         _claimsService = claimsService;
     }
+
     [HttpGet]
     public async Task<IActionResult> GetNotifications([FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 10)
     {
@@ -43,7 +44,7 @@ public class NotificationController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
+
     [HttpGet("unread-count")]
     public async Task<IActionResult> GetUnreadCount()
     {
@@ -60,7 +61,6 @@ public class NotificationController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
 
 
     [HttpPost("read-all")]
