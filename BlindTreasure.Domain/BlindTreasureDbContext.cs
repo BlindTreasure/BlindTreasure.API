@@ -44,6 +44,9 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<Wishlist> Wishlists { get; set; }
     public DbSet<WishlistItem> WishlistItems { get; set; }
 
+    public DbSet<ChatMessage> ChatMessages { get; set; }
+
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -134,6 +137,22 @@ public class BlindTreasureDbContext : DbContext
         });
 
         #endregion
+
+
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.Property(m => m.Content).HasMaxLength(1000).IsRequired();
+
+            entity.HasOne(m => m.Sender)
+                .WithMany()
+                .HasForeignKey(m => m.SenderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(m => m.Receiver)
+                .WithMany()
+                .HasForeignKey(m => m.ReceiverId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
 
 
         // Role ↔ User (1-n)

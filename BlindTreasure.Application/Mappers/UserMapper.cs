@@ -33,7 +33,7 @@ public static class UserMapper
             Status = user.Status,
             PhoneNumber = user.Phone,
             RoleName = user.RoleName,
-            CreatedAt = user.CreatedAt,
+            CreatedAt = user.CreatedAt
         };
     }
 }

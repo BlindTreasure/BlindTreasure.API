@@ -11,7 +11,6 @@ using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using OpenAI.ObjectModels.ResponseModels;
 
 namespace BlindTreasure.Application.Services;
 
