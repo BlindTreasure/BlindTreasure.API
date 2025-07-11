@@ -1215,7 +1215,7 @@ public class SystemController : ControllerBase
             blindBox.SecretProbability = blindBoxItems
                 .Where(i => i.IsSecret)
                 .Sum(i => Math.Round(i.DropRate, 2));
-            
+
             await _context.BlindBoxes.AddAsync(blindBox);
             await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
             await _context.RarityConfigs.AddRangeAsync(rarityConfigs);

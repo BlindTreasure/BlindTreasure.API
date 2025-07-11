@@ -2,7 +2,6 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PromotionDTOs;
-using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -166,7 +165,8 @@ public class PromotionController : ControllerBase
         try
         {
             var result = await _promotionService.ParticipatePromotionAsync(id);
-            return Ok(ApiResult<ParticipantPromotionDto>.Success(result, "200", "Tham gia chiến dịch voucher thành công."));
+            return Ok(ApiResult<ParticipantPromotionDto>.Success(result, "200",
+                "Tham gia chiến dịch voucher thành công."));
         }
         catch (Exception ex)
         {
@@ -188,7 +188,8 @@ public class PromotionController : ControllerBase
         try
         {
             var result = await _promotionService.WithdrawPromotionAsync(dto);
-            return Ok(ApiResult<ParticipantPromotionDto>.Success(result, "200", "Rút khỏi chiến dịch voucher thành công."));
+            return Ok(ApiResult<ParticipantPromotionDto>.Success(result, "200",
+                "Rút khỏi chiến dịch voucher thành công."));
         }
         catch (Exception ex)
         {

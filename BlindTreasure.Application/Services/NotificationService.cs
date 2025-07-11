@@ -42,7 +42,7 @@ public class NotificationService : INotificationService
         return await _unitOfWork.Notifications.GetQueryable()
             .CountAsync(n => n.UserId == userId && !n.IsDeleted);
     }
-    
+
 
     public async Task<int> GetUnreadNotificationsCount(Guid userId)
     {
