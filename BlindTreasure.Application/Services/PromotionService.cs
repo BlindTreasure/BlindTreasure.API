@@ -384,7 +384,7 @@ public class PromotionService : IPromotionService
 
         return result;
     }
-    
+
     public async Task<List<SellerParticipantDto>> GetPromotionParticipantsAsync(SellerParticipantPromotionParameter param)
     {
         var currentUserId = _claimsService.CurrentUserId;
@@ -395,14 +395,15 @@ public class PromotionService : IPromotionService
         var participants = _unitOfWork.PromotionParticipants
             .GetQueryable()
             .Where(pp => pp.PromotionId == param.PromotionId && !pp.IsDeleted)
-            .Include(pp => pp.Seller);
+            .Include(pp => pp.Seller)
+            .ThenInclude(s => s.User);
 
         var result = participants.Select(pp => new SellerParticipantDto
         {
             Id = pp.Seller.Id,
-            Email = user.Email,
-            FullName = user.FullName,
-            Phone = user.Phone,
+            Email = pp.Seller.User.Email,
+            FullName = pp.Seller.User.FullName,
+            Phone = pp.Seller.User.Phone,
             CompanyName = pp.Seller.CompanyName,
             TaxId = pp.Seller.TaxId,
             CompanyAddress = pp.Seller.CompanyAddress,
