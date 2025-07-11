@@ -45,6 +45,13 @@ public class UserService : IUserService
             throw ErrorHelper.NotFound($"Người dùng với ID {userId} không tồn tại hoặc đã bị xóa.");
         }
 
+        var seller = new Seller();
+        if (user.RoleName == RoleType.Seller)
+        {
+            seller = await GetSellerByUserIdAsync(user.Id);
+            user.Seller = seller;
+        }
+
         return UserMapper.ToUserDto(user);
     }
 
@@ -286,5 +293,10 @@ public class UserService : IUserService
 
         var existingUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
         return existingUser != null;
+    }
+
+    private async Task<Seller?> GetSellerByUserIdAsync(Guid userId)
+    {
+        return await _unitOfWork.Sellers.FirstOrDefaultAsync(u => u.UserId == userId);
     }
 }

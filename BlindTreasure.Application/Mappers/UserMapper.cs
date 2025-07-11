@@ -7,6 +7,22 @@ public static class UserMapper
 {
     public static UserDto ToUserDto(User user)
     {
+        if (user.Seller != null)
+            return new UserDto
+            {
+                UserId = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                DateOfBirth = user.DateOfBirth,
+                AvatarUrl = user.AvatarUrl,
+                Status = user.Status,
+                PhoneNumber = user.Phone,
+                RoleName = user.RoleName,
+                CreatedAt = user.CreatedAt,
+                SellerId = user.Seller.Id
+            };
+
+
         return new UserDto
         {
             UserId = user.Id,
@@ -14,11 +30,9 @@ public static class UserMapper
             Email = user.Email,
             DateOfBirth = user.DateOfBirth,
             AvatarUrl = user.AvatarUrl,
-            PhoneNumber = user.Phone,
             Status = user.Status,
+            PhoneNumber = user.Phone,
             RoleName = user.RoleName,
-            Reason = user.Reason,
-            Gender = user.Gender,
             CreatedAt = user.CreatedAt
         };
     }

@@ -141,10 +141,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHub<UserChatHub>("/hubs/user-chat");
-app.MapHub<SellerChatHub>("/hubs/seller-chat");
-app.MapHub<StaffChatHub>("/hubs/staff-chat");
 app.MapHub<NotificationHub>("/hubs/notification");
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.UseStaticFiles();
 

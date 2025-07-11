@@ -12,10 +12,11 @@ public class SellerVerificationService : ISellerVerificationService
 {
     private readonly ICacheService _cacheService;
     private readonly IEmailService _emailService;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public SellerVerificationService(IUnitOfWork unitOfWork, IEmailService emailService, ICacheService cacheService, INotificationService notificationService)
+    public SellerVerificationService(IUnitOfWork unitOfWork, IEmailService emailService, ICacheService cacheService,
+        INotificationService notificationService)
     {
         _unitOfWork = unitOfWork;
         _emailService = emailService;
@@ -51,7 +52,7 @@ public class SellerVerificationService : ISellerVerificationService
             }
         );
 
-        
+
         // XÓA CACHE
         await _cacheService.RemoveAsync($"seller:{seller.Id}");
         await _cacheService.RemoveAsync($"seller:user:{seller.UserId}");

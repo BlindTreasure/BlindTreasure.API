@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.Entities;
 
 public class Listing : BaseEntity
 {
@@ -8,5 +10,5 @@ public class Listing : BaseEntity
 
     public decimal Price { get; set; }
     public DateTime ListedAt { get; set; }
-    public string Status { get; set; }
+    public ListingStatus Status { get; set; }
 }
