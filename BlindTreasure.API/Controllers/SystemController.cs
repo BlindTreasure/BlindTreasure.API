@@ -38,6 +38,7 @@ public class SystemController : ControllerBase
             await SeedProducts();
             await SeedBlindBoxes();
             await SeedPromotions();
+            await SeedPromotionParticipants();
             return Ok(ApiResult<object>.Success(new
             {
                 Message = "Data seeded successfully."
@@ -256,6 +257,39 @@ public class SystemController : ControllerBase
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
                 AvatarUrl = defaultAvatar
+            },
+            new()
+            {
+                Email = "honhatquang1@gmail.com",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Official Brand Seller",
+                Phone = "0900000001",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Seller,
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
+            },
+            new()
+            {
+                Email = "honhatquang2@gmail.com",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Official Brand Seller",
+                Phone = "0900000001",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Seller,
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
+            },
+            new()
+            {
+                Email = "honhatquang3@gmail.com",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Official Brand Seller",
+                Phone = "0900000001",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Seller,
+                CreatedAt = now,
+                AvatarUrl = defaultAvatar
             }
         };
     }
@@ -334,6 +368,10 @@ public class SystemController : ControllerBase
 
         await SeedSellerForUser("blindtreasurefpt@gmail.com");
         await SeedSellerForUser("hanhnthse170189@fpt.edu.vn");
+        await SeedSellerForUser("quanghnse170229@fpt.edu.vn");
+        await SeedSellerForUser("honhatquang1@gmail.com");
+        await SeedSellerForUser("honhatquang2@gmail.com");
+        await SeedSellerForUser("honhatquang3@gmail.com");
 
         _logger.Success("Users and seller seeded successfully.");
     }
@@ -1183,7 +1221,7 @@ public class SystemController : ControllerBase
                 Description = "Giảm 10% cho tất cả đơn hàng.",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 10,
-                StartDate = now,
+                StartDate = now.AddDays(3),
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
                 SellerId = seller.Id,
@@ -1198,7 +1236,7 @@ public class SystemController : ControllerBase
                 Description = "Giảm 50K cho đơn từ 500K.",
                 DiscountType = DiscountType.Fixed,
                 DiscountValue = 50000,
-                StartDate = now,
+                StartDate = now.AddDays(3),
                 EndDate = now.AddMonths(2),
                 Status = PromotionStatus.Pending,
                 SellerId = seller.Id,
@@ -1213,7 +1251,7 @@ public class SystemController : ControllerBase
                 Description = "Voucher giới hạn cho khách VIP.",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 15,
-                StartDate = now,
+                StartDate = now.AddDays(3),
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
                 SellerId = seller.Id,
@@ -1228,7 +1266,7 @@ public class SystemController : ControllerBase
                 Description = "Voucher test bị từ chối.",
                 DiscountType = DiscountType.Fixed,
                 DiscountValue = 30000,
-                StartDate = now,
+                StartDate = now.AddDays(3),
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Rejected,
                 SellerId = seller.Id,
@@ -1244,7 +1282,7 @@ public class SystemController : ControllerBase
                 Description = "Voucher toàn sàn cho mọi khách hàng.",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 5,
-                StartDate = now,
+                StartDate = now.AddDays(3),
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
                 SellerId = null, // Toàn sàn
@@ -1257,6 +1295,50 @@ public class SystemController : ControllerBase
         await _context.Promotions.AddRangeAsync(promotions);
         await _context.SaveChangesAsync();
         _logger.Success("[SeedPromotions] Đã seed 5 promotion mẫu.");
+    }
+
+    private async Task SeedPromotionParticipants()
+    {
+        if (_context.PromotionParticipants.Any())
+        {
+            _logger.Info("[SeedPromotions] Đã tồn tại promotionparticipants. Bỏ qua seed.");
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+
+        // Lấy seller mẫu
+        var sellers = _context.Sellers.Where(s => s.IsVerified == true && s.IsDeleted == false);
+        if (sellers == null)
+        {
+            _logger.Warn("[SeedSellers] Không tìm thấy Seller để tạo promotion.");
+            return;
+        }
+
+        var promotion = await _context.Promotions.FirstOrDefaultAsync(p => p.Status == PromotionStatus.Approved && p.CreatedByRole == RoleType.Staff);
+        if (promotion == null)
+        {
+            _logger.Warn("[SeedPromotions] Không tìm thấy Promotion để tạo participant.");
+            return;
+        }
+
+        var promotionParticipant = new List<PromotionParticipant>();
+
+        foreach (var seller in sellers)
+        {
+            var participantItem =  new PromotionParticipant()
+            {
+                Id = Guid.NewGuid(),
+                PromotionId = promotion.Id,
+                SellerId = seller.Id,
+                JoinedAt = now,
+            };
+            promotionParticipant.Add(participantItem);
+        }
+
+        await _context.PromotionParticipants.AddRangeAsync(promotionParticipant);
+        await _context.SaveChangesAsync();
+        _logger.Success("[SeedPromotionParticipants] Đã seed promotion participant mẫu.");
     }
 
 
