@@ -7,14 +7,12 @@ using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Services.ThirdParty.AIModels;
-using BlindTreasure.Application.SignalR;
 using BlindTreasure.Domain;
 using BlindTreasure.Infrastructure;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using BlindTreasure.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -158,6 +156,7 @@ public static class IocContainer
         services.AddScoped<ICustomerBlindBoxService, CustomerBlindBoxService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IUnboxingService, UnboxingService>();
+        services.AddScoped<IChatMessageService, ChatMessageService>();
 
         //3rd party
         services.AddHttpClient();
@@ -166,7 +165,6 @@ public static class IocContainer
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IBlindyService, BlindyService>();
-        services.AddSingleton<IUserIdProvider, UserIdProviderByGuid>();
         services.AddSignalR().AddJsonProtocol();
 
 
