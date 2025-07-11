@@ -22,9 +22,9 @@ public class BlindBoxService : IBlindBoxService
     private readonly IEmailService _emailService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapperService;
+    private readonly INotificationService _notificationService;
     private readonly ICurrentTime _time;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly INotificationService _notificationService;
 
     public BlindBoxService(
         IUnitOfWork unitOfWork,
@@ -33,7 +33,8 @@ public class BlindBoxService : IBlindBoxService
         IMapperService mapperService,
         IBlobService blobService,
         ICacheService cacheService,
-        ILoggerService logger, IEmailService emailService, ICategoryService categoryService, INotificationService notificationService)
+        ILoggerService logger, IEmailService emailService, ICategoryService categoryService,
+        INotificationService notificationService)
     {
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
@@ -570,7 +571,7 @@ public class BlindBoxService : IBlindBoxService
         }
 
         await _unitOfWork.SaveChangesAsync();
-        
+
         await _notificationService.PushNotificationToUser(
             blindBox.Seller.UserId,
             new NotificationDTO
@@ -583,7 +584,7 @@ public class BlindBoxService : IBlindBoxService
             }
         );
 
-        
+
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 

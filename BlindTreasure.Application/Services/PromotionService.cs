@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Text.RegularExpressions;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
@@ -8,25 +9,23 @@ using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System.Text.RegularExpressions;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
-using static OpenAI.ObjectModels.SharedModels.IOpenAiModels;
 
 namespace BlindTreasure.Application.Services;
 
 public class PromotionService : IPromotionService
 {
+    private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly IEmailService _emailService;
     private readonly ILoggerService _loggerService;
     private readonly IMapperService _mapperService;
+    private readonly ISellerService _sellerService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUserService _userService;
-    private readonly ISellerService _sellerService;
-    private readonly ICacheService _cacheService;
 
     public PromotionService(IUnitOfWork unitOfWork, ILoggerService loggerService, IMapperService mapperService,
-        IClaimsService claimsService, IUserService userService, ISellerService sellerService, IEmailService emailService, ICacheService cacheService)
+        IClaimsService claimsService, IUserService userService, ISellerService sellerService,
+        IEmailService emailService, ICacheService cacheService)
     {
         _unitOfWork = unitOfWork;
         _loggerService = loggerService;
@@ -53,17 +52,13 @@ public class PromotionService : IPromotionService
         {
             // Promotion của chính shop seller + toàn sàn
             if (param.Status.HasValue)
-            {
                 query = query.Where(p =>
                     (p.SellerId == param.SellerId && p.Status == param.Status) ||
                     p.CreatedByRole != RoleType.Seller);
-            }
             else
-            {
                 query = query.Where(p =>
                     p.SellerId == param.SellerId ||
                     p.CreatedByRole != RoleType.Seller);
-            }
 
             // Include PromotionParticipants để check IsParticipant
             query = query.Include(p => p.PromotionParticipants);
@@ -75,28 +70,16 @@ public class PromotionService : IPromotionService
                 p.SellerId == param.SellerId ||
                 p.PromotionParticipants.Any(pp => pp.SellerId == param.SellerId));
 
-            if (param.Status.HasValue)
-            {
-                query = query.Where(p => p.Status == param.Status);
-            }
+            if (param.Status.HasValue) query = query.Where(p => p.Status == param.Status);
 
-            if (role == RoleType.Customer)
-            {
-                query = query.Where(p => p.Status == PromotionStatus.Approved);
-            }
+            if (role == RoleType.Customer) query = query.Where(p => p.Status == PromotionStatus.Approved);
         }
         else
         {
             // Staff/Customer xem tất cả promotion (không truyền SellerId)
-            if (param.Status.HasValue)
-            {
-                query = query.Where(p => p.Status == param.Status);
-            }
+            if (param.Status.HasValue) query = query.Where(p => p.Status == param.Status);
 
-            if (role == RoleType.Customer)
-            {
-                query = query.Where(p => p.Status == PromotionStatus.Approved);
-            }
+            if (role == RoleType.Customer) query = query.Where(p => p.Status == PromotionStatus.Approved);
         }
 
         var totalCount = await query.CountAsync();
@@ -119,20 +102,15 @@ public class PromotionService : IPromotionService
 
             // Nếu là seller và là promotion global, check IsParticipant
             if (role == RoleType.Seller && p.CreatedByRole != RoleType.Seller)
-            {
                 // Null check để tránh lỗi
-                dto.IsParticipant = p.PromotionParticipants?.Any(pp => pp.SellerId == param.SellerId && !pp.IsDeleted) ?? false;
-            }
+                dto.IsParticipant =
+                    p.PromotionParticipants?.Any(pp => pp.SellerId == param.SellerId && !pp.IsDeleted) ?? false;
             else if (role == RoleType.Seller && p.SellerId == param.SellerId)
-            {
                 // Promotion riêng của seller thì IsParticipant = null
                 dto.IsParticipant = null;
-            }
             else
-            {
                 // Các role khác thì IsParticipant = null
                 dto.IsParticipant = null;
-            }
 
             return dto;
         }).ToList();
@@ -335,13 +313,13 @@ public class PromotionService : IPromotionService
 
 
         // // 6. Kiểm tra phạm vi
-         //if (promotion.SellerId.HasValue)
-         //{
-         //    var hasSellerItems = await _unitOfWork.OrderDetails.(od =>
-         //        od.OrderId == order.Id && od.SellerId == promotion.SellerId);
-         //    if (!hasSellerItems)
-         //        throw ErrorHelper.BadRequest("Voucher không áp dụng cho đơn hàng này.");
-         //}
+        //if (promotion.SellerId.HasValue)
+        //{
+        //    var hasSellerItems = await _unitOfWork.OrderDetails.(od =>
+        //        od.OrderId == order.Id && od.SellerId == promotion.SellerId);
+        //    if (!hasSellerItems)
+        //        throw ErrorHelper.BadRequest("Voucher không áp dụng cho đơn hàng này.");
+        //}
 
         // 7. Tính giảm giá
         decimal discountAmount = 0;
@@ -368,7 +346,7 @@ public class PromotionService : IPromotionService
         var currentUser = await _userService.GetUserById(currentUserId, true);
         if (currentUser == null)
             throw ErrorHelper.Unauthorized("Không tìm thấy thông tin người dùng.");
-        else if (currentUser.RoleName != RoleType.Seller)
+        if (currentUser.RoleName != RoleType.Seller)
             throw ErrorHelper.Unauthorized("Chỉ có seller mới có quyền tham gia voucher.");
 
         await ValidateParticipantPromotionAsync(currentUser, id);
@@ -385,13 +363,14 @@ public class PromotionService : IPromotionService
         var currentUserId = _claimsService.CurrentUserId;
         var currentUser = await _userService.GetUserById(currentUserId, true);
         var currentSeller = await _sellerService.GetSellerProfileByIdAsync(param.SellerId);
-        
+
         if (currentUser == null || currentSeller.UserId != currentUserId)
             throw ErrorHelper.Unauthorized("Không tìm thấy thông tin người dùng.");
-        else if (currentUser.RoleName != RoleType.Seller)
+        if (currentUser.RoleName != RoleType.Seller)
             throw ErrorHelper.Unauthorized("Chỉ có seller mới có quyền rút khỏi chiến dịch voucher.");
 
-        var promotionParticipant = await _unitOfWork.PromotionParticipants.FirstOrDefaultAsync(p => p.PromotionId == param.PromotionId && p.SellerId == param.SellerId && !p.IsDeleted);
+        var promotionParticipant = await _unitOfWork.PromotionParticipants.FirstOrDefaultAsync(p =>
+            p.PromotionId == param.PromotionId && p.SellerId == param.SellerId && !p.IsDeleted);
         if (promotionParticipant == null)
             throw ErrorHelper.NotFound("Seller chưa tham gia chiến dịch voucher, không thể rút");
 
@@ -406,7 +385,8 @@ public class PromotionService : IPromotionService
         return result;
     }
 
-    public async Task<Pagination<SellerParticipantDto>> GetPromotionParticipantsAsync(SellerParticipantPromotionParameter param)
+    public async Task<Pagination<SellerParticipantDto>> GetPromotionParticipantsAsync(
+        SellerParticipantPromotionParameter param)
     {
         var currentUserId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserById(currentUserId, true);
@@ -515,7 +495,7 @@ public class PromotionService : IPromotionService
         }
     }
 
-    private async Task ValidateParticipantPromotionAsync(User user,Guid promotionId)
+    private async Task ValidateParticipantPromotionAsync(User user, Guid promotionId)
     {
         if (user.RoleName == RoleType.Seller)
         {
@@ -544,14 +524,12 @@ public class PromotionService : IPromotionService
                 !pp.Promotion.IsDeleted);
 
             if (activeParticipantCount >= 2)
-            {
-                throw ErrorHelper.BadRequest("Bạn chỉ được tham gia tối đa 2 chiến dịch voucher toàn sàn cùng lúc. Vui lòng chờ chiến dịch hiện tại kết thúc.");
-            }
+                throw ErrorHelper.BadRequest(
+                    "Bạn chỉ được tham gia tối đa 2 chiến dịch voucher toàn sàn cùng lúc. Vui lòng chờ chiến dịch hiện tại kết thúc.");
 
             var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == promotionId);
             if (promotion.StartDate <= DateTime.Now)
                 throw ErrorHelper.BadRequest("Không thể tham gia/rút khỏi chiến dịch đã bắt đầu.");
-
         }
     }
 
@@ -596,6 +574,7 @@ public class PromotionService : IPromotionService
 
         return dto;
     }
+
     private async Task<ParticipantPromotionDto> MapParticipantPromotionToDto(PromotionParticipant promotionParticipant)
     {
         var dto = _mapperService.Map<PromotionParticipant, ParticipantPromotionDto>(promotionParticipant);
@@ -606,7 +585,8 @@ public class PromotionService : IPromotionService
     private async Task<PromotionParticipant> SetParticipantPromotionDataAsync(Guid userId, Guid promotionId)
     {
         var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == promotionId);
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId && s.IsVerified && !s.IsDeleted);
+        var seller =
+            await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId && s.IsVerified && !s.IsDeleted);
 
         var participantPromotion = new PromotionParticipant
         {
@@ -614,7 +594,7 @@ public class PromotionService : IPromotionService
             Promotion = promotion,
             SellerId = seller.Id,
             PromotionId = promotion.Id,
-            JoinedAt = DateTime.UtcNow,
+            JoinedAt = DateTime.UtcNow
         };
 
         return participantPromotion;
@@ -626,7 +606,8 @@ public class PromotionService : IPromotionService
         var cached = await _cacheService.GetAsync<ParticipantPromotionDto>(cacheKey);
         if (cached != null) return cached;
 
-        var participantPromotion = await _unitOfWork.PromotionParticipants.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+        var participantPromotion =
+            await _unitOfWork.PromotionParticipants.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
         if (participantPromotion == null)
             throw ErrorHelper.NotFound("Không tìm thấy voucher.");
 

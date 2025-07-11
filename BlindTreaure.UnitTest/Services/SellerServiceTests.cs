@@ -18,12 +18,12 @@ public class SellerServiceTests
     private readonly Mock<IEmailService> _emailServiceMock;
     private readonly Mock<ILoggerService> _loggerServiceMock;
     private readonly Mock<IMapperService> _mapperServiceMock;
+    private readonly Mock<INotificationService> _notificationServiceMock; // thêm dòng này
     private readonly Mock<IGenericRepository<Product>> _productRepoMock;
     private readonly Mock<IProductService> _productServiceMock;
     private readonly Mock<IGenericRepository<Seller>> _sellerRepoMock;
     private readonly SellerService _sellerService;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
-    private readonly Mock<INotificationService> _notificationServiceMock; // thêm dòng này
 
 
     public SellerServiceTests()
@@ -53,7 +53,6 @@ public class SellerServiceTests
             _claimsServiceMock.Object,
             _productServiceMock.Object,
             _notificationServiceMock.Object // thêm dòng này
-
         );
     }
 
