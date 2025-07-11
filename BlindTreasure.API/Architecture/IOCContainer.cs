@@ -156,6 +156,7 @@ public static class IocContainer
         services.AddScoped<ICustomerBlindBoxService, CustomerBlindBoxService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IUnboxingService, UnboxingService>();
+        services.AddScoped<IChatMessageService, ChatMessageService>();
 
         //3rd party
         services.AddHttpClient();
