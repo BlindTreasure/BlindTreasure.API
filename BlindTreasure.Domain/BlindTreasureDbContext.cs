@@ -143,13 +143,13 @@ public class BlindTreasureDbContext : DbContext
             entity.Property(x => x.Rarity)
                 .HasConversion<string>()
                 .HasMaxLength(32);
-            
+
             entity.Property(e => e.ProductName).HasMaxLength(255);
             entity.Property(e => e.ProbabilityTableJson).HasColumnType("jsonb");
             entity.Property(e => e.BlindBoxName).HasMaxLength(255);
         });
 
-        
+
         modelBuilder.Entity<ChatMessage>(entity =>
         {
             entity.Property(m => m.Content).HasMaxLength(1000).IsRequired();

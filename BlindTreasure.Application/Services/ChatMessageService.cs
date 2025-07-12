@@ -18,7 +18,6 @@ public class ChatMessageService : IChatMessageService
     private readonly IHubContext<ChatHub> _hubContext;
 
 
-
     public ChatMessageService(ICacheService cacheService, IClaimsService claimsService, ILoggerService logger,
         IUnitOfWork unitOfWork, IHubContext<ChatHub> hubContext)
     {
@@ -74,7 +73,7 @@ public class ChatMessageService : IChatMessageService
         }).ToList();
     }
 
-    
+
     public async Task MarkMessagesAsReadAsync(Guid fromUserId, Guid toUserId)
     {
         var unreadMessages = await _unitOfWork.ChatMessages.GetQueryable()
@@ -99,14 +98,15 @@ public class ChatMessageService : IChatMessageService
         await _hubContext.Clients.User(fromUserId.ToString()).SendAsync("MessageReadConfirmed", new
         {
             readerId = toUserId,
-            messages = unreadMessages.Select(m => new {
+            messages = unreadMessages.Select(m => new
+            {
                 m.Id,
                 m.ReadAt
             }).ToList()
         });
     }
 
-    
+
     private static string GetLastMessageCacheKey(Guid user1Id, Guid user2Id)
     {
         var ids = new[] { user1Id, user2Id }.OrderBy(x => x).ToList();

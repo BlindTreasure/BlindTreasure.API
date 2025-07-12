@@ -121,7 +121,6 @@ public class UnboxingService : IUnboxingService
     }
 
 
-
     public async Task<List<ProbabilityConfig>> GetApprovedProbabilitiesAsync(Guid blindBoxId)
     {
         var items = await _unitOfWork.BlindBoxItems.GetQueryable()
