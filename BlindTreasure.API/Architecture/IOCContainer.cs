@@ -166,7 +166,19 @@ public static class IocContainer
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IBlindyService, BlindyService>();
-        services.AddSignalR().AddJsonProtocol();
+        services.AddSignalR(options =>
+        {
+            options.EnableDetailedErrors = true;
+            options.MaximumReceiveMessageSize = 102400; // 100 KB
+            options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+            options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+            options.StreamBufferCapacity = 10;
+        })
+        .AddJsonProtocol(options =>
+        {
+            options.PayloadSerializerOptions.PropertyNamingPolicy = null;
+        });
 
 
         services.AddHttpContextAccessor();
@@ -244,15 +256,14 @@ public static class IocContainer
                 x.SaveToken = true;
                 x.TokenValidationParameters = new TokenValidationParameters
                 {
-                    ValidateIssuer = true, // Bật kiểm tra Issuer
-                    ValidateAudience = true, // Bật kiểm tra Audience
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidIssuer = configuration["JWT:Issuer"],
                     ValidAudience = configuration["JWT:Audience"],
                     IssuerSigningKey =
                         new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:SecretKey"] ??
                                                                         throw new InvalidOperationException())),
-                    // ✅ DÒNG NÀY RẤT QUAN TRỌNG
                     NameClaimType = ClaimTypes.NameIdentifier
                 };
                 x.Events = new JwtBearerEvents
@@ -261,9 +272,12 @@ public static class IocContainer
                     {
                         var accessToken = context.Request.Query["access_token"];
                         var path = context.HttpContext.Request.Path;
-                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notification"))
+                        if (!string.IsNullOrEmpty(accessToken) && 
+                            (path.StartsWithSegments("/hubs/notification") || 
+                             path.StartsWithSegments("/hubs/chat")))
+                        {
                             context.Token = accessToken;
-
+                        }
                         return Task.CompletedTask;
                     }
                 };
