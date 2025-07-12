@@ -41,7 +41,8 @@ builder.Services.AddCors(options =>
                 )
                 .AllowAnyMethod()
                 .AllowAnyHeader()
-                .AllowCredentials();
+                .AllowCredentials()
+                .SetIsOriginAllowed(_ => true); // Allow WebSocket
         });
 });
 
@@ -88,7 +89,6 @@ builder.Services.AddHttpClient<IGhtkService, GhtkService>();
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.SetupRedisService(builder.Configuration);
-
 
 
 var app = builder.Build();

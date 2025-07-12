@@ -27,7 +27,8 @@ public class UnitOfWork(
     IGenericRepository<RarityConfig> rarityConfigs,
     IGenericRepository<PromotionParticipant> promotionParticipants,
     IGenericRepository<Listing> listings,
-    IGenericRepository<ChatMessage> chatMessages)
+    IGenericRepository<ChatMessage> chatMessages,
+    IGenericRepository<BlindBoxUnboxLog> blindBoxUnboxLogs)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
@@ -52,6 +53,7 @@ public class UnitOfWork(
     public IGenericRepository<PromotionParticipant> PromotionParticipants { get; } = promotionParticipants;
     public IGenericRepository<Listing> Listings { get; } = listings;
     public IGenericRepository<ChatMessage> ChatMessages { get; } = chatMessages;
+    public IGenericRepository<BlindBoxUnboxLog> BlindBoxUnboxLogs { get; } = blindBoxUnboxLogs;
 
     public void Dispose()
     {

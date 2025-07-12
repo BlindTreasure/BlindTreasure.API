@@ -88,62 +88,13 @@ public class ProductService : IProductService
             return cachedResult;
         }
 
-        var query = _unitOfWork.Products.GetQueryable()
+        var baseQuery = _unitOfWork.Products.GetQueryable()
             .Include(p => p.Seller)
             .Where(p => !p.IsDeleted && p.ProductType == ProductSaleType.DirectSale)
             .AsNoTracking();
 
+        var query = await ApplyProductFiltersAndSorts(baseQuery, param);
 
-        // Filter
-        if (!string.IsNullOrWhiteSpace(param.Search))
-        {
-            var keyword = param.Search.Trim().ToLower();
-            query = query.Where(p => p.Name.ToLower().Contains(keyword));
-        }
-
-        if (param.CategoryId.HasValue)
-        {
-            var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
-            query = query.Where(p => categoryIds.Contains(p.CategoryId));
-        }
-
-        if (param.ProductStatus.HasValue)
-            query = query.Where(p => p.Status == param.ProductStatus);
-
-        if (param.SellerId.HasValue)
-            query = query.Where(p => p.SellerId == param.SellerId.Value);
-
-        if (param.MinPrice.HasValue)
-            query = query.Where(p => p.Price >= param.MinPrice.Value);
-
-        if (param.MaxPrice.HasValue)
-            query = query.Where(p => p.Price <= param.MaxPrice.Value);
-
-        if (param.ReleaseDateFrom.HasValue)
-            query = query.Where(p => p.CreatedAt >= param.ReleaseDateFrom.Value);
-
-        if (param.ReleaseDateTo.HasValue)
-            query = query.Where(p => p.CreatedAt <= param.ReleaseDateTo.Value);
-
-        // Sort based on SortBy field and Desc parameter
-        query = param.SortBy switch
-        {
-            ProductSortField.Name => param.Desc
-                ? query.OrderByDescending(p => p.Name)
-                : query.OrderBy(p => p.Name),
-            ProductSortField.Price => param.Desc
-                ? query.OrderByDescending(p => p.Price)
-                : query.OrderBy(p => p.Price),
-            ProductSortField.Stock => param.Desc
-                ? query.OrderByDescending(p => p.Stock)
-                : query.OrderBy(p => p.Stock),
-            ProductSortField.CreatedAt => param.Desc
-                ? query.OrderByDescending(p => p.CreatedAt)
-                : query.OrderBy(p => p.CreatedAt),
-            _ => param.Desc
-                ? query.OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
-                : query.OrderBy(p => p.UpdatedAt ?? p.CreatedAt)
-        };
 
         var count = await query.CountAsync();
 
@@ -390,20 +341,109 @@ public class ProductService : IProductService
 
     #region PRIVATE HELPER METHODS
 
+    private async Task<IQueryable<Product>> ApplyProductFiltersAndSorts(IQueryable<Product> query,
+        ProductQueryParameter param)
+    {
+        // Filter
+        if (!string.IsNullOrWhiteSpace(param.Search))
+        {
+            var keyword = param.Search.Trim().ToLower();
+            query = query.Where(p => p.Name.ToLower().Contains(keyword));
+        }
+
+        if (param.CategoryId.HasValue)
+        {
+            var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
+            query = query.Where(p => categoryIds.Contains(p.CategoryId));
+        }
+
+        if (param.ProductStatus.HasValue)
+            query = query.Where(p => p.Status == param.ProductStatus);
+
+        if (param.SellerId.HasValue)
+            query = query.Where(p => p.SellerId == param.SellerId.Value);
+
+        if (param.MinPrice.HasValue)
+            query = query.Where(p => p.Price >= param.MinPrice.Value);
+
+        if (param.MaxPrice.HasValue)
+            query = query.Where(p => p.Price <= param.MaxPrice.Value);
+
+        if (param.ReleaseDateFrom.HasValue)
+            query = query.Where(p => p.CreatedAt >= param.ReleaseDateFrom.Value);
+
+        if (param.ReleaseDateTo.HasValue)
+            query = query.Where(p => p.CreatedAt <= param.ReleaseDateTo.Value);
+
+        // Sort + push OutOfStock to bottom
+        if (param.SortBy == null)
+            query = query
+                .OrderBy(p => p.Stock == 0)
+                .ThenBy(p => p.Price);
+        else
+            query = param.SortBy switch
+            {
+                ProductSortField.Name => param.Desc
+                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.Name)
+                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.Name),
+                ProductSortField.Price => param.Desc
+                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.Price)
+                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.Price),
+                ProductSortField.Stock => param.Desc
+                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.Stock)
+                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.Stock),
+                ProductSortField.CreatedAt => param.Desc
+                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.CreatedAt)
+                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.CreatedAt),
+                _ => param.Desc
+                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.UpdatedAt ?? p.CreatedAt)
+            };
+
+        return query;
+    }
+
+
     private async Task ValidateProductDto(ProductCreateDto dto)
     {
+        _logger.Info(
+            $"[ValidateProductDto] Start validating product: Name='{dto.Name}', Description='{dto.Description}', Price={dto.Price}, Stock={dto.Stock}, CategoryId={dto.CategoryId}");
+
         if (string.IsNullOrWhiteSpace(dto.Name))
+        {
+            _logger.Warn("[ValidateProductDto] Validation failed: 'Name' is null or empty.");
             throw ErrorHelper.BadRequest("Tên sản phẩm không được để trống.");
+        }
+
         if (string.IsNullOrWhiteSpace(dto.Description))
+        {
+            _logger.Warn("[ValidateProductDto] Validation failed: 'Description' is null or empty.");
             throw ErrorHelper.BadRequest("Mô tả không được để trống.");
+        }
+
         if (dto.Price <= 0)
+        {
+            _logger.Warn($"[ValidateProductDto] Validation failed: 'Price' must be > 0. Input value: {dto.Price}");
             throw ErrorHelper.BadRequest("Giá sản phẩm phải lớn hơn 0.");
+        }
+
         if (dto.Stock < 0)
+        {
+            _logger.Warn($"[ValidateProductDto] Validation failed: 'Stock' must be >= 0. Input value: {dto.Stock}");
             throw ErrorHelper.BadRequest("Số lượng tồn kho phải >= 0.");
+        }
+
         var categoryExists = await _unitOfWork.Categories.GetQueryable()
             .AnyAsync(c => c.Id == dto.CategoryId && !c.IsDeleted);
+
         if (!categoryExists)
+        {
+            _logger.Warn(
+                $"[ValidateProductDto] Validation failed: Category '{dto.CategoryId}' does not exist or is deleted.");
             throw ErrorHelper.BadRequest("Danh mục sản phẩm không hợp lệ.");
+        }
+
+        _logger.Success($"[ValidateProductDto] Validation passed for product: Name='{dto.Name}'");
     }
 
 
