@@ -385,7 +385,8 @@ public class PromotionService : IPromotionService
         return result;
     }
 
-    public async Task<List<SellerParticipantDto>> GetPromotionParticipantsAsync(SellerParticipantPromotionParameter param)
+    public async Task<List<SellerParticipantDto>> GetPromotionParticipantsAsync(
+        SellerParticipantPromotionParameter param)
     {
         var currentUserId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserById(currentUserId, true);
