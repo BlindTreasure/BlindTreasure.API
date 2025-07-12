@@ -1,8 +1,10 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Text.Json;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.UnboxDTOs;
+using BlindTreasure.Domain.DTOs.UnboxLogDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -46,7 +48,32 @@ public class UnboxingService : IUnboxingService
             throw ErrorHelper.BadRequest("Hộp này không còn item nào để mở.");
 
         // 3 & 4. Random item theo xác suất (dùng hàm mới)
-        var selectedItem = GetRandomItemByProbability(items, now);
+        var (selectedItem, roll, probabilityMap) = GetRandomItemByProbability(items, now);
+        if (selectedItem == null)
+            throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
+
+        // Ghi log vào bảng
+        await _unitOfWork.BlindBoxUnboxLogs.AddAsync(new BlindBoxUnboxLog
+        {
+            Id = Guid.NewGuid(),
+            CustomerBlindBoxId = customerBox.Id,
+            UserId = userId,
+            ProductId = selectedItem.ProductId,
+            ProductName = selectedItem.Product?.Name ?? "",
+            Rarity = selectedItem.RarityConfig?.Name ?? RarityName.Common,
+            DropRate = selectedItem.DropRate,
+            RollValue = roll,
+            ProbabilityTableJson = JsonSerializer.Serialize(probabilityMap.Select(p => new
+            {
+                p.Key.ProductId,
+                ProductName = p.Key.Product?.Name,
+                Rarity = p.Key.RarityConfig?.Name,
+                DropRate = p.Value
+            })),
+            UnboxedAt = now,
+            BlindBoxName = blindBox?.Name ?? ""
+        });
+
         if (selectedItem == null)
             throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
 
@@ -62,6 +89,38 @@ public class UnboxingService : IUnboxingService
             UnboxedAt = now
         };
     }
+
+    public async Task<List<UnboxLogDto>> GetLogsAsync(Guid? userId, Guid? productId)
+    {
+        var query = _unitOfWork.BlindBoxUnboxLogs.GetQueryable();
+
+        if (userId.HasValue)
+            query = query.Where(x => x.UserId == userId.Value);
+
+        if (productId.HasValue)
+            query = query.Where(x => x.ProductId == productId.Value);
+
+        var result = await query
+            .OrderByDescending(x => x.UnboxedAt)
+            .Take(100)
+            .Select(x => new UnboxLogDto
+            {
+                Id = x.Id,
+                CustomerBlindBoxId = x.CustomerBlindBoxId,
+                ProductId = x.ProductId,
+                ProductName = x.ProductName,
+                Rarity = x.Rarity,
+                DropRate = x.DropRate,
+                RollValue = x.RollValue,
+                UnboxedAt = x.UnboxedAt,
+                BlindBoxName = x.BlindBoxName
+            })
+            .ToListAsync();
+
+        return result;
+    }
+
+
 
     public async Task<List<ProbabilityConfig>> GetApprovedProbabilitiesAsync(Guid blindBoxId)
     {
@@ -171,7 +230,8 @@ public class UnboxingService : IUnboxingService
         // TODO: Gửi email qua EmailService nếu có
     }
 
-    private BlindBoxItem? GetRandomItemByProbability(List<BlindBoxItem> items, DateTime now)
+    private (BlindBoxItem? Item, decimal Roll, Dictionary<BlindBoxItem, decimal> Probabilities)
+        GetRandomItemByProbability(List<BlindBoxItem> items, DateTime now)
     {
         var probabilities = new Dictionary<BlindBoxItem, decimal>();
         foreach (var item in items)
@@ -186,71 +246,28 @@ public class UnboxingService : IUnboxingService
 
         var totalProbability = probabilities.Values.Sum();
 
-        // Header bảng
-        var separator =
-            "+----+--------------------------------------+--------------------------+--------+----------+";
-        var header =
-            "| No | ProductId                            | ProductName              | Rarity | Weight   | Prob(%) |";
-        _loggerService.Info("[Gacha] =========== RANDOM BLINDBOX ITEM ===========");
-        _loggerService.Info(separator);
-        _loggerService.Info(header);
-        _loggerService.Info(separator);
-
-        var idx = 1;
-        foreach (var kvp in probabilities)
-        {
-            var item = kvp.Key;
-            var prob = kvp.Value;
-            var productName = (item.Product?.Name ?? "").PadRight(24).Substring(0, 24);
-            var rarity = item.RarityConfig?.Name.ToString() ?? "Unknown";
-            var weight = (item.RarityConfig?.Weight ?? 0).ToString().PadLeft(6);
-            var probText = prob.ToString("0.##").PadLeft(7);
-
-            _loggerService.Info(
-                $"| {idx.ToString().PadLeft(2)} | {item.ProductId} | {productName} | {rarity.PadRight(8)} | {weight} | {probText} |");
-            idx++;
-        }
-
-        _loggerService.Info(separator);
-        _loggerService.Info($"[Gacha] Tổng xác suất: {totalProbability}%");
-
         if (totalProbability <= 0)
         {
             _loggerService.Warn("[Gacha] Tổng xác suất bằng 0, không thể random.");
-            return null;
+            return (null, 0, probabilities);
         }
 
         var rand = new Random();
         var roll = (decimal)rand.NextDouble() * totalProbability;
-        _loggerService.Info($"[Gacha] Số random sinh ra: {roll:0.#####} (range 0 ~ {totalProbability})");
-
         decimal cumulative = 0;
         BlindBoxItem? selectedItem = null;
-        var selectIndex = 1;
+
         foreach (var kvp in probabilities)
         {
             cumulative += kvp.Value;
-            _loggerService.Info($"[Gacha] [Cộng dồn] #{selectIndex}: {cumulative:0.###}");
             if (roll <= cumulative)
             {
                 selectedItem = kvp.Key;
-                var item = selectedItem;
-                _loggerService.Info("[Gacha] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-                _loggerService.Info(
-                    $"[Gacha] KẾT QUẢ: Sản phẩm [{item.ProductId}] | {item.Product?.Name} | Rarity={item.RarityConfig?.Name} | Weight={item.RarityConfig?.Weight}");
-                _loggerService.Info("[Gacha] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
                 break;
             }
-
-            selectIndex++;
         }
 
-        if (selectedItem == null)
-            _loggerService.Warn("[Gacha] Không chọn được item nào!");
-
-        _loggerService.Info("[Gacha] =========== KẾT THÚC RANDOM BLINDBOX ITEM ===========");
-
-        return selectedItem;
+        return (selectedItem, roll, probabilities);
     }
 
     #endregion

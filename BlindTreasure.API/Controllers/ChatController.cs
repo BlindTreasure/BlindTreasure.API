@@ -26,7 +26,8 @@ public class ChatController : ControllerBase
     ///     Lấy lịch sử tin nhắn giữa user hiện tại và 1 người dùng khác
     /// </summary>
     [HttpGet("history/{receiverId}")]
-    public async Task<IActionResult> GetChatHistory(Guid receiverId, [FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetChatHistory(Guid receiverId, [FromQuery] int pageIndex = 0,
+        [FromQuery] int pageSize = 20)
     {
         var currentUserId = _claimsService.CurrentUserId;
         var messages = await _chatMessageService.GetMessagesAsync(currentUserId, receiverId, pageIndex, pageSize);
@@ -44,7 +45,7 @@ public class ChatController : ControllerBase
         await _chatMessageService.SaveMessageAsync(senderId, request.ReceiverId, request.Content);
         return Ok(ApiResult.Success("200", "Gửi tin nhắn thành công"));
     }
-    
+
     /// <summary>
     /// Đánh dấu tất cả tin nhắn từ người gửi là đã đọc
     /// </summary>
@@ -55,5 +56,4 @@ public class ChatController : ControllerBase
         await _chatMessageService.MarkMessagesAsReadAsync(fromUserId, currentUserId);
         return Ok(ApiResult.Success("200", "Đánh dấu đã đọc thành công"));
     }
-
 }

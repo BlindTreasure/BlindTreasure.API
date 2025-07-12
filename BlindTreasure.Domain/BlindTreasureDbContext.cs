@@ -45,7 +45,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<WishlistItem> WishlistItems { get; set; }
 
     public DbSet<ChatMessage> ChatMessages { get; set; }
-
+    public DbSet<BlindBoxUnboxLog> BlindBoxUnboxLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -138,7 +138,18 @@ public class BlindTreasureDbContext : DbContext
 
         #endregion
 
+        modelBuilder.Entity<BlindBoxUnboxLog>(entity =>
+        {
+            entity.Property(x => x.Rarity)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+            
+            entity.Property(e => e.ProductName).HasMaxLength(255);
+            entity.Property(e => e.ProbabilityTableJson).HasColumnType("jsonb");
+            entity.Property(e => e.BlindBoxName).HasMaxLength(255);
+        });
 
+        
         modelBuilder.Entity<ChatMessage>(entity =>
         {
             entity.Property(m => m.Content).HasMaxLength(1000).IsRequired();
