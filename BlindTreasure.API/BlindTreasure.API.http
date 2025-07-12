@@ -1,6 +1,5 @@
 @BlindTreasure.API_HostAddress = http://localhost:5208
 
-GET {{BlindTreasure.API_HostAddress}}/weatherforecast/
-Accept: application/json
+
 
 ###
