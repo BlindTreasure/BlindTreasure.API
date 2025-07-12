@@ -7,7 +7,7 @@ public class ChatMessage : BaseEntity
     public string Content { get; set; } = null!;
     public DateTime SentAt { get; set; }
     public DateTime? ReadAt { get; set; } // Thêm dòng này
-    
+
     public bool IsRead { get; set; } = false;
 
     // Navigation
