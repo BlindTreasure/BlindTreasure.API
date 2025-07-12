@@ -58,12 +58,19 @@ public class ApiResult<T>
         };
     }
 
-    public static ApiResult<T> Failure(string code = "400", string message = "Operation failed.")
+    public static ApiResult<T> Failure(string code = "400", string message = "Operation failed.", T value = default)
     {
         return new ApiResult<T>
         {
             IsSuccess = false,
-            Value = null,
+            Value = value == null
+                ? null
+                : new ResponseDataContent<T>
+                {
+                    Code = code,
+                    Message = message,
+                    Data = value
+                },
             Error = new ErrorContent
             {
                 Code = code,
