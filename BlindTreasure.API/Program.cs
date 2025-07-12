@@ -1,14 +1,19 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Text.Json.Serialization;
-using BlindTreasure.API.Architecture;
+﻿using BlindTreasure.API.Architecture;
 using BlindTreasure.Application.GHTK.Authorization;
+using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
+using BlindTreasure.Application.Services;
+using BlindTreasure.Application.Services.ThirdParty.AIModels;
 using BlindTreasure.Application.SignalR.Hubs;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.StripeDTOs;
 using Microsoft.AspNetCore.Diagnostics;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Stripe;
 using SwaggerThemes;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json.Serialization;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -76,11 +81,14 @@ builder.Services.AddTransient<IStripeClient, StripeClient>(s =>
 
 #endregion
 
-
+builder.Services.Configure<GhtkSettings>(builder.Configuration.GetSection("GHTK"));
+builder.Services.AddHttpClient<IGhtkService, GhtkService>();
 
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.SetupRedisService(builder.Configuration);
+
+
 
 var app = builder.Build();
 
