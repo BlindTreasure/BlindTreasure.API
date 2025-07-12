@@ -1,15 +1,15 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
-using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Stripe.Forwarding;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace BlindTreasure.Application.Services
 {
@@ -21,8 +21,15 @@ namespace BlindTreasure.Application.Services
         private readonly IOrderService _orderService;
         private readonly IUnitOfWork _unitOfWork;
         private readonly GhtkSettings _ghtkSettings;
+        private readonly JsonSerializerOptions _jsonOptions;
 
-        public GhtkService(HttpClient client, ILoggerService logger, IMapperService mapper, IOrderService orderService, IUnitOfWork unitOfWork, IOptions<GhtkSettings> opt)
+        public GhtkService(
+            HttpClient client,
+            ILoggerService logger,
+            IMapperService mapper,
+            IOrderService orderService,
+            IUnitOfWork unitOfWork,
+            IOptions<GhtkSettings> opt)
         {
             _ghtkSettings = opt.Value;
             _client = client;
@@ -33,83 +40,154 @@ namespace BlindTreasure.Application.Services
             _mapper = mapper;
             _orderService = orderService;
             _unitOfWork = unitOfWork;
+            _jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
             _logger.Info($"GHTK Settings: BaseUrl={_ghtkSettings.BaseUrl}, ApiToken={_ghtkSettings.ApiToken}, PartnerCode={_ghtkSettings.PartnerCode}");
-
         }
-
 
         public async Task<GhtkAuthResponse> AuthenticateAsync()
         {
-            var response = await _client.PostAsync("/services/authenticated", null);
-
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                var errorContent = await response.Content.ReadFromJsonAsync<GhtkAuthResponse>();
-                errorContent.StatusCode = response.StatusCode.ToString();
-                _logger.Error($"Authentication failed: {System.Text.Json.JsonSerializer.Serialize(errorContent)}");
-                return errorContent;
+                var response = await _client.PostAsync("/services/authenticated", null);
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var result = JsonSerializer.Deserialize<GhtkAuthResponse>(responseContent, _jsonOptions)
+                             ?? new GhtkAuthResponse { Success = false, Message = "Empty response" };
+                result.StatusCode = response.StatusCode.ToString();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.Error($"Authentication failed: {responseContent}");
+                }
+                else
+                {
+                    _logger.Success("Authentication successfully.");
+                }
+                return result;
             }
-            var result = await response.Content.ReadFromJsonAsync<GhtkAuthResponse>();
-            result.StatusCode = response.StatusCode.ToString();
-            if (result == null)
+            catch (Exception ex)
             {
-                _logger.Error("Empty response from GHTK authentication API.");
-                return new GhtkAuthResponse { Success = false, Message = "Empty response" };
+                _logger.Error(ex.Message);
+                return new GhtkAuthResponse { Success = false, Message = ex.Message, StatusCode = "500" };
             }
-            _logger.Success("Authentication successfully.");
-            return result;
-
-
-            // chưa dùng tới code ở dưới 
-            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                _logger.Error("Authentication failed: Invalid token or credentials.");
-                return new GhtkAuthResponse { Success = false, Message = "Invalid token or credentials" };
-
-            }
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                _logger.Error("Authentication failed: Unauthorized access.");
-                return new GhtkAuthResponse { Success = false, Message = "Unauthorized access" };
-            }
-            response.EnsureSuccessStatusCode();
-            _logger.Success("Authentication successfully.");
-
-           
-
         }
 
-        public async Task<GhtkSubmitOrderResponse> SubmitOrderAsync(
-    GhtkSubmitOrderRequest request)
+        public async Task<GhtkSubmitOrderResponse> SubmitOrderAsync(GhtkSubmitOrderRequest request)
         {
-            var response = await _client.PostAsJsonAsync(
-                "/services/shipment/order", request);
-
-            var result = await response.Content
-                .ReadFromJsonAsync<GhtkSubmitOrderResponse>();
-
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                _logger.Error($"GHTK submit-order failed: {result?.Message}");
-            }
+                var content = JsonSerializer.Serialize(request, _jsonOptions);
+                var response = await _client.PostAsync("/services/shipment/order", new StringContent(content, Encoding.UTF8, "application/json"));
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.Info(responseContent);
 
-            return result;
+                // Try to parse as GhtkSubmitOrderResponse first
+                var result = JsonSerializer.Deserialize<GhtkSubmitOrderResponse>(responseContent, _jsonOptions);
+
+                // If failed or error, try to parse as GhtkAuthResponse for error details
+                if (result == null || result.Success == false)
+                {
+                    var errorResult = JsonSerializer.Deserialize<GhtkAuthResponse>(responseContent, _jsonOptions);
+                    return new GhtkSubmitOrderResponse
+                    {
+                        Success = errorResult?.Success ?? false,
+                        Message = errorResult?.Message ?? "Unknown error",
+                        StatusCode = errorResult?.StatusCode ?? response.StatusCode.ToString()
+                    };
+                }
+
+                result.StatusCode = response.StatusCode.ToString();
+                if (!response.IsSuccessStatusCode || !result.Success)
+                {
+                    _logger.Error($"GHTK submit-order failed: {result.Message}");
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex.Message);
+                return new GhtkSubmitOrderResponse { Success = false, Message = ex.Message, StatusCode = "500" };
+            }
         }
 
         public async Task<GhtkTrackResponse> TrackOrderAsync(string trackingOrder)
         {
-            var response = await _client.GetAsync($"/services/shipment/v2/{Uri.EscapeDataString(trackingOrder)}");
-
-            var result = await response.Content.ReadFromJsonAsync<GhtkTrackResponse>()
-                       ?? new GhtkTrackResponse { Success = false, Message = "Empty response" };
-
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                _logger.Error($"GHTK track-order failed: {result.Message}");
+                var response = await _client.GetAsync($"/services/shipment/v2/{Uri.EscapeDataString(trackingOrder)}");
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.Info(responseContent);
+                var result = JsonSerializer.Deserialize<GhtkTrackResponse>(responseContent, _jsonOptions)
+                             ?? new GhtkTrackResponse { Success = false, Message = "Empty response" };
+
+                if (!response.IsSuccessStatusCode || !result.Success)
+                {
+                    _logger.Error($"GHTK track-order failed: {result.Message}");
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex.Message);
+                return new GhtkTrackResponse { Success = false, Message = ex.Message };
+            }
+        }
+
+        public async Task<GhtkFeeResponse> CalculateFeeAsync(GhtkFeeRequest request)
+        {
+            try
+            {
+                var query = BuildFeeQueryString(request);
+                _logger.Info($"url is : {query}");
+                var response = await _client.GetAsync($"/services/shipment/fee{query}");
+                var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.Info(responseContent);
+
+                var result = JsonSerializer.Deserialize<GhtkFeeResponse>(responseContent, _jsonOptions)
+                             ?? new GhtkFeeResponse { Success = false, Message = "Empty response" };
+
+                if (!response.IsSuccessStatusCode || !result.Success)
+                {
+                    _logger.Error($"GHTK fee calculation failed: {result.Message}");
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex.Message);
+                return new GhtkFeeResponse { Success = false, Message = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Build query string từ GhtkFeeRequest.
+        /// </summary>
+        private static string BuildFeeQueryString(GhtkFeeRequest req)
+        {
+            var query = HttpUtility.ParseQueryString(string.Empty);
+
+            if (!string.IsNullOrWhiteSpace(req.PickAddressId)) query["pick_address_id"] = req.PickAddressId;
+            if (!string.IsNullOrWhiteSpace(req.PickAddress)) query["pick_address"] = req.PickAddress;
+            query["pick_province"] = req.PickProvince;
+            query["pick_district"] = req.PickDistrict;
+            if (!string.IsNullOrWhiteSpace(req.PickWard)) query["pick_ward"] = req.PickWard;
+            if (!string.IsNullOrWhiteSpace(req.PickStreet)) query["pick_street"] = req.PickStreet;
+            if (!string.IsNullOrWhiteSpace(req.Address)) query["address"] = req.Address;
+            query["province"] = req.Province;
+            query["district"] = req.District;
+            if (!string.IsNullOrWhiteSpace(req.Ward)) query["ward"] = req.Ward;
+            if (!string.IsNullOrWhiteSpace(req.Street)) query["street"] = req.Street;
+            query["weight"] = req.Weight.ToString();
+            if (req.Value.HasValue) query["value"] = req.Value.Value.ToString();
+            if (!string.IsNullOrWhiteSpace(req.Transport)) query["transport"] = req.Transport;
+            query["deliver_option"] = req.DeliverOption;
+            if (req.Tags != null && req.Tags.Length > 0)
+            {
+                foreach (var tag in req.Tags)
+                    query.Add("tags", tag);
             }
 
-            return result;
+            return "?" + query.ToString();
         }
     }
 }

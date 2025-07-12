@@ -15,7 +15,9 @@ namespace BlindTreasure.Domain.DTOs.ShipmentDTOs
         [JsonPropertyName("message")]
         public string Message { get; set; } = string.Empty;
         [JsonPropertyName("order")]
-        public required SubmitOrderResponseOrder Order { get; set; }
+        public SubmitOrderResponseOrder? Order { get; set; }
+        public string? StatusCode { get; set; } // For error cases (422, etc.)
+        public string? LogId { get; set; }      // For error cases
     }
 
     public class SubmitOrderResponseOrder
@@ -27,16 +29,16 @@ namespace BlindTreasure.Domain.DTOs.ShipmentDTOs
         public string Label { get; set; } = default!;
 
         [JsonPropertyName("area")]
-        public string Area { get; set; }
+        public int? Area { get; set; }
 
         [JsonPropertyName("fee")]
-        public string Fee { get; set; }
+        public double? Fee { get; set; }
 
         [JsonPropertyName("insurance_fee")]
-        public string InsuranceFee { get; set; }
+        public double? InsuranceFee { get; set; }
 
         [JsonPropertyName("tracking_id")]
-        public string TrackingId { get; set; } = default!;
+        public int? TrackingId { get; set; } = default!;
 
         [JsonPropertyName("estimated_pick_time")]
         public string EstimatedPickTime { get; set; } = default!;
@@ -45,7 +47,7 @@ namespace BlindTreasure.Domain.DTOs.ShipmentDTOs
         public string EstimatedDeliverTime { get; set; } = default!;
 
         [JsonPropertyName("products")]
-        public GhtkProduct[] Products { get; set; } = Array.Empty<GhtkProduct>();
+        public object[] Products { get; set; } = Array.Empty<object>();
 
         [JsonPropertyName("status_id")]
         public int StatusId { get; set; }

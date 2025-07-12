@@ -29,7 +29,7 @@ namespace BlindTreasure.Domain.DTOs.ShipmentDTOs
             public string PartnerId { get; set; } = default!;
 
             [JsonPropertyName("status")]
-            public string Status { get; set; } = default!;
+            public int? Status { get; set; } = default!;
 
             [JsonPropertyName("status_text")]
             public string StatusText { get; set; } = default!;
@@ -59,25 +59,25 @@ namespace BlindTreasure.Domain.DTOs.ShipmentDTOs
             public string Address { get; set; } = default!;
 
             [JsonPropertyName("storage_day")]
-            public string StorageDay { get; set; } = default!;
+            public int? StorageDay { get; set; } = default!;
 
             [JsonPropertyName("ship_money")]
-            public string ShipMoney { get; set; } = default!;
+            public int? ShipMoney { get; set; } = default!;
 
             [JsonPropertyName("insurance")]
-            public string Insurance { get; set; } = default!;
+            public int? Insurance { get; set; } = default!;
 
             [JsonPropertyName("value")]
-            public string Value { get; set; } = default!;
+            public int? Value { get; set; } = default!;
 
             [JsonPropertyName("weight")]
-            public string Weight { get; set; } = default!;
+            public int? Weight { get; set; } = default!;
 
             [JsonPropertyName("pick_money")]
-            public int PickMoney { get; set; }
+            public int? PickMoney { get; set; }
 
             [JsonPropertyName("is_freeship")]
-            public string IsFreeShip { get; set; } = default!;
+            public int? IsFreeShip { get; set; } = default!;
         }
     }
 
