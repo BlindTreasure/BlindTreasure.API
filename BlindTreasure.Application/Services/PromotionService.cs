@@ -385,39 +385,25 @@ public class PromotionService : IPromotionService
         return result;
     }
 
-    public async Task<Pagination<SellerParticipantDto>> GetPromotionParticipantsAsync(
-        SellerParticipantPromotionParameter param)
+    public async Task<List<SellerParticipantDto>> GetPromotionParticipantsAsync(SellerParticipantPromotionParameter param)
     {
         var currentUserId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserById(currentUserId, true);
         if (user?.RoleName != RoleType.Staff && user?.RoleName != RoleType.Admin)
             throw ErrorHelper.Forbidden("Không có quyền xem danh sách tham gia.");
 
-        var query = _unitOfWork.PromotionParticipants
+        var participants = _unitOfWork.PromotionParticipants
             .GetQueryable()
             .Where(pp => pp.PromotionId == param.PromotionId && !pp.IsDeleted)
-            .Include(pp => pp.Seller);
-
-        // Đếm tổng số record
-        var totalCount = await query.CountAsync();
-
-        // Sắp xếp theo thời gian tham gia
-        var orderedQuery = param.Desc
-            ? query.OrderByDescending(pp => pp.JoinedAt)
-            : query.OrderBy(pp => pp.JoinedAt);
-
-        // Phân trang
-        var participants = await orderedQuery
-            .Skip((param.PageIndex - 1) * param.PageSize)
-            .Take(param.PageSize)
-            .ToListAsync();
+            .Include(pp => pp.Seller)
+            .ThenInclude(s => s.User);
 
         var result = participants.Select(pp => new SellerParticipantDto
         {
             Id = pp.Seller.Id,
-            Email = user.Email,
-            FullName = user.FullName,
-            Phone = user.Phone,
+            Email = pp.Seller.User.Email,
+            FullName = pp.Seller.User.FullName,
+            Phone = pp.Seller.User.Phone,
             CompanyName = pp.Seller.CompanyName,
             TaxId = pp.Seller.TaxId,
             CompanyAddress = pp.Seller.CompanyAddress,
@@ -425,7 +411,7 @@ public class PromotionService : IPromotionService
             JoinedAt = pp.JoinedAt
         }).ToList();
 
-        return new Pagination<SellerParticipantDto>(result, totalCount, param.PageIndex, param.PageSize);
+        return result;
     }
 
     #region private methods

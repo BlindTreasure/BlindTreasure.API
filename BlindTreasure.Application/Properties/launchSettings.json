@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "BlindTreasure.Application": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:52404;http://localhost:52405"
+    }
+  }
+}

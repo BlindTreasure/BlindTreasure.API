@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using BlindTreasure.Application.GHTK.Authorization;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
@@ -266,6 +267,13 @@ public static class IocContainer
                         return Task.CompletedTask;
                     }
                 };
+            })
+            .AddXClientSource(options =>
+            {
+                options.IssuerSigningKey = configuration["IssuerSigningKey"] ?? "";
+                options.ClientValidator = async (clientSource, token, principle) => true;
+
+
             });
         services.AddAuthorization(options =>
         {
