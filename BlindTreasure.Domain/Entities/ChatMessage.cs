@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.Entities;
 
 public class ChatMessage : BaseEntity
 {
@@ -7,7 +9,7 @@ public class ChatMessage : BaseEntity
     public string Content { get; set; } = null!;
     public DateTime SentAt { get; set; }
     public DateTime? ReadAt { get; set; } // Thêm dòng này
-
+    public ChatMessageType MessageType { get; set; }
     public bool IsRead { get; set; } = false;
 
     // Navigation

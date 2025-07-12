@@ -7,87 +7,85 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using OpenAI.ObjectModels.ResponseModels;
 
-namespace BlindTreasure.API.Controllers
+namespace BlindTreasure.API.Controllers;
+
+[ApiController]
+[Route("/services/shipment")]
+public class ShipmentServiceController : ControllerBase
 {
-    [ApiController]
-    [Route("/services/shipment")]
+    private readonly IGhtkService _ghtkService;
 
-    public class ShipmentServiceController : ControllerBase
+    public ShipmentServiceController(IGhtkService ghtkService)
     {
-        private readonly IGhtkService _ghtkService;
-        public ShipmentServiceController(IGhtkService ghtkService)
-        {
-            _ghtkService = ghtkService;
-        }
+        _ghtkService = ghtkService;
+    }
 
-        [HttpGet("authenticate")]
-        public async Task<IActionResult> Authenticate()
+    [HttpGet("authenticate")]
+    public async Task<IActionResult> Authenticate()
+    {
+        try
         {
-            try
+            var res = await _ghtkService.AuthenticateAsync();
+
+            if (!res.Success)
             {
-                var res = await _ghtkService.AuthenticateAsync();
-
-                if (!res.Success)
+                // Chuyển StatusCode từ string sang int (nếu có)
+                if (int.TryParse(res.StatusCode, out var statusCode))
                 {
-                    // Chuyển StatusCode từ string sang int (nếu có)
-                    if (int.TryParse(res.StatusCode, out int statusCode))
+                    var apiResult = new ApiResult<GhtkAuthResponse>
                     {
-                        var apiResult = new ApiResult<GhtkAuthResponse> {
-                            IsSuccess = false,
-                            Error = new ErrorContent
-                            {
-                                Code = res.StatusCode ?? "500",
-                                Message = res.Message ?? "GHTK authentication failed."
-                            },
-                            Value = new ResponseDataContent<GhtkAuthResponse>
-                            {
-                                Code = res.StatusCode ?? "500",
-                                Message = res.Message ?? "GHTK authentication failed.",
-                                Data = res
-                            }
+                        IsSuccess = false,
+                        Error = new ErrorContent
+                        {
+                            Code = res.StatusCode ?? "500",
+                            Message = res.Message ?? "GHTK authentication failed."
+                        },
+                        Value = new ResponseDataContent<GhtkAuthResponse>
+                        {
+                            Code = res.StatusCode ?? "500",
+                            Message = res.Message ?? "GHTK authentication failed.",
+                            Data = res
+                        }
+                    };
 
-                        };
-                           
-                    
-                        return StatusCode(statusCode, apiResult);
-                    }
-                    // Nếu không parse được, trả về 400 BadRequest
-                    var failApiResult = ApiResult<GhtkAuthResponse>.Failure(
-                        "400",
-                        res.Message ?? "GHTK authentication failed."
-                       
-                    );
-                    return BadRequest(failApiResult);
+
+                    return StatusCode(statusCode, apiResult);
                 }
 
-                //_logger.info("GHTK authentication successful.");
-                return Ok(ApiResult<GhtkAuthResponse>.Success(res, "200", "authenticated api ghtk thành công"));
+                // Nếu không parse được, trả về 400 BadRequest
+                var failApiResult = ApiResult<GhtkAuthResponse>.Failure(
+                    "400",
+                    res.Message ?? "GHTK authentication failed."
+                );
+                return BadRequest(failApiResult);
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, ApiResult<GhtkAuthResponse>.Failure("500", ex.Message));
-            }
 
+            //_logger.info("GHTK authentication successful.");
+            return Ok(ApiResult<GhtkAuthResponse>.Success(res, "200", "authenticated api ghtk thành công"));
         }
-
-        [HttpPost("order")]
-        public async Task<IActionResult> SubmitOrder([FromBody] GhtkSubmitOrderRequest req)
+        catch (Exception ex)
         {
-            var res = await _ghtkService.SubmitOrderAsync(req);
-            if (!res.Success)
-                return BadRequest(res.Message);
-            return Ok(res);
+            return StatusCode(500, ApiResult<GhtkAuthResponse>.Failure("500", ex.Message));
         }
+    }
+
+    [HttpPost("order")]
+    public async Task<IActionResult> SubmitOrder([FromBody] GhtkSubmitOrderRequest req)
+    {
+        var res = await _ghtkService.SubmitOrderAsync(req);
+        if (!res.Success)
+            return BadRequest(res.Message);
+        return Ok(res);
+    }
 
 
-        [HttpGet("track/{trackingOrder}")]
-        public async Task<IActionResult> TrackOrder(string trackingOrder)
-        {
-            var res = await _ghtkService.TrackOrderAsync(trackingOrder);
-            if (!res.Success)
-                return BadRequest(res.Message);
+    [HttpGet("track/{trackingOrder}")]
+    public async Task<IActionResult> TrackOrder(string trackingOrder)
+    {
+        var res = await _ghtkService.TrackOrderAsync(trackingOrder);
+        if (!res.Success)
+            return BadRequest(res.Message);
 
-            return Ok(res);
-        }
+        return Ok(res);
     }
 }

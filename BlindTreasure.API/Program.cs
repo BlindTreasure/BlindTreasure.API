@@ -89,7 +89,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.SetupRedisService(builder.Configuration);
 
 
-
 var app = builder.Build();
 
 app.UseCors("AllowFrontend");

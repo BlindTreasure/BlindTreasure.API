@@ -211,7 +211,8 @@ public class PromotionController : ControllerBase
         try
         {
             var result = await _promotionService.GetPromotionParticipantsAsync(param);
-            return Ok(ApiResult<List<SellerParticipantDto>>.Success(result, "200", "Danh sách seller tham gia chiến dịch voucher"));
+            return Ok(ApiResult<List<SellerParticipantDto>>.Success(result, "200",
+                "Danh sách seller tham gia chiến dịch voucher"));
         }
         catch (Exception ex)
         {

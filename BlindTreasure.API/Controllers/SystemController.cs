@@ -1649,7 +1649,8 @@ public class SystemController : ControllerBase
             return;
         }
 
-        var promotion = await _context.Promotions.FirstOrDefaultAsync(p => p.Status == PromotionStatus.Approved && p.CreatedByRole == RoleType.Staff);
+        var promotion = await _context.Promotions.FirstOrDefaultAsync(p =>
+            p.Status == PromotionStatus.Approved && p.CreatedByRole == RoleType.Staff);
         if (promotion == null)
         {
             _logger.Warn("[SeedPromotions] Không tìm thấy Promotion để tạo participant.");
@@ -1660,12 +1661,12 @@ public class SystemController : ControllerBase
 
         foreach (var seller in sellers)
         {
-            var participantItem =  new PromotionParticipant()
+            var participantItem = new PromotionParticipant
             {
                 Id = Guid.NewGuid(),
                 PromotionId = promotion.Id,
                 SellerId = seller.Id,
-                JoinedAt = now,
+                JoinedAt = now
             };
             promotionParticipant.Add(participantItem);
         }

@@ -272,8 +272,6 @@ public static class IocContainer
             {
                 options.IssuerSigningKey = configuration["IssuerSigningKey"] ?? "";
                 options.ClientValidator = async (clientSource, token, principle) => true;
-
-
             });
         services.AddAuthorization(options =>
         {

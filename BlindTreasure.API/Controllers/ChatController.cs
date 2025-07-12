@@ -34,6 +34,16 @@ public class ChatController : ControllerBase
         return Ok(ApiResult<List<ChatMessageDto>>.Success(messages));
     }
 
+    /// <summary>
+    /// Lịch sử chat với AI
+    /// </summary>
+    [HttpGet("history/ai")]
+    public async Task<IActionResult> GetChatHistoryWithAi([FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 20)
+    {
+        var currentUserId = _claimsService.CurrentUserId;
+        var messages = await _chatMessageService.GetMessagesAsync(currentUserId, Guid.Empty, pageIndex, pageSize);
+        return Ok(ApiResult<List<ChatMessageDto>>.Success(messages));
+    }
 
     /// <summary>
     ///     Gửi tin nhắn đến một người dùng

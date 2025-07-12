@@ -5,32 +5,24 @@ using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Domain.DTOs.ShipmentDTOs
+namespace BlindTreasure.Domain.DTOs.ShipmentDTOs;
+
+public class GhtkFeeResponse
 {
-    public class GhtkFeeResponse
-    {
-        [JsonPropertyName("success")]
-        public bool Success { get; set; }
+    [JsonPropertyName("success")] public bool Success { get; set; }
 
-        [JsonPropertyName("message")]
-        public string Message { get; set; }
+    [JsonPropertyName("message")] public string Message { get; set; }
 
-        [JsonPropertyName("fee")]
-        public GhtkFeeData Fee { get; set; }
-    }
+    [JsonPropertyName("fee")] public GhtkFeeData Fee { get; set; }
+}
 
-    public class GhtkFeeData
-    {
-        [JsonPropertyName("name")]
-        public string Name { get; set; }
+public class GhtkFeeData
+{
+    [JsonPropertyName("name")] public string Name { get; set; }
 
-        [JsonPropertyName("fee")]
-        public int ShippingFee { get; set; }
+    [JsonPropertyName("fee")] public int ShippingFee { get; set; }
 
-        [JsonPropertyName("insurance_fee")]
-        public int InsuranceFee { get; set; }
+    [JsonPropertyName("insurance_fee")] public int InsuranceFee { get; set; }
 
-        [JsonPropertyName("delivery")]
-        public bool Delivery { get; set; }
-    }
+    [JsonPropertyName("delivery")] public bool Delivery { get; set; }
 }
