@@ -53,6 +53,11 @@ public class BlindTreasureDbContext : DbContext
 
         #region enums converter
 
+        modelBuilder.Entity<ChatMessage>()
+            .Property(c => c.MessageType)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+
         modelBuilder.Entity<Listing>(entity =>
         {
             entity.Property(l => l.Status)

@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Domain.DTOs.ChatDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,23 @@ public class ChatMessageService : IChatMessageService
         _hubContext = hubContext;
     }
 
+    public async Task SaveAiMessageAsync(Guid customerId, string content)
+    {
+        var message = new ChatMessage
+        {
+            SenderId = Guid.Empty, // AI là hệ thống
+            ReceiverId = customerId,
+            Content = content,
+            SentAt = DateTime.UtcNow,
+            IsRead = false,
+            MessageType = ChatMessageType.AiToUser
+        };
+
+        await _unitOfWork.ChatMessages.AddAsync(message);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+
     public async Task SaveMessageAsync(Guid senderId, Guid receiverId, string content)
     {
         var message = new ChatMessage
@@ -51,15 +69,27 @@ public class ChatMessageService : IChatMessageService
 
     public async Task<List<ChatMessageDto>> GetMessagesAsync(Guid user1Id, Guid user2Id, int pageIndex, int pageSize)
     {
-        var query = _unitOfWork.ChatMessages.GetQueryable()
-            .Where(m =>
-                (m.SenderId == user1Id && m.ReceiverId == user2Id) ||
-                (m.SenderId == user2Id && m.ReceiverId == user1Id))
+        IQueryable<ChatMessage> query;
+
+        if (user2Id == Guid.Empty)
+            // Lịch sử chat AI
+            query = _unitOfWork.ChatMessages.GetQueryable()
+                .Where(m =>
+                    (m.SenderId == user1Id || m.ReceiverId == user1Id) &&
+                    (m.MessageType == ChatMessageType.UserToAi || m.MessageType == ChatMessageType.AiToUser));
+        else
+            // Lịch sử chat người-người
+            query = _unitOfWork.ChatMessages.GetQueryable()
+                .Where(m =>
+                    (m.SenderId == user1Id && m.ReceiverId == user2Id) ||
+                    (m.SenderId == user2Id && m.ReceiverId == user1Id))
+                .Where(m => m.MessageType == ChatMessageType.UserToUser);
+
+        var messages = await query
             .OrderByDescending(m => m.SentAt)
             .Skip(pageIndex * pageSize)
-            .Take(pageSize);
-
-        var messages = await query.ToListAsync();
+            .Take(pageSize)
+            .ToListAsync();
 
         return messages.Select(m => new ChatMessageDto
         {
