@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.SignalR.Hubs;
+using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ChatDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -29,12 +30,18 @@ public class ChatMessageService : IChatMessageService
         _hubContext = hubContext;
     }
 
-    public async Task SaveAiMessageAsync(Guid customerId, string content)
+    public async Task SaveAiMessageAsync(Guid userId, string content)
     {
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null || user.IsDeleted)
+            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
+
         var message = new ChatMessage
         {
-            SenderId = Guid.Empty, // AI là hệ thống
-            ReceiverId = customerId,
+            SenderId = null,
+            SenderType = ChatParticipantType.AI,
+            ReceiverId = userId,
+            ReceiverType = ChatParticipantType.User,
             Content = content,
             SentAt = DateTime.UtcNow,
             IsRead = false,
@@ -51,39 +58,49 @@ public class ChatMessageService : IChatMessageService
         var message = new ChatMessage
         {
             SenderId = senderId,
-            ReceiverId = receiverId,
+            SenderType = ChatParticipantType.User,
+            ReceiverId = receiverId == Guid.Empty ? null : receiverId,
+            ReceiverType = receiverId == Guid.Empty ? ChatParticipantType.AI : ChatParticipantType.User,
             Content = content,
             SentAt = DateTime.UtcNow,
-            IsRead = false
+            IsRead = false,
+            MessageType = receiverId == Guid.Empty ? ChatMessageType.UserToAi : ChatMessageType.UserToUser
         };
+
 
         await _unitOfWork.ChatMessages.AddAsync(message);
         await _unitOfWork.SaveChangesAsync();
 
-        // Cache preview
         var previewKey = GetLastMessageCacheKey(senderId, receiverId);
         await _cacheService.SetAsync(previewKey, message, TimeSpan.FromHours(1));
 
         _logger.Info($"[Chat] {senderId} → {receiverId}: {content}");
     }
 
-    public async Task<List<ChatMessageDto>> GetMessagesAsync(Guid user1Id, Guid user2Id, int pageIndex, int pageSize)
+    public async Task<List<ChatMessageDto>> GetMessagesAsync(Guid currentUserId, Guid targetId, int pageIndex, int pageSize)
     {
         IQueryable<ChatMessage> query;
 
-        if (user2Id == Guid.Empty)
-            // Lịch sử chat AI
+        if (targetId == Guid.Empty)
+        {
+            // Chat giữa User và AI
             query = _unitOfWork.ChatMessages.GetQueryable()
                 .Where(m =>
-                    (m.SenderId == user1Id || m.ReceiverId == user1Id) &&
-                    (m.MessageType == ChatMessageType.UserToAi || m.MessageType == ChatMessageType.AiToUser));
+                    (m.SenderType == ChatParticipantType.User && m.SenderId == currentUserId && m.ReceiverType == ChatParticipantType.AI)
+                    ||
+                    (m.SenderType == ChatParticipantType.AI && m.ReceiverType == ChatParticipantType.User && m.ReceiverId == currentUserId)
+                );
+        }
         else
-            // Lịch sử chat người-người
+        {
+            // Chat giữa 2 người dùng
             query = _unitOfWork.ChatMessages.GetQueryable()
                 .Where(m =>
-                    (m.SenderId == user1Id && m.ReceiverId == user2Id) ||
-                    (m.SenderId == user2Id && m.ReceiverId == user1Id))
-                .Where(m => m.MessageType == ChatMessageType.UserToUser);
+                    (m.SenderId == currentUserId && m.ReceiverId == targetId && m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
+                    ||
+                    (m.SenderId == targetId && m.ReceiverId == currentUserId && m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
+                );
+        }
 
         var messages = await query
             .OrderByDescending(m => m.SentAt)
@@ -96,12 +113,15 @@ public class ChatMessageService : IChatMessageService
             Id = m.Id,
             SenderId = m.SenderId,
             ReceiverId = m.ReceiverId,
-            SenderName = m.Sender?.FullName ?? "Unknown",
+            SenderName = m.SenderType == ChatParticipantType.AI
+                ? "BlindTreasure AI"
+                : m.Sender?.FullName ?? "Unknown",
             Content = m.Content,
             SentAt = m.SentAt,
             IsRead = m.IsRead
         }).ToList();
     }
+
 
 
     public async Task MarkMessagesAsReadAsync(Guid fromUserId, Guid toUserId)
