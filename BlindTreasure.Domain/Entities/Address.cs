@@ -10,6 +10,9 @@ public class Address : BaseEntity
     public string Phone { get; set; }
     public string AddressLine { get; set; }
     public string City { get; set; }
+    //thiếu ward tên phường/xã
+    //thiếu district tên quận/huyện
+    // thiếu street 
     public string Province { get; set; }
     public string PostalCode { get; set; } = "";
     public string Country { get; set; } = "Vietnam";
