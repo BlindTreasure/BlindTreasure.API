@@ -27,6 +27,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<Listing> Listings { get; }
     IGenericRepository<ChatMessage> ChatMessages { get; }
     IGenericRepository<BlindBoxUnboxLog> BlindBoxUnboxLogs { get; }
+    IGenericRepository<Shipment> Shipments { get; }
 
     Task<int> SaveChangesAsync();
 }

@@ -8,4 +8,6 @@ public class CreateInventoryItemDto
     public int Quantity { get; set; }
     public string? Location { get; set; }
     public InventoryItemStatus Status { get; set; } // enum
+    public Guid? AddressId { get; set; } // FK → Address, optional
+
 }

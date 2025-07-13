@@ -84,7 +84,8 @@ public class InventoryItemService : IInventoryItemService
             ProductId = dto.ProductId,
             Quantity = dto.Quantity,
             Location = dto.Location ?? string.Empty,
-            Status = dto.Status
+            Status = dto.Status,
+            AddressId = dto.AddressId,
         };
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
@@ -212,6 +213,60 @@ public class InventoryItemService : IInventoryItemService
         await _cacheService.RemoveAsync(GetCacheKey(id));
 
         _loggerService.Success($"[DeleteAsync] Inventory item {id} deleted.");
+        return true;
+    }
+
+
+    /// <summary>
+    /// Yêu cầu giao hàng cho một InventoryItem.
+    /// Nếu chưa có địa chỉ thì phải truyền vào addressId.
+    /// Tạo Shipment và cập nhật trạng thái OrderDetail liên quan.
+    /// </summary>
+    public async Task<bool> RequestShipmentAsync(Guid inventoryItemId, Guid? addressId = null)
+    {
+        // 1. Lấy InventoryItem
+        var item = await _unitOfWork.InventoryItems.GetByIdAsync(inventoryItemId, i => i.Address, i => i.Product);
+        if (item == null || item.IsDeleted)
+            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm trong kho.");
+
+        // 2. Kiểm tra hoặc cập nhật địa chỉ giao hàng
+        if (item.AddressId == null)
+        {
+            if (!addressId.HasValue)
+                throw ErrorHelper.BadRequest("Vui lòng chọn địa chỉ giao hàng.");
+            // Cập nhật địa chỉ cho item
+            var address = await _unitOfWork.Addresses.GetByIdAsync(addressId.Value);
+            if (address == null || address.IsDeleted || address.UserId != item.UserId)
+                throw ErrorHelper.BadRequest("Địa chỉ không hợp lệ.");
+            item.AddressId = address.Id;
+            await _unitOfWork.InventoryItems.Update(item);
+        }
+
+        // 3. Tìm OrderDetail liên quan đến InventoryItem
+        var orderDetail = await _unitOfWork.OrderDetails.GetQueryable()
+            .FirstOrDefaultAsync(od => od.ProductId == item.ProductId && od.Order.UserId == item.UserId);
+
+        if (orderDetail == null)
+            throw ErrorHelper.NotFound("Không tìm thấy OrderDetail liên quan.");
+
+        // 4. Tạo Shipment mới
+        var shipment = new Shipment
+        {
+            OrderDetailId = orderDetail.Id,
+            Provider = "Unknown", // Có thể cho phép chọn provider sau
+            TrackingNumber = string.Empty, // Sẽ cập nhật sau khi ship
+            ShippedAt = DateTime.UtcNow,
+            EstimatedDelivery = DateTime.UtcNow.AddDays(3), // Giả sử 3 ngày
+            Status = "Requested"
+        };
+        var result = await _unitOfWork.Shipments.AddAsync(shipment);
+
+        // 5. Cập nhật trạng thái OrderDetail
+        orderDetail.Status = "RequestingShipment";
+        await _unitOfWork.OrderDetails.Update(orderDetail);
+
+        await _unitOfWork.SaveChangesAsync();
+        _loggerService.Success($"[RequestShipmentAsync] Đã tạo yêu cầu giao hàng cho item {item.Id}.");
         return true;
     }
 
