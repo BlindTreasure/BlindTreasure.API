@@ -58,6 +58,16 @@ public class BlindTreasureDbContext : DbContext
             .HasConversion<string>()
             .HasMaxLength(32);
 
+        modelBuilder.Entity<ChatMessage>()
+            .Property(m => m.SenderType)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+
+        modelBuilder.Entity<ChatMessage>()
+            .Property(m => m.ReceiverType)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        
         modelBuilder.Entity<Listing>(entity =>
         {
             entity.Property(l => l.Status)
@@ -155,20 +165,19 @@ public class BlindTreasureDbContext : DbContext
         });
 
 
-        modelBuilder.Entity<ChatMessage>(entity =>
-        {
-            entity.Property(m => m.Content).HasMaxLength(1000).IsRequired();
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(m => m.Sender)
+            .WithMany()
+            .HasForeignKey(m => m.SenderId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false); // vì AI không phải user
 
-            entity.HasOne(m => m.Sender)
-                .WithMany()
-                .HasForeignKey(m => m.SenderId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasOne(m => m.Receiver)
-                .WithMany()
-                .HasForeignKey(m => m.ReceiverId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(m => m.Receiver)
+            .WithMany()
+            .HasForeignKey(m => m.ReceiverId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
 
 
         // Role ↔ User (1-n)
