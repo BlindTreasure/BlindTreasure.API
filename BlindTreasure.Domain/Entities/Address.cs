@@ -8,12 +8,13 @@ public class Address : BaseEntity
 
     public string FullName { get; set; }
     public string Phone { get; set; }
-    public string AddressLine { get; set; }
-    public string City { get; set; }
-    //thiếu ward tên phường/xã
-    //thiếu district tên quận/huyện
-    // thiếu street 
-    public string Province { get; set; }
+    // field dùng GHN
+    public string AddressLine { get; set; } // vd: "123 Đường ABC, Phường XYZ, Quận 10, HCM"
+    public string City { get; set; } = "Ho Chi Minh City"; // Default city
+    public string? Ward { get; set; }
+    public string? District { get; set; }
+    public string Province { get; set; } = "Ho Chi Minh City"; // Default province, hoặc tỉnh và thành phố khác tỉnh
+    //
     public string PostalCode { get; set; } = "";
     public string Country { get; set; } = "Vietnam";
     public bool IsDefault { get; set; } = false;

@@ -1,308 +1,177 @@
-﻿using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain;
+﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Services;
+using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
-using BlindTreasure.Infrastructure.Interfaces;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace BlindTreasure.API.Controllers
 {
-    [Route("api/[controller]")]
+    /// <summary>
+    ///     API tích hợp GHN Shipping cho BlindTreasure.
+    ///     Cung cấp các endpoint lấy địa chỉ, dịch vụ, tính phí, preview và tạo đơn hàng GHN.
+    /// </summary>
     [ApiController]
+    [Route("api/shipping")]
     public class ShippingController : ControllerBase
     {
-        private readonly BlindTreasureDbContext _context;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IUnitOfWork _unitOfWork;
-        private const string TOKEN = "28729d34-5751-11f0-9b81-222185cb68c8";
-        private const string SHOP_ID = "197002";
-        private const string BASE_URL = "https://dev-online-gateway.ghn.vn";
-        private const string GET_PROVINCE = "/shiip/public-api/master-data/province";
-        private const string GET_DISTRICT = "/shiip/public-api/master-data/district";
-        private const string GET_WARD = "/shiip/public-api/master-data/ward";
-        private const string GET_SERVICES = "/shiip/public-api/v2/shipping-order/available-services";
-        private const string CALCULATE_FEE = "/shiip/public-api/v2/shipping-order/fee";
-        private const string PREVIEW_ORDER = "/shiip/public-api/v2/shipping-order/preview";
+        private readonly IGhnShippingService _shippingService;
+        private readonly ILoggerService _logger;
 
-        private readonly JsonSerializerOptions _jsonOptions;
-
-
-        public ShippingController(IHttpClientFactory httpClientFactory, BlindTreasureDbContext context, IUnitOfWork unitOfWork  )
+        public ShippingController(IGhnShippingService shippingService, ILoggerService logger)
         {
-            _httpClientFactory = httpClientFactory;
-            _context = context;
-            _unitOfWork = unitOfWork;
-            _jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-                PropertyNameCaseInsensitive = true
-            };
-
+            _shippingService = shippingService;
+            _logger = logger;
         }
-
-        private HttpClient CreateClient()
-        {
-            var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri(BASE_URL);
-            client.DefaultRequestHeaders.Add("Token", TOKEN);
-            client.DefaultRequestHeaders.Add("ShopId", SHOP_ID);
-            client.DefaultRequestHeaders.Add("Accept", "application/json");
-            return client;
-        }
-
-        [HttpGet("provinces")]
-        public async Task<ActionResult<ApiResult<List<ProvinceDto>>>> GetProvinces()
-        {
-            var client = CreateClient();
-            var resp = await client.GetAsync(GET_PROVINCE);
-            if (!resp.IsSuccessStatusCode)
-                return ApiResult<List<ProvinceDto>>.Failure("500", $"GHN error: {resp.StatusCode}");
-
-            var body = await resp.Content.ReadAsStringAsync();
-            var apiResp = JsonSerializer.Deserialize<ApiResponse<List<ProvinceDto>>>(body,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            return ApiResult<List<ProvinceDto>>.Success(apiResp.Data);
-        }
-
-        [HttpGet("districts")]
-        public async Task<ActionResult<ApiResult<List<DistrictDto>>>> GetDistricts([FromQuery] int provinceId)
-        {
-            var client = CreateClient();
-            var resp = await client.GetAsync($"{GET_DISTRICT}?province_id={provinceId}");
-            if (!resp.IsSuccessStatusCode)
-                return ApiResult<List<DistrictDto>>.Failure("500", $"GHN error: {resp.StatusCode}");
-
-            var body = await resp.Content.ReadAsStringAsync();
-            var apiResp = JsonSerializer.Deserialize<ApiResponse<List<DistrictDto>>>(body,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            return ApiResult<List<DistrictDto>>.Success(apiResp.Data);
-        }
-
-        [HttpGet("wards")]
-        public async Task<ActionResult<ApiResult<List<WardDto>>>> GetWards([FromQuery] int districtId)
-        {
-            var client = CreateClient();
-            var resp = await client.GetAsync($"{GET_WARD}?district_id={districtId}");
-            if (!resp.IsSuccessStatusCode)
-                return ApiResult<List<WardDto>>.Failure("500", $"GHN error: {resp.StatusCode}");
-
-            var body = await resp.Content.ReadAsStringAsync();
-            var apiResp = JsonSerializer.Deserialize<ApiResponse<List<WardDto>>>(body,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            return ApiResult<List<WardDto>>.Success(apiResp.Data);
-        }
-
-        [HttpGet("available-services")]
-        public async Task<ActionResult<ApiResult<List<ServiceDTO>>>> GetAvailableServices(
-            [FromQuery] int fromDistrict, [FromQuery] int toDistrict)
-        {
-            var client = CreateClient();
-            var resp = await client.GetAsync($"{GET_SERVICES}?shop_id={SHOP_ID}&from_district={fromDistrict}&to_district={toDistrict}");
-            if (!resp.IsSuccessStatusCode)
-                return ApiResult<List<ServiceDTO>>.Failure("500", $"GHN error: {resp.StatusCode}");
-
-            var body = await resp.Content.ReadAsStringAsync();
-            var apiResp = JsonSerializer.Deserialize<ApiResponse<List<ServiceSerialize>>>(body,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            var dtos = apiResp.Data
-                .Select(x => new ServiceDTO { ServiceId = x.ServiceId, ShortName = x.ShortName, ServiceTypeId = x.ServiceTypeId })
-                .ToList();
-
-            return ApiResult<List<ServiceDTO>>.Success(dtos);
-        }
-
-        [HttpPost("calculate-fee")]
-        public async Task<ActionResult<ApiResult<CalculateShippingFeeResponse>>> CalculateFee([FromBody] CalculateShippingFeeRequest request)
-        {
-            var client = CreateClient();
-            var payload = JsonSerializer.Serialize(request);
-            var resp = await client.PostAsync(CALCULATE_FEE, new StringContent(payload, Encoding.UTF8, "application/json"));
-
-            if (!resp.IsSuccessStatusCode)
-                return ApiResult<CalculateShippingFeeResponse>.Failure("500", $"GHN error: {resp.StatusCode}");
-
-            var body = await resp.Content.ReadAsStringAsync();
-            var apiResp = JsonSerializer.Deserialize<ApiResponse<CalculateShippingFeeResponse>>(body,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            return ApiResult<CalculateShippingFeeResponse>.Success(apiResp.Data);
-        }
-
-        [HttpPost("preview-order")]
-        public async Task<ActionResult<ApiResult<GhnPreviewResponse>>> PreviewOrder([FromBody] GhnOrderRequest req)
-        {
-            var client = CreateClient();
-
-            // Serialize request theo snake_case
-            var payload = JsonSerializer.Serialize(req, _jsonOptions);
-            var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-            // Gọi GHN preview
-            var resp = await client.PostAsync(PREVIEW_ORDER, content);
-            var body = await resp.Content.ReadAsStringAsync();
-            Console.WriteLine(body);    
-            if (!resp.IsSuccessStatusCode)
-                return ApiResult<GhnPreviewResponse>.Failure("500", $"GHN error: {resp.StatusCode}");
-
-            // Đọc body và deserialize theo snake_case
-            var apiResp = JsonSerializer.Deserialize<ApiResponse<GhnPreviewResponse>>(body, _jsonOptions);
-            if (apiResp == null || apiResp.Data == null)
-                return ApiResult<GhnPreviewResponse>.Failure("500", "Invalid response from GHN");
-
-            return ApiResult<GhnPreviewResponse>.Success(apiResp.Data);
-        }
-
 
         /// <summary>
-        /// Tạo đơn hàng chính thức trên GHN.
+        ///     Lấy danh sách tỉnh/thành phố từ GHN.
         /// </summary>
-        /// <param name="req">Thông tin đơn hàng (dùng chung với preview).</param>
-        /// <returns>Kết quả tạo đơn hàng từ GHN.</returns>
-        [HttpPost("create-order")]
-        public async Task<ActionResult<ApiResult<GhnCreateResponse>>> CreateOrder([FromBody] GhnOrderRequest req)
+        [HttpGet("provinces")]
+        [ProducesResponseType(typeof(ApiResult<List<ProvinceDto>>), 200)]
+        public async Task<IActionResult> GetProvinces()
         {
-            var client = CreateClient();
-            var payload = JsonSerializer.Serialize(req, _jsonOptions);
-            var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-            var resp = await client.PostAsync("/shiip/public-api/v2/shipping-order/create", content);
-            if (!resp.IsSuccessStatusCode)
-                return ApiResult<GhnCreateResponse>.Failure("500", $"GHN error: {resp.StatusCode}");
-
-            var body = await resp.Content.ReadAsStringAsync();
-            var apiResp = JsonSerializer.Deserialize<ApiResponse<GhnCreateResponse>>(body, _jsonOptions);
-            if (apiResp == null || apiResp.Data == null)
-                return ApiResult<GhnCreateResponse>.Failure("500", "Invalid response from GHN");
-
-            return ApiResult<GhnCreateResponse>.Success(apiResp.Data, "200", apiResp.Message);
+            try
+            {
+                var result = await _shippingService.GetProvincesAsync();
+                if (result == null)
+                    return StatusCode(500, ApiResult<List<ProvinceDto>>.Failure("500", "GHN error or no data."));
+                return Ok(ApiResult<List<ProvinceDto>>.Success(result, "200", "Lấy danh sách tỉnh/thành thành công."));
+            }
+            catch (System.Exception ex)
+            {
+                _logger.Error($"[ShippingController][GetProvinces] {ex.Message}");
+                return StatusCode(500, ApiResult<List<ProvinceDto>>.Failure("500", ex.Message));
+            }
         }
-    }
 
-    public class CalculateShippingFeeRequest
-    {
-        [JsonPropertyName("service_id")]
-        public int? ServiceId { get; set; }
+        /// <summary>
+        ///     Lấy danh sách quận/huyện theo tỉnh/thành phố từ GHN.
+        /// </summary>
+        [HttpGet("districts")]
+        [ProducesResponseType(typeof(ApiResult<List<DistrictDto>>), 200)]
+        public async Task<IActionResult> GetDistricts([FromQuery] int provinceId)
+        {
+            try
+            {
+                var result = await _shippingService.GetDistrictsAsync(provinceId);
+                if (result == null)
+                    return StatusCode(500, ApiResult<List<DistrictDto>>.Failure("500", "GHN error or no data."));
+                return Ok(ApiResult<List<DistrictDto>>.Success(result, "200", "Lấy danh sách quận/huyện thành công."));
+            }
+            catch (System.Exception ex)
+            {
+                _logger.Error($"[ShippingController][GetDistricts] {ex.Message}");
+                return StatusCode(500, ApiResult<List<DistrictDto>>.Failure("500", ex.Message));
+            }
+        }
 
-        [JsonPropertyName("service_type_id")]
-        public int? ServiceTypeId { get; set; } = 2;
+        /// <summary>
+        ///     Lấy danh sách phường/xã theo quận/huyện từ GHN.
+        /// </summary>
+        [HttpGet("wards")]
+        [ProducesResponseType(typeof(ApiResult<List<WardDto>>), 200)]
+        public async Task<IActionResult> GetWards([FromQuery] int districtId)
+        {
+            try
+            {
+                var result = await _shippingService.GetWardsAsync(districtId);
+                if (result == null)
+                    return StatusCode(500, ApiResult<List<WardDto>>.Failure("500", "GHN error or no data."));
+                return Ok(ApiResult<List<WardDto>>.Success(result, "200", "Lấy danh sách phường/xã thành công."));
+            }
+            catch (System.Exception ex)
+            {
+                _logger.Error($"[ShippingController][GetWards] {ex.Message}");
+                return StatusCode(500, ApiResult<List<WardDto>>.Failure("500", ex.Message));
+            }
+        }
 
-        [JsonPropertyName("from_district_id")]
-        public int? FromDistrictId { get; set; }
+        /// <summary>
+        ///     Lấy danh sách dịch vụ vận chuyển GHN giữa 2 quận/huyện.
+        /// </summary>
+        [HttpGet("available-services")]
+        [ProducesResponseType(typeof(ApiResult<List<ServiceDTO>>), 200)]
+        public async Task<IActionResult> GetAvailableServices([FromQuery] int fromDistrict, [FromQuery] int toDistrict)
+        {
+            try
+            {
+                var result = await _shippingService.GetAvailableServicesAsync(fromDistrict, toDistrict);
+                if (result == null)
+                    return StatusCode(500, ApiResult<List<ServiceDTO>>.Failure("500", "GHN error or no data."));
+                return Ok(ApiResult<List<ServiceDTO>>.Success(result, "200", "Lấy dịch vụ vận chuyển thành công."));
+            }
+            catch (System.Exception ex)
+            {
+                _logger.Error($"[ShippingController][GetAvailableServices] {ex.Message}");
+                return StatusCode(500, ApiResult<List<ServiceDTO>>.Failure("500", ex.Message));
+            }
+        }
 
-        [JsonPropertyName("from_ward_code")]
-        public string? FromWardCode { get; set; }
+        /// <summary>
+        ///     Tính phí vận chuyển GHN.
+        /// </summary>
+        [HttpPost("calculate-fee")]
+        [ProducesResponseType(typeof(ApiResult<CalculateShippingFeeResponse>), 200)]
+        public async Task<IActionResult> CalculateFee([FromBody] CalculateShippingFeeRequest request)
+        {
+            try
+            {
+                var result = await _shippingService.CalculateFeeAsync(request);
+                if (result == null)
+                    return StatusCode(500, ApiResult<CalculateShippingFeeResponse>.Failure("500", "GHN error or no data."));
+                return Ok(ApiResult<CalculateShippingFeeResponse>.Success(result, "200", "Tính phí vận chuyển thành công."));
+            }
+            catch (System.Exception ex)
+            {
+                _logger.Error($"[ShippingController][CalculateFee] {ex.Message}");
+                return StatusCode(500, ApiResult<CalculateShippingFeeResponse>.Failure("500", ex.Message));
+            }
+        }
 
-        [JsonPropertyName("to_district_id")]
-        public int? ToDistrictId { get; set; }
+        /// <summary>
+        ///     Xem trước thông tin đơn hàng GHN (preview).
+        /// </summary>
+        [HttpPost("preview-order")]
+        [ProducesResponseType(typeof(ApiResult<GhnPreviewResponse>), 200)]
+        public async Task<IActionResult> PreviewOrder([FromBody] GhnOrderRequest req)
+        {
+            try
+            {
+                var result = await _shippingService.PreviewOrderAsync(req);
+                if (result == null)
+                    return StatusCode(500, ApiResult<GhnPreviewResponse>.Failure("500", "GHN error or no data."));
+                return Ok(ApiResult<GhnPreviewResponse>.Success(result, "200", "Preview đơn hàng thành công."));
+            }
+            catch (System.Exception ex)
+            {
+                _logger.Error($"[ShippingController][PreviewOrder] {ex.Message}");
+                return StatusCode(500, ApiResult<GhnPreviewResponse>.Failure("500", ex.Message));
+            }
+        }
 
-        [JsonPropertyName("to_ward_code")]
-        public string? ToWardCode { get; set; }
-
-        [JsonPropertyName("weight")]
-        public int? Weight { get; set; } = 1000;
-
-        [JsonPropertyName("length")]
-        public int? Length { get; set; } = 10;
-
-        [JsonPropertyName("width")]
-        public int? Width { get; set; } = 10;
-
-        [JsonPropertyName("height")]
-        public int? Height { get; set; } = 10;
-
-    }
-
-    public class CalculateShippingFeeResponse
-    {
-        [JsonPropertyName("total")]
-        public int Total { get; set; }
-
-        [JsonPropertyName("service_fee")]
-        public int ServiceFee { get; set; }
-
-        [JsonPropertyName("insurance_fee")]
-        public int InsuranceFee { get; set; }
-
-        [JsonPropertyName("pick_station_fee")]
-        public int PickStationFee { get; set; }
-
-        [JsonPropertyName("coupon_value")]
-        public int CouponValue { get; set; }
-
-        [JsonPropertyName("r2s_fee")]
-        public int R2sFee { get; set; }
-
-        [JsonPropertyName("document_return")]
-        public int DocumentReturn { get; set; }
-
-        [JsonPropertyName("double_check")]
-        public int DoubleCheck { get; set; }
-
-        [JsonPropertyName("cod_fee")]
-        public int CodFee { get; set; }
-
-        [JsonPropertyName("pick_remote_areas_fee")]
-        public int PickRemoteAreasFee { get; set; }
-
-        [JsonPropertyName("deliver_remote_areas_fee")]
-        public int DeliverRemoteAreasFee { get; set; }
-
-        [JsonPropertyName("cod_failed_fee")]
-        public int CodFailedFee { get; set; }
-    }
-
-
-    public class ApiResponse<T>
-    {
-        [JsonPropertyName("code")]
-        public int Code { get; set; }
-
-        [JsonPropertyName("message")]
-        public string Message { get; set; }
-
-        [JsonPropertyName("data")]
-        public T Data { get; set; }
-    }
-
-
-    public class ServiceSerialize
-    {
-        [JsonPropertyName("service_id")]
-        public int ServiceId { get; set; }
-        [JsonPropertyName("short_name")]
-        public string ShortName { get; set; }
-        [JsonPropertyName("service_type_id")]
-        public int ServiceTypeId { get; set; }
-    }
-
-    public class ServiceDTO
-    {
-        public int ServiceId { get; set; }
-        public string ShortName { get; set; }
-        public int ServiceTypeId { get; set; }
-    }
-    public class ProvinceDto
-    {
-        public int ProvinceID { get; set; }
-        public string ProvinceName { get; set; }
-    }
-
-    public class DistrictDto
-    {
-        public int DistrictID { get; set; }
-        public int ProvinceID { get; set; }
-        public string DistrictName { get; set; }
-    }
-
-    public class WardDto
-    {
-        public string WardCode { get; set; }
-        public int DistrictID { get; set; }
-        public string WardName { get; set; }
+        /// <summary>
+        ///     Tạo đơn hàng chính thức trên GHN.
+        /// </summary>
+        [HttpPost("create-order")]
+        [ProducesResponseType(typeof(ApiResult<GhnCreateResponse>), 200)]
+        public async Task<IActionResult> CreateOrder([FromBody] GhnOrderRequest req)
+        {
+            try
+            {
+                var result = await _shippingService.CreateOrderAsync(req);
+                if (result == null)
+                    return StatusCode(500, ApiResult<GhnCreateResponse>.Failure("500", "GHN error or no data."));
+                return Ok(ApiResult<GhnCreateResponse>.Success(result, "200", "Tạo đơn hàng thành công."));
+            }
+            catch (System.Exception ex)
+            {
+                _logger.Error($"[ShippingController][CreateOrder] {ex.Message}");
+                return StatusCode(500, ApiResult<GhnCreateResponse>.Failure("500", ex.Message));
+            }
+        }
     }
 }

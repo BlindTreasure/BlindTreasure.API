@@ -158,6 +158,7 @@ public static class IocContainer
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IUnboxingService, UnboxingService>();
         services.AddScoped<IChatMessageService, ChatMessageService>();
+        services.AddScoped<IGhnShippingService, GhnShippingService>();
 
         //3rd party
         services.AddHttpClient();
