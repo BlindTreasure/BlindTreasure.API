@@ -20,10 +20,16 @@ public class Product : BaseEntity
     public List<string> ImageUrls { get; set; } = new(); // new: khởi tạo mặc định tránh null
     public ProductStatus Status { get; set; }
 
-    public decimal? Height { get; set; } // cm 
+    // thông tin chi tiết sản phẩm thực tế để có thể đi tính phí dịch vụ ghn
+    public decimal? Length { get; set; } = 15;// cm
+    public decimal? Weight { get; set; } = 15;// cm
+    public decimal? Width { get; set; } = 10;//cm
+    public decimal? Height { get; set; } = 5;// cm 
     public string? Material { get; set; }
     public ProductSaleType? ProductType { get; set; }
     public string? Brand { get; set; }
+
+    //
 
     // Navigation
     public ICollection<Certificate> Certificates { get; set; }

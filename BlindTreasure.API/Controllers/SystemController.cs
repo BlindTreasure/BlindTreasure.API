@@ -1693,9 +1693,14 @@ public class SystemController : ControllerBase
             CoaDocumentUrl = "https://example.com/coa.pdf",
             CompanyName = "Blind Treasure Ltd.",
             TaxId = "987654321",
-            CompanyAddress = "District 1, HCMC",
+            CompanyAddress = "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, Vietnam",
             Status = SellerStatus.Approved,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            CompanyPhone = "0123456789",
+            CompanyWardName = "Phường 14",
+            CompanyDistrictName = "Quận 10",
+            CompanyProvinceName = "HCM",
+
         };
 
         await _context.Sellers.AddAsync(seller);
