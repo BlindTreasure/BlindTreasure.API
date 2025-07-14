@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Text;
+using System.Text.Json;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
@@ -71,7 +72,8 @@ public class UnboxingService : IUnboxingService
                 DropRate = p.Value
             })),
             UnboxedAt = now,
-            BlindBoxName = blindBox?.Name ?? ""
+            BlindBoxName = blindBox?.Name ?? "",
+            Reason = BuildUnboxReasonForFrontend(probabilityMap, roll, selectedItem)
         });
 
         if (selectedItem == null)
@@ -113,7 +115,8 @@ public class UnboxingService : IUnboxingService
                 DropRate = x.DropRate,
                 RollValue = x.RollValue,
                 UnboxedAt = x.UnboxedAt,
-                BlindBoxName = x.BlindBoxName
+                BlindBoxName = x.BlindBoxName,
+                Reason = x.Reason
             })
             .ToListAsync();
 
@@ -135,6 +138,45 @@ public class UnboxingService : IUnboxingService
     }
 
     #region Private methods
+
+    private string BuildUnboxReasonForFrontend(
+        Dictionary<BlindBoxItem, decimal> probabilities,
+        decimal roll,
+        BlindBoxItem selectedItem)
+    {
+        var sb = new StringBuilder();
+        var total = probabilities.Values.Sum();
+
+        sb.AppendLine($"Gacha Roll: {Math.Round(roll, 4):N4} / Tổng xác suất: {Math.Round(total, 2):N2}%");
+        sb.AppendLine("Danh sách item:");
+
+        decimal cumulative = 0;
+        foreach (var kvp in probabilities
+                     .OrderByDescending(p => p.Value)
+                     .ThenBy(p => p.Key.ProductId))
+        {
+            var start = cumulative;
+            var end = start + kvp.Value;
+            cumulative = end;
+
+            var name = kvp.Key.Product?.Name ?? "Không rõ";
+            var rarity = kvp.Key.RarityConfig?.Name.ToString() ?? "Không rõ";
+            var drop = Math.Round(kvp.Value, 2);
+            var range = $"[{Math.Round(start, 2):N2} – {Math.Round(end, 2):N2}]";
+
+            var selectedMark = kvp.Key.Id == selectedItem.Id ? " <= ĐÃ TRÚNG" : "";
+
+            sb.AppendLine($"- {name} | Độ hiếm: {rarity} | Tỉ lệ: {drop:N2}% | Khoảng: {range}{selectedMark}");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine($"Kết quả: '{selectedItem.Product?.Name}' được chọn (DropRate = {Math.Round(selectedItem.DropRate, 2):N2}%)");
+
+        return sb.ToString();
+    }
+
+
+
 
     private async Task<CustomerBlindBox> GetValidCustomerBlindBoxAsync(Guid id, Guid userId)
     {
@@ -233,6 +275,7 @@ public class UnboxingService : IUnboxingService
         GetRandomItemByProbability(List<BlindBoxItem> items, DateTime now)
     {
         var probabilities = new Dictionary<BlindBoxItem, decimal>();
+
         foreach (var item in items)
         {
             var pConfig = item.ProbabilityConfigs
@@ -251,12 +294,35 @@ public class UnboxingService : IUnboxingService
             return (null, 0, probabilities);
         }
 
+        var sorted = probabilities
+            .OrderByDescending(p => p.Value)
+            .ThenBy(p => p.Key.ProductId)
+            .ToList();
+
+        // ✅ Log bảng sắp xếp
+        var orderLog = new StringBuilder();
+        orderLog.AppendLine("[Gacha] Thứ tự item sau khi sắp xếp để random:");
+        decimal start = 0;
+        foreach (var kvp in sorted)
+        {
+            var end = start + kvp.Value;
+            var productName = kvp.Key.Product?.Name ?? "Unknown";
+            var rarity = kvp.Key.RarityConfig?.Name.ToString() ?? "Unknown";
+            orderLog.AppendLine(
+                $"- {productName} (Rarity: {rarity}, DropRate: {kvp.Value:N2}%) → Range: [{start:N2} – {end:N2}]"
+            );
+            start = end;
+        }
+
+        _loggerService.Info(orderLog.ToString());
+
+        // ✅ Sinh roll và chọn item theo khoảng
         var rand = new Random();
         var roll = (decimal)rand.NextDouble() * totalProbability;
         decimal cumulative = 0;
         BlindBoxItem? selectedItem = null;
 
-        foreach (var kvp in probabilities)
+        foreach (var kvp in sorted)
         {
             cumulative += kvp.Value;
             if (roll <= cumulative)

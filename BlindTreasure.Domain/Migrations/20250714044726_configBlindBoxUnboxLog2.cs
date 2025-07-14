@@ -5,32 +5,32 @@
 namespace BlindTreasure.Domain.Migrations
 {
     /// <inheritdoc />
-    public partial class configListing : Migration
+    public partial class configBlindBoxUnboxLog2 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterColumn<string>(
-                name: "Status",
-                table: "Listings",
-                type: "character varying(32)",
-                maxLength: 32,
+                name: "Reason",
+                table: "BlindBoxUnboxLogs",
+                type: "text",
                 nullable: false,
                 oldClrType: typeof(string),
-                oldType: "text");
+                oldType: "character varying(1000)",
+                oldMaxLength: 1000);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AlterColumn<string>(
-                name: "Status",
-                table: "Listings",
-                type: "text",
+                name: "Reason",
+                table: "BlindBoxUnboxLogs",
+                type: "character varying(1000)",
+                maxLength: 1000,
                 nullable: false,
                 oldClrType: typeof(string),
-                oldType: "character varying(32)",
-                oldMaxLength: 32);
+                oldType: "text");
         }
     }
 }

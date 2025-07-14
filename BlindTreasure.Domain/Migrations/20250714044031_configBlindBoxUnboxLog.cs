@@ -5,16 +5,16 @@
 namespace BlindTreasure.Domain.Migrations
 {
     /// <inheritdoc />
-    public partial class configChatMessage3 : Migration
+    public partial class configBlindBoxUnboxLog : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "MessageType",
-                table: "ChatMessages",
-                type: "character varying(32)",
-                maxLength: 32,
+                name: "Reason",
+                table: "BlindBoxUnboxLogs",
+                type: "character varying(1000)",
+                maxLength: 1000,
                 nullable: false,
                 defaultValue: "");
         }
@@ -23,8 +23,8 @@ namespace BlindTreasure.Domain.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "MessageType",
-                table: "ChatMessages");
+                name: "Reason",
+                table: "BlindBoxUnboxLogs");
         }
     }
 }

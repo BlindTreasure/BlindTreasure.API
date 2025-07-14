@@ -391,8 +391,12 @@ public class SystemController : ControllerBase
 
                 var tablesToDelete = new List<Func<Task>>
                 {
+                    () => context.ChatMessages.ExecuteDeleteAsync(),
+                    () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
+
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
                     () => context.RarityConfigs.ExecuteDeleteAsync(),
+
                     () => context.BlindBoxItems.ExecuteDeleteAsync(),
                     () => context.CartItems.ExecuteDeleteAsync(),
                     () => context.OrderDetails.ExecuteDeleteAsync(),
@@ -414,19 +418,21 @@ public class SystemController : ControllerBase
                     () => context.Promotions.ExecuteDeleteAsync(),
                     () => context.PromotionParticipants.ExecuteDeleteAsync(),
                     () => context.Addresses.ExecuteDeleteAsync(),
+
                     () => context.Products.ExecuteDeleteAsync(),
                     () => context.BlindBoxes.ExecuteDeleteAsync(),
                     () => context.Certificates.ExecuteDeleteAsync(),
                     () => context.Categories.ExecuteDeleteAsync(),
+
                     () => context.Sellers.ExecuteDeleteAsync(),
                     () => context.Users.ExecuteDeleteAsync(),
                     () => context.Roles.ExecuteDeleteAsync()
                 };
 
-                foreach (var deleteFunc in tablesToDelete) await deleteFunc();
+                foreach (var deleteFunc in tablesToDelete)
+                    await deleteFunc();
 
                 await transaction.CommitAsync();
-
 
                 _logger.Success("Xóa sạch dữ liệu trong database thành công.");
             }
