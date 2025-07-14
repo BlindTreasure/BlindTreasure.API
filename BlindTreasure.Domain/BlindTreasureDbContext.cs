@@ -67,7 +67,7 @@ public class BlindTreasureDbContext : DbContext
             .Property(m => m.ReceiverType)
             .HasConversion<string>()
             .HasMaxLength(32);
-        
+
         modelBuilder.Entity<Listing>(entity =>
         {
             entity.Property(l => l.Status)
@@ -159,11 +159,19 @@ public class BlindTreasureDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(32);
 
-            entity.Property(e => e.ProductName).HasMaxLength(255);
-            entity.Property(e => e.ProbabilityTableJson).HasColumnType("jsonb");
-            entity.Property(e => e.BlindBoxName).HasMaxLength(255);
-        });
+            entity.Property(e => e.ProductName)
+                .HasMaxLength(255);
 
+            entity.Property(e => e.ProbabilityTableJson)
+                .HasColumnType("jsonb");
+
+            entity.Property(e => e.BlindBoxName)
+                .HasMaxLength(255);
+
+            entity.Property(e => e.Reason)
+                .HasColumnType("text") 
+                .IsRequired();
+        });
 
         modelBuilder.Entity<ChatMessage>()
             .HasOne(m => m.Sender)

@@ -13,4 +13,6 @@ public class UnboxLogDto
     public decimal RollValue { get; set; }
     public DateTime UnboxedAt { get; set; }
     public string BlindBoxName { get; set; }
+    public string Reason { get; set; }
+
 }

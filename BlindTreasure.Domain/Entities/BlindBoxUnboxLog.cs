@@ -14,4 +14,6 @@ public class BlindBoxUnboxLog : BaseEntity
     public string ProbabilityTableJson { get; set; }
     public DateTime UnboxedAt { get; set; }
     public string BlindBoxName { get; set; }
+    public string Reason { get; set; } = string.Empty;
+
 }
