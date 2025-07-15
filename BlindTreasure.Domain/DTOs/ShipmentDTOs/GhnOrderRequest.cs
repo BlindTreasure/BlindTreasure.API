@@ -12,8 +12,8 @@ namespace BlindTreasure.Domain.DTOs.ShipmentDTOs
         [DefaultValue("cai nay de test ne")]
         public string? Note { get; set; }
 
-        [DefaultValue("KHONGCHOXEMHANG")]
-        public string RequiredNote { get; set; } = "KHONGCHOXEMHANG";
+        [DefaultValue("CHOXEMHANGKHONGTHU")]
+        public string RequiredNote { get; set; } = "CHOXEMHANGKHONGTHU";
 
         public string? ReturnPhone { get; set; }
         public string? ReturnAddress { get; set; }
