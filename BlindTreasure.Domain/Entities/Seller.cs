@@ -16,7 +16,7 @@ public class Seller : BaseEntity
     public string? StripeAccountId { get; set; }
 
     //địa chỉ lấy hàng của seller cho ghn 
-
+    public string? ShopId { get; set; } = "197002"; // ShopId = 
     public string? CompanyName { get; set; } = "BlindTreasure-Collaboration"; // FromName
     public string? CompanyPhone { get; set; } = "0987654321"; // FromPhone
     public string? CompanyAddress { get; set; } = "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, Vietnam"; // FromAddress

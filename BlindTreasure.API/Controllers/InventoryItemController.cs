@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
@@ -156,6 +157,31 @@ public class InventoryItemController : ControllerBase
         catch (Exception ex)
         {
             _logger.Error($"[InventoryItemController][Delete] {ex.Message}");
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     Yêu cầu giao hàng cho một InventoryItem.
+    ///     Nếu chưa có địa chỉ thì phải truyền vào addressId.
+    ///     Tạo Shipment và cập nhật trạng thái OrderDetail liên quan.
+    /// </summary>
+    [HttpPost("{id:guid}/request-shipment")]
+    [ProducesResponseType(typeof(ApiResult<ShipResponseDTO>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> RequestShipment(Guid id, [FromBody] RequestShipmentDTO request)
+    {
+        try
+        {
+            var result = await _inventoryItemService.RequestShipmentAsync(id, request);
+            _logger.Success($"[InventoryItemController][RequestShipment] Đã tạo yêu cầu giao hàng cho item {id}.");
+            return Ok(ApiResult<ShipResponseDTO>.Success(result, "200", "Yêu cầu giao hàng thành công."));
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[InventoryItemController][RequestShipment] {ex.Message}");
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var error = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, error);

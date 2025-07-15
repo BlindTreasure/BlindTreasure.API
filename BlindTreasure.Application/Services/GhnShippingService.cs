@@ -66,7 +66,7 @@ namespace BlindTreasure.Application.Services
         }
 
         /// <summary>
-        /// Xem thông tin trả về của đơn hàng trước khi tạo (GHN Preview).
+        /// Xem thông tin trả về của đơn hàng trước khi tạo (GHN Preview) để preview và biết trước được thông tin + phí dịch vụ.
         /// </summary>
         public async Task<GhnPreviewResponse?> PreviewOrderAsync(GhnOrderRequest req)
         {

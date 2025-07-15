@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+﻿using BlindTreasure.Application.Services;
+using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Infrastructure.Commons;
 
@@ -12,4 +13,5 @@ public interface IInventoryItemService
     Task<List<InventoryItemDto>> GetMyUnboxedItemsFromBlindBoxAsync(Guid blindBoxId);
     Task<InventoryItemDto> UpdateAsync(Guid id, UpdateInventoryItemDto dto);
     Task<InventoryItemDto?> GetByIdAsync(Guid id);
+    Task<ShipResponseDTO> RequestShipmentAsync(Guid inventoryItemId, RequestShipmentDTO request);
 }
