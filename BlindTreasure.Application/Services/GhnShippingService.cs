@@ -81,6 +81,14 @@ namespace BlindTreasure.Application.Services
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.Error($"[GhnShippingService][PreviewOrderAsync] GHN error: {resp.StatusCode} - {body}");
+                var errorCheck = JsonSerializer.Deserialize<ApiResponse<object>>(body, _jsonOptions);
+                if (errorCheck == null)
+                {
+                    _logger.Error("Error message: Invalid response from GHN.");
+                    return null;
+                }
+                _logger.Error($"Code message: {errorCheck?.CodeMessage} \n" +
+                       $"Message display: {errorCheck?.Message}");
                 return null;
             }
 
@@ -111,6 +119,14 @@ namespace BlindTreasure.Application.Services
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.Error($"[GhnShippingService][CreateOrderAsync] GHN error: {resp.StatusCode} - {body}");
+                var errorCheck = JsonSerializer.Deserialize<ApiResponse<object>>(body, _jsonOptions);
+                if (errorCheck == null)
+                {
+                    _logger.Error("Error message: Invalid response from GHN.");
+                    return null;
+                }
+                _logger.Error($"Code message: {errorCheck?.CodeMessage} \n" +
+                              $"Message display: {errorCheck?.Message}");
                 return null;
             }
 
@@ -188,6 +204,14 @@ namespace BlindTreasure.Application.Services
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.Error($"[GhnShippingService][GetAvailableServicesAsync] GHN error: {resp.StatusCode} - {body}");
+                var errorCheck = JsonSerializer.Deserialize<ApiResponse<object>>(body, _jsonOptions);
+                if (errorCheck == null)
+                {
+                    _logger.Error("Error message: Invalid response from GHN.");
+                    return null;
+                }
+                _logger.Error($"Error message: {errorCheck?.CodeMessage}");
+                return null;
                 return null;
             }
 
@@ -212,6 +236,13 @@ namespace BlindTreasure.Application.Services
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.Error($"[GhnShippingService][CalculateFeeAsync] GHN error: {resp.StatusCode} - {body}");
+                var errorCheck = JsonSerializer.Deserialize<ApiResponse<object>>(body, _jsonOptions);
+                if (errorCheck == null)
+                {
+                    _logger.Error("Error message: Invalid response from GHN.");
+                    return null;
+                }
+                _logger.Error($"Error message: {errorCheck?.CodeMessage}");
                 return null;
             }
 
@@ -305,6 +336,11 @@ namespace BlindTreasure.Application.Services
 
         [JsonPropertyName("data")]
         public T Data { get; set; }
+
+        [JsonPropertyName("code_message")]
+        public string? CodeMessage { get; set; } = string.Empty;
+        [JsonPropertyName("message_display")]
+        public string? MessageDisplay { get; set; } = string.Empty;
     }
 
 
