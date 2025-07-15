@@ -84,7 +84,7 @@ builder.Services.AddTransient<IStripeClient, StripeClient>(s =>
 #endregion
 
 builder.Services.Configure<GhtkSettings>(builder.Configuration.GetSection("GHTK"));
-builder.Services.AddHttpClient<IGhtkService, GhtkService>();
+
 
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 builder.Services.AddEndpointsApiExplorer();
