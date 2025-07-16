@@ -871,6 +871,9 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("PromotionNote")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("SellerId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ShippingAddressId")
                         .HasColumnType("uuid");
 
@@ -1539,6 +1542,9 @@ namespace BlindTreasure.Domain.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("RejectReason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ShopId")
                         .HasColumnType("text");
 
                     b.Property<string>("Status")

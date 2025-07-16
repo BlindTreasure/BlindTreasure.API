@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250714044031_configBlindBoxUnboxLog")]
-    partial class configBlindBoxUnboxLog
+    [Migration("20250716080552_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -55,6 +55,9 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("District")
+                        .HasColumnType("text");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -85,6 +88,9 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Ward")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -287,8 +293,7 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<string>("Reason")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("text");
 
                     b.Property<decimal>("RollValue")
                         .HasColumnType("numeric");
@@ -869,6 +874,9 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("PromotionNote")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("SellerId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ShippingAddressId")
                         .HasColumnType("uuid");
 
@@ -1174,6 +1182,9 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<decimal?>("Length")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("Material")
                         .HasColumnType("text");
 
@@ -1204,6 +1215,12 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("Weight")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("Width")
+                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -1494,7 +1511,19 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("CompanyAddress")
                         .HasColumnType("text");
 
+                    b.Property<string>("CompanyDistrictName")
+                        .HasColumnType("text");
+
                     b.Property<string>("CompanyName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CompanyPhone")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CompanyProvinceName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CompanyWardName")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
@@ -1516,6 +1545,9 @@ namespace BlindTreasure.Domain.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("RejectReason")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ShopId")
                         .HasColumnType("text");
 
                     b.Property<string>("Status")
@@ -1573,6 +1605,12 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("MainServiceFee")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OrderCode")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("OrderDetailId")
                         .HasColumnType("uuid");
 
@@ -1586,6 +1624,9 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int?>("TotalFee")
+                        .HasColumnType("integer");
 
                     b.Property<string>("TrackingNumber")
                         .IsRequired()
