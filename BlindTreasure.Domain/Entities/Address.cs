@@ -15,7 +15,7 @@ public class Address : BaseEntity
     public string? District { get; set; }
     public string Province { get; set; } = "Ho Chi Minh City"; // Default province, hoặc tỉnh và thành phố khác tỉnh
     //
-    public string PostalCode { get; set; } = "";
+    public string PostalCode { get; set; } = "700000"; // Default value for PostalCode HCM CITY
     public string Country { get; set; } = "Vietnam";
     public bool IsDefault { get; set; } = false;
 

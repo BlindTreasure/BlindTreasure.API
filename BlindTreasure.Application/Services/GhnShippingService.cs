@@ -27,11 +27,6 @@ namespace BlindTreasure.Application.Services
         private const string CALCULATE_FEE = "/shiip/public-api/v2/shipping-order/fee";
 
 
-        private readonly IProductService _productService;
-        private readonly IBlindBoxService _blindBoxService;
-        private readonly IOrderService _orderService;
-        private readonly IUnitOfWork _unitOfWork;
-
 
         private readonly JsonSerializerOptions _jsonOptions = new()
         {
@@ -41,18 +36,11 @@ namespace BlindTreasure.Application.Services
 
         public GhnShippingService(
             IHttpClientFactory httpClientFactory,
-            ILoggerService logger,
-            IProductService productService,
-            IBlindBoxService blindBoxService,
-            IOrderService orderService,
-            IUnitOfWork unitOfWork)
+            ILoggerService logger)
         {
             _httpClientFactory = httpClientFactory;
             _logger = logger;
-            _productService = productService;
-            _blindBoxService = blindBoxService;
-            _orderService = orderService;
-            _unitOfWork = unitOfWork;
+
         }
 
         private HttpClient CreateClient()
@@ -89,14 +77,14 @@ namespace BlindTreasure.Application.Services
                 }
                 _logger.Error($"Code message: {errorCheck?.CodeMessage} \n" +
                        $"Message display: {errorCheck?.Message}");
-                return null;
+                throw new Exception($"GHN error: {errorCheck?.Message}");
             }
 
             var apiResp = JsonSerializer.Deserialize<ApiResponse<GhnPreviewResponse>>(body, _jsonOptions);
             if (apiResp == null || apiResp.Data == null)
             {
                 _logger.Error("[GhnShippingService][PreviewOrderAsync] Invalid response from GHN.");
-                return null;
+                throw new Exception($"GHN error: {apiResp?.Message}");
             }
 
             _logger.Success("[GhnShippingService][PreviewOrderAsync] Preview success.");
