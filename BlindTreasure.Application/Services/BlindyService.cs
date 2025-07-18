@@ -110,16 +110,7 @@ public class BlindyService : IBlindyService
         return await _geminiService.GenerateResponseAsync(fullPrompt);
     }
 
-    public async Task<string> AskSellerAsync(string prompt)
-    {
-        var fullPrompt = $"""
-                              Bạn là AI hỗ trợ Seller trên BlindTreasure. Hướng dẫn chi tiết quy trình tạo sản phẩm thường, cấu hình blind box và upload COA cho từng sản phẩm. Trả lời ngắn gọn, rõ ràng.
-                              {prompt}
-                          """;
-        return await _geminiService.GenerateResponseAsync(fullPrompt);
-    }
-
-    public async Task<string> AskStaffAsync(string prompt)
+    private async Task<string> AskStaffAsync(string prompt)
     {
         var fullPrompt = $"""
                               Bạn là AI nội bộ hỗ trợ nghiệp vụ dành cho nhân viên (staff) nền tảng BlindTreasure. Ưu tiên trả lời ngắn gọn, súc tích, đúng quy trình và nghiệp vụ quản trị.

@@ -90,7 +90,7 @@ public class InventoryItemService : IInventoryItemService
             Quantity = dto.Quantity,
             Location = dto.Location ?? string.Empty,
             Status = dto.Status,
-            AddressId = dto.AddressId,
+            AddressId = dto.AddressId
         };
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
@@ -240,7 +240,7 @@ public class InventoryItemService : IInventoryItemService
             throw ErrorHelper.NotFound("Không tìm thấy vật phẩm trong kho.");
 
         // 2. Kiểm tra hoặc cập nhật địa chỉ giao hàng
-        Address address = item.Address!;
+        var address = item.Address!;
         if (item.AddressId == null)
         {
             if (!request.AddressId.HasValue)
@@ -254,10 +254,10 @@ public class InventoryItemService : IInventoryItemService
 
         // 3. Tìm OrderDetail liên quan đến InventoryItem
         var orderDetail = await _unitOfWork.OrderDetails.GetQueryable()
-       .Include(od => od.Order)
-       .Include(od => od.Product).ThenInclude(p => p.Seller)
-       .Include(od => od.Product).ThenInclude(p => p.Category)
-       .FirstOrDefaultAsync(od => od.ProductId == item.ProductId && od.Order.UserId == item.UserId);
+            .Include(od => od.Order)
+            .Include(od => od.Product).ThenInclude(p => p.Seller)
+            .Include(od => od.Product).ThenInclude(p => p.Category)
+            .FirstOrDefaultAsync(od => od.ProductId == item.ProductId && od.Order.UserId == item.UserId);
 
         if (orderDetail == null)
             throw ErrorHelper.NotFound("Không tìm thấy OrderDetail liên quan.");
@@ -275,10 +275,10 @@ public class InventoryItemService : IInventoryItemService
             throw ErrorHelper.NotFound("Category not found for this product.");
 
         // 4. Chuẩn bị dữ liệu cho GHN Order Request
-        int length = Convert.ToInt32(product.Length > 0 ? product.Length : 10);
-        int width = Convert.ToInt32(product.Width > 0 ? product.Width : 10);
-        int height = Convert.ToInt32(product.Height > 0 ? product.Height : 10);
-        int weight = Convert.ToInt32(product.Weight > 0 ? product.Weight : 1000);
+        var length = Convert.ToInt32(product.Length > 0 ? product.Length : 10);
+        var width = Convert.ToInt32(product.Width > 0 ? product.Width : 10);
+        var height = Convert.ToInt32(product.Height > 0 ? product.Height : 10);
+        var weight = Convert.ToInt32(product.Weight > 0 ? product.Weight : 1000);
 
         var ghnOrderRequest = new GhnOrderRequest
         {
@@ -307,23 +307,22 @@ public class InventoryItemService : IInventoryItemService
             ServiceTypeId = 2,
             Items = new[]
             {
-            new GhnOrderItemDto
-            {
-
-        Name = product.Name,
-        Code = product.Id.ToString(),
-        Quantity = item.Quantity,
-        Price = Convert.ToInt32(product.Price),
-        Length = length,
-        Width = width,
-        Height = height,
-        Weight = weight,
-         Category = new GhnItemCategory
-        {
-            Level1 = product.Category.Name,
-        }
+                new GhnOrderItemDto
+                {
+                    Name = product.Name,
+                    Code = product.Id.ToString(),
+                    Quantity = item.Quantity,
+                    Price = Convert.ToInt32(product.Price),
+                    Length = length,
+                    Width = width,
+                    Height = height,
+                    Weight = weight,
+                    Category = new GhnItemCategory
+                    {
+                        Level1 = product.Category.Name
+                    }
+                }
             }
-        }
         };
 
         // 5. Call GHN API: Preview hoặc Create Order
@@ -347,10 +346,12 @@ public class InventoryItemService : IInventoryItemService
                 Provider = "GHN",
                 OrderCode = ghnCreateResponse?.OrderCode,
                 TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0,
-                MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0), 
+                MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0),
                 TrackingNumber = ghnCreateResponse?.OrderCode ?? "",
                 ShippedAt = DateTime.UtcNow,
-                EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default ? ghnCreateResponse.ExpectedDeliveryTime : DateTime.UtcNow.AddDays(3),
+                EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
+                    ? ghnCreateResponse.ExpectedDeliveryTime
+                    : DateTime.UtcNow.AddDays(3),
                 Status = "Requested"
             };
             await _unitOfWork.Shipments.AddAsync(shipment);

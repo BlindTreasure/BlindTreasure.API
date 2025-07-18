@@ -162,7 +162,6 @@ public static class IocContainer
 
         //3rd party
         services.AddHttpClient();
-        services.AddScoped<IGptService, GptService>();
         services.AddScoped<IBlobService, BlobService>();
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IGeminiService, GeminiService>();

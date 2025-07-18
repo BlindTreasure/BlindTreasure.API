@@ -104,7 +104,7 @@ public class TransactionService : ITransactionService
                 {
                     _logger.Info(
                         $"[HandleSuccessfulPaymentAsync] Tạo inventory item cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
-                 
+
                     var createDto = new CreateInventoryItemDto
                     {
                         ProductId = od.ProductId.Value,
@@ -117,13 +117,16 @@ public class TransactionService : ITransactionService
                     if (order.ShippingAddressId.HasValue)
                     {
                         shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(order.ShippingAddressId.Value);
-                        if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != order.UserId)
+                        if (shippingAddress == null || shippingAddress.IsDeleted ||
+                            shippingAddress.UserId != order.UserId)
                         {
                             _logger.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
                             throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
                         }
+
                         createDto.AddressId = shippingAddress.Id;
                     }
+
                     await _inventoryItemService.CreateAsync(createDto, order.UserId);
                     _logger.Success(
                         $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++productCount} cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
