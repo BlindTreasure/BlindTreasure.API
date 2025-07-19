@@ -4,6 +4,7 @@ using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -164,20 +165,47 @@ public class InventoryItemController : ControllerBase
     }
 
     /// <summary>
-    ///     Yêu cầu giao hàng cho một InventoryItem.
-    ///     Nếu chưa có địa chỉ thì phải truyền vào addressId.
+    ///     Yêu cầu giao hàng cho một LIST InventoryItem truyền vào
+    ///     LẤY ĐỊA CHỈ MẶC ĐỊNH CỦA NGƯỜI DÙNG
     ///     Tạo Shipment và cập nhật trạng thái OrderDetail liên quan.
     /// </summary>
-    [HttpPost("{id:guid}/request-shipment")]
-    [ProducesResponseType(typeof(ApiResult<ShipResponseDTO>), 200)]
-    [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> RequestShipment(Guid id, [FromBody] RequestShipmentDTO request)
+    [HttpPost("request-shipment")]
+    [ProducesResponseType(typeof(ApiResult<ShipmentItemResponseDTO>), 200)]
+    [ProducesResponseType(typeof(ApiResult<ShipmentItemResponseDTO>), 400)]
+    public async Task<IActionResult> RequestShipment([FromBody] RequestItemShipmentDTO request) 
     {
         try
         {
-            var result = await _inventoryItemService.RequestShipmentAsync(id, request);
-            _logger.Success($"[InventoryItemController][RequestShipment] Đã tạo yêu cầu giao hàng cho item {id}.");
-            return Ok(ApiResult<ShipResponseDTO>.Success(result, "200", "Yêu cầu giao hàng thành công."));
+            var result = await _inventoryItemService.RequestShipmentAsync(request);
+            _logger.Success($"[InventoryItemController][RequestShipment] Đã tạo yêu cầu giao hàng cho list item {request.InventoryItemIds}.");
+            return Ok(ApiResult<ShipmentItemResponseDTO>.Success(result, "200", "Yêu cầu giao hàng thành công."));
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[InventoryItemController][RequestShipment] {ex.Message}");
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+
+
+    /// <summary>
+    ///     PREVIEW yêu cầu giao hàng cho một LIST InventoryItem.
+    ///     LẤY ĐỊA CHỈ MẶC ĐỊNH CỦA NGƯỜI DÙNG
+    ///     Tạo Shipment và cập nhật trạng thái OrderDetail liên quan.
+    /// </summary>
+    [HttpPost("preview-shipment")]
+    [ProducesResponseType(typeof(ApiResult<List<ShipmentCheckoutResponseDTO>>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> RequestPreviewShipmentForListItems([FromBody] RequestItemShipmentDTO requests)
+    {
+        try
+        {
+             var result = await _inventoryItemService.PreviewShipmentForListItemsAsync(requests);
+            _logger.Success($"[RequestPreviewShipmentForListItems][RequestShipment] Đã tạo yêu cầu preview đơn giao hàng cho list item: {requests.InventoryItemIds}.");
+            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200", "Yêu cầu xem trước đơn giao hàng thành công."));
         }
         catch (Exception ex)
         {

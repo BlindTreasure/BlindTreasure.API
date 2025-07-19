@@ -610,7 +610,8 @@ public class OrderService : IOrderService
             {
                 result.Add(new ShipmentCheckoutResponseDTO
                 {
-                    ProductId = item.ProductId,
+                    SellerId = seller.Id,
+                    SellerCompanyName = seller.CompanyName,
                     Shipment = null,
                     GhnPreviewResponse = ghnPreviewResponse
                 });

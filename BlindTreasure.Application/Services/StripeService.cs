@@ -270,6 +270,52 @@ public class StripeService : IStripeService
         }
     }
 
+    public async Task<string> CreateShipmentCheckoutSessionAsync(List<Shipment> shipments, Guid userId, int totalShippingFee)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null)
+            throw ErrorHelper.NotFound("User không tồn tại.");
+
+        var lineItems = new List<SessionLineItemOptions>
+    {
+        new SessionLineItemOptions
+        {
+            PriceData = new SessionLineItemPriceDataOptions
+            {
+                Currency = "vnd",
+                ProductData = new SessionLineItemPriceDataProductDataOptions
+                {
+                    Name = "Phí vận chuyển nhiều đơn GHN",
+                    Description = string.Join(" | ", shipments.Select(s => $"Mã vận đơn: {s.OrderCode}, Phí: {s.TotalFee:N0} VND"))
+                },
+                UnitAmount = totalShippingFee
+            },
+            Quantity = 1
+        }
+    };
+
+        var options = new SessionCreateOptions
+        {
+            Metadata = new Dictionary<string, string>
+        {
+            { "shipmentIds", string.Join(",", shipments.Select(s => s.Id)) },
+            { "userId", userId.ToString() }
+        },
+            CustomerEmail = user.Email,
+            PaymentMethodTypes = new List<string> { "card" },
+            LineItems = lineItems,
+            Mode = "payment",
+            SuccessUrl = $"{_successRedirectUrl}?status=success&session_id={{CHECKOUT_SESSION_ID}}",
+            CancelUrl = $"{_failRedirectUrl}?status=failed&session_id={{CHECKOUT_SESSION_ID}}",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        };
+
+        var service = new SessionService(_stripeClient);
+        var session = await service.CreateAsync(options);
+
+        return session.Url;
+    }
+
     // 2. Hoàn lại tiền cho khách (refund)
     public async Task<Refund> RefundPaymentAsync(string paymentIntentId, decimal amount)
     {
