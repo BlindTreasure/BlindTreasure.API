@@ -517,7 +517,7 @@ public class OrderService : IOrderService
                     od => od.Quantity
                 );
 
-                var ghnCreateResponse = await _ghnShippingService.CreateOrderAsync(ghnOrderRequest);
+                var ghnCreateResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest); // sửa thành chính thức sang preview vì đây là tạo yêu cầu thanh toán
 
                 order.TotalAmount += ghnCreateResponse?.TotalFee ?? 0;
                 _loggerService.Info($"Created GHN shipment for seller {seller.Id}, fee: {ghnCreateResponse?.TotalFee ?? 0}");
@@ -534,7 +534,7 @@ public class OrderService : IOrderService
                         TrackingNumber = ghnCreateResponse?.OrderCode ?? "",
                         ShippedAt = DateTime.UtcNow,
                         EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default ? ghnCreateResponse.ExpectedDeliveryTime : DateTime.UtcNow.AddDays(3),
-                        Status = "Requested"
+                        Status = "WAITING_PAYMENT" // chưa thanh toán, chờ xác nhận
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
 
