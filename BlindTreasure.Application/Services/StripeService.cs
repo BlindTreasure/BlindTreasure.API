@@ -57,9 +57,11 @@ public class StripeService : IStripeService
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.Product)
+                .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.BlindBox)
+                .ThenInclude(od => od.BlindBox)
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Shipments)
             .Include(o => o.Promotion)
             .FirstOrDefaultAsync();
 
@@ -79,6 +81,26 @@ public class StripeService : IStripeService
 
         // Lấy thông tin promotion từ order nếu có
         var promotionDesc = GetPromotionDescription(order);
+
+        // Tổng hợp thông tin shipment/fee cho description
+        var shipmentDescriptions = new List<string>();
+        decimal totalShippingFee = 0;
+        foreach (var od in order.OrderDetails)
+        {
+            if (od.Shipments != null && od.Shipments.Any())
+            {
+                foreach (var shipment in od.Shipments)
+                {
+                    shipmentDescriptions.Add(
+                        $"Giao hàng bởi: {shipment.Provider}, Mã vận đơn: {shipment.OrderCode}, Phí ship: {shipment.TotalFee:N0} VND, Trạng thái: {shipment.Status}"
+                    );
+                    totalShippingFee += shipment.TotalFee ?? 0;
+                }
+            }
+        }
+        var shipmentDesc = shipmentDescriptions.Any()
+            ? string.Join(" | ", shipmentDescriptions)
+            : "Không có thông tin giao hàng.";
 
         // Chuẩn bị line items cho Stripe
         var lineItems = new List<SessionLineItemOptions>();
@@ -101,6 +123,14 @@ public class StripeService : IStripeService
                 throw ErrorHelper.BadRequest("Sản phẩm hoặc BlindBox trong đơn hàng không hợp lệ.");
             }
 
+            // Thêm thông tin shipment cho từng sản phẩm nếu có
+            string shipmentInfo = "";
+            if (item.Shipments != null && item.Shipments.Any())
+            {
+                var shipment = item.Shipments.First();
+                shipmentInfo = $", Ship: {shipment.Provider} - {shipment.TotalFee:N0} VND, Tracking: {shipment.OrderCode}";
+            }
+
             lineItems.Add(new SessionLineItemOptions
             {
                 PriceData = new SessionLineItemPriceDataOptions
@@ -111,12 +141,32 @@ public class StripeService : IStripeService
                         Name =
                             $"Product/Blindbox Name: {name} , Order Detail id {item.Id} belongs to Order {order.Id} paid by {user.Email}",
                         Description =
-                            $"Sản phẩm: {name}, Số lượng: {item.Quantity}, Tổng: {item.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
-                            (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "")
+                        $"Sản phẩm: {name}, Số lượng: {item.Quantity}, Tổng: {item.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
+                        (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "") +
+                        (!string.IsNullOrEmpty(shipmentInfo) ? shipmentInfo : "")
                     },
                     UnitAmount = (long)unitPrice // Stripe expects amount in cents
                 },
                 Quantity = item.Quantity
+            });
+        }
+
+        // Thêm một line item cho phí ship tổng nếu có
+        if (totalShippingFee > 0)
+        {
+            lineItems.Add(new SessionLineItemOptions
+            {
+                PriceData = new SessionLineItemPriceDataOptions
+                {
+                    Currency = "vnd",
+                    ProductData = new SessionLineItemPriceDataProductDataOptions
+                    {
+                        Name = "Phí vận chuyển",
+                        Description = shipmentDesc
+                    },
+                    UnitAmount = (long)totalShippingFee
+                },
+                Quantity = 1
             });
         }
 

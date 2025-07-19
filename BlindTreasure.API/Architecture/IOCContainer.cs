@@ -132,6 +132,8 @@ public static class IocContainer
         // services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
         // Add application services
+        services.AddScoped<IGhnShippingService, GhnShippingService>();
+
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ILoggerService, LoggerService>();
@@ -158,7 +160,7 @@ public static class IocContainer
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IUnboxingService, UnboxingService>();
         services.AddScoped<IChatMessageService, ChatMessageService>();
-        services.AddScoped<IGhnShippingService, GhnShippingService>();
+        services.AddScoped<IShipmentService, ShipmentService>();
 
         //3rd party
         services.AddHttpClient();

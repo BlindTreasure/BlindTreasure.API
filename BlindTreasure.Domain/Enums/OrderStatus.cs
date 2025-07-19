@@ -13,7 +13,8 @@ public enum OrderStatus
 public enum OrderDetailStatus
 {
     PENDING,
-    SHIPPED,
+    SHIPPING_REQUESTED,
     DELIVERING,
+    DELIVERED,
     CANCELLED
 }

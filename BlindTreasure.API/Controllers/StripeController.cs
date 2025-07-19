@@ -1,15 +1,16 @@
-﻿using System.Text;
-using BlindTreasure.Application.Interfaces;
+﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.StripeDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Stripe;
 using Stripe.Checkout;
+using System.Text;
 
 namespace BlindTreasure.API.Controllers;
 
@@ -20,6 +21,8 @@ namespace BlindTreasure.API.Controllers;
 [ApiController]
 public class StripeController : ControllerBase
 {
+    private readonly ICartItemService _cartItemService;
+
     private readonly IClaimsService _claimService;
     private readonly IConfiguration _configuration;
     private readonly string _deployStripeSecret;
@@ -41,7 +44,8 @@ public class StripeController : ControllerBase
         IStripeClient stripeClient,
         IOrderService orderService,
         ITransactionService transactionService,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ICartItemService cartItemService)
     {
         _claimService = claimService;
         _userService = userService;
@@ -54,6 +58,7 @@ public class StripeController : ControllerBase
         _configuration = configuration;
         _localStripeSecret = _configuration["STRIPE:LocalWebhookSecret"] ?? "";
         _deployStripeSecret = _configuration["STRIPE:DeployWebhookSecret"] ?? "";
+        _cartItemService = cartItemService; 
     }
 
     [Authorize]
@@ -110,6 +115,60 @@ public class StripeController : ControllerBase
             var errorResponse = ExceptionUtils.CreateErrorResponse<string>(ex);
             return StatusCode(statusCode, errorResponse);
         }
+    }
+
+    [Authorize]
+    [HttpPost("preview-shipping")]
+    public async Task<IActionResult> PreviewShippingFromCart()
+    {
+        try
+        {
+            var cart = await _cartItemService.GetCurrentUserCartAsync();
+            // Map CartItemDto sang DirectCartItemDto
+            var directCartItems = cart.Items.Select(i => new DirectCartItemDto
+            {
+                ProductId = i.ProductId,
+                ProductName = i.ProductName,
+                BlindBoxId = i.BlindBoxId,
+                BlindBoxName = i.BlindBoxName,
+                Quantity = i.Quantity,
+                UnitPrice = i.UnitPrice,
+                TotalPrice = i.TotalPrice
+            }).ToList();
+
+            var result = await _orderService.PreviewShippingCheckoutAsync(directCartItems);
+            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200", "Preview shipment thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+
+
+
+    }
+
+
+    [Authorize]
+    [HttpPost("preview-shipping-direct")]
+    public async Task<IActionResult> PreviewShippingFromClientCart([FromBody] DirectCartCheckoutDto cart)
+    {
+        try
+        {
+            var result = await _orderService.PreviewShippingCheckoutAsync(cart.Items);
+            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200", "Preview shipment thành công."));
+        }
+        catch (Exception ex)
+        {
+
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+
+
     }
 
     /// <summary>

@@ -4,6 +4,7 @@ using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -21,6 +22,7 @@ public class TransactionService : ITransactionService
     private readonly IMapperService _mapper;
     private readonly IOrderService _orderService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IGhnShippingService _ghnShippingService;
 
     public TransactionService(
         ICacheService cacheService,
@@ -30,7 +32,8 @@ public class TransactionService : ITransactionService
         IOrderService orderService,
         IUnitOfWork unitOfWork,
         IInventoryItemService inventoryItemService,
-        ICustomerBlindBoxService customerBlindBoxService)
+        ICustomerBlindBoxService customerBlindBoxService,
+        IGhnShippingService ghnShippingService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -40,6 +43,7 @@ public class TransactionService : ITransactionService
         _unitOfWork = unitOfWork;
         _inventoryItemService = inventoryItemService;
         _customerBlindBoxService = customerBlindBoxService;
+        _ghnShippingService = ghnShippingService;
     }
 
     /// <summary>
@@ -59,6 +63,13 @@ public class TransactionService : ITransactionService
             var transaction = await _unitOfWork.Transactions.GetQueryable()
                 .Include(t => t.Payment)
                 .ThenInclude(p => p.Order).ThenInclude(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+                .ThenInclude(p => p.Seller)
+                .Include(t => t.Payment)
+                .ThenInclude(p => p.Order).ThenInclude(o => o.OrderDetails)
+                .ThenInclude(od => od.BlindBox)
+                .Include(t => t.Payment)
+                .ThenInclude(p => p.Order).ThenInclude(o => o.ShippingAddress)
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
             if (transaction == null)
@@ -77,18 +88,10 @@ public class TransactionService : ITransactionService
 
             _logger.Info($"[HandleSuccessfulPaymentAsync] OrderDetails count = {order.OrderDetails?.Count ?? 0}");
 
-            // Cập nhật trạng thái transaction và payment
-            transaction.Status = TransactionStatus.Successful.ToString();
-            transaction.Payment.Status = PaymentStatus.Paid.ToString();
-            transaction.Payment.PaidAt = DateTime.UtcNow;
+            // Cập nhật trạng thái transaction, payment, order
+            UpdatePaymentAndOrderStatus(transaction, order);
 
-            // Cập nhật trạng thái order
-            order.Status = OrderStatus.PAID.ToString();
-            order.CompletedAt = DateTime.UtcNow;
-
-            // Lấy order details và tạo inventory item cho từng sản phẩm
-            var orderDetails = await _unitOfWork.OrderDetails.GetAllAsync(od => od.OrderId == order.Id)
-                               ?? order.OrderDetails?.ToList() ?? new List<OrderDetail>();
+            var orderDetails = await GetOrderDetails(order.Id);
 
             if (!orderDetails.Any())
             {
@@ -96,58 +99,16 @@ public class TransactionService : ITransactionService
                 return;
             }
 
-            var productCount = 0;
-            var blindBoxCount = 0;
-            foreach (var od in orderDetails)
-            {
-                if (od.ProductId.HasValue)
-                {
-                    _logger.Info(
-                        $"[HandleSuccessfulPaymentAsync] Tạo inventory item cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
-                 
-                    var createDto = new CreateInventoryItemDto
-                    {
-                        ProductId = od.ProductId.Value,
-                        Quantity = od.Quantity,
-                        Location = string.Empty,
-                        Status = InventoryItemStatus.Available
-                    };
+            // 1. Tạo đơn GHN chính thức và cập nhật shipment
+            await CreateGhnOrdersAndUpdateShipments(order, orderDetails);
 
-                    Address? shippingAddress = null;
-                    if (order.ShippingAddressId.HasValue)
-                    {
-                        shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(order.ShippingAddressId.Value);
-                        if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != order.UserId)
-                        {
-                            _logger.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
-                            throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
-                        }
-                        createDto.AddressId = shippingAddress.Id;
-                    }
-                    await _inventoryItemService.CreateAsync(createDto, order.UserId);
-                    _logger.Success(
-                        $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++productCount} cho sản phẩm {od.ProductId.Value} trong order {orderId}.");
-                }
+            // 2. Tạo inventory cho sản phẩm vật lý
+            await CreateInventoryForOrderDetails(order, orderDetails);
 
-                if (od.BlindBoxId.HasValue)
-                {
-                    _logger.Info(
-                        $"[HandleSuccessfulPaymentAsync] Tạo customer inventory cho BlindBox {od.BlindBoxId.Value} trong order {orderId}.");
-                    for (var i = 0; i < od.Quantity; i++)
-                    {
-                        var createBlindBoxDto = new CreateCustomerInventoryDto
-                        {
-                            BlindBoxId = od.BlindBoxId.Value,
-                            OrderDetailId = od.Id,
-                            IsOpened = false
-                        };
-                        await _customerBlindBoxService.CreateAsync(createBlindBoxDto, order.UserId);
-                        _logger.Success(
-                            $"[HandleSuccessfulPaymentAsync] Đã tạo customer inventory thứ {++blindBoxCount} cho BlindBox {od.BlindBoxId.Value} trong order {orderId}.");
-                    }
-                }
-            }
+            // 3. Tạo customer inventory cho BlindBox
+            await CreateCustomerBlindBoxForOrderDetails(order, orderDetails);
 
+            // 4. Lưu thay đổi cuối cùng
             await _unitOfWork.Transactions.Update(transaction);
             await _unitOfWork.Payments.Update(transaction.Payment);
             await _unitOfWork.Orders.Update(order);
@@ -160,6 +121,163 @@ public class TransactionService : ITransactionService
         {
             _logger.Error($"[HandleSuccessfulPaymentAsync] {ex}");
             throw;
+        }
+    }
+
+    private void UpdatePaymentAndOrderStatus(Transaction transaction, Order order)
+    {
+        transaction.Status = TransactionStatus.Successful.ToString();
+        transaction.Payment.Status = PaymentStatus.Paid.ToString();
+        transaction.Payment.PaidAt = DateTime.UtcNow;
+        order.Status = OrderStatus.PAID.ToString();
+        order.CompletedAt = DateTime.UtcNow;
+    }
+
+    private async Task<List<OrderDetail>> GetOrderDetails(Guid orderId)
+    {
+        return await _unitOfWork.OrderDetails.GetAllAsync(od => od.OrderId == orderId)
+               ?? new List<OrderDetail>();
+    }
+
+    private async Task CreateGhnOrdersAndUpdateShipments(Order order, List<OrderDetail> orderDetails)
+    {
+        var shipments = await _unitOfWork.Shipments.GetQueryable()
+            .Where(s => orderDetails.Select(od => od.Id).Contains(s.OrderDetailId) && s.Status == "WAITING_PAYMENT")
+            .Include(s => s.OrderDetail).ThenInclude(od => od.Product).ThenInclude(p => p.Seller)
+            .ToListAsync();
+
+        var sellerGroups = shipments
+            .Where(s => s.OrderDetail.Product != null)
+            .GroupBy(s => s.OrderDetail.Product.SellerId);
+
+        foreach (var group in sellerGroups)
+        {
+            var seller = group.First().OrderDetail.Product.Seller;
+            var address = order.ShippingAddress;
+            var orderDetailsInGroup = group.Select(s => s.OrderDetail).ToList();
+
+            var ghnOrderRequest = BuildGhnOrderRequestFromOrderDetails(orderDetailsInGroup, seller, address);
+
+            var ghnCreateResponse = await _ghnShippingService.CreateOrderAsync(ghnOrderRequest);
+
+            foreach (var shipment in group)
+            {
+                UpdateShipmentWithGhnResponse(shipment, ghnCreateResponse);
+                await _unitOfWork.Shipments.Update(shipment);
+            }
+        }
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    private GhnOrderRequest BuildGhnOrderRequestFromOrderDetails(
+        List<OrderDetail> orderDetails, Seller seller, Address address)
+    {
+        var items = orderDetails.Select(od => new GhnOrderItemDto
+        {
+            Name = od.Product.Name,
+            Code = od.Product.Id.ToString(),
+            Quantity = od.Quantity,
+            Price = Convert.ToInt32(od.Product.Price),
+            Length = Convert.ToInt32(od.Product.Length ?? 10),
+            Width = Convert.ToInt32(od.Product.Width ?? 10),
+            Height = Convert.ToInt32(od.Product.Height ?? 10),
+            Weight = Convert.ToInt32(od.Product.Weight ?? 1000),
+            Category = new GhnItemCategory
+            {
+                Level1 = od.Product.Category?.Name,
+                Level2 = od.Product.Category?.Parent?.Name,
+                Level3 = od.Product.Category?.Parent?.Parent?.Name
+            }
+        }).ToArray();
+
+        return new GhnOrderRequest
+        {
+            PaymentTypeId = 2,
+            Note = $"Giao hàng cho seller {seller.CompanyName}",
+            RequiredNote = "CHOXEMHANGKHONGTHU",
+            FromName = seller.CompanyName ?? "BlindTreasure Warehouse",
+            FromPhone = seller.CompanyPhone ?? "0925136907",
+            FromAddress = seller.CompanyAddress ?? "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, TP.HCM",
+            FromWardName = seller.CompanyWardName ?? "Phường 14",
+            FromDistrictName = seller.CompanyDistrictName ?? "Quận 10",
+            FromProvinceName = seller.CompanyProvinceName ?? "HCM",
+            ToName = address.FullName,
+            ToPhone = address.Phone,
+            ToAddress = address.AddressLine,
+            ToWardName = address.Ward ?? "",
+            ToDistrictName = address.District ?? "",
+            ToProvinceName = address.Province,
+            CodAmount = 0,
+            Content = $"Giao hàng cho {address.FullName} từ seller {seller.CompanyName}",
+            Length = items.Max(i => i.Length),
+            Width = items.Max(i => i.Width),
+            Height = items.Max(i => i.Height),
+            Weight = items.Sum(i => i.Weight),
+            InsuranceValue = items.Sum(i => i.Price * i.Quantity),
+            ServiceTypeId = 2,
+            Items = items
+        };
+    }
+
+    private void UpdateShipmentWithGhnResponse(Shipment shipment, GhnCreateResponse? ghnCreateResponse)
+    {
+        shipment.OrderCode = ghnCreateResponse?.OrderCode;
+        shipment.TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0;
+        shipment.MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0);
+        shipment.TrackingNumber = ghnCreateResponse?.OrderCode ?? "";
+        shipment.ShippedAt = DateTime.UtcNow;
+        shipment.EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime ?? DateTime.UtcNow.AddDays(3);
+        shipment.Status = "REQUESTED";
+    }
+
+    private async Task CreateInventoryForOrderDetails(Order order, List<OrderDetail> orderDetails)
+    {
+        var productCount = 0;
+        foreach (var od in orderDetails.Where(od => od.ProductId.HasValue))
+        {
+            _logger.Info($"[HandleSuccessfulPaymentAsync] Tạo inventory item cho sản phẩm {od.ProductId.Value} trong order {order.Id}.");
+
+            var createDto = new CreateInventoryItemDto
+            {
+                ProductId = od.ProductId.Value,
+                Quantity = od.Quantity,
+                Location = string.Empty,
+                Status = InventoryItemStatus.Available
+            };
+
+            Address? shippingAddress = null;
+            if (order.ShippingAddressId.HasValue)
+            {
+                shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(order.ShippingAddressId.Value);
+                if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != order.UserId)
+                {
+                    _logger.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
+                    throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
+                }
+                createDto.AddressId = shippingAddress.Id;
+            }
+            await _inventoryItemService.CreateAsync(createDto, order.UserId);
+            _logger.Success($"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++productCount} cho sản phẩm {od.ProductId.Value} trong order {order.Id}.");
+        }
+    }
+
+    private async Task CreateCustomerBlindBoxForOrderDetails(Order order, List<OrderDetail> orderDetails)
+    {
+        var blindBoxCount = 0;
+        foreach (var od in orderDetails.Where(od => od.BlindBoxId.HasValue))
+        {
+            _logger.Info($"[HandleSuccessfulPaymentAsync] Tạo customer inventory cho BlindBox {od.BlindBoxId.Value} trong order {order.Id}.");
+            for (var i = 0; i < od.Quantity; i++)
+            {
+                var createBlindBoxDto = new CreateCustomerInventoryDto
+                {
+                    BlindBoxId = od.BlindBoxId.Value,
+                    OrderDetailId = od.Id,
+                    IsOpened = false
+                };
+                await _customerBlindBoxService.CreateAsync(createBlindBoxDto, order.UserId);
+                _logger.Success($"[HandleSuccessfulPaymentAsync] Đã tạo customer inventory thứ {++blindBoxCount} cho BlindBox {od.BlindBoxId.Value} trong order {order.Id}.");
+            }
         }
     }
 
