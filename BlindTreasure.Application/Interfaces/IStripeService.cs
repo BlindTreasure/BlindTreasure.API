@@ -1,10 +1,12 @@
-﻿using Stripe;
+﻿using BlindTreasure.Domain.Entities;
+using Stripe;
 
 namespace BlindTreasure.Application.Interfaces;
 
 public interface IStripeService
 {
     Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false);
+    Task<string> CreateShipmentCheckoutSessionAsync(List<Shipment> shipments, Guid userId, int totalShippingFee);
     Task<string> GenerateExpressLoginLink();
     Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId, string redirectUrl);
     Task<bool> IsSellerStripeAccountVerifiedAsync(string sellerStripeAccountId);

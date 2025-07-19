@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -77,7 +78,7 @@ namespace BlindTreasure.Application.Services
                 }
                 _logger.Error($"Code message: {errorCheck?.CodeMessage} \n" +
                        $"Message display: {errorCheck?.Message}");
-                throw new Exception($"GHN error: {errorCheck?.Message}");
+                throw ErrorHelper.BadRequest($"GHN error: {errorCheck?.Message}");
             }
 
             var apiResp = JsonSerializer.Deserialize<ApiResponse<GhnPreviewResponse>>(body, _jsonOptions);
@@ -115,14 +116,14 @@ namespace BlindTreasure.Application.Services
                 }
                 _logger.Error($"Code message: {errorCheck?.CodeMessage} \n" +
                               $"Message display: {errorCheck?.Message}");
-                return null;
+                throw ErrorHelper.BadRequest($"GHN error: {errorCheck?.Message}");
             }
 
             var apiResp = JsonSerializer.Deserialize<ApiResponse<GhnCreateResponse>>(body, _jsonOptions);
             if (apiResp == null || apiResp.Data == null)
             {
                 _logger.Error("[GhnShippingService][CreateOrderAsync] Invalid response from GHN.");
-                return null;
+                throw ErrorHelper.BadRequest("Invalid response from GHN.");
             }
 
             _logger.Success("[GhnShippingService][CreateOrderAsync] Create order success.");
@@ -141,7 +142,7 @@ namespace BlindTreasure.Application.Services
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.Error($"[GhnShippingService][GetProvincesAsync] GHN error: {resp.StatusCode} - {body}");
-                return null;
+                throw ErrorHelper.BadRequest($"GHN error: {body}");
             }
 
             var apiResp = JsonSerializer.Deserialize<ApiResponse<List<ProvinceDto>>>(body);
@@ -158,7 +159,7 @@ namespace BlindTreasure.Application.Services
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.Error($"[GhnShippingService][GetDistrictsAsync] GHN error: {resp.StatusCode} - {body}");
-                return null;
+                throw ErrorHelper.BadRequest($"GHN error: {body}");
             }
 
             var apiResp = JsonSerializer.Deserialize<ApiResponse<List<DistrictDto>>>(body);
@@ -175,7 +176,7 @@ namespace BlindTreasure.Application.Services
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.Error($"[GhnShippingService][GetWardsAsync] GHN error: {resp.StatusCode} - {body}");
-                return null;
+                throw ErrorHelper.BadRequest($"GHN error: {body}");
             }
 
             var apiResp = JsonSerializer.Deserialize<ApiResponse<List<WardDto>>>(body);
@@ -199,8 +200,7 @@ namespace BlindTreasure.Application.Services
                     return null;
                 }
                 _logger.Error($"Error message: {errorCheck?.CodeMessage}");
-                return null;
-                return null;
+                throw ErrorHelper.BadRequest($"GHN error: {errorCheck?.Message}");
             }
 
             var apiResp = JsonSerializer.Deserialize<ApiResponse<List<ServiceSerialize>>>(body);
@@ -231,7 +231,7 @@ namespace BlindTreasure.Application.Services
                     return null;
                 }
                 _logger.Error($"Error message: {errorCheck?.CodeMessage}");
-                return null;
+                throw ErrorHelper.BadRequest($"GHN error: {errorCheck?.Message}");
             }
 
             var apiResp = JsonSerializer.Deserialize<ApiResponse<CalculateShippingFeeResponse>>(body);

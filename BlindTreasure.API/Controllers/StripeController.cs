@@ -61,12 +61,12 @@ public class StripeController : ControllerBase
         _cartItemService = cartItemService; 
     }
 
-    [Authorize]
     /// <summary>
     ///     Tạo đơn hàng và trả về link thanh toán Stripe cho đơn hàng từ cart truyền lên từ client.
     /// </summary>
     /// <param name="cart">Thông tin cart từ FE (danh sách sản phẩm, số lượng, giá...)</param>
     /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
+    [Authorize]
     [HttpPost("checkout-direct")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
@@ -89,12 +89,13 @@ public class StripeController : ControllerBase
         }
     }
 
-    [Authorize]
     /// <summary>
-    ///     Tạo đơn hàng từ giỏ hàng hiện tại và trả về link thanh toán Stripe.
+    ///     Tạo đơn hàng từ giỏ hàng trong DB và trả về link thanh toán Stripe (tiến test).
     /// </summary>
     /// <param name="dto">Thông tin đặt hàng (địa chỉ giao hàng, ...)</param>
     /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
+    [Authorize]
+
     [HttpPost("checkout")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
@@ -117,6 +118,9 @@ public class StripeController : ControllerBase
         }
     }
 
+    /// <summary>
+    ///     TIẾN TEST BẰNG CÁI NÀY
+    /// </summary>
     [Authorize]
     [HttpPost("preview-shipping")]
     public async Task<IActionResult> PreviewShippingFromCart()
@@ -150,7 +154,11 @@ public class StripeController : ControllerBase
 
     }
 
-
+    /// <summary>
+    ///     FRONT-END DÙNG API NÀY ĐỂ LẤY TRƯỚC THÔNG TIN GIAO HÀNG CỦA ITEM TRUYỀN VÀO
+    /// </summary>
+    /// <param name="cart">Thông tin cart từ FE (danh sách sản phẩm, số lượng, giá...)</param>
+    /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
     [Authorize]
     [HttpPost("preview-shipping-direct")]
     public async Task<IActionResult> PreviewShippingFromClientCart([FromBody] DirectCartCheckoutDto cart)
