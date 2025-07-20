@@ -1705,8 +1705,7 @@ public class SystemController : ControllerBase
             CompanyPhone = "0325134357",
             CompanyWardName = "Phường 14",
             CompanyDistrictName = "Quận 10",
-            CompanyProvinceName = "HCM",
-
+            CompanyProvinceName = "HCM"
         };
 
         await _context.Sellers.AddAsync(seller);

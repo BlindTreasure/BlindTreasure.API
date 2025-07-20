@@ -15,5 +15,4 @@ public class BlindBoxUnboxLog : BaseEntity
     public DateTime UnboxedAt { get; set; }
     public string BlindBoxName { get; set; }
     public string Reason { get; set; } = string.Empty;
-
 }

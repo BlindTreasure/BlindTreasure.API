@@ -77,30 +77,31 @@ public class ChatMessageService : IChatMessageService
         _logger.Info($"[Chat] {senderId} → {receiverId}: {content}");
     }
 
-    public async Task<List<ChatMessageDto>> GetMessagesAsync(Guid currentUserId, Guid targetId, int pageIndex, int pageSize)
+    public async Task<List<ChatMessageDto>> GetMessagesAsync(Guid currentUserId, Guid targetId, int pageIndex,
+        int pageSize)
     {
         IQueryable<ChatMessage> query;
 
         if (targetId == Guid.Empty)
-        {
             // Chat giữa User và AI
             query = _unitOfWork.ChatMessages.GetQueryable()
                 .Where(m =>
-                    (m.SenderType == ChatParticipantType.User && m.SenderId == currentUserId && m.ReceiverType == ChatParticipantType.AI)
+                    (m.SenderType == ChatParticipantType.User && m.SenderId == currentUserId &&
+                     m.ReceiverType == ChatParticipantType.AI)
                     ||
-                    (m.SenderType == ChatParticipantType.AI && m.ReceiverType == ChatParticipantType.User && m.ReceiverId == currentUserId)
+                    (m.SenderType == ChatParticipantType.AI && m.ReceiverType == ChatParticipantType.User &&
+                     m.ReceiverId == currentUserId)
                 );
-        }
         else
-        {
             // Chat giữa 2 người dùng
             query = _unitOfWork.ChatMessages.GetQueryable()
                 .Where(m =>
-                    (m.SenderId == currentUserId && m.ReceiverId == targetId && m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
+                    (m.SenderId == currentUserId && m.ReceiverId == targetId &&
+                     m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
                     ||
-                    (m.SenderId == targetId && m.ReceiverId == currentUserId && m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
+                    (m.SenderId == targetId && m.ReceiverId == currentUserId &&
+                     m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
                 );
-        }
 
         var messages = await query
             .OrderByDescending(m => m.SentAt)
@@ -121,7 +122,6 @@ public class ChatMessageService : IChatMessageService
             IsRead = m.IsRead
         }).ToList();
     }
-
 
 
     public async Task MarkMessagesAsReadAsync(Guid fromUserId, Guid toUserId)

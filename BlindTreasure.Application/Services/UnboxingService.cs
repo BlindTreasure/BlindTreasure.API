@@ -170,12 +170,11 @@ public class UnboxingService : IUnboxingService
         }
 
         sb.AppendLine();
-        sb.AppendLine($"Kết quả: '{selectedItem.Product?.Name}' được chọn (DropRate = {Math.Round(selectedItem.DropRate, 2):N2}%)");
+        sb.AppendLine(
+            $"Kết quả: '{selectedItem.Product?.Name}' được chọn (DropRate = {Math.Round(selectedItem.DropRate, 2):N2}%)");
 
         return sb.ToString();
     }
-
-
 
 
     private async Task<CustomerBlindBox> GetValidCustomerBlindBoxAsync(Guid id, Guid userId)

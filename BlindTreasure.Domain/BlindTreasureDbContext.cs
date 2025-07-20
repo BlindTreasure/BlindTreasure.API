@@ -46,6 +46,7 @@ public class BlindTreasureDbContext : DbContext
 
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<BlindBoxUnboxLog> BlindBoxUnboxLogs { get; set; }
+    public DbSet<ListingReport> ListingReports { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -153,6 +154,23 @@ public class BlindTreasureDbContext : DbContext
 
         #endregion
 
+        modelBuilder.Entity<ListingReport>(entity =>
+        {
+            entity.Property(r => r.Reason)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.HasOne(r => r.Listing)
+                .WithMany()
+                .HasForeignKey(r => r.ListingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(r => r.User)
+                .WithMany()
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<BlindBoxUnboxLog>(entity =>
         {
             entity.Property(x => x.Rarity)
@@ -169,7 +187,7 @@ public class BlindTreasureDbContext : DbContext
                 .HasMaxLength(255);
 
             entity.Property(e => e.Reason)
-                .HasColumnType("text") 
+                .HasColumnType("text")
                 .IsRequired();
         });
 

@@ -1,4 +1,5 @@
-﻿.swagger-ui::after {
+﻿/* Base Styles and Background Pattern */
+.swagger-ui::after {
     content: "";
     position: absolute;
     top: 0;
@@ -8,53 +9,125 @@
     z-index: -1;
     background-color: #e5e5f7;
     opacity: 0.05;
-    background-image: linear-gradient(#4551f7 1.4000000000000001px, transparent 1.4000000000000001px), linear-gradient(to right, #4551f7 1.4000000000000001px, #e5e5f7 1.4000000000000001px);
+    background-image: linear-gradient(#4551f7 1.4px, transparent 1.4px), linear-gradient(to right, #4551f7 1.4px, #e5e5f7 1.4px);
     background-size: 28px 28px;
 }
 
+/* Add smooth transition for theme switching */
+.swagger-ui,
+.swagger-ui *,
+.swagger-ui *:before,
+.swagger-ui *:after {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Dark Mode Styles */
 .swagger-ui.dark-mode {
-    background-color: #1e293b; /* Dark background */
-    color: #f8fafc; /* Light text */
+    background-color: #0f172a; /* Darker background */
+    color: #f1f5f9; /* Light text with better contrast */
 }
 
 .swagger-ui.dark-mode * {
-    color: #f8fafc !important; /* Ensure all text is light */
+    color: #f1f5f9 !important; /* Ensure all text is light with better contrast */
 }
 
 .swagger-ui.dark-mode .opblock {
-    background-color: #334155; /* Darker background for sections */
-    color: #f8fafc;
+    background-color: #1e293b; /* Darker background for sections */
+    border-radius: 6px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    margin-bottom: 10px;
 }
 
 .swagger-ui.dark-mode .opblock-summary {
-    background-color: #475569; /* Summary section background */
-    color: #f8fafc;
+    background-color: #334155; /* Summary section background */
+    border-radius: 6px 6px 0 0;
+    padding: 10px;
 }
 
 .swagger-ui.dark-mode .opblock-summary:hover {
-    background-color: #64748b; /* Hover effect */
+    background-color: #475569; /* Hover effect */
 }
 
+/* Method colors in dark mode */
+.swagger-ui.dark-mode .opblock-get {
+    border-color: #0ea5e9 !important;
+}
+
+.swagger-ui.dark-mode .opblock-post {
+    border-color: #22c55e !important;
+}
+
+.swagger-ui.dark-mode .opblock-put {
+    border-color: #f59e0b !important;
+}
+
+.swagger-ui.dark-mode .opblock-delete {
+    border-color: #ef4444 !important;
+}
+
+.swagger-ui.dark-mode .opblock-patch {
+    border-color: #8b5cf6 !important;
+}
+
+/* Form controls */
 .swagger-ui.dark-mode input[type="text"],
-.swagger-ui.dark-mode input[type="checkbox"] {
-    background-color: #334155;
-    color: #f8fafc;
+.swagger-ui.dark-mode input[type="password"],
+.swagger-ui.dark-mode input[type="search"],
+.swagger-ui.dark-mode input[type="email"],
+.swagger-ui.dark-mode input[type="number"],
+.swagger-ui.dark-mode select,
+.swagger-ui.dark-mode textarea {
+    background-color: #1e293b;
+    color: #f1f5f9;
     border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 8px 12px;
 }
 
-.swagger-ui.dark-mode input[type="text"]:focus {
+.swagger-ui.dark-mode input[type="text"]:focus,
+.swagger-ui.dark-mode input[type="password"]:focus,
+.swagger-ui.dark-mode input[type="search"]:focus,
+.swagger-ui.dark-mode input[type="email"]:focus,
+.swagger-ui.dark-mode input[type="number"]:focus,
+.swagger-ui.dark-mode select:focus,
+.swagger-ui.dark-mode textarea:focus {
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    outline: none;
 }
 
+/* Checkboxes */
+.swagger-ui.dark-mode input[type="checkbox"] {
+    accent-color: #3b82f6;
+}
+
+/* Buttons */
 .swagger-ui.dark-mode .btn {
-    background-color: #475569;
-    color: #f8fafc;
-    border: 1px solid #64748b;
+    background-color: #334155;
+    color: #f1f5f9;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 500;
 }
 
 .swagger-ui.dark-mode .btn:hover {
-    background-color: #64748b;
+    background-color: #475569;
+}
+
+.swagger-ui.dark-mode .btn.execute {
+    background-color: #3b82f6 !important;
+    border-color: #2563eb !important;
+}
+
+.swagger-ui.dark-mode .btn.execute:hover {
+    background-color: #2563eb !important;
+}
+
+.swagger-ui.dark-mode .btn.cancel {
+    background-color: #64748b !important;
+    border-color: #475569 !important;
 }
 
 /* Headers and Titles */
@@ -64,23 +137,126 @@
 .swagger-ui.dark-mode h4,
 .swagger-ui.dark-mode h5,
 .swagger-ui.dark-mode h6 {
-    color: #f8fafc !important;
+    color: #f1f5f9 !important;
+}
+
+.swagger-ui.dark-mode .title {
+    color: #3b82f6 !important;
 }
 
 /* Links */
 .swagger-ui.dark-mode a {
-    color: #3b82f6; /* Light blue for links */
+    color: #38bdf8 !important; /* Brighter blue for links */
+    text-decoration: none;
 }
 
 .swagger-ui.dark-mode a:hover {
-    color: #60a5fa; /* Lighter blue for hover */
+    color: #7dd3fc !important; /* Lighter blue for hover */
+    text-decoration: underline;
 }
 
 /* Code blocks */
 .swagger-ui.dark-mode pre,
 .swagger-ui.dark-mode code {
-    background-color: #475569; /* Dark background for code blocks */
-    color: #f8fafc;
+    background-color: #334155 !important; /* Dark background for code blocks */
+    color: #f1f5f9 !important;
     border-radius: 4px;
-    padding: 4px;
+    padding: 8px;
+    font-family: 'Fira Code', monospace;
+    border: 1px solid #475569;
+}
+
+/* Tables */
+.swagger-ui.dark-mode table {
+    background-color: #1e293b !important;
+    color: #f1f5f9 !important;
+}
+
+.swagger-ui.dark-mode table thead tr {
+    background-color: #334155 !important;
+    color: #f1f5f9 !important;
+}
+
+.swagger-ui.dark-mode table tbody tr {
+    background-color: #1e293b !important;
+    color: #f1f5f9 !important;
+}
+
+.swagger-ui.dark-mode table tbody tr:nth-child(odd) {
+    background-color: #283548 !important;
+}
+
+/* Models */
+.swagger-ui.dark-mode .model {
+    background-color: #1e293b !important;
+    border-radius: 6px;
+    border: 1px solid #475569;
+}
+
+.swagger-ui.dark-mode .model-container {
+    background-color: #1e293b !important;
+    border-radius: 6px;
+}
+
+/* Parameter row */
+.swagger-ui.dark-mode .parameters-col_description {
+    border-left: 1px solid #475569 !important;
+}
+
+.swagger-ui.dark-mode .parameter__name {
+    color: #f1f5f9 !important;
+    font-weight: 600 !important;
+}
+
+.swagger-ui.dark-mode .parameter__type {
+    color: #94a3b8 !important;
+}
+
+/* Response section */
+.swagger-ui.dark-mode .responses-inner {
+    background-color: #1e293b !important;
+}
+
+.swagger-ui.dark-mode .response-col_status {
+    color: #f1f5f9 !important;
+}
+
+/* Authorize button */
+.swagger-ui.dark-mode .btn.authorize {
+    background-color: transparent !important;
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+}
+
+.swagger-ui.dark-mode .btn.authorize svg {
+    fill: #3b82f6 !important;
+}
+
+/* Authorization dialog */
+.swagger-ui.dark-mode .dialog-ux .modal {
+    background-color: #1e293b !important;
+    border: 1px solid #475569 !important;
+    border-radius: 6px !important;
+}
+
+.swagger-ui.dark-mode .dialog-ux .modal-ux-header {
+    background-color: #334155 !important;
+    border-bottom: 1px solid #475569 !important;
+}
+
+.swagger-ui.dark-mode .dialog-ux .modal-ux-header h3 {
+    color: #f1f5f9 !important;
+}
+
+.swagger-ui.dark-mode .dialog-ux .modal-ux-content {
+    background-color: #1e293b !important;
+}
+
+.swagger-ui.dark-mode .scopes-table {
+    background-color: #1e293b !important;
+}
+
+.swagger-ui.dark-mode .scopes-table th {
+    background-color: #334155 !important;
+    color: #f1f5f9 !important;
 }

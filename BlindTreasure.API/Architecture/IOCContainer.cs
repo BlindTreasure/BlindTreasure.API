@@ -164,24 +164,20 @@ public static class IocContainer
 
         //3rd party
         services.AddHttpClient();
-        services.AddScoped<IGptService, GptService>();
         services.AddScoped<IBlobService, BlobService>();
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IBlindyService, BlindyService>();
         services.AddSignalR(options =>
-        {
-            options.EnableDetailedErrors = true;
-            options.MaximumReceiveMessageSize = 102400; // 100 KB
-            options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
-            options.KeepAliveInterval = TimeSpan.FromSeconds(15);
-            options.HandshakeTimeout = TimeSpan.FromSeconds(15);
-            options.StreamBufferCapacity = 10;
-        })
-        .AddJsonProtocol(options =>
-        {
-            options.PayloadSerializerOptions.PropertyNamingPolicy = null;
-        });
+            {
+                options.EnableDetailedErrors = true;
+                options.MaximumReceiveMessageSize = 102400; // 100 KB
+                options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+                options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+                options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+                options.StreamBufferCapacity = 10;
+            })
+            .AddJsonProtocol(options => { options.PayloadSerializerOptions.PropertyNamingPolicy = null; });
 
 
         services.AddHttpContextAccessor();
@@ -275,12 +271,10 @@ public static class IocContainer
                     {
                         var accessToken = context.Request.Query["access_token"];
                         var path = context.HttpContext.Request.Path;
-                        if (!string.IsNullOrEmpty(accessToken) && 
-                            (path.StartsWithSegments("/hubs/notification") || 
+                        if (!string.IsNullOrEmpty(accessToken) &&
+                            (path.StartsWithSegments("/hubs/notification") ||
                              path.StartsWithSegments("/hubs/chat")))
-                        {
                             context.Token = accessToken;
-                        }
                         return Task.CompletedTask;
                     }
                 };
