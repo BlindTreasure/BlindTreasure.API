@@ -37,7 +37,6 @@ public class User : BaseEntity
     // Collections
     public ICollection<CartItem> CartItems { get; set; }
     public ICollection<InventoryItem> InventoryItems { get; set; }
-    public ICollection<CustomerDiscount> CustomerDiscounts { get; set; }
     public ICollection<CustomerBlindBox>? CustomerBlindBoxes { get; set; }
 
     public ICollection<Order> Orders { get; set; }
@@ -45,7 +44,6 @@ public class User : BaseEntity
     public ICollection<Review> Reviews { get; set; }
     public ICollection<SupportTicket> SupportTickets { get; set; }
     public ICollection<Notification> Notifications { get; set; }
-    public ICollection<Wishlist> Wishlists { get; set; }
     public ICollection<Certificate> VerifiedCertificates { get; set; }
     public ICollection<ProbabilityConfig> ApprovedProbabilityConfigs { get; set; }
 }

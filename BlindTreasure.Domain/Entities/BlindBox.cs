@@ -26,5 +26,4 @@ public class BlindBox : BaseEntity
     public ICollection<CartItem>? CartItems { get; set; }
     public ICollection<OrderDetail>? OrderDetails { get; set; }
     public ICollection<Review>? Reviews { get; set; }
-    public ICollection<WishlistItem>? WishlistItems { get; set; }
 }

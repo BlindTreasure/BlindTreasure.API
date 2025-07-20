@@ -403,7 +403,6 @@ public class SystemController : ControllerBase
                     () => context.Listings.ExecuteDeleteAsync(),
                     () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
-                    () => context.WishlistItems.ExecuteDeleteAsync(),
                     () => context.SupportTickets.ExecuteDeleteAsync(),
                     () => context.Reviews.ExecuteDeleteAsync(),
                     () => context.Shipments.ExecuteDeleteAsync(),
@@ -411,8 +410,6 @@ public class SystemController : ControllerBase
                     () => context.Notifications.ExecuteDeleteAsync(),
                     () => context.OtpVerifications.ExecuteDeleteAsync(),
 
-                    () => context.Wishlists.ExecuteDeleteAsync(),
-                    () => context.CustomerDiscounts.ExecuteDeleteAsync(),
                     () => context.Orders.ExecuteDeleteAsync(),
                     () => context.Payments.ExecuteDeleteAsync(),
                     () => context.Promotions.ExecuteDeleteAsync(),
