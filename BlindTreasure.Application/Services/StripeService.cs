@@ -57,11 +57,11 @@ public class StripeService : IStripeService
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
+            .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
+            .ThenInclude(od => od.BlindBox)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Shipments)
+            .ThenInclude(od => od.Shipments)
             .Include(o => o.Promotion)
             .FirstOrDefaultAsync();
 
@@ -86,9 +86,7 @@ public class StripeService : IStripeService
         var shipmentDescriptions = new List<string>();
         decimal totalShippingFee = 0;
         foreach (var od in order.OrderDetails)
-        {
             if (od.Shipments != null && od.Shipments.Any())
-            {
                 foreach (var shipment in od.Shipments)
                 {
                     shipmentDescriptions.Add(
@@ -96,8 +94,7 @@ public class StripeService : IStripeService
                     );
                     totalShippingFee += shipment.TotalFee ?? 0;
                 }
-            }
-        }
+
         var shipmentDesc = shipmentDescriptions.Any()
             ? string.Join(" | ", shipmentDescriptions)
             : "Không có thông tin giao hàng.";
@@ -124,11 +121,12 @@ public class StripeService : IStripeService
             }
 
             // Thêm thông tin shipment cho từng sản phẩm nếu có
-            string shipmentInfo = "";
+            var shipmentInfo = "";
             if (item.Shipments != null && item.Shipments.Any())
             {
                 var shipment = item.Shipments.First();
-                shipmentInfo = $", Ship: {shipment.Provider} - {shipment.TotalFee:N0} VND, Tracking: {shipment.OrderCode}";
+                shipmentInfo =
+                    $", Ship: {shipment.Provider} - {shipment.TotalFee:N0} VND, Tracking: {shipment.OrderCode}";
             }
 
             lineItems.Add(new SessionLineItemOptions
@@ -141,9 +139,9 @@ public class StripeService : IStripeService
                         Name =
                             $"Product/Blindbox Name: {name} , Order Detail id {item.Id} belongs to Order {order.Id} paid by {user.Email}",
                         Description =
-                        $"Sản phẩm: {name}, Số lượng: {item.Quantity}, Tổng: {item.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
-                        (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "") +
-                        (!string.IsNullOrEmpty(shipmentInfo) ? shipmentInfo : "")
+                            $"Sản phẩm: {name}, Số lượng: {item.Quantity}, Tổng: {item.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
+                            (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "") +
+                            (!string.IsNullOrEmpty(shipmentInfo) ? shipmentInfo : "")
                     },
                     UnitAmount = (long)unitPrice // Stripe expects amount in cents
                 },
@@ -153,7 +151,6 @@ public class StripeService : IStripeService
 
         // Thêm một line item cho phí ship tổng nếu có
         if (totalShippingFee > 0)
-        {
             lineItems.Add(new SessionLineItemOptions
             {
                 PriceData = new SessionLineItemPriceDataOptions
@@ -168,7 +165,6 @@ public class StripeService : IStripeService
                 },
                 Quantity = 1
             });
-        }
 
         var options = new SessionCreateOptions
         {
@@ -270,37 +266,39 @@ public class StripeService : IStripeService
         }
     }
 
-    public async Task<string> CreateShipmentCheckoutSessionAsync(List<Shipment> shipments, Guid userId, int totalShippingFee)
+    public async Task<string> CreateShipmentCheckoutSessionAsync(List<Shipment> shipments, Guid userId,
+        int totalShippingFee)
     {
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null)
             throw ErrorHelper.NotFound("User không tồn tại.");
 
         var lineItems = new List<SessionLineItemOptions>
-    {
-        new SessionLineItemOptions
         {
-            PriceData = new SessionLineItemPriceDataOptions
+            new()
             {
-                Currency = "vnd",
-                ProductData = new SessionLineItemPriceDataProductDataOptions
+                PriceData = new SessionLineItemPriceDataOptions
                 {
-                    Name = "Phí vận chuyển nhiều đơn GHN",
-                    Description = string.Join(" | ", shipments.Select(s => $"Mã vận đơn: {s.OrderCode}, Phí: {s.TotalFee:N0} VND"))
+                    Currency = "vnd",
+                    ProductData = new SessionLineItemPriceDataProductDataOptions
+                    {
+                        Name = "Phí vận chuyển nhiều đơn GHN",
+                        Description = string.Join(" | ",
+                            shipments.Select(s => $"Mã vận đơn: {s.OrderCode}, Phí: {s.TotalFee:N0} VND"))
+                    },
+                    UnitAmount = totalShippingFee
                 },
-                UnitAmount = totalShippingFee
-            },
-            Quantity = 1
-        }
-    };
+                Quantity = 1
+            }
+        };
 
         var options = new SessionCreateOptions
         {
             Metadata = new Dictionary<string, string>
-        {
-            { "shipmentIds", string.Join(",", shipments.Select(s => s.Id)) },
-            { "userId", userId.ToString() }
-        },
+            {
+                { "shipmentIds", string.Join(",", shipments.Select(s => s.Id)) },
+                { "userId", userId.ToString() }
+            },
             CustomerEmail = user.Email,
             PaymentMethodTypes = new List<string> { "card" },
             LineItems = lineItems,

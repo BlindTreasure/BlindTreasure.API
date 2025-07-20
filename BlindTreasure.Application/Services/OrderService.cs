@@ -70,6 +70,7 @@ public class OrderService : IOrderService
                 _loggerService.Warn("Default shipping address not found.");
                 throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
             }
+
             shippingAddressId = address.Id;
         }
 
@@ -112,6 +113,7 @@ public class OrderService : IOrderService
                 _loggerService.Warn("Default shipping address not found.");
                 throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
             }
+
             shippingAddressId = address.Id;
         }
 
@@ -189,7 +191,7 @@ public class OrderService : IOrderService
             : query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
 
         var totalCount = await query.CountAsync();
-        List<Order> orders = param.PageIndex == 0
+        var orders = param.PageIndex == 0
             ? await query.ToListAsync()
             : await query.Skip((param.PageIndex - 1) * param.PageSize).Take(param.PageSize).ToListAsync();
 
@@ -231,6 +233,7 @@ public class OrderService : IOrderService
                 blindBox.TotalQuantity += od.Quantity;
                 await _unitOfWork.BlindBoxes.Update(blindBox);
             }
+
             od.Status = OrderDetailStatus.CANCELLED.ToString();
         }
 
@@ -269,10 +272,10 @@ public class OrderService : IOrderService
         {
             var product = getProduct(item);
             var category = product.Category;
-            int length = Convert.ToInt32(product.Length ?? 10);
-            int width = Convert.ToInt32(product.Width ?? 10);
-            int height = Convert.ToInt32(product.Height ?? 10);
-            int weight = Convert.ToInt32(product.Weight ?? 1000);
+            var length = Convert.ToInt32(product.Length ?? 10);
+            var width = Convert.ToInt32(product.Width ?? 10);
+            var height = Convert.ToInt32(product.Height ?? 10);
+            var weight = Convert.ToInt32(product.Weight ?? 1000);
 
             return new GhnOrderItemDto
             {
@@ -301,7 +304,7 @@ public class OrderService : IOrderService
             Note = $"Giao hàng cho seller {seller.CompanyName}",
             RequiredNote = "CHOXEMHANGKHONGTHU",
             FromName = seller.CompanyName ?? "BlindTreasure Warehouse",
-            FromPhone = "0925136907" ?? seller.CompanyPhone  ,
+            FromPhone = "0925136907" ?? seller.CompanyPhone,
             FromAddress = seller.CompanyAddress ?? "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, TP.HCM",
             FromWardName = seller.CompanyWardName ?? "Phường 14",
             FromDistrictName = seller.CompanyDistrictName ?? "Quận 10",
@@ -357,7 +360,6 @@ public class OrderService : IOrderService
         }
 
         foreach (var item in itemList)
-        {
             if (item.ProductId.HasValue)
             {
                 var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
@@ -366,11 +368,13 @@ public class OrderService : IOrderService
                     _loggerService.Warn($"Product {item.ProductId} not found or deleted.");
                     throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderProductNotFound, item.ProductName));
                 }
+
                 if (product.Stock < item.Quantity)
                 {
                     _loggerService.Warn($"Product {item.ProductId} out of stock.");
                     throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderProductOutOfStock, item.ProductName));
                 }
+
                 if (product.Status != ProductStatus.Active)
                 {
                     _loggerService.Warn($"Product {item.ProductId} not for sale.");
@@ -385,18 +389,21 @@ public class OrderService : IOrderService
                     _loggerService.Warn($"BlindBox {item.BlindBoxId} not found or deleted.");
                     throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderBlindBoxNotFound, item.BlindBoxName));
                 }
+
                 if (blindBox.Status != BlindBoxStatus.Approved)
                 {
                     _loggerService.Warn($"BlindBox {item.BlindBoxId} not approved.");
-                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderBlindBoxNotApproved, item.BlindBoxName));
+                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderBlindBoxNotApproved,
+                        item.BlindBoxName));
                 }
+
                 if (blindBox.TotalQuantity < item.Quantity)
                 {
                     _loggerService.Warn($"BlindBox {item.BlindBoxId} out of stock.");
-                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderBlindBoxOutOfStock, item.BlindBoxName));
+                    throw ErrorHelper.BadRequest(
+                        string.Format(ErrorMessages.OrderBlindBoxOutOfStock, item.BlindBoxName));
                 }
             }
-        }
 
         var totalPrice = itemList.Sum(i => i.TotalPrice);
 
@@ -484,6 +491,7 @@ public class OrderService : IOrderService
                     blindBox.Status = BlindBoxStatus.Rejected;
                     _loggerService.Info($"BlindBox {blindBox.Id} is now out of stock and set to Rejected.");
                 }
+
                 await _unitOfWork.BlindBoxes.Update(blindBox);
             }
         }
@@ -517,10 +525,14 @@ public class OrderService : IOrderService
                     od => od.Quantity
                 );
 
-                var ghnCreateResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest); // sửa thành chính thức sang preview vì đây là tạo yêu cầu thanh toán
+                var ghnCreateResponse =
+                    await _ghnShippingService
+                        .PreviewOrderAsync(
+                            ghnOrderRequest); // sửa thành chính thức sang preview vì đây là tạo yêu cầu thanh toán
 
                 order.TotalAmount += ghnCreateResponse?.TotalFee ?? 0;
-                _loggerService.Info($"Created GHN shipment for seller {seller.Id}, fee: {ghnCreateResponse?.TotalFee ?? 0}");
+                _loggerService.Info(
+                    $"Created GHN shipment for seller {seller.Id}, fee: {ghnCreateResponse?.TotalFee ?? 0}");
 
                 foreach (var od in group)
                 {
@@ -529,11 +541,15 @@ public class OrderService : IOrderService
                         OrderDetailId = od.Id,
                         Provider = "GHN",
                         OrderCode = ghnCreateResponse?.OrderCode,
-                        TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0,
+                        TotalFee = ghnCreateResponse?.TotalFee != null
+                            ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value)
+                            : 0,
                         MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0),
                         TrackingNumber = ghnCreateResponse?.OrderCode ?? "",
                         ShippedAt = DateTime.UtcNow,
-                        EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default ? ghnCreateResponse.ExpectedDeliveryTime : DateTime.UtcNow.AddDays(3),
+                        EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
+                            ? ghnCreateResponse.ExpectedDeliveryTime
+                            : DateTime.UtcNow.AddDays(3),
                         Status = "WAITING_PAYMENT" // chưa thanh toán, chờ xác nhận
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
@@ -543,6 +559,7 @@ public class OrderService : IOrderService
                     await _unitOfWork.OrderDetails.Update(od);
                 }
             }
+
             await _unitOfWork.SaveChangesAsync();
         }
 
@@ -554,7 +571,8 @@ public class OrderService : IOrderService
         return await _stripeService.CreateCheckoutSession(order.Id);
     }
 
-    public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(List<DirectCartItemDto> items, bool? IsPreview = false)
+    public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(List<DirectCartItemDto> items,
+        bool? IsPreview = false)
     {
         _loggerService.Info("Preview shipping checkout started.");
         var userId = _claimsService.CurrentUserId;
@@ -607,7 +625,6 @@ public class OrderService : IOrderService
             var ghnPreviewResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest);
 
             foreach (var item in groupItems)
-            {
                 result.Add(new ShipmentCheckoutResponseDTO
                 {
                     SellerId = seller.Id,
@@ -615,7 +632,6 @@ public class OrderService : IOrderService
                     Shipment = null,
                     GhnPreviewResponse = ghnPreviewResponse
                 });
-            }
         }
 
         _loggerService.Info("Preview shipping checkout completed.");

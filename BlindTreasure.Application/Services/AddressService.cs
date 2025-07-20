@@ -80,8 +80,7 @@ public class AddressService : IAddressService
             PostalCode = dto.PostalCode,
             IsDefault = dto.IsDefault,
             Ward = dto.Ward,
-            District = dto.District,
-
+            District = dto.District
         };
 
         if (!isFirstAddress && dto.IsDefault)
@@ -223,8 +222,7 @@ public class AddressService : IAddressService
             Country = address.Country,
             IsDefault = address.IsDefault,
             Ward = address.Ward,
-            District = address.District,
-
+            District = address.District
         };
     }
 }

@@ -30,7 +30,9 @@ public class UnitOfWork(
     IGenericRepository<ChatMessage> chatMessages,
     IGenericRepository<BlindBoxUnboxLog> blindBoxUnboxLogs,
     IGenericRepository<Shipment> Shipments,
-    IGenericRepository<ListingReport> listingReports)
+    IGenericRepository<ListingReport> listingReports,
+    IGenericRepository<TradeHistory> tradeHistories,
+    IGenericRepository<TradeRequest> tradeRequests)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
@@ -58,6 +60,8 @@ public class UnitOfWork(
     public IGenericRepository<BlindBoxUnboxLog> BlindBoxUnboxLogs { get; } = blindBoxUnboxLogs;
     public IGenericRepository<Shipment> Shipments { get; } = Shipments;
     public IGenericRepository<ListingReport> ListingReports { get; } = listingReports;
+    public IGenericRepository<TradeHistory> TradeHistories { get; } = tradeHistories;
+    public IGenericRepository<TradeRequest> TradeRequests { get; } = tradeRequests;
 
     public void Dispose()
     {

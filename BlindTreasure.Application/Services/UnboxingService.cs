@@ -147,8 +147,12 @@ public class UnboxingService : IUnboxingService
         var sb = new StringBuilder();
         var total = probabilities.Values.Sum();
 
-        sb.AppendLine($"Gacha Roll: {Math.Round(roll, 4):N4} / Tổng xác suất: {Math.Round(total, 2):N2}%");
-        sb.AppendLine("Danh sách item:");
+        // Tiêu đề
+        sb.AppendLine($"### Gacha Roll");
+        sb.AppendLine($"- **Roll:** {Math.Round(roll, 4):N4}");
+        sb.AppendLine($"- **Tổng xác suất:** {Math.Round(total, 2):N2}%\n");
+
+        sb.AppendLine("### Danh sách item:");
 
         decimal cumulative = 0;
         foreach (var kvp in probabilities
@@ -162,16 +166,16 @@ public class UnboxingService : IUnboxingService
             var name = kvp.Key.Product?.Name ?? "Không rõ";
             var rarity = kvp.Key.RarityConfig?.Name.ToString() ?? "Không rõ";
             var drop = Math.Round(kvp.Value, 2);
-            var range = $"[{Math.Round(start, 2):N2} – {Math.Round(end, 2):N2}]";
+            var range = $"{Math.Round(start, 2):N2}% – {Math.Round(end, 2):N2}%";
+            var selectedMark = kvp.Key.Id == selectedItem.Id ? " **<= ĐÃ TRÚNG**" : "";
 
-            var selectedMark = kvp.Key.Id == selectedItem.Id ? " <= ĐÃ TRÚNG" : "";
-
-            sb.AppendLine($"- {name} | Độ hiếm: {rarity} | Tỉ lệ: {drop:N2}% | Khoảng: {range}{selectedMark}");
+            sb.AppendLine(
+                $"- **{name}** (Độ hiếm: *{rarity}*, Tỉ lệ: {drop:N2}%, Khoảng: {range}){selectedMark}"
+            );
         }
 
-        sb.AppendLine();
         sb.AppendLine(
-            $"Kết quả: '{selectedItem.Product?.Name}' được chọn (DropRate = {Math.Round(selectedItem.DropRate, 2):N2}%)");
+            $"\n**Kết quả:** `{selectedItem.Product?.Name}` (DropRate = {Math.Round(selectedItem.DropRate, 2):N2}%)");
 
         return sb.ToString();
     }

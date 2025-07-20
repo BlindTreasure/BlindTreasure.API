@@ -2,6 +2,8 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.ListingDTOs;
+using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
+using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,6 +21,24 @@ public class ListingController : ControllerBase
         _listingService = listingService;
     }
 
+    [AllowAnonymous]
+    [HttpGet]
+    public async Task<IActionResult> GetAllListings([FromQuery] ListingQueryParameter param)
+    {
+        try
+        {
+            var result = await _listingService.GetAllListingsAsync(param);
+            return Ok(ApiResult<Pagination<ListingDetailDto>>.Success(result, "200", "Lấy danh sách listing thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<Pagination<ListingDetailDto>>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    
     /// <summary>
     ///     Tạo listing (free hoặc trade) cho item trong kho.
     /// </summary>
@@ -76,22 +96,97 @@ public class ListingController : ControllerBase
         }
     }
 
+    // /// <summary>
+    // ///     Cronjob: cập nhật các listing quá 30 ngày thành Expired.
+    // /// </summary>
+    // [HttpPost("cron/expire-old-listings")]
+    // [AllowAnonymous]
+    // public async Task<IActionResult> ExpireOldListings()
+    // {
+    //     try
+    //     {
+    //         var count = await _listingService.ExpireOldListingsAsync();
+    //         return Ok(ApiResult<object>.Success(new { count }, "200", "Cập nhật hết hạn listing thành công."));
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+    //         var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+    //         return StatusCode(statusCode, error);
+    //     }
+    // }
     /// <summary>
-    ///     Cronjob: cập nhật các listing quá 30 ngày thành Expired.
+    ///     Tạo Trade Request cho một Listing.
     /// </summary>
-    [HttpPost("cron/expire-old-listings")]
-    [AllowAnonymous]
-    public async Task<IActionResult> ExpireOldListings()
+    [HttpPost("{listingId}/trade-requests")]
+    public async Task<IActionResult> CreateTradeRequest(Guid listingId, [FromBody] CreateTradeRequestDto dto)
     {
         try
         {
-            var count = await _listingService.ExpireOldListingsAsync();
-            return Ok(ApiResult<object>.Success(new { count }, "200", "Cập nhật hết hạn listing thành công."));
+            var result = await _listingService.CreateTradeRequestAsync(listingId, dto.OfferedInventoryId);
+            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", "Tạo trade request thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<TradeRequestDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     Phản hồi Trade Request (Accept/Reject).
+    /// </summary>
+    [HttpPost("trade-requests/{tradeRequestId}/respond")]
+    public async Task<IActionResult> RespondTradeRequest(Guid tradeRequestId, [FromQuery] bool isAccepted)
+    {
+        try
+        {
+            var result = await _listingService.RespondTradeRequestAsync(tradeRequestId, isAccepted);
+            return Ok(ApiResult<object>.Success(new { result }, "200", "Cập nhật trade request thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     Đóng một Listing.
+    /// </summary>
+    [HttpPost("{listingId}/close")]
+    public async Task<IActionResult> CloseListing(Guid listingId)
+    {
+        try
+        {
+            var result = await _listingService.CloseListingAsync(listingId);
+            return Ok(ApiResult<object>.Success(new { result }, "200", "Đóng listing thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     Lấy danh sách Trade Request cho một Listing.
+    /// </summary>
+    [HttpGet("{listingId}/trade-requests")]
+    public async Task<IActionResult> GetTradeRequests(Guid listingId)
+    {
+        try
+        {
+            var result = await _listingService.GetTradeRequestsAsync(listingId);
+            return Ok(ApiResult<List<TradeRequestDto>>.Success(result, "200", "Lấy danh sách trade requests thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<List<TradeRequestDto>>(ex);
             return StatusCode(statusCode, error);
         }
     }

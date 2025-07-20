@@ -5,14 +5,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Domain.DTOs.InventoryItemDTOs
+namespace BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+
+public class RequestItemShipmentDTO
 {
-    public class RequestItemShipmentDTO
-    {
-
-        public List<Guid> InventoryItemIds { get; set; }
-
-    }
-
-   
+    public List<Guid> InventoryItemIds { get; set; }
 }

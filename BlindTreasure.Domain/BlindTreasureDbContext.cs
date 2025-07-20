@@ -28,7 +28,6 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<CustomerBlindBox> CustomerBlindBoxes { get; set; }
     public DbSet<OtpVerification> OtpVerifications { get; set; }
     public DbSet<Listing> Listings { get; set; }
-    public DbSet<CustomerDiscount> CustomerDiscounts { get; set; }
     public DbSet<CartItem> CartItems { get; set; }
     public DbSet<Order> Orders { get; set; }
     public DbSet<OrderDetail> OrderDetails { get; set; }
@@ -41,8 +40,6 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<Promotion> Promotions { get; set; }
     public DbSet<PromotionParticipant> PromotionParticipants { get; set; }
-    public DbSet<Wishlist> Wishlists { get; set; }
-    public DbSet<WishlistItem> WishlistItems { get; set; }
 
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<BlindBoxUnboxLog> BlindBoxUnboxLogs { get; set; }
@@ -435,12 +432,6 @@ public class BlindTreasureDbContext : DbContext
             .WithOne(l => l.InventoryItem)
             .HasForeignKey(l => l.InventoryId);
 
-        // CustomerDiscount ↔ User (n-1)
-        modelBuilder.Entity<CustomerDiscount>()
-            .HasOne(cd => cd.Customer)
-            .WithMany(u => u.CustomerDiscounts)
-            .HasForeignKey(cd => cd.CustomerId);
-
         // CartItem ↔ User (n-1)
         modelBuilder.Entity<CartItem>()
             .HasOne(ci => ci.User)
@@ -553,28 +544,48 @@ public class BlindTreasureDbContext : DbContext
             .WithMany(u => u.Notifications)
             .HasForeignKey(n => n.UserId);
 
-        // Wishlist ↔ User (n-1)
-        modelBuilder.Entity<Wishlist>()
-            .HasOne(w => w.User)
-            .WithMany(u => u.Wishlists)
-            .HasForeignKey(w => w.UserId);
+        modelBuilder.Entity<TradeRequest>(entity =>
+        {
+            entity.Property(t => t.Status)
+                .HasConversion<string>()
+                .HasMaxLength(32);
 
-        // WishlistItem ↔ Wishlist / Product / BlindBox (n-1), set null
-        modelBuilder.Entity<WishlistItem>()
-            .HasOne(wi => wi.Wishlist)
-            .WithMany(w => w.WishlistItems)
-            .HasForeignKey(wi => wi.WishlistId);
+            entity.HasOne(t => t.Listing)
+                .WithMany()
+                .HasForeignKey(t => t.ListingId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<WishlistItem>()
-            .HasOne(wi => wi.Product)
-            .WithMany(p => p.WishlistItems)
-            .HasForeignKey(wi => wi.ProductId)
-            .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(t => t.Requester)
+                .WithMany()
+                .HasForeignKey(t => t.RequesterId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<WishlistItem>()
-            .HasOne(wi => wi.BlindBox)
-            .WithMany(b => b.WishlistItems)
-            .HasForeignKey(wi => wi.BlindBoxId)
-            .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(t => t.OfferedInventory)
+                .WithMany()
+                .HasForeignKey(t => t.OfferedInventoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<TradeHistory>(entity =>
+        {
+            entity.Property(t => t.FinalStatus)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+
+            entity.HasOne(t => t.Listing)
+                .WithMany()
+                .HasForeignKey(t => t.ListingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(t => t.Requester)
+                .WithMany()
+                .HasForeignKey(t => t.RequesterId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(t => t.OfferedInventory)
+                .WithMany()
+                .HasForeignKey(t => t.OfferedInventoryId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
     }
 }

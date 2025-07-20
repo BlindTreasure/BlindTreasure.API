@@ -6,7 +6,6 @@ using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
-using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -16,14 +15,14 @@ namespace BlindTreasure.Application.Services;
 public class InventoryItemService : IInventoryItemService
 {
     private readonly ICacheService _cacheService;
-    private readonly ICategoryService _categoryService; 
+    private readonly ICategoryService _categoryService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _loggerService;
     private readonly IOrderService _orderService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
-    public readonly IGhnShippingService _ghnShippingService;
-    public readonly IStripeService _stripeService;
+    private readonly IGhnShippingService _ghnShippingService;
+    private readonly IStripeService _stripeService;
 
 
     public InventoryItemService(
@@ -93,7 +92,7 @@ public class InventoryItemService : IInventoryItemService
             Quantity = dto.Quantity,
             Location = dto.Location ?? string.Empty,
             Status = dto.Status,
-            AddressId = dto.AddressId,
+            AddressId = dto.AddressId
         };
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
@@ -260,7 +259,7 @@ public class InventoryItemService : IInventoryItemService
 
         var shipments = new List<Shipment>();
         var shipmentDtos = new List<ShipmentDto>();
-        int totalShippingFee = 0;
+        var totalShippingFee = 0;
 
         foreach (var group in sellerGroups)
         {
@@ -271,10 +270,10 @@ public class InventoryItemService : IInventoryItemService
             var ghnOrderItems = group.Select(i =>
             {
                 var p = i.Product;
-                int length = Convert.ToInt32(p.Length ?? 10);
-                int width = Convert.ToInt32(p.Width ?? 10);
-                int height = Convert.ToInt32(p.Height ?? 10);
-                int weight = Convert.ToInt32(p.Weight ?? 1000);
+                var length = Convert.ToInt32(p.Length ?? 10);
+                var width = Convert.ToInt32(p.Width ?? 10);
+                var height = Convert.ToInt32(p.Height ?? 10);
+                var weight = Convert.ToInt32(p.Weight ?? 1000);
 
                 return new GhnOrderItemDto
                 {
@@ -335,7 +334,9 @@ public class InventoryItemService : IInventoryItemService
                 MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0),
                 TrackingNumber = ghnCreateResponse?.OrderCode ?? "",
                 ShippedAt = DateTime.UtcNow,
-                EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default ? ghnCreateResponse.ExpectedDeliveryTime : DateTime.UtcNow.AddDays(3),
+                EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
+                    ? ghnCreateResponse.ExpectedDeliveryTime
+                    : DateTime.UtcNow.AddDays(3),
                 Status = "WAITING_PAYMENT"
             };
             shipment = await _unitOfWork.Shipments.AddAsync(shipment);
@@ -358,7 +359,8 @@ public class InventoryItemService : IInventoryItemService
 
     // C# BlindTreasure.Application\Services\InventoryItemService.cs
 
-    public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShipmentForListItemsAsync(RequestItemShipmentDTO request)
+    public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShipmentForListItemsAsync(
+        RequestItemShipmentDTO request)
     {
         var userId = _claimsService.CurrentUserId;
         if (request.InventoryItemIds == null || !request.InventoryItemIds.Any())
@@ -397,10 +399,10 @@ public class InventoryItemService : IInventoryItemService
             var ghnOrderItems = group.Select(i =>
             {
                 var p = i.Product;
-                int length = Convert.ToInt32(p.Length > 0 ? p.Length : 10);
-                int width = Convert.ToInt32(p.Width > 0 ? p.Width : 10);
-                int height = Convert.ToInt32(p.Height > 0 ? p.Height : 10);
-                int weight = Convert.ToInt32(p.Weight > 0 ? p.Weight : 1000);
+                var length = Convert.ToInt32(p.Length > 0 ? p.Length : 10);
+                var width = Convert.ToInt32(p.Width > 0 ? p.Width : 10);
+                var height = Convert.ToInt32(p.Height > 0 ? p.Height : 10);
+                var weight = Convert.ToInt32(p.Weight > 0 ? p.Weight : 1000);
 
                 return new GhnOrderItemDto
                 {
@@ -458,7 +460,7 @@ public class InventoryItemService : IInventoryItemService
                 SellerCompanyName = seller.CompanyName,
                 SellerId = seller.Id,
                 GhnPreviewResponse = ghnPreviewResponse
-            }); 
+            });
         }
 
         return result;
@@ -474,5 +476,4 @@ public class ShipmentItemResponseDTO
 {
     public string? PaymentUrl { get; set; } // URL thanh toán phí ship
     public List<ShipmentDto>? Shipments { get; set; }
-
 }

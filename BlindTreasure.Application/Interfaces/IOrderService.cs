@@ -14,5 +14,7 @@ public interface IOrderService
     Task DeleteOrderAsync(Guid orderId);
     Task<Pagination<OrderDto>> GetMyOrdersAsync(OrderQueryParameter param);
     Task<OrderDto> GetOrderByIdAsync(Guid orderId);
-    Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(List<DirectCartItemDto> items, bool? IsPreview=false);
+
+    Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(List<DirectCartItemDto> items,
+        bool? IsPreview = false);
 }
