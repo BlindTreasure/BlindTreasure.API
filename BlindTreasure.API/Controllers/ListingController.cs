@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.ListingDTOs;
+using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -92,6 +93,81 @@ public class ListingController : ControllerBase
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+    /// <summary>
+    ///     Tạo Trade Request cho một Listing.
+    /// </summary>
+    [HttpPost("{listingId}/trade-requests")]
+    public async Task<IActionResult> CreateTradeRequest(Guid listingId, [FromBody] CreateTradeRequestDto dto)
+    {
+        try
+        {
+            var result = await _listingService.CreateTradeRequestAsync(listingId, dto.OfferedInventoryId);
+            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", "Tạo trade request thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<TradeRequestDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     Phản hồi Trade Request (Accept/Reject).
+    /// </summary>
+    [HttpPost("trade-requests/{tradeRequestId}/respond")]
+    public async Task<IActionResult> RespondTradeRequest(Guid tradeRequestId, [FromQuery] bool isAccepted)
+    {
+        try
+        {
+            var result = await _listingService.RespondTradeRequestAsync(tradeRequestId, isAccepted);
+            return Ok(ApiResult<object>.Success(new { result }, "200", "Cập nhật trade request thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     Đóng một Listing.
+    /// </summary>
+    [HttpPost("{listingId}/close")]
+    public async Task<IActionResult> CloseListing(Guid listingId)
+    {
+        try
+        {
+            var result = await _listingService.CloseListingAsync(listingId);
+            return Ok(ApiResult<object>.Success(new { result }, "200", "Đóng listing thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    ///     Lấy danh sách Trade Request cho một Listing.
+    /// </summary>
+    [HttpGet("{listingId}/trade-requests")]
+    public async Task<IActionResult> GetTradeRequests(Guid listingId)
+    {
+        try
+        {
+            var result = await _listingService.GetTradeRequestsAsync(listingId);
+            return Ok(ApiResult<List<TradeRequestDto>>.Success(result, "200", "Lấy danh sách trade requests thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<List<TradeRequestDto>>(ex);
             return StatusCode(statusCode, error);
         }
     }
