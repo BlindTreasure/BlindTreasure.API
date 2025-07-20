@@ -54,15 +54,62 @@ public class ListingService : IListingService
             .ToListAsync();
 
         var listingDtos = listings
-            .Select(l => _mapper.Map<Listing, ListingDetailDto>(l))
+            .Select(l => {
+                var dto = _mapper.Map<Listing, ListingDetailDto>(l);
+                dto.ProductName = l.InventoryItem?.Product?.Name ?? "Unknown";
+                dto.ProductImage = l.InventoryItem?.Product?.ImageUrls?.FirstOrDefault() ?? "";
+                return dto;
+            })
             .ToList();
 
         return new Pagination<ListingDetailDto>(listingDtos, count, param.PageIndex, param.PageSize);
     }
 
-    /// <summary>
-    /// Tạo listing mới, hỗ trợ cho free hoặc trade item.
-    /// </summary>
+    public async Task<List<InventoryItemDto>> GetAvailableItemsForListingAsync()
+    {
+        var userId = _claimsService.CurrentUserId;
+
+        var items = await _unitOfWork.InventoryItems.GetAllAsync(
+            x => x.UserId == userId &&
+                 x.IsFromBlindBox &&
+                 !x.IsDeleted &&
+                 x.Status == InventoryItemStatus.Available &&
+                 (!x.Listings.Any() || x.Listings.All(l => l.Status != ListingStatus.Active)),
+            i => i.Product,
+            i => i.Listings
+        );
+
+        return items.Select(item => {
+            var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
+            dto.ProductName = item.Product?.Name ?? "Unknown";
+            dto.ProductImage = item.Product?.ImageUrls?.FirstOrDefault() ?? "";
+            return dto;
+        }).ToList();
+    }
+
+    public async Task<List<TradeRequestDto>> GetTradeRequestsAsync(Guid listingId)
+    {
+        var listing = await _unitOfWork.Listings.GetByIdAsync(listingId);
+        if (listing == null)
+            throw ErrorHelper.NotFound("Listing không tồn tại.");
+
+        var tradeRequests = await _unitOfWork.TradeRequests.GetAllAsync(t => t.ListingId == listingId,
+            t => t.OfferedInventory, t => t.Requester);
+        return tradeRequests.Select(t => new TradeRequestDto
+        {
+            Id = t.Id,
+            ListingId = t.ListingId,
+            ListingItemName = listing.InventoryItem?.Product?.Name ?? "Unknown",
+            RequesterId = t.RequesterId,
+            RequesterName = t.Requester.FullName ?? "Unknown",
+            OfferedInventoryId = t.OfferedInventoryId,
+            OfferedItemName = t.OfferedInventory?.Product?.Name,
+            Status = t.Status.ToString(),
+            RequestedAt = t.RequestedAt,
+            RespondedAt = t.RespondedAt
+        }).ToList();
+    }
+
     public async Task<ListingDto> CreateListingAsync(CreateListingRequestDto dto)
     {
         var userId = _claimsService.CurrentUserId;
@@ -89,6 +136,7 @@ public class ListingService : IListingService
             IsFree = dto.IsFree,
             DesiredItemId = dto.IsFree ? null : dto.DesiredItemId,
             DesiredItemName = dto.IsFree ? null : dto.DesiredItemName,
+            Description = dto.Description,
             ListedAt = DateTime.UtcNow,
             Status = ListingStatus.Active,
             TradeStatus = TradeStatus.Pending
@@ -104,6 +152,25 @@ public class ListingService : IListingService
         return listingDto;
     }
 
+    public async Task<bool> CloseListingAsync(Guid listingId)
+    {
+        var listing = await _unitOfWork.Listings.GetByIdAsync(listingId);
+        if (listing == null)
+            throw ErrorHelper.NotFound("Listing không tồn tại.");
+
+        var userId = _claimsService.CurrentUserId;
+        if (listing.InventoryItem.UserId != userId)
+            throw ErrorHelper.Forbidden("Bạn không có quyền đóng listing này.");
+
+        listing.Status = ListingStatus.Sold;
+        await _unitOfWork.Listings.Update(listing);
+        await _unitOfWork.SaveChangesAsync();
+        return true;
+    }
+
+    /// <summary>
+    /// Tạo báo cáo listing
+    /// </summary>
     public async Task ReportListingAsync(Guid listingId, string reason)
     {
         var listing = await _unitOfWork.Listings.GetByIdAsync(listingId);
@@ -120,26 +187,6 @@ public class ListingService : IListingService
 
         await _unitOfWork.ListingReports.AddAsync(report);
         await _unitOfWork.SaveChangesAsync();
-    }
-
-    /// <summary>
-    /// Lấy danh sách item có thể tạo listing.
-    /// </summary>
-    public async Task<List<InventoryItemDto>> GetAvailableItemsForListingAsync()
-    {
-        var userId = _claimsService.CurrentUserId;
-
-        var items = await _unitOfWork.InventoryItems.GetAllAsync(
-            x => x.UserId == userId &&
-                 x.IsFromBlindBox &&
-                 !x.IsDeleted &&
-                 x.Status == InventoryItemStatus.Available &&
-                 (!x.Listings.Any() || x.Listings.All(l => l.Status != ListingStatus.Active)),
-            i => i.Product,
-            i => i.Listings
-        );
-
-        return items.Select(item => _mapper.Map<InventoryItem, InventoryItemDto>(item)).ToList();
     }
 
     /// <summary>
@@ -232,7 +279,6 @@ public class ListingService : IListingService
         };
     }
 
-
     public async Task<bool> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted)
     {
         var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(
@@ -308,44 +354,5 @@ public class ListingService : IListingService
         await _unitOfWork.TradeRequests.Update(tradeRequest);
         await _unitOfWork.SaveChangesAsync();
         return true;
-    }
-
-    public async Task<bool> CloseListingAsync(Guid listingId)
-    {
-        var listing = await _unitOfWork.Listings.GetByIdAsync(listingId);
-        if (listing == null)
-            throw ErrorHelper.NotFound("Listing không tồn tại.");
-
-        var userId = _claimsService.CurrentUserId;
-        if (listing.InventoryItem.UserId != userId)
-            throw ErrorHelper.Forbidden("Bạn không có quyền đóng listing này.");
-
-        listing.Status = ListingStatus.Sold;
-        await _unitOfWork.Listings.Update(listing);
-        await _unitOfWork.SaveChangesAsync();
-        return true;
-    }
-
-    public async Task<List<TradeRequestDto>> GetTradeRequestsAsync(Guid listingId)
-    {
-        var listing = await _unitOfWork.Listings.GetByIdAsync(listingId);
-        if (listing == null)
-            throw ErrorHelper.NotFound("Listing không tồn tại.");
-
-        var tradeRequests = await _unitOfWork.TradeRequests.GetAllAsync(t => t.ListingId == listingId,
-            t => t.OfferedInventory, t => t.Requester);
-        return tradeRequests.Select(t => new TradeRequestDto
-        {
-            Id = t.Id,
-            ListingId = t.ListingId,
-            ListingItemName = listing.InventoryItem?.Product?.Name ?? "Unknown",
-            RequesterId = t.RequesterId,
-            RequesterName = t.Requester.FullName ?? "Unknown",
-            OfferedInventoryId = t.OfferedInventoryId,
-            OfferedItemName = t.OfferedInventory?.Product?.Name,
-            Status = t.Status.ToString(),
-            RequestedAt = t.RequestedAt,
-            RespondedAt = t.RespondedAt
-        }).ToList();
     }
 }

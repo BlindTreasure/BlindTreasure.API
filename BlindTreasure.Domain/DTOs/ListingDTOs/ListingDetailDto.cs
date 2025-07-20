@@ -9,7 +9,7 @@ public class ListingDetailDto
     public string ProductImage { get; set; }
     public bool IsFree { get; set; }
     public string? DesiredItemName { get; set; }
-    public string? Description { get; set; }
+    public string? Description { get; set; } // Mô tả listing
     public ListingStatus Status { get; set; }
     public DateTime ListedAt { get; set; }
     public string OwnerName { get; set; }
