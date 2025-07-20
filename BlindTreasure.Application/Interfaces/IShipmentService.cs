@@ -6,12 +6,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Application.Interfaces
+namespace BlindTreasure.Application.Interfaces;
+
+public interface IShipmentService
 {
-    public interface IShipmentService
-    {
-        Task<ShipmentDto?> GetByIdAsync(Guid shipmentId);
-        Task<List<ShipmentDto>> GetByOrderDetailIdAsync(Guid orderDetailId);
-        Task<List<ShipmentDto>> GetMyShipmentsAsync(Guid? orderId = null, Guid? orderDetailId = null);
-    }
+    Task<ShipmentDto?> GetByIdAsync(Guid shipmentId);
+    Task<List<ShipmentDto>> GetByOrderDetailIdAsync(Guid orderDetailId);
+    Task<List<ShipmentDto>> GetMyShipmentsAsync(Guid? orderId = null, Guid? orderDetailId = null);
 }

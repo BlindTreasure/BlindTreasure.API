@@ -587,6 +587,5 @@ public class BlindTreasureDbContext : DbContext
                 .HasForeignKey(t => t.OfferedInventoryId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
-
     }
 }

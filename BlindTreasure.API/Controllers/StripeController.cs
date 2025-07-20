@@ -58,7 +58,7 @@ public class StripeController : ControllerBase
         _configuration = configuration;
         _localStripeSecret = _configuration["STRIPE:LocalWebhookSecret"] ?? "";
         _deployStripeSecret = _configuration["STRIPE:DeployWebhookSecret"] ?? "";
-        _cartItemService = cartItemService; 
+        _cartItemService = cartItemService;
     }
 
     /// <summary>
@@ -95,7 +95,6 @@ public class StripeController : ControllerBase
     /// <param name="dto">Thông tin đặt hàng (địa chỉ giao hàng, ...)</param>
     /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
     [Authorize]
-
     [HttpPost("checkout")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
@@ -141,7 +140,8 @@ public class StripeController : ControllerBase
             }).ToList();
 
             var result = await _orderService.PreviewShippingCheckoutAsync(directCartItems);
-            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200", "Preview shipment thành công."));
+            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200",
+                "Preview shipment thành công."));
         }
         catch (Exception ex)
         {
@@ -149,9 +149,6 @@ public class StripeController : ControllerBase
             var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, errorResponse);
         }
-
-
-
     }
 
     /// <summary>
@@ -166,17 +163,15 @@ public class StripeController : ControllerBase
         try
         {
             var result = await _orderService.PreviewShippingCheckoutAsync(cart.Items);
-            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200", "Preview shipment thành công."));
+            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200",
+                "Preview shipment thành công."));
         }
         catch (Exception ex)
         {
-
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, errorResponse);
         }
-
-
     }
 
     /// <summary>

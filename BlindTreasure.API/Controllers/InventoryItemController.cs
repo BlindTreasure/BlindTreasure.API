@@ -172,12 +172,13 @@ public class InventoryItemController : ControllerBase
     [HttpPost("request-shipment")]
     [ProducesResponseType(typeof(ApiResult<ShipmentItemResponseDTO>), 200)]
     [ProducesResponseType(typeof(ApiResult<ShipmentItemResponseDTO>), 400)]
-    public async Task<IActionResult> RequestShipment([FromBody] RequestItemShipmentDTO request) 
+    public async Task<IActionResult> RequestShipment([FromBody] RequestItemShipmentDTO request)
     {
         try
         {
             var result = await _inventoryItemService.RequestShipmentAsync(request);
-            _logger.Success($"[InventoryItemController][RequestShipment] Đã tạo yêu cầu giao hàng cho list item {request.InventoryItemIds}.");
+            _logger.Success(
+                $"[InventoryItemController][RequestShipment] Đã tạo yêu cầu giao hàng cho list item {request.InventoryItemIds}.");
             return Ok(ApiResult<ShipmentItemResponseDTO>.Success(result, "200", "Yêu cầu giao hàng thành công."));
         }
         catch (Exception ex)
@@ -188,7 +189,6 @@ public class InventoryItemController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-
 
 
     /// <summary>
@@ -203,9 +203,11 @@ public class InventoryItemController : ControllerBase
     {
         try
         {
-             var result = await _inventoryItemService.PreviewShipmentForListItemsAsync(requests);
-            _logger.Success($"[RequestPreviewShipmentForListItems][RequestShipment] Đã tạo yêu cầu preview đơn giao hàng cho list item: {requests.InventoryItemIds}.");
-            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200", "Yêu cầu xem trước đơn giao hàng thành công."));
+            var result = await _inventoryItemService.PreviewShipmentForListItemsAsync(requests);
+            _logger.Success(
+                $"[RequestPreviewShipmentForListItems][RequestShipment] Đã tạo yêu cầu preview đơn giao hàng cho list item: {requests.InventoryItemIds}.");
+            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200",
+                "Yêu cầu xem trước đơn giao hàng thành công."));
         }
         catch (Exception ex)
         {

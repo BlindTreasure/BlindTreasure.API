@@ -8,7 +8,8 @@ public class UpdateAddressDto
 
     [DefaultValue("0123456789")] public string Phone { get; set; }
 
-    [DefaultValue("72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, Vietnam")] public string AddressLine { get; set; }
+    [DefaultValue("72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, Vietnam")]
+    public string AddressLine { get; set; }
 
     [DefaultValue("HCM")] public string City { get; set; }
 

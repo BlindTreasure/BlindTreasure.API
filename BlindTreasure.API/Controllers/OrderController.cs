@@ -174,9 +174,4 @@ public class OrderController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
-   
-    
-
-
 }

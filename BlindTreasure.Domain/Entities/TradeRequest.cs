@@ -7,7 +7,7 @@ public class TradeRequest : BaseEntity
     public Guid ListingId { get; set; }
     public Listing Listing { get; set; }
 
-    public Guid RequesterId { get; set; }      // User gửi yêu cầu
+    public Guid RequesterId { get; set; } // User gửi yêu cầu
     public User Requester { get; set; }
 
     public Guid? OfferedInventoryId { get; set; } // Item mà requester đề xuất đổi

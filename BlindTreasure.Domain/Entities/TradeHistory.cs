@@ -13,6 +13,6 @@ public class TradeHistory : BaseEntity
     public Guid? OfferedInventoryId { get; set; }
     public InventoryItem? OfferedInventory { get; set; }
 
-    public TradeRequestStatus FinalStatus { get; set; }   // Accepted/Rejected/Cancelled
+    public TradeRequestStatus FinalStatus { get; set; } // Accepted/Rejected/Cancelled
     public DateTime CompletedAt { get; set; }
 }

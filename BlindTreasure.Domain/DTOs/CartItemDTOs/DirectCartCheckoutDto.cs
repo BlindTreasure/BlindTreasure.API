@@ -15,6 +15,7 @@ public class DirectCartItemDto
     public string? BlindBoxName { get; set; }
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
+
     public decimal TotalPrice { get; set; }
     //public Guid? PromotionId { get; set; } // voucher được apply theo seller nên phải tính trên item
     // Có thể bổ sung thêm payment info, note, v.v.
