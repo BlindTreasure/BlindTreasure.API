@@ -3,6 +3,7 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.ListingDTOs;
 using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
+using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -20,6 +21,24 @@ public class ListingController : ControllerBase
         _listingService = listingService;
     }
 
+    [AllowAnonymous]
+    [HttpGet]
+    public async Task<IActionResult> GetAllListings([FromQuery] ListingQueryParameter param)
+    {
+        try
+        {
+            var result = await _listingService.GetAllListingsAsync(param);
+            return Ok(ApiResult<Pagination<ListingDetailDto>>.Success(result, "200", "Lấy danh sách listing thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<Pagination<ListingDetailDto>>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    
     /// <summary>
     ///     Tạo listing (free hoặc trade) cho item trong kho.
     /// </summary>
