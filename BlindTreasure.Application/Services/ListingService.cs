@@ -81,8 +81,6 @@ public class ListingService : IListingService
 
         return items.Select(item => {
             var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
-            dto.ProductName = item.Product?.Name ?? "Unknown";
-            dto.ProductImage = item.Product?.ImageUrls?.FirstOrDefault() ?? "";
             return dto;
         }).ToList();
     }
