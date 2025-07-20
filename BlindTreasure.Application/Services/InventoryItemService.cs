@@ -16,13 +16,14 @@ namespace BlindTreasure.Application.Services;
 public class InventoryItemService : IInventoryItemService
 {
     private readonly ICacheService _cacheService;
-    private readonly ICategoryService _categoryService;
+    private readonly ICategoryService _categoryService; 
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _loggerService;
     private readonly IOrderService _orderService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
     public readonly IGhnShippingService _ghnShippingService;
+    public readonly IStripeService _stripeService;
 
 
     public InventoryItemService(
@@ -33,7 +34,8 @@ public class InventoryItemService : IInventoryItemService
         IUnitOfWork unitOfWork,
         IOrderService orderService,
         ICategoryService categoryService,
-        IGhnShippingService ghnShippingService) // added ghnShippingService
+        IGhnShippingService ghnShippingService,
+        IStripeService stripeService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -43,6 +45,7 @@ public class InventoryItemService : IInventoryItemService
         _orderService = orderService;
         _categoryService = categoryService; // initialize categoryService
         _ghnShippingService = ghnShippingService; // initialize ghnShippingService
+        _stripeService = stripeService; // initialize stripeService
     }
 
     public async Task<List<InventoryItemDto>> GetMyUnboxedItemsFromBlindBoxAsync(Guid blindBoxId)
@@ -90,7 +93,7 @@ public class InventoryItemService : IInventoryItemService
             Quantity = dto.Quantity,
             Location = dto.Location ?? string.Empty,
             Status = dto.Status,
-            AddressId = dto.AddressId
+            AddressId = dto.AddressId,
         };
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
@@ -227,148 +230,238 @@ public class InventoryItemService : IInventoryItemService
     /// Nếu chưa có địa chỉ thì phải truyền vào addressId.
     /// Tạo Shipment và cập nhật trạng thái OrderDetail liên quan.
     /// </summary>
-    public async Task<ShipResponseDTO> RequestShipmentAsync(Guid inventoryItemId, RequestShipmentDTO request)
+    public async Task<ShipmentItemResponseDTO> RequestShipmentAsync(RequestItemShipmentDTO request)
     {
-        // 1. Lấy InventoryItem và các navigation cần thiết
-        var item = await _unitOfWork.InventoryItems.GetByIdAsync(
-            inventoryItemId,
-            i => i.Address,
-            i => i.Product,
-            i => i.User
-        );
-        if (item == null || item.IsDeleted)
-            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm trong kho.");
+        var userId = _claimsService.CurrentUserId;
+        if (request.InventoryItemIds == null || !request.InventoryItemIds.Any())
+            throw ErrorHelper.BadRequest("Danh sách inventory item rỗng.");
 
-        // 2. Kiểm tra hoặc cập nhật địa chỉ giao hàng
-        var address = item.Address!;
-        if (item.AddressId == null)
+        // Lấy inventory item của user
+        var items = await _unitOfWork.InventoryItems.GetQueryable()
+            .Where(i => request.InventoryItemIds.Contains(i.Id) && i.UserId == userId && !i.IsDeleted)
+            .Include(i => i.Product).ThenInclude(p => p.Seller)
+            .Include(i => i.Product).ThenInclude(p => p.Category)
+            .ToListAsync();
+
+        if (!items.Any())
+            throw ErrorHelper.BadRequest("Không tìm thấy inventory item hợp lệ.");
+
+        // Lấy địa chỉ giao hàng mặc định của user
+        var address = await _unitOfWork.Addresses.GetQueryable()
+            .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
+            .FirstOrDefaultAsync();
+        if (address == null)
+            throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
+
+        // Group theo seller
+        var sellerGroups = items
+            .Where(i => i.Product != null && i.Product.Seller != null)
+            .GroupBy(i => i.Product.SellerId);
+
+        var shipments = new List<Shipment>();
+        var shipmentDtos = new List<ShipmentDto>();
+        int totalShippingFee = 0;
+
+        foreach (var group in sellerGroups)
         {
-            if (!request.AddressId.HasValue)
-                throw ErrorHelper.BadRequest("Please add shipping address for this item/order.");
-            address = await _unitOfWork.Addresses.GetByIdAsync(request.AddressId.Value);
-            if (address == null || address.IsDeleted || address.UserId != item.UserId)
-                throw ErrorHelper.BadRequest("Invalid address.");
-            item.AddressId = address.Id;
-            await _unitOfWork.InventoryItems.Update(item);
-        }
+            var seller = group.First().Product.Seller;
+            if (seller == null) continue;
 
-        // 3. Tìm OrderDetail liên quan đến InventoryItem
-        var orderDetail = await _unitOfWork.OrderDetails.GetQueryable()
-            .Include(od => od.Order)
-            .Include(od => od.Product).ThenInclude(p => p.Seller)
-            .Include(od => od.Product).ThenInclude(p => p.Category)
-            .FirstOrDefaultAsync(od => od.ProductId == item.ProductId && od.Order.UserId == item.UserId);
-
-        if (orderDetail == null)
-            throw ErrorHelper.NotFound("Không tìm thấy OrderDetail liên quan.");
-
-        var seller = orderDetail.Product?.Seller;
-        if (seller == null || seller.IsDeleted)
-            throw ErrorHelper.NotFound("Seller not found for this product.");
-
-        var product = orderDetail.Product;
-        if (product == null || product.IsDeleted)
-            throw ErrorHelper.NotFound("Product not found for this order detail.");
-
-        var category = product.Category;
-        if (category == null)
-            throw ErrorHelper.NotFound("Category not found for this product.");
-
-        // 4. Chuẩn bị dữ liệu cho GHN Order Request
-        var length = Convert.ToInt32(product.Length > 0 ? product.Length : 10);
-        var width = Convert.ToInt32(product.Width > 0 ? product.Width : 10);
-        var height = Convert.ToInt32(product.Height > 0 ? product.Height : 10);
-        var weight = Convert.ToInt32(product.Weight > 0 ? product.Weight : 1000);
-
-        var ghnOrderRequest = new GhnOrderRequest
-        {
-            PaymentTypeId = 2,
-            Note = $"Giao hàng cho sản phẩm {product.Name}",
-            RequiredNote = "CHOXEMHANGKHONGTHU",
-            FromName = seller.CompanyName ?? "BlindTreasure Warehouse",
-            FromPhone = seller.CompanyPhone ?? "0123456789",
-            FromAddress = seller.CompanyAddress ?? "123 Đường ABC, Quận 10, TP.HCM",
-            FromWardName = seller.CompanyWardName ?? "",
-            FromDistrictName = seller.CompanyDistrictName ?? "",
-            FromProvinceName = seller.CompanyProvinceName ?? "",
-            ToName = address.FullName,
-            ToPhone = address.Phone,
-            ToAddress = address.AddressLine,
-            ToWardName = address.Ward ?? "",
-            ToDistrictName = address.District ?? "",
-            ToProvinceName = address.Province,
-            CodAmount = 0,
-            Content = $"Sản phẩm: {product.Name} được ship cho {address.FullName} bởi seller {seller.CompanyName}",
-            Length = length,
-            Width = width,
-            Height = height,
-            Weight = weight,
-            InsuranceValue = (int)orderDetail.UnitPrice * item.Quantity,
-            ServiceTypeId = 2,
-            Items = new[]
+            // Build GHN order request cho group này
+            var ghnOrderItems = group.Select(i =>
             {
-                new GhnOrderItemDto
+                var p = i.Product;
+                int length = Convert.ToInt32(p.Length ?? 10);
+                int width = Convert.ToInt32(p.Width ?? 10);
+                int height = Convert.ToInt32(p.Height ?? 10);
+                int weight = Convert.ToInt32(p.Weight ?? 1000);
+
+                return new GhnOrderItemDto
                 {
-                    Name = product.Name,
-                    Code = product.Id.ToString(),
-                    Quantity = item.Quantity,
-                    Price = Convert.ToInt32(product.Price),
+                    Name = p.Name,
+                    Code = p.Id.ToString(),
+                    Quantity = i.Quantity,
+                    Price = Convert.ToInt32(p.Price),
                     Length = length,
                     Width = width,
                     Height = height,
                     Weight = weight,
                     Category = new GhnItemCategory
                     {
-                        Level1 = product.Category.Name
+                        Level1 = p.Category?.Name,
+                        Level2 = p.Category?.Parent?.Name,
+                        Level3 = p.Category?.Parent?.Parent?.Name
                     }
-                }
-            }
-        };
+                };
+            }).ToList();
 
-        // 5. Call GHN API: Preview hoặc Create Order
-        if (request.IsPreReview)
-        {
-            var ghnPreviewResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest);
-            return new ShipResponseDTO
+            var ghnOrderRequest = new GhnOrderRequest
             {
-                Shipment = null,
-                GhnPreviewResponse = ghnPreviewResponse
+                PaymentTypeId = 2,
+                Note = $"Giao hàng cho seller {seller.CompanyName}",
+                RequiredNote = "CHOXEMHANGKHONGTHU",
+                FromName = seller.CompanyName ?? "BlindTreasure Warehouse",
+                FromPhone = seller.CompanyPhone ?? "0123456789",
+                FromAddress = seller.CompanyAddress ?? "123 Đường ABC, Quận 10, TP.HCM",
+                FromWardName = seller.CompanyWardName ?? "",
+                FromDistrictName = seller.CompanyDistrictName ?? "",
+                FromProvinceName = seller.CompanyProvinceName ?? "",
+                ToName = address.FullName,
+                ToPhone = address.Phone,
+                ToAddress = address.AddressLine,
+                ToWardName = address.Ward ?? "",
+                ToDistrictName = address.District ?? "",
+                ToProvinceName = address.Province,
+                CodAmount = 0,
+                Content = $"Giao hàng cho {address.FullName} từ seller {seller.CompanyName}",
+                Length = ghnOrderItems.Max(i => i.Length),
+                Width = ghnOrderItems.Max(i => i.Width),
+                Height = ghnOrderItems.Max(i => i.Height),
+                Weight = ghnOrderItems.Sum(i => i.Weight),
+                InsuranceValue = ghnOrderItems.Sum(i => i.Price * i.Quantity),
+                ServiceTypeId = 2,
+                Items = ghnOrderItems.ToArray()
             };
-        }
-        else
-        {
+
+            // Tạo đơn hàng GHN chính thức
             var ghnCreateResponse = await _ghnShippingService.CreateOrderAsync(ghnOrderRequest);
 
-            // 6. Tạo Shipment mới
+            // Tạo shipment cho group này
             var shipment = new Shipment
             {
-                OrderDetailId = orderDetail.Id,
                 Provider = "GHN",
                 OrderCode = ghnCreateResponse?.OrderCode,
                 TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0,
                 MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0),
                 TrackingNumber = ghnCreateResponse?.OrderCode ?? "",
                 ShippedAt = DateTime.UtcNow,
-                EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
-                    ? ghnCreateResponse.ExpectedDeliveryTime
-                    : DateTime.UtcNow.AddDays(3),
-                Status = "Requested"
+                EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default ? ghnCreateResponse.ExpectedDeliveryTime : DateTime.UtcNow.AddDays(3),
+                Status = "WAITING_PAYMENT"
             };
-            await _unitOfWork.Shipments.AddAsync(shipment);
-
-            // 7. Cập nhật trạng thái OrderDetail
-            orderDetail.Status = OrderDetailStatus.DELIVERING.ToString();
-            await _unitOfWork.OrderDetails.Update(orderDetail);
-
+            shipment = await _unitOfWork.Shipments.AddAsync(shipment);
             await _unitOfWork.SaveChangesAsync();
-            _loggerService.Success($"[RequestShipmentAsync] Đã tạo yêu cầu giao hàng cho item {item.Id}.");
 
-            return new ShipResponseDTO
-            {
-                Shipment = ShipmentDtoMapper.ToShipmentDto(shipment),
-                GhnResponse = ghnCreateResponse
-            };
+            shipments.Add(shipment);
+            shipmentDtos.Add(ShipmentDtoMapper.ToShipmentDto(shipment));
+            totalShippingFee += shipment.TotalFee ?? 0;
         }
+
+        // Tạo duy nhất 1 link thanh toán cho toàn bộ phí ship
+        var paymentUrl = await _stripeService.CreateShipmentCheckoutSessionAsync(shipments, userId, totalShippingFee);
+
+        return new ShipmentItemResponseDTO
+        {
+            Shipments = shipmentDtos,
+            PaymentUrl = paymentUrl
+        };
+    }
+
+    // C# BlindTreasure.Application\Services\InventoryItemService.cs
+
+    public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShipmentForListItemsAsync(RequestItemShipmentDTO request)
+    {
+        var userId = _claimsService.CurrentUserId;
+        if (request.InventoryItemIds == null || !request.InventoryItemIds.Any())
+            throw ErrorHelper.BadRequest("Danh sách inventory item rỗng.");
+
+        // Lấy toàn bộ inventory item của user
+        var items = await _unitOfWork.InventoryItems.GetQueryable()
+            .Where(i => request.InventoryItemIds.Contains(i.Id) && i.UserId == userId && !i.IsDeleted)
+            .Include(i => i.Product).ThenInclude(p => p.Seller)
+            .Include(i => i.Product).ThenInclude(p => p.Category)
+            .ToListAsync();
+
+        if (!items.Any())
+            throw ErrorHelper.BadRequest("Không tìm thấy inventory item hợp lệ.");
+
+        // Group theo seller
+        var sellerGroups = items
+            .Where(i => i.Product != null && i.Product.Seller != null)
+            .GroupBy(i => i.Product.SellerId);
+
+        var result = new List<ShipmentCheckoutResponseDTO>();
+
+        foreach (var group in sellerGroups)
+        {
+            var seller = group.First().Product.Seller;
+            if (seller == null) continue;
+
+            // Lấy địa chỉ giao hàng mặc định của user
+            var address = await _unitOfWork.Addresses.GetQueryable()
+                .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
+                .FirstOrDefaultAsync();
+            if (address == null)
+                throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
+
+            // Build GHN order request cho group này
+            var ghnOrderItems = group.Select(i =>
+            {
+                var p = i.Product;
+                int length = Convert.ToInt32(p.Length > 0 ? p.Length : 10);
+                int width = Convert.ToInt32(p.Width > 0 ? p.Width : 10);
+                int height = Convert.ToInt32(p.Height > 0 ? p.Height : 10);
+                int weight = Convert.ToInt32(p.Weight > 0 ? p.Weight : 1000);
+
+                return new GhnOrderItemDto
+                {
+                    Name = p.Name,
+                    Code = p.Id.ToString(),
+                    Quantity = i.Quantity,
+                    Price = Convert.ToInt32(p.Price),
+                    Length = length,
+                    Width = width,
+                    Height = height,
+                    Weight = weight,
+                    Category = new GhnItemCategory
+                    {
+                        Level1 = p.Category?.Name,
+                        Level2 = p.Category?.Parent?.Name,
+                        Level3 = p.Category?.Parent?.Parent?.Name
+                    }
+                };
+            }).ToList();
+
+            var ghnOrderRequest = new GhnOrderRequest
+            {
+                PaymentTypeId = 2,
+                Note = $"Giao hàng cho seller {seller.CompanyName}",
+                RequiredNote = "CHOXEMHANGKHONGTHU",
+                FromName = seller.CompanyName ?? "BlindTreasure Warehouse",
+                FromPhone = seller.CompanyPhone ?? "0123456789",
+                FromAddress = seller.CompanyAddress ?? "123 Đường ABC, Quận 10, TP.HCM",
+                FromWardName = seller.CompanyWardName ?? "",
+                FromDistrictName = seller.CompanyDistrictName ?? "",
+                FromProvinceName = seller.CompanyProvinceName ?? "",
+                ToName = address.FullName,
+                ToPhone = address.Phone,
+                ToAddress = address.AddressLine,
+                ToWardName = address.Ward ?? "",
+                ToDistrictName = address.District ?? "",
+                ToProvinceName = address.Province,
+                CodAmount = 0,
+                Content = $"Giao hàng cho {address.FullName} từ seller {seller.CompanyName}",
+                Length = ghnOrderItems.Max(i => i.Length),
+                Width = ghnOrderItems.Max(i => i.Width),
+                Height = ghnOrderItems.Max(i => i.Height),
+                Weight = ghnOrderItems.Sum(i => i.Weight),
+                InsuranceValue = ghnOrderItems.Sum(i => i.Price * i.Quantity),
+                ServiceTypeId = 2,
+                Items = ghnOrderItems.ToArray()
+            };
+
+            // Preview GHN
+            var ghnPreviewResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest);
+
+            result.Add(new ShipmentCheckoutResponseDTO
+            {
+                Shipment = null,
+                SellerCompanyName = seller.CompanyName,
+                SellerId = seller.Id,
+                GhnPreviewResponse = ghnPreviewResponse
+            }); 
+        }
+
+        return result;
     }
 
     private static string GetCacheKey(Guid id)
@@ -377,9 +470,9 @@ public class InventoryItemService : IInventoryItemService
     }
 }
 
-public class ShipResponseDTO
+public class ShipmentItemResponseDTO
 {
-    public ShipmentDto? Shipment { get; set; }
-    public GhnCreateResponse? GhnResponse { get; set; }
-    public GhnPreviewResponse? GhnPreviewResponse { get; set; }
+    public string? PaymentUrl { get; set; } // URL thanh toán phí ship
+    public List<ShipmentDto>? Shipments { get; set; }
+
 }

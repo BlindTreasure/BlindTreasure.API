@@ -2,8 +2,8 @@
 
 public class CreateCheckoutRequestDto
 {
-    public Guid? ShippingAddressId { get; set; }
+    
+    public bool? IsShip{ get; set; } = false; // có muốn ship hàng hay không
+    public Guid? PromotionId { get; set; } // voucher được apply theo seller nên phải tính trên order
 
-    public Guid? PromotionId { get; set; }
-    // Có thể bổ sung thêm payment info, note, v.v.
 }

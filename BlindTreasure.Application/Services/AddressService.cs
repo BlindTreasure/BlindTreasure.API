@@ -4,6 +4,7 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AddressDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
 
@@ -74,12 +75,13 @@ public class AddressService : IAddressService
             FullName = dto.FullName,
             Phone = dto.Phone,
             AddressLine = dto.AddressLine,
-            //AddressLine2 = dto.AddressLine2,
             City = dto.City,
             Province = dto.Province,
             PostalCode = dto.PostalCode,
-            IsDefault = dto.IsDefault
-            //Country = dto.Country,
+            IsDefault = dto.IsDefault,
+            Ward = dto.Ward,
+            District = dto.District,
+
         };
 
         if (!isFirstAddress && dto.IsDefault)
@@ -188,6 +190,16 @@ public class AddressService : IAddressService
         return ToAddressDto(address);
     }
 
+    /// <summary>
+    ///     Lấy địa chỉ mặc định của user.
+    /// </summary>
+    public async Task<Address?> GetDefaultShippingAddressAsync(Guid userId)
+    {
+        return await _unitOfWork.Addresses.GetQueryable()
+            .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
+            .FirstOrDefaultAsync();
+    }
+
     //private method
 
     private async Task RemoveAddressCacheAsync(Guid userId, Guid addressId)
@@ -209,7 +221,10 @@ public class AddressService : IAddressService
             Province = address.Province,
             PostalCode = address.PostalCode,
             Country = address.Country,
-            IsDefault = address.IsDefault
+            IsDefault = address.IsDefault,
+            Ward = address.Ward,
+            District = address.District,
+
         };
     }
 }
