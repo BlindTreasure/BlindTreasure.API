@@ -87,7 +87,6 @@ public class ListingService : IListingService
         await _unitOfWork.SaveChangesAsync();
     }
 
-
     /// <summary>
     /// Lấy danh sách item có thể tạo listing.
     /// </summary>
@@ -107,7 +106,6 @@ public class ListingService : IListingService
 
         return items.Select(item => _mapper.Map<InventoryItem, InventoryItemDto>(item)).ToList();
     }
-
 
     /// <summary>
     /// Hết hạn listing sau 30 ngày.

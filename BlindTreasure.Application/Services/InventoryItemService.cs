@@ -6,7 +6,6 @@ using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
-using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -22,8 +21,8 @@ public class InventoryItemService : IInventoryItemService
     private readonly IOrderService _orderService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
-    public readonly IGhnShippingService _ghnShippingService;
-    public readonly IStripeService _stripeService;
+    private readonly IGhnShippingService _ghnShippingService;
+    private readonly IStripeService _stripeService;
 
 
     public InventoryItemService(
