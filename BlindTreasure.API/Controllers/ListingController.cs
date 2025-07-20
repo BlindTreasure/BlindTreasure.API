@@ -77,25 +77,25 @@ public class ListingController : ControllerBase
         }
     }
 
-    /// <summary>
-    ///     Cronjob: cập nhật các listing quá 30 ngày thành Expired.
-    /// </summary>
-    [HttpPost("cron/expire-old-listings")]
-    [AllowAnonymous]
-    public async Task<IActionResult> ExpireOldListings()
-    {
-        try
-        {
-            var count = await _listingService.ExpireOldListingsAsync();
-            return Ok(ApiResult<object>.Success(new { count }, "200", "Cập nhật hết hạn listing thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
+    // /// <summary>
+    // ///     Cronjob: cập nhật các listing quá 30 ngày thành Expired.
+    // /// </summary>
+    // [HttpPost("cron/expire-old-listings")]
+    // [AllowAnonymous]
+    // public async Task<IActionResult> ExpireOldListings()
+    // {
+    //     try
+    //     {
+    //         var count = await _listingService.ExpireOldListingsAsync();
+    //         return Ok(ApiResult<object>.Success(new { count }, "200", "Cập nhật hết hạn listing thành công."));
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+    //         var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+    //         return StatusCode(statusCode, error);
+    //     }
+    // }
     /// <summary>
     ///     Tạo Trade Request cho một Listing.
     /// </summary>

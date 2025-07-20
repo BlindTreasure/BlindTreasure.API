@@ -345,10 +345,10 @@ public class SystemController : ControllerBase
             {
                 Email = "honhatquang1@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
-                FullName = "Official Brand Seller",
+                FullName = "Hồ Nhật Quang",
                 Phone = "0900000001",
                 Status = UserStatus.Active,
-                RoleName = RoleType.Seller,
+                RoleName = RoleType.Customer,
                 CreatedAt = now,
                 AvatarUrl = defaultAvatar
             },
@@ -455,7 +455,6 @@ public class SystemController : ControllerBase
         await SeedSellerForUser("blindtreasurefpt@gmail.com");
         await SeedSellerForUser("hanhnthse170189@fpt.edu.vn");
         await SeedSellerForUser("quanghnse170229@fpt.edu.vn");
-        await SeedSellerForUser("honhatquang1@gmail.com");
         await SeedSellerForUser("honhatquang2@gmail.com");
         await SeedSellerForUser("honhatquang3@gmail.com");
 
