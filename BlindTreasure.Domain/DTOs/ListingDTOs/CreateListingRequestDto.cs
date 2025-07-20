@@ -3,5 +3,7 @@
 public class CreateListingRequestDto
 {
     public Guid InventoryId { get; set; }
-    public decimal Price { get; set; }
+    public bool IsFree { get; set; }
+    public Guid? DesiredItemId { get; set; }
+    public string? DesiredItemName { get; set; }
 }

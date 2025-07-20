@@ -11,22 +11,23 @@ namespace BlindTreasure.Application.Services;
 
 public class ListingService : IListingService
 {
-    private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
     private readonly IUnitOfWork _unitOfWork;
 
-    public ListingService(ICacheService cacheService, IClaimsService claimsService, ILoggerService logger,
+    public ListingService(IClaimsService claimsService, ILoggerService logger,
         IMapperService mapper, IUnitOfWork unitOfWork)
     {
-        _cacheService = cacheService;
         _claimsService = claimsService;
         _logger = logger;
         _mapper = mapper;
         _unitOfWork = unitOfWork;
     }
 
+    /// <summary>
+    /// Tạo listing mới, hỗ trợ cho free hoặc trade item.
+    /// </summary>
     public async Task<ListingDto> CreateListingAsync(CreateListingRequestDto dto)
     {
         var userId = _claimsService.CurrentUserId;
@@ -50,15 +51,16 @@ public class ListingService : IListingService
         var listing = new Listing
         {
             InventoryId = inventory.Id,
-            Price = dto.Price,
+            IsFree = dto.IsFree,
+            DesiredItemId = dto.IsFree ? null : dto.DesiredItemId,
+            DesiredItemName = dto.IsFree ? null : dto.DesiredItemName,
             ListedAt = DateTime.UtcNow,
-            Status = ListingStatus.Active
+            Status = ListingStatus.Active,
+            TradeStatus = TradeStatus.Pending
         };
 
         await _unitOfWork.Listings.AddAsync(listing);
         await _unitOfWork.SaveChangesAsync();
-
-        await TrackPriceChangeAsync(inventory.ProductId, dto.Price);
 
         var listingDto = _mapper.Map<Listing, ListingDto>(listing);
         listingDto.ProductName = inventory.Product?.Name ?? "Unknown";
@@ -67,6 +69,28 @@ public class ListingService : IListingService
         return listingDto;
     }
 
+    public async Task ReportListingAsync(Guid listingId, string reason)
+    {
+        var listing = await _unitOfWork.Listings.GetByIdAsync(listingId);
+        if (listing == null)
+            throw ErrorHelper.NotFound("Không tìm thấy listing để báo cáo.");
+
+        var report = new ListingReport
+        {
+            ListingId = listingId,
+            UserId = _claimsService.CurrentUserId,
+            Reason = reason,
+            ReportedAt = DateTime.UtcNow
+        };
+
+        await _unitOfWork.ListingReports.AddAsync(report);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+
+    /// <summary>
+    /// Lấy danh sách item có thể tạo listing.
+    /// </summary>
     public async Task<List<InventoryItemDto>> GetAvailableItemsForListingAsync()
     {
         var userId = _claimsService.CurrentUserId;
@@ -84,64 +108,18 @@ public class ListingService : IListingService
         return items.Select(item => _mapper.Map<InventoryItem, InventoryItemDto>(item)).ToList();
     }
 
-    public async Task<decimal> GetSuggestedPriceAsync(Guid productId)
-    {
-        var listings = await _unitOfWork.Listings.GetAllAsync(
-            l => !l.IsDeleted &&
-                 l.Status == ListingStatus.Active &&
-                 l.InventoryItem.ProductId == productId,
-            l => l.InventoryItem
-        );
 
-        if (!listings.Any())
-            throw ErrorHelper.NotFound("Chưa có dữ liệu thị trường để gợi ý giá.");
-
-        return Math.Round(listings.Average(x => x.Price), 2);
-    }
-
-    public async Task<List<PricePointDto>> GetPriceHistoryAsync(Guid productId)
-    {
-        var key = $"price-history:{productId}";
-        var history = await _cacheService.GetAsync<List<PricePointDto>>(key);
-
-        return history?.OrderBy(h => h.Timestamp).ToList() ?? new List<PricePointDto>();
-    }
-
-    #region private methods
-
-    private async Task TrackPriceChangeAsync(Guid productId, decimal price)
-    {
-        var key = $"price-history:{productId}";
-        var now = DateTime.UtcNow;
-
-        var history = await _cacheService.GetAsync<List<PricePointDto>>(key) ?? new List<PricePointDto>();
-
-        history.Add(new PricePointDto
-        {
-            Timestamp = now,
-            Price = price
-        });
-
-        // Giữ tối đa 100 bản ghi gần nhất (bảo vệ Redis và tốc độ truy vấn)
-        history = history
-            .OrderByDescending(h => h.Timestamp)
-            .Take(100)
-            .OrderBy(h => h.Timestamp)
-            .ToList();
-
-        await _cacheService.SetAsync(key, history, TimeSpan.FromDays(7));
-    }
-
+    /// <summary>
+    /// Hết hạn listing sau 30 ngày.
+    /// </summary>
     public async Task<int> ExpireOldListingsAsync()
     {
         var now = DateTime.UtcNow;
         var expiredThreshold = now.AddDays(-30);
 
-        // Truy vấn các listing Active quá 30 ngày
         var expiredListings = await _unitOfWork.Listings.GetAllAsync(l => l.Status == ListingStatus.Active &&
                                                                           l.ListedAt < expiredThreshold &&
-                                                                          !l.IsDeleted
-        );
+                                                                          !l.IsDeleted);
 
         if (!expiredListings.Any())
             return 0;
@@ -158,6 +136,4 @@ public class ListingService : IListingService
 
         return expiredListings.Count;
     }
-
-    #endregion
 }

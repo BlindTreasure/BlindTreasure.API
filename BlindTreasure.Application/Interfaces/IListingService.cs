@@ -7,7 +7,6 @@ public interface IListingService
 {
     Task<ListingDto> CreateListingAsync(CreateListingRequestDto dto);
     Task<List<InventoryItemDto>> GetAvailableItemsForListingAsync();
-    Task<decimal> GetSuggestedPriceAsync(Guid productId);
-    Task<List<PricePointDto>> GetPriceHistoryAsync(Guid productId);
+    Task ReportListingAsync(Guid listingId, string reason);
     Task<int> ExpireOldListingsAsync();
 }
