@@ -19,8 +19,8 @@ public class TradingController : ControllerBase
     }
 
     /// <summary>
-    /// User A tạo yêu cầu giao dịch với User B cho một Listing.
-    /// Nếu Listing miễn phí, User A không cần cung cấp item để trao đổi, nếu không, User A phải cung cấp item hợp lệ.
+    /// User B tạo yêu cầu giao dịch với User A cho một Listing.
+    /// Nếu Listing miễn phí, User B không cần cung cấp item để trao đổi, nếu không, User A phải cung cấp item hợp lệ.
     /// </summary>
     [HttpPost("{listingId}/trade-requests")]
     public async Task<IActionResult> CreateTradeRequest(Guid listingId, [FromBody] CreateTradeRequestDto dto)
@@ -39,7 +39,7 @@ public class TradingController : ControllerBase
     }
 
     /// <summary>
-    /// User B chấp nhận hoặc từ chối yêu cầu giao dịch của User A.
+    /// User A chấp nhận hoặc từ chối yêu cầu giao dịch của User B.
     /// Nếu từ chối, item của User A được cập nhật lại thành Available.
     /// </summary>
     [HttpPost("trade-requests/{tradeRequestId}/respond")]
@@ -59,7 +59,7 @@ public class TradingController : ControllerBase
     }
 
     /// <summary>
-    /// User B xem tất cả yêu cầu giao dịch của User A cho một Listing.
+    /// A xem được các request đến với mình
     /// </summary>
     [HttpGet("{listingId}/trade-requests")]
     public async Task<IActionResult> GetTradeRequests(Guid listingId)
@@ -79,7 +79,7 @@ public class TradingController : ControllerBase
     }
 
     /// <summary>
-    /// User B khóa item trong giao dịch khi chấp nhận yêu cầu của User A.
+    /// A chốt với requestId nào đó và khóa lại không cho request nữa
     /// </summary>
     [HttpPost("trade-requests/{tradeRequestId}/lock")]
     public async Task<IActionResult> LockDeal(Guid tradeRequestId)
@@ -98,7 +98,7 @@ public class TradingController : ControllerBase
     }
 
     /// <summary>
-    /// User A (người bán) khóa item trong giao dịch khi chấp nhận yêu cầu của User B.
+    /// B (người mua) confirm deal và chuyển quyền sở hữu cho B (người mua)
     /// </summary>
     [HttpPost("trade-requests/{tradeRequestId}/confirm")]
     public async Task<IActionResult> ConfirmDeal(Guid tradeRequestId)
