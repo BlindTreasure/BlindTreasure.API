@@ -5,5 +5,5 @@ public enum TradeRequestStatus
     Pending,
     Accepted,
     Rejected,
-    Cancelled
+    Expired
 }

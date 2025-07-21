@@ -96,63 +96,6 @@ public class ListingController : ControllerBase
         }
     }
 
-    // /// <summary>
-    // ///     Cronjob: cập nhật các listing quá 30 ngày thành Expired.
-    // /// </summary>
-    // [HttpPost("cron/expire-old-listings")]
-    // [AllowAnonymous]
-    // public async Task<IActionResult> ExpireOldListings()
-    // {
-    //     try
-    //     {
-    //         var count = await _listingService.ExpireOldListingsAsync();
-    //         return Ok(ApiResult<object>.Success(new { count }, "200", "Cập nhật hết hạn listing thành công."));
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-    //         var error = ExceptionUtils.CreateErrorResponse<object>(ex);
-    //         return StatusCode(statusCode, error);
-    //     }
-    // }
-    /// <summary>
-    ///     Tạo Trade Request cho một Listing.
-    /// </summary>
-    [HttpPost("{listingId}/trade-requests")]
-    public async Task<IActionResult> CreateTradeRequest(Guid listingId, [FromBody] CreateTradeRequestDto dto)
-    {
-        try
-        {
-            var result = await _listingService.CreateTradeRequestAsync(listingId, dto.OfferedInventoryId);
-            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", "Tạo trade request thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<TradeRequestDto>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
-
-    /// <summary>
-    ///     Phản hồi Trade Request (Accept/Reject).
-    /// </summary>
-    [HttpPost("trade-requests/{tradeRequestId}/respond")]
-    public async Task<IActionResult> RespondTradeRequest(Guid tradeRequestId, [FromQuery] bool isAccepted)
-    {
-        try
-        {
-            var result = await _listingService.RespondTradeRequestAsync(tradeRequestId, isAccepted);
-            return Ok(ApiResult<object>.Success(new { result }, "200", "Cập nhật trade request thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
-
     /// <summary>
     ///     Đóng một Listing.
     /// </summary>
@@ -172,24 +115,6 @@ public class ListingController : ControllerBase
         }
     }
 
-    /// <summary>
-    ///     Lấy danh sách Trade Request cho một Listing.
-    /// </summary>
-    [HttpGet("{listingId}/trade-requests")]
-    public async Task<IActionResult> GetTradeRequests(Guid listingId)
-    {
-        try
-        {
-            var result = await _listingService.GetTradeRequestsAsync(listingId);
-            return Ok(ApiResult<List<TradeRequestDto>>.Success(result, "200", "Lấy danh sách trade requests thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<List<TradeRequestDto>>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
 }
 
 /// <summary>
