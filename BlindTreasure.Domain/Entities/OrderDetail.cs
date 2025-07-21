@@ -19,6 +19,10 @@ public class OrderDetail : BaseEntity
     public DateTime? ShippedAt { get; set; }
     public DateTime? ReceivedAt { get; set; }
 
+    // New: each detail knows its seller
+    public Guid? SellerId { get; set; }
+    public Seller? Seller { get; set; }
+
     // 1-n → Shipments
     public ICollection<Shipment> Shipments { get; set; }
     public ICollection<CustomerBlindBox>? CustomerBlindBoxes { get; set; }

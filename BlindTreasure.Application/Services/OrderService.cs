@@ -82,10 +82,9 @@ public class OrderService : IOrderService
                 BlindBoxName = i.BlindBoxName,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
-                TotalPrice = i.TotalPrice
+                TotalPrice = i.TotalPrice,
             }),
-            shippingAddressId,
-            dto.PromotionId
+            shippingAddressId
         );
         _loggerService.Success("Checkout from system cart completed.");
         return result;
@@ -124,10 +123,10 @@ public class OrderService : IOrderService
                 BlindBoxName = i.BlindBoxName,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
-                TotalPrice = i.TotalPrice
+                TotalPrice = i.TotalPrice,
+                PromotionId = i.PromotionId
             }),
-            shippingAddressId,
-            cartDto.PromotionId
+            shippingAddressId
         );
         _loggerService.Success("Checkout from client cart completed.");
         return result;
@@ -170,7 +169,6 @@ public class OrderService : IOrderService
         var userId = _claimsService.CurrentUserId;
         var query = _unitOfWork.Orders.GetQueryable()
             .Where(o => o.UserId == userId && !o.IsDeleted)
-            .Include(o => o.Promotion)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
             .Include(o => o.ShippingAddress)
@@ -324,154 +322,91 @@ public class OrderService : IOrderService
         };
     }
 
-    private async Task<string> CheckoutCore(
-        IEnumerable<CheckoutItem> items,
-        Guid? shippingAddressId,
-        Guid? promotionId = null)
+    private async Task<string> CheckoutCore(IEnumerable<CheckoutItem> items, Guid? shippingAddressId)
     {
         _loggerService.Info("Start core checkout logic.");
         var userId = _claimsService.CurrentUserId;
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null || user.IsDeleted)
-        {
-            _loggerService.Warn("User not found or deleted.");
             throw ErrorHelper.Forbidden(ErrorMessages.AccountNotFound);
-        }
 
         var itemList = items.ToList();
         if (!itemList.Any())
-        {
-            _loggerService.Warn("Cart is empty or invalid.");
             throw ErrorHelper.BadRequest(ErrorMessages.OrderCartEmptyOrInvalid);
-        }
 
-        Address? shippingAddress = null;
+        Address shippingAddress = null;
         if (shippingAddressId.HasValue)
         {
             shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(shippingAddressId.Value);
             if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != userId)
-            {
-                _loggerService.Warn("Shipping address invalid.");
                 throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
-            }
         }
+
+        var productIds = itemList.Where(i => i.ProductId.HasValue)
+                                 .Select(i => i.ProductId.Value)
+                                 .Distinct()
+                                 .ToList();
+        var products = await _unitOfWork.Products.GetQueryable()
+            .Where(p => productIds.Contains(p.Id))
+            .Include(p => p.Seller)
+            .ToListAsync();
 
         foreach (var item in itemList)
         {
             if (item.ProductId.HasValue)
             {
-                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
+                var product = products.FirstOrDefault(p => p.Id == item.ProductId);
                 if (product == null || product.IsDeleted)
-                {
-                    _loggerService.Warn($"Product {item.ProductId} not found or deleted.");
                     throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderProductNotFound, item.ProductName));
-                }
                 if (product.Stock < item.Quantity)
-                {
-                    _loggerService.Warn($"Product {item.ProductId} out of stock.");
                     throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderProductOutOfStock, item.ProductName));
-                }
                 if (product.Status != ProductStatus.Active)
-                {
-                    _loggerService.Warn($"Product {item.ProductId} not for sale.");
                     throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderProductNotForSale, item.ProductName));
-                }
             }
             else if (item.BlindBoxId.HasValue)
             {
                 var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value);
                 if (blindBox == null || blindBox.IsDeleted)
-                {
-                    _loggerService.Warn($"BlindBox {item.BlindBoxId} not found or deleted.");
                     throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderBlindBoxNotFound, item.BlindBoxName));
-                }
                 if (blindBox.Status != BlindBoxStatus.Approved)
-                {
-                    _loggerService.Warn($"BlindBox {item.BlindBoxId} not approved.");
                     throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderBlindBoxNotApproved, item.BlindBoxName));
-                }
                 if (blindBox.TotalQuantity < item.Quantity)
-                {
-                    _loggerService.Warn($"BlindBox {item.BlindBoxId} out of stock.");
                     throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderBlindBoxOutOfStock, item.BlindBoxName));
-                }
             }
-        }
-
-        var totalPrice = itemList.Sum(i => i.TotalPrice);
-
-        decimal discountAmount = 0;
-        string? promotionNote = null;
-        Promotion? promotion = null;
-
-        if (promotionId.HasValue)
-        {
-            promotion = await _unitOfWork.Promotions.GetByIdAsync(promotionId.Value);
-            if (promotion == null)
-            {
-                _loggerService.Warn("Promotion not found.");
-                throw ErrorHelper.BadRequest("Voucher không tồn tại.");
-            }
-
-            if (promotion.Status != PromotionStatus.Approved)
-            {
-                _loggerService.Warn("Promotion not approved.");
-                throw ErrorHelper.BadRequest("Voucher chưa được duyệt.");
-            }
-
-            var now = DateTime.UtcNow;
-            if (now < promotion.StartDate || now > promotion.EndDate)
-            {
-                _loggerService.Warn("Promotion expired or not started.");
-                throw ErrorHelper.BadRequest("Voucher đã hết hạn hoặc chưa bắt đầu.");
-            }
-
-            if (promotion.DiscountType == DiscountType.Percentage)
-                discountAmount = Math.Round(totalPrice * (promotion.DiscountValue / 100m), 2);
-            else if (promotion.DiscountType == DiscountType.Fixed)
-                discountAmount = promotion.DiscountValue;
-
-            discountAmount = Math.Min(discountAmount, totalPrice);
-            promotionNote = $"Áp dụng voucher {promotion.Code}, giảm {discountAmount:N0}đ";
         }
 
         var order = new Order
         {
             UserId = userId,
             Status = OrderStatus.PENDING.ToString(),
-            TotalAmount = totalPrice,
-            FinalAmount = totalPrice - discountAmount,
             PlacedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
             ShippingAddressId = shippingAddressId,
-            PromotionId = promotionId,
-            Promotion = promotion,
-            DiscountAmount = discountAmount > 0 ? discountAmount : null,
-            PromotionNote = promotionNote,
-            OrderDetails = new List<OrderDetail>()
+            OrderDetails = new List<OrderDetail>(),
+            OrderSellerPromotions = new List<OrderSellerPromotion>()
         };
 
-        var orderDetails = new List<OrderDetail>();
         foreach (var item in itemList)
         {
-            var orderDetail = new OrderDetail
+            var sellerId = products.First(p => p.Id == item.ProductId).SellerId;
+            var od = new OrderDetail
             {
                 Id = Guid.NewGuid(),
-                OrderId = order.Id,
+                Order = order,
                 ProductId = item.ProductId,
                 BlindBoxId = item.BlindBoxId,
                 Quantity = item.Quantity,
                 UnitPrice = item.UnitPrice,
                 TotalPrice = item.TotalPrice,
+                SellerId = sellerId,
                 Status = OrderDetailStatus.PENDING.ToString(),
                 CreatedAt = DateTime.UtcNow
             };
-            order.OrderDetails.Add(orderDetail);
-            orderDetails.Add(orderDetail);
+            order.OrderDetails.Add(od);
 
             if (item.ProductId.HasValue)
             {
-                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
+                var product = products.First(p => p.Id == item.ProductId);
                 product.Stock -= item.Quantity;
                 await _unitOfWork.Products.Update(product);
             }
@@ -480,79 +415,99 @@ public class OrderService : IOrderService
                 var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value);
                 blindBox.TotalQuantity -= item.Quantity;
                 if (blindBox.TotalQuantity <= 0 && blindBox.Status == BlindBoxStatus.Approved)
-                {
                     blindBox.Status = BlindBoxStatus.Rejected;
-                    _loggerService.Info($"BlindBox {blindBox.Id} is now out of stock and set to Rejected.");
-                }
                 await _unitOfWork.BlindBoxes.Update(blindBox);
             }
         }
+
+        var sellerPromos = itemList
+            .Where(i => i.PromotionId.HasValue)
+            .GroupBy(i => new { Seller = products.First(p => p.Id == i.ProductId).SellerId, Promo = i.PromotionId.Value })
+            .Select(g => new { g.Key.Seller, g.Key.Promo })
+            .ToList();
+
+        foreach (var sp in sellerPromos)
+        {
+            var promo = await _unitOfWork.Promotions.GetByIdAsync(sp.Promo);
+            if (promo == null || promo.Status != PromotionStatus.Approved)
+                throw ErrorHelper.BadRequest("Invalid promotion");
+
+            var subTotal = order.OrderDetails
+                .Where(od => od.SellerId == sp.Seller)
+                .Sum(od => od.TotalPrice);
+
+            decimal discount = promo.DiscountType == DiscountType.Percentage
+                ? Math.Round(subTotal * promo.DiscountValue / 100m, 2)
+                : promo.DiscountValue;
+            discount = Math.Min(discount, subTotal);
+
+            var osp = new OrderSellerPromotion
+            {
+                Order = order,
+                SellerId = sp.Seller,
+                Promotion = promo,
+                DiscountAmount = discount,
+                Note = $"Applied {promo.Code}, -{discount:N0}"
+            };
+            order.OrderSellerPromotions.Add(osp);
+
+            promo.UsageLimit = (promo.UsageLimit ?? 0) - 1;
+            await _unitOfWork.Promotions.Update(promo);
+        }
+
+        order.TotalAmount = order.OrderDetails.Sum(od => od.TotalPrice);
+        order.FinalAmount = order.TotalAmount - order.OrderSellerPromotions.Sum(osp => osp.DiscountAmount);
 
         await _unitOfWork.Orders.AddAsync(order);
         await _unitOfWork.SaveChangesAsync();
 
         if (shippingAddress != null)
         {
-            var orderDetailIds = orderDetails.Select(od => od.Id).ToList();
+            var orderDetailIds = order.OrderDetails.Select(od => od.Id).ToList();
             var orderDetailsWithProduct = await _unitOfWork.OrderDetails.GetQueryable()
                 .Where(od => orderDetailIds.Contains(od.Id))
                 .Include(od => od.Product).ThenInclude(p => p.Category)
                 .Include(od => od.Product).ThenInclude(p => p.Seller)
                 .ToListAsync();
 
-            var sellerGroups = orderDetailsWithProduct
-                .Where(od => od.ProductId.HasValue && od.Product != null)
-                .GroupBy(od => od.Product.SellerId);
+            var sellerGroups = orderDetailsWithProduct.GroupBy(od => od.Product.SellerId);
 
             foreach (var group in sellerGroups)
             {
                 var seller = group.First().Product.Seller;
-                if (seller == null) continue;
+                var ghnRequest = BuildGhnOrderRequest(group, seller, shippingAddress, od => od.Product, od => od.Quantity);
+                var ghnResponse = await _ghnShippingService.PreviewOrderAsync(ghnRequest);
 
-                var ghnOrderRequest = BuildGhnOrderRequest(
-                    group,
-                    seller,
-                    shippingAddress,
-                    od => od.Product,
-                    od => od.Quantity
-                );
-
-                var ghnCreateResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest); // sửa thành chính thức sang preview vì đây là tạo yêu cầu thanh toán
-
-                order.TotalAmount += ghnCreateResponse?.TotalFee ?? 0;
-                _loggerService.Info($"Created GHN shipment for seller {seller.Id}, fee: {ghnCreateResponse?.TotalFee ?? 0}");
-
+                order.TotalAmount += ghnResponse?.TotalFee ?? 0;
                 foreach (var od in group)
                 {
                     var shipment = new Shipment
                     {
                         OrderDetailId = od.Id,
                         Provider = "GHN",
-                        OrderCode = ghnCreateResponse?.OrderCode,
-                        TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0,
-                        MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0),
-                        TrackingNumber = ghnCreateResponse?.OrderCode ?? "",
+                        OrderCode = ghnResponse?.OrderCode,
+                        TotalFee = ghnResponse?.TotalFee != null ? Convert.ToInt32(ghnResponse.TotalFee.Value) : 0,
+                        MainServiceFee = (int)(ghnResponse?.Fee?.MainService ?? 0),
+                        TrackingNumber = ghnResponse?.OrderCode ?? string.Empty,
                         ShippedAt = DateTime.UtcNow,
-                        EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default ? ghnCreateResponse.ExpectedDeliveryTime : DateTime.UtcNow.AddDays(3),
-                        Status = "WAITING_PAYMENT" // chưa thanh toán, chờ xác nhận
+                        EstimatedDelivery = ghnResponse?.ExpectedDeliveryTime ?? DateTime.UtcNow.AddDays(3),
+                        Status = "WAITING_PAYMENT"
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
-
                     od.Status = OrderDetailStatus.DELIVERING.ToString();
-                    od.Shipments = new List<Shipment> { shipment };
                     await _unitOfWork.OrderDetails.Update(od);
                 }
             }
             await _unitOfWork.SaveChangesAsync();
+            order.FinalAmount = order.TotalAmount - order.OrderSellerPromotions.Sum(osp => osp.DiscountAmount);
+            await _unitOfWork.Orders.Update(order);
+            await _unitOfWork.SaveChangesAsync();
         }
 
         await _cartItemService.UpdateCartAfterCheckoutAsync(userId, itemList);
-        _loggerService.Info("Cart updated after checkout.");
-        await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
-        _loggerService.Info("Order cache cleared after checkout.");
-        _loggerService.Success($"Order checkout success for user {userId}.");
         return await _stripeService.CreateCheckoutSession(order.Id);
     }
+
 
     public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(List<DirectCartItemDto> items, bool? IsPreview = false)
     {
@@ -631,5 +586,6 @@ public class OrderService : IOrderService
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
+        public Guid? PromotionId { get; set; } // voucher được apply theo seller nên phải tính trên item
     }
 }

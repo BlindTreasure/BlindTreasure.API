@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Stripe;
 using Stripe.Checkout;
+using System.Text;
 
 namespace BlindTreasure.Application.Services;
 
@@ -45,15 +46,97 @@ public class StripeService : IStripeService
         return loginLink.Url;
     }
 
+    private string GetPromotionDescription(Order order)
+    {
+        if (order.OrderSellerPromotions != null && order.OrderSellerPromotions.Any())
+        {
+            var descBuilder = new StringBuilder();
+            foreach (var op in order.OrderSellerPromotions)
+            {
+                if (op.Promotion != null)
+                {
+                    descBuilder.AppendLine(
+                        $"[Voucher: {op.Promotion.Code} - {op.Promotion.Description}]");
+                }
+            }
+            descBuilder.AppendLine($"Tổng tiền gốc: {order.TotalAmount:N0}đ");
+            descBuilder.AppendLine($"Khách cần thanh toán: {order.FinalAmount:N0}đ");
+            return descBuilder.ToString();
+        }
+
+        return
+            $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
+            $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
+    }
+
+    private async Task UpsertPaymentAndTransactionForOrder(Order order, string sessionId, Guid userId, bool isRenew)
+    {
+        var transactionType = isRenew ? "Renew" : "Checkout";
+        var now = DateTime.UtcNow;
+
+        if (order.Payment == null)
+        {
+            var payment = new Payment
+            {
+                Order = order,
+                Amount = order.TotalAmount,
+                DiscountRate = 0,
+                NetAmount = order.TotalAmount,
+                Method = "Stripe",
+                Status = "Pending",
+                TransactionId = "",
+                PaidAt = now,
+                RefundedAmount = 0,
+                CreatedAt = now,
+                CreatedBy = userId,
+                Transactions = new List<Transaction>()
+            };
+
+            var transaction = new Transaction
+            {
+                Payment = payment,
+                Type = transactionType,
+                Amount = order.TotalAmount,
+                Currency = "vnd",
+                Status = "Pending",
+                OccurredAt = now,
+                ExternalRef = sessionId,
+                CreatedAt = now,
+                CreatedBy = userId
+            };
+
+            payment.Transactions.Add(transaction);
+            order.Payment = payment;
+            await _unitOfWork.Orders.Update(order);
+        }
+        else
+        {
+            var transaction = new Transaction
+            {
+                Payment = order.Payment,
+                Type = transactionType,
+                Amount = order.TotalAmount,
+                Currency = "vnd",
+                Status = "Pending",
+                OccurredAt = now,
+                ExternalRef = sessionId,
+                CreatedAt = now,
+                CreatedBy = userId
+            };
+            order.Payment.Transactions ??= new List<Transaction>();
+            order.Payment.Transactions.Add(transaction);
+            await _unitOfWork.Payments.Update(order.Payment);
+        }
+    }
+
+
     public async Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false)
     {
-        // Lấy user hiện tại
         var userId = _claimsService.CurrentUserId;
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null)
             throw ErrorHelper.NotFound("User không tồn tại.");
 
-        // Lấy order và kiểm tra quyền sở hữu, include Promotion để lấy thông tin voucher
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails)
@@ -62,7 +145,8 @@ public class StripeService : IStripeService
                 .ThenInclude(od => od.BlindBox)
             .Include(o => o.OrderDetails)
                 .ThenInclude(od => od.Shipments)
-            .Include(o => o.Promotion)
+            .Include(o => o.OrderSellerPromotions)
+                .ThenInclude(op => op.Promotion)
             .FirstOrDefaultAsync();
 
         if (order == null)
@@ -79,10 +163,8 @@ public class StripeService : IStripeService
                 throw ErrorHelper.BadRequest("Chỉ có thể gia hạn đơn hàng đã hoàn thành hoặc hết hạn.");
         }
 
-        // Lấy thông tin promotion từ order nếu có
         var promotionDesc = GetPromotionDescription(order);
 
-        // Tổng hợp thông tin shipment/fee cho description
         var shipmentDescriptions = new List<string>();
         decimal totalShippingFee = 0;
         foreach (var od in order.OrderDetails)
@@ -98,11 +180,11 @@ public class StripeService : IStripeService
                 }
             }
         }
+
         var shipmentDesc = shipmentDescriptions.Any()
             ? string.Join(" | ", shipmentDescriptions)
             : "Không có thông tin giao hàng.";
 
-        // Chuẩn bị line items cho Stripe
         var lineItems = new List<SessionLineItemOptions>();
         foreach (var item in order.OrderDetails)
         {
@@ -123,7 +205,6 @@ public class StripeService : IStripeService
                 throw ErrorHelper.BadRequest("Sản phẩm hoặc BlindBox trong đơn hàng không hợp lệ.");
             }
 
-            // Thêm thông tin shipment cho từng sản phẩm nếu có
             string shipmentInfo = "";
             if (item.Shipments != null && item.Shipments.Any())
             {
@@ -141,17 +222,16 @@ public class StripeService : IStripeService
                         Name =
                             $"Product/Blindbox Name: {name} , Order Detail id {item.Id} belongs to Order {order.Id} paid by {user.Email}",
                         Description =
-                        $"Sản phẩm: {name}, Số lượng: {item.Quantity}, Tổng: {item.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
-                        (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "") +
-                        (!string.IsNullOrEmpty(shipmentInfo) ? shipmentInfo : "")
+                            $"Sản phẩm: {name}, Số lượng: {item.Quantity}, Tổng: {item.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
+                            (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "") +
+                            (!string.IsNullOrEmpty(shipmentInfo) ? shipmentInfo : "")
                     },
-                    UnitAmount = (long)unitPrice // Stripe expects amount in cents
+                    UnitAmount = (long)unitPrice
                 },
                 Quantity = item.Quantity
             });
         }
 
-        // Thêm một line item cho phí ship tổng nếu có
         if (totalShippingFee > 0)
         {
             lineItems.Add(new SessionLineItemOptions
@@ -173,16 +253,14 @@ public class StripeService : IStripeService
         var options = new SessionCreateOptions
         {
             Metadata = new Dictionary<string, string>
-            {
-                { "orderId", orderId.ToString() },
-                { "userId", userId.ToString() },
-                { "isRenew", isRenew.ToString() },
-                { "promotion", promotionDesc },
-                { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
-                { "promotionCode", order.Promotion?.Code ?? "" },
-                { "totalAmount", order.TotalAmount.ToString() },
-                { "finalAmount", order.FinalAmount.ToString() }
-            },
+        {
+            { "orderId", orderId.ToString() },
+            { "userId", userId.ToString() },
+            { "isRenew", isRenew.ToString() },
+            { "promotion", promotionDesc },
+            { "totalAmount", order.TotalAmount.ToString() },
+            { "finalAmount", order.FinalAmount.ToString() }
+        },
 
             CustomerEmail = user.Email,
             PaymentMethodTypes = new List<string> { "card" },
@@ -196,34 +274,30 @@ public class StripeService : IStripeService
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
                 Metadata = new Dictionary<string, string>
-                {
-                    { "orderId", orderId.ToString() },
-                    { "userId", userId.ToString() },
-                    { "createdAt", DateTime.UtcNow.ToString("o") },
-                    { "email", user.Email },
-                    { "orderStatus", order.Status },
-                    { "itemCount", order.OrderDetails.Count.ToString() },
-                    { "totalAmount", order.TotalAmount.ToString() },
-                    { "currency", "vnd" },
-                    { "isRenew", isRenew.ToString() },
-                    { "promotion", promotionDesc },
-                    { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
-                    { "promotionCode", order.Promotion?.Code ?? "" }
-                }
+            {
+                { "orderId", orderId.ToString() },
+                { "userId", userId.ToString() },
+                { "createdAt", DateTime.UtcNow.ToString("o") },
+                { "email", user.Email },
+                { "orderStatus", order.Status },
+                { "itemCount", order.OrderDetails.Count.ToString() },
+                { "totalAmount", order.TotalAmount.ToString() },
+                { "currency", "vnd" },
+                { "isRenew", isRenew.ToString() },
+                { "promotion", promotionDesc }
+            }
             }
         };
 
         var service = new SessionService(_stripeClient);
         var session = await service.CreateAsync(options);
 
-        // Tạo Payment và Transaction như cũ
         await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew);
-
-
         await _unitOfWork.SaveChangesAsync();
 
         return session.Url;
     }
+
 
     // 1. Chuyển tiền payout cho seller (Stripe Connect)
     public async Task<Transfer> PayoutToSellerAsync(string sellerStripeAccountId, decimal amount,
@@ -422,80 +496,5 @@ public class StripeService : IStripeService
         return await reversalService.CreateAsync(transferId, options);
     }
 
-    private string GetPromotionDescription(Order order)
-    {
-        if (order.Promotion != null)
-            return
-                $"[Voucher: {order.Promotion.Code} - {order.Promotion.Description}]\n" +
-                $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
-                $"Giảm giá: {order.DiscountAmount?.ToString("N0") ?? "0"}đ\n" +
-                $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
-        if (!string.IsNullOrEmpty(order.PromotionNote))
-            return order.PromotionNote +
-                   $"\nTổng tiền gốc: {order.TotalAmount:N0}đ" +
-                   $"\nKhách cần thanh toán: {order.FinalAmount:N0}đ";
-        return
-            $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
-            $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
-    }
-
-    private async Task UpsertPaymentAndTransactionForOrder(Order order, string sessionId, Guid userId, bool isRenew)
-    {
-        var transactionType = isRenew ? "Renew" : "Checkout";
-        var now = DateTime.UtcNow;
-
-        if (order.Payment == null)
-        {
-            var payment = new Payment
-            {
-                Order = order,
-                Amount = order.TotalAmount,
-                DiscountRate = 0,
-                NetAmount = order.TotalAmount,
-                Method = "Stripe",
-                Status = "Pending",
-                TransactionId = "",
-                PaidAt = now,
-                RefundedAmount = 0,
-                CreatedAt = now,
-                CreatedBy = userId,
-                Transactions = new List<Transaction>()
-            };
-
-            var transaction = new Transaction
-            {
-                Payment = payment,
-                Type = transactionType,
-                Amount = order.TotalAmount,
-                Currency = "vnd",
-                Status = "Pending",
-                OccurredAt = now,
-                ExternalRef = sessionId,
-                CreatedAt = now,
-                CreatedBy = userId
-            };
-
-            payment.Transactions.Add(transaction);
-            order.Payment = payment;
-            await _unitOfWork.Orders.Update(order);
-        }
-        else
-        {
-            var transaction = new Transaction
-            {
-                Payment = order.Payment,
-                Type = transactionType,
-                Amount = order.TotalAmount,
-                Currency = "vnd",
-                Status = "Pending",
-                OccurredAt = now,
-                ExternalRef = sessionId,
-                CreatedAt = now,
-                CreatedBy = userId
-            };
-            order.Payment.Transactions ??= new List<Transaction>();
-            order.Payment.Transactions.Add(transaction);
-            await _unitOfWork.Payments.Update(order.Payment);
-        }
-    }
+ 
 }

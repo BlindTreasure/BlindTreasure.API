@@ -27,4 +27,6 @@ public class Promotion : BaseEntity
 
     //navigation property to Order
     public ICollection<Order> Orders { get; set; }
+    // New navigation to OrderSellerPromotion
+    public ICollection<OrderSellerPromotion> OrderSellerPromotions { get; set; }
 }

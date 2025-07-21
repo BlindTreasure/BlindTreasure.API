@@ -16,19 +16,14 @@ public static class OrderDtoMapper
                 Id = order.Id,
                 Status = order.Status,
                 TotalAmount = order.TotalAmount,
-                FinalAmount = order.TotalAmount - (order.DiscountAmount ?? 0),
+                FinalAmount = order.FinalAmount.Value,
                 PlacedAt = order.PlacedAt,
                 CompletedAt = order.CompletedAt,
                 ShippingAddress = order.ShippingAddress != null
                     ? ToOrderAddressDto(order.ShippingAddress)
                     : null,
                 Details = order.OrderDetails?.Select(ToOrderDetailDto).ToList() ?? new List<OrderDetailDto>(),
-                Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
-                PromotionId = order.PromotionId,
-                DiscountAmount = order.DiscountAmount,
-                PromotionNote = order.PromotionNote
-                                ?? order.Promotion?.Description
-                                ?? string.Empty
+                Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null
             };
         }
         catch (Exception ex)
