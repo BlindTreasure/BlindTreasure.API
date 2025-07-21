@@ -17,5 +17,4 @@ public class TradeRequest : BaseEntity
     public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
     public DateTime? RespondedAt { get; set; }
     public DateTime? LockedAt { get; set; }
-
 }

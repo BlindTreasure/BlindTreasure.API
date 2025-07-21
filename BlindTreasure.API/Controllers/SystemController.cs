@@ -393,6 +393,8 @@ public class SystemController : ControllerBase
                 {
                     () => context.ChatMessages.ExecuteDeleteAsync(),
                     () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
+                    () => context.TradeHistories.ExecuteDeleteAsync(),
+                    () => context.TradeRequests.ExecuteDeleteAsync(),
 
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
                     () => context.RarityConfigs.ExecuteDeleteAsync(),

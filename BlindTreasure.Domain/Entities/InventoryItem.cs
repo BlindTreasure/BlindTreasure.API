@@ -22,7 +22,7 @@ public class InventoryItem : BaseEntity
 
     // 1-n → Listings
     public ICollection<Listing>? Listings { get; set; }
-    
+
     // Thêm trường LockedByRequestId
     public Guid? LockedByRequestId { get; set; } // Giao dịch đang khóa item này
     public TradeRequest? LockedByRequest { get; set; } // Liên kết với giao dịch khóa item

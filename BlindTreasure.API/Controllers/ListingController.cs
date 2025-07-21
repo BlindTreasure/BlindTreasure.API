@@ -28,7 +28,8 @@ public class ListingController : ControllerBase
         try
         {
             var result = await _listingService.GetAllListingsAsync(param);
-            return Ok(ApiResult<Pagination<ListingDetailDto>>.Success(result, "200", "Lấy danh sách listing thành công."));
+            return Ok(ApiResult<Pagination<ListingDetailDto>>.Success(result, "200",
+                "Lấy danh sách listing thành công."));
         }
         catch (Exception ex)
         {
@@ -38,7 +39,7 @@ public class ListingController : ControllerBase
         }
     }
 
-    
+
     /// <summary>
     ///     Tạo listing (free hoặc trade) cho item trong kho.
     /// </summary>
@@ -114,7 +115,6 @@ public class ListingController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-
 }
 
 /// <summary>

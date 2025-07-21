@@ -67,7 +67,8 @@ public class TradingController : ControllerBase
         try
         {
             var result = await _tradingService.GetTradeRequestsAsync(listingId);
-            return Ok(ApiResult<List<TradeRequestDto>>.Success(result, "200", "Lấy danh sách trade requests thành công."));
+            return Ok(ApiResult<List<TradeRequestDto>>.Success(result, "200",
+                "Lấy danh sách trade requests thành công."));
         }
         catch (Exception ex)
         {
@@ -134,4 +135,3 @@ public class TradingController : ControllerBase
         }
     }
 }
-

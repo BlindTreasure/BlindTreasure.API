@@ -44,6 +44,8 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<BlindBoxUnboxLog> BlindBoxUnboxLogs { get; set; }
     public DbSet<ListingReport> ListingReports { get; set; }
+    public DbSet<TradeRequest> TradeRequests { get; set; }
+    public DbSet<TradeHistory> TradeHistories { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -10,4 +10,5 @@ public class ListingDto
     public Guid InventoryId { get; set; }
     public string ProductName { get; set; }
     public string ProductImage { get; set; }
+    public string Description { get; set; } // Thêm mô tả vào DTO
 }

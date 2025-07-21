@@ -115,9 +115,7 @@ public class ListingService : IListingService
         {
             InventoryId = inventory.Id,
             IsFree = dto.IsFree,
-            DesiredItemId = dto.IsFree ? null : dto.DesiredItemId,
-            DesiredItemName = dto.IsFree ? null : dto.DesiredItemName,
-            Description = dto.Description,
+            Description = dto.Description, // Lưu mô tả vào Listing
             ListedAt = DateTime.UtcNow,
             Status = ListingStatus.Active,
             TradeStatus = TradeStatus.Pending
@@ -129,6 +127,7 @@ public class ListingService : IListingService
         var listingDto = _mapper.Map<Listing, ListingDto>(listing);
         listingDto.ProductName = inventory.Product?.Name ?? "Unknown";
         listingDto.ProductImage = inventory.Product?.ImageUrls?.FirstOrDefault() ?? "";
+        listingDto.Description = listing.Description; // Đảm bảo trả về mô tả
 
         return listingDto;
     }
