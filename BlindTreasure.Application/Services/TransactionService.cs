@@ -142,7 +142,7 @@ public class TransactionService : ITransactionService
     private async Task CreateGhnOrdersAndUpdateShipments(Order order, List<OrderDetail> orderDetails)
     {
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => orderDetails.Select(od => od.Id).Contains(s.OrderDetailId) && s.Status == "WAITING_PAYMENT")
+            .Where(s => orderDetails.Select(od => od.Id).Contains(s.OrderDetailId.Value) && s.Status == "WAITING_PAYMENT")
             .Include(s => s.OrderDetail).ThenInclude(od => od.Product).ThenInclude(p => p.Seller)
             .ToListAsync();
 

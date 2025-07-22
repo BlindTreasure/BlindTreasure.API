@@ -11,6 +11,8 @@ public class OrderDetail : BaseEntity
     public Product Product { get; set; }
     public Guid? BlindBoxId { get; set; }
     public BlindBox BlindBox { get; set; }
+    public int? TotalShippingFee { get; set; } // Tổng phí vận chuyển
+
 
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }

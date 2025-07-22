@@ -81,18 +81,26 @@ public class InventoryItemService : IInventoryItemService
         }
 
         _loggerService.Info($"[CreateAsync] Creating inventory item for user {userId}, product {dto.ProductId}.");
-        var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId);
+        var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId, x => x.Seller);
         if (product == null || product.IsDeleted)
             throw ErrorHelper.NotFound("Product not found.");
+
+
+        // Lấy địa chỉ giao hàng mặc định của user
+        var address = await _unitOfWork.Addresses.GetQueryable()
+            .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
+            .FirstOrDefaultAsync();
+        if (address == null)
+            throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
 
         var item = new InventoryItem
         {
             UserId = userId.Value,
             ProductId = dto.ProductId,
             Quantity = dto.Quantity,
-            Location = dto.Location ?? string.Empty,
-            Status = dto.Status,
-            AddressId = dto.AddressId
+            Location = product.Seller.CompanyAddress ?? string.Empty,
+            Status = Domain.Enums.InventoryItemStatus.Available,
+            AddressId = address.Id
         };
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);

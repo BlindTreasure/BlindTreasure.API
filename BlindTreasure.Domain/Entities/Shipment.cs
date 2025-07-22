@@ -3,8 +3,8 @@
 public class Shipment : BaseEntity
 {
     // FK → OrderDetail
-    public Guid OrderDetailId { get; set; }
-    public OrderDetail OrderDetail { get; set; }
+    public Guid? OrderDetailId { get; set; }
+    public OrderDetail? OrderDetail { get; set; }
 
 
     //các field cho GHN 

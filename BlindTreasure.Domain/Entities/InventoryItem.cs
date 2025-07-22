@@ -20,6 +20,10 @@ public class InventoryItem : BaseEntity
     public Guid? AddressId { get; set; } // FK → Address, optional
     public Address? Address { get; set; }
 
+    // FK → OrderDetail
+    public Guid? OrderDetailId { get; set; }
+    public OrderDetail? OrderDetail { get; set; }
+
     // 1-n → Listings
     public ICollection<Listing>? Listings { get; set; }
 }

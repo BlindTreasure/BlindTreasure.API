@@ -10,6 +10,7 @@ namespace BlindTreasure.Domain.DTOs.ShipmentDTOs;
 
 public class ShipmentDto
 {
+    public Guid? Id { get; set; }
     public OrderDetailDto? OrderDetail { get; set; }
 
 

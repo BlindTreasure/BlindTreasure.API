@@ -19,6 +19,7 @@ public static class ShipmentDtoMapper
 
         return new ShipmentDto
         {
+            Id = shipment.Id,
             OrderDetail = shipment.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(shipment.OrderDetail) : null,
             OrderCode = shipment.OrderCode,
             TotalFee = shipment.TotalFee,

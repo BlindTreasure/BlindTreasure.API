@@ -60,6 +60,32 @@ public class InventoryItemController : ControllerBase
         }
     }
 
+    /// <summary>
+    ///     Tạo mới một inventory item cho user hiện tại.
+    ///     (Chỉ sử dụng cho mục đích nội bộ, không public cho client)
+    /// </summary>
+    /// <param name="dto">Thông tin inventory item cần tạo</param>
+    /// <returns>Inventory item vừa được tạo</returns>
+    [HttpPost]
+    [ProducesResponseType(typeof(ApiResult<InventoryItemDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> Create([FromBody] CreateInventoryItemDto dto)
+    {
+        try
+        {
+            var result = await _inventoryItemService.CreateAsync(dto, null);
+            _logger.Success($"[InventoryItemController][Create] Tạo inventory item mới thành công cho product {dto.ProductId}.");
+            return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Tạo inventory item thành công."));
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[InventoryItemController][Create] {ex.Message}");
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
     [HttpGet("by-blindbox/{blindBoxId}")]
     public async Task<IActionResult> GetUnboxedItemsByBlindBox(Guid blindBoxId)
     {
