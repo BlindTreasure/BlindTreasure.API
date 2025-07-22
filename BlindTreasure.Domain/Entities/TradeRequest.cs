@@ -16,4 +16,5 @@ public class TradeRequest : BaseEntity
     public TradeRequestStatus Status { get; set; } = TradeRequestStatus.Pending;
     public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
     public DateTime? RespondedAt { get; set; }
+    public DateTime? LockedAt { get; set; }
 }
