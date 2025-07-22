@@ -9,7 +9,7 @@ public static class InventoryItemMapper
     {
         return new InventoryItemDto
         {
-            Id = item.Id,
+            InventoryItemId = item.Id,
             UserId = item.UserId,
             ProductId = item.ProductId,
             //ProductName = item.Product?.Name ?? string.Empty,

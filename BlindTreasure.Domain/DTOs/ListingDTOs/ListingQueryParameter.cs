@@ -8,4 +8,3 @@ public class ListingQueryParameter : PaginationParameter
     public ListingStatus? Status { get; set; }
     public bool? IsFree { get; set; } // Filter theo IsFree
 }
-

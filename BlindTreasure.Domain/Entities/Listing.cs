@@ -9,9 +9,6 @@ public class Listing : BaseEntity
 
     public bool IsFree { get; set; } = false;
 
-    public Guid? DesiredItemId { get; set; }
-    public string? DesiredItemName { get; set; }
-
     public string? Description { get; set; } // Mô tả listing
 
     public DateTime ListedAt { get; set; }

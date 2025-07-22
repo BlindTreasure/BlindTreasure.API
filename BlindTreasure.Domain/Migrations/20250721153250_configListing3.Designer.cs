@@ -3,6 +3,7 @@ using System;
 using BlindTreasure.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    partial class BlindTreasureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250721153250_configListing3")]
+    partial class configListing3
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1770,7 +1773,7 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.HasIndex("RequesterId");
 
-                    b.ToTable("TradeHistories");
+                    b.ToTable("TradeHistory");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.TradeRequest", b =>
@@ -1831,7 +1834,7 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.HasIndex("RequesterId");
 
-                    b.ToTable("TradeRequests");
+                    b.ToTable("TradeRequest");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Transaction", b =>
