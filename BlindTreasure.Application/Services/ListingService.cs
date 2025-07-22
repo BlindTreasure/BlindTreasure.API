@@ -148,9 +148,6 @@ public class ListingService : IListingService
         return true;
     }
 
-    /// <summary>
-    /// Tạo báo cáo listing
-    /// </summary>
     public async Task ReportListingAsync(Guid listingId, string reason)
     {
         var listing = await _unitOfWork.Listings.GetByIdAsync(listingId);
@@ -169,9 +166,6 @@ public class ListingService : IListingService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    /// <summary>
-    /// Hết hạn listing sau 30 ngày.
-    /// </summary>
     public async Task<int> ExpireOldListingsAsync()
     {
         var now = DateTime.UtcNow;
@@ -197,6 +191,7 @@ public class ListingService : IListingService
         return expiredListings.Count;
     }
 
+    #region private methods
 
     private async Task EnsureItemCanBeListedAsync(Guid inventoryId, Guid userId)
     {
@@ -225,4 +220,6 @@ public class ListingService : IListingService
         if (ongoingTradeRequest != null)
             throw ErrorHelper.Conflict("Vật phẩm này đang có giao dịch chờ xử lý.");
     }
+
+    #endregion
 }

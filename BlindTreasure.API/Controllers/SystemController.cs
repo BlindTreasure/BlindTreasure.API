@@ -393,8 +393,7 @@ public class SystemController : ControllerBase
                 {
                     () => context.ChatMessages.ExecuteDeleteAsync(),
                     () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
-                    () => context.TradeHistories.ExecuteDeleteAsync(),
-                    () => context.TradeRequests.ExecuteDeleteAsync(),
+
 
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
                     () => context.RarityConfigs.ExecuteDeleteAsync(),
@@ -404,7 +403,11 @@ public class SystemController : ControllerBase
                     () => context.OrderDetails.ExecuteDeleteAsync(),
                     () => context.Listings.ExecuteDeleteAsync(),
                     () => context.InventoryItems.ExecuteDeleteAsync(),
+
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
+
+                    () => context.TradeHistories.ExecuteDeleteAsync(),
+                    () => context.TradeRequests.ExecuteDeleteAsync(),
                     () => context.SupportTickets.ExecuteDeleteAsync(),
                     () => context.Reviews.ExecuteDeleteAsync(),
                     () => context.Shipments.ExecuteDeleteAsync(),

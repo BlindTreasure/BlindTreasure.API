@@ -144,7 +144,7 @@ public class TradingService : ITradingService
     {
         var tradeRequest =
             await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId, t => t.Listing, t => t.Listing.InventoryItem);
-        if (tradeRequest == null || tradeRequest.Status != TradeRequestStatus.Pending)
+        if (tradeRequest == null || tradeRequest.Status != TradeRequestStatus.Accepted)
             throw ErrorHelper.NotFound("Trade request không tồn tại hoặc đã xử lý.");
 
         var listingItem = tradeRequest.Listing.InventoryItem;
