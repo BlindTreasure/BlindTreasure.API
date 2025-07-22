@@ -1,5 +1,4 @@
 ﻿using BlindTreasure.API.Architecture;
-using BlindTreasure.Application.GHTK.Authorization;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using BlindTreasure.Application.Services;
