@@ -508,7 +508,8 @@ public class BlindTreasureDbContext : DbContext
         modelBuilder.Entity<Shipment>()
             .HasOne(s => s.OrderDetail)
             .WithMany(od => od.Shipments)
-            .HasForeignKey(s => s.OrderDetailId);
+            .HasForeignKey(s => s.OrderDetailId)
+            .OnDelete(DeleteBehavior.Cascade); // This will delete Shipments when OrderDetail is deleted
 
         // Review ↔ User / Product / BlindBox (n-1), set null
         modelBuilder.Entity<Review>()
