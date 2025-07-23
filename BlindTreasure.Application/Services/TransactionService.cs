@@ -136,14 +136,15 @@ public class TransactionService : ITransactionService
 
     private async Task<List<OrderDetail>> GetOrderDetails(Guid orderId)
     {
-        return await _unitOfWork.OrderDetails.GetAllAsync(od => od.OrderId == orderId, x=>x.Shipments)
+        return await _unitOfWork.OrderDetails.GetAllAsync(od => od.OrderId == orderId, x => x.Shipments)
                ?? new List<OrderDetail>();
     }
 
     private async Task CreateGhnOrdersAndUpdateShipments(Order order, List<OrderDetail> orderDetails)
     {
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => orderDetails.Select(od => od.Id).Contains(s.OrderDetailId.Value) && s.Status == "WAITING_PAYMENT")
+            .Where(s => orderDetails.Select(od => od.Id).Contains(s.OrderDetailId.Value) &&
+                        s.Status == "WAITING_PAYMENT")
             .Include(s => s.OrderDetail).ThenInclude(od => od.Product).ThenInclude(p => p.Seller)
             .ToListAsync();
 
@@ -238,8 +239,8 @@ public class TransactionService : ITransactionService
     /// Mỗi InventoryItem đại diện cho một vật phẩm duy nhất, gắn với đúng OrderDetail và Shipment.
     /// </summary>
     private async Task CreateInventoryForOrderDetailsAsync(
-     Order order,
-     List<OrderDetail> orderDetails)
+        Order order,
+        List<OrderDetail> orderDetails)
     {
         // 1) Lấy và validate shippingAddress (1 lần)
         Address? shippingAddress = null;
@@ -263,18 +264,18 @@ public class TransactionService : ITransactionService
             .ToDictionary(
                 od => od.Id,
                 od => od.Shipments!
-                        .Select(s => new { s.Id, SellerId = s.OrderDetail.SellerId })
-                        .ToList()
+                    .Select(s => new { s.Id, SellerId = s.OrderDetail.SellerId })
+                    .ToList()
             );
 
         // 3) Tạo từng InventoryItem
-        int createdCount = 0;
+        var createdCount = 0;
         foreach (var od in orderDetails.Where(od => od.ProductId.HasValue))
         {
             // danh sách shipment ID cho orderDetail này (có thể rỗng)
             shipmentsByDetail.TryGetValue(od.Id, out var shipmentInfos);
 
-            for (int i = 0; i < od.Quantity; i++)
+            for (var i = 0; i < od.Quantity; i++)
             {
                 // chọn shipmentId: nếu 1 thì 1, nếu nhiều thì theo seller match
                 Guid? shipmentId = null;
@@ -288,8 +289,8 @@ public class TransactionService : ITransactionService
                     {
                         // match theo sellerId (nếu cần)
                         var info = shipmentInfos
-                            .FirstOrDefault(si => si.SellerId == od.SellerId)
-                            ?? shipmentInfos[0];
+                                       .FirstOrDefault(si => si.SellerId == od.SellerId)
+                                   ?? shipmentInfos[0];
                         shipmentId = info.Id;
                     }
                 }
@@ -301,8 +302,8 @@ public class TransactionService : ITransactionService
                     Quantity = 1,
                     Location = string.Empty,
                     Status = shipmentId.HasValue
-                                      ? InventoryItemStatus.Delivering
-                                      : InventoryItemStatus.Available,
+                        ? InventoryItemStatus.Delivering
+                        : InventoryItemStatus.Available,
                     ShipmentId = shipmentId,
                     OrderDetailId = od.Id,
                     AddressId = shippingAddress?.Id

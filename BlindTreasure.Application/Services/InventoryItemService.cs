@@ -98,8 +98,7 @@ public class InventoryItemService : IInventoryItemService
             UserId = userId.Value,
             ProductId = dto.ProductId,
             Location = product.Seller.CompanyAddress ?? string.Empty,
-            Status = Domain.Enums.InventoryItemStatus.Available,
-
+            Status = Domain.Enums.InventoryItemStatus.Available
         };
 
         if (dto.OrderDetailId.HasValue)
@@ -110,7 +109,8 @@ public class InventoryItemService : IInventoryItemService
             item.OrderDetailId = dto.OrderDetailId.Value;
             item.OrderDetail = orderDetail;
         }
-        if(dto.ShipmentId.HasValue)
+
+        if (dto.ShipmentId.HasValue)
         {
             var shipment = await _unitOfWork.Shipments.GetByIdAsync(dto.ShipmentId.Value);
             if (shipment == null || shipment.IsDeleted)

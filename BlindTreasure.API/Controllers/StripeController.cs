@@ -496,10 +496,9 @@ public class StripeController : ControllerBase
 
             if (!string.IsNullOrEmpty(orderId))
             {
-              
                 await _transactionService.HandleSuccessfulPaymentAsync(session.Id, orderId);
                 _logger.Success(
-                  $"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {session.Id}");
+                    $"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {session.Id}");
             }
             else
             {
@@ -556,18 +555,20 @@ public class StripeController : ControllerBase
     {
         try
         {
-            var IsShipment = session.Metadata != null && session.Metadata.TryGetValue("IsShipment", out var isShipmentStr)
+            var IsShipment = session.Metadata != null &&
+                             session.Metadata.TryGetValue("IsShipment", out var isShipmentStr)
                 ? isShipmentStr
                 : null;
-            if(string.IsNullOrEmpty(IsShipment) || IsShipment != "true")
+            if (string.IsNullOrEmpty(IsShipment) || IsShipment != "true")
             {
                 _logger.Warn("[Stripe][Webhook] Not a shipment payment, skipping.");
                 return;
             }
 
-            var shipmentIds = session.Metadata != null && session.Metadata.TryGetValue("shipmentIds", out var shipmentIdList)
-               ? shipmentIdList
-               : null;
+            var shipmentIds = session.Metadata != null &&
+                              session.Metadata.TryGetValue("shipmentIds", out var shipmentIdList)
+                ? shipmentIdList
+                : null;
 
             // xử lý luồng yêu cầu thanh toán shipment thành công của các inventory item
 

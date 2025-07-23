@@ -74,7 +74,8 @@ public class InventoryItemController : ControllerBase
         try
         {
             var result = await _inventoryItemService.CreateAsync(dto, null);
-            _logger.Success($"[InventoryItemController][Create] Tạo inventory item mới thành công cho product {dto.ProductId}.");
+            _logger.Success(
+                $"[InventoryItemController][Create] Tạo inventory item mới thành công cho product {dto.ProductId}.");
             return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Tạo inventory item thành công."));
         }
         catch (Exception ex)

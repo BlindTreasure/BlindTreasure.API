@@ -24,11 +24,32 @@ public class TradingService : ITradingService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task<TradeRequestDto> GetByIdAsync(Guid tradeRequestId)
+    {
+        var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
+            t => t.Listing,
+            t => t.Listing.InventoryItem,
+            t => t.Listing.InventoryItem.Product!,
+            t => t.Requester);
+
+        if (tradeRequest == null)
+            throw ErrorHelper.NotFound("Trade Request không tồn tại.");
+
+        // Load OfferedInventory nếu có
+        InventoryItem? offeredInventory = null;
+        if (tradeRequest.OfferedInventoryId.HasValue)
+            offeredInventory = await _unitOfWork.InventoryItems.GetByIdAsync(
+                tradeRequest.OfferedInventoryId.Value,
+                i => i.Product);
+
+        return MapTradeRequestToDto(tradeRequest, offeredInventory);
+    }
+
     public async Task<List<TradeRequestDto>> GetTradeRequestsAsync(Guid listingId)
     {
         // Lấy thông tin listing
         var listing =
-            await _unitOfWork.Listings.GetByIdAsync(listingId, l => l.InventoryItem, l => l.InventoryItem.Product);
+            await _unitOfWork.Listings.GetByIdAsync(listingId, l => l.InventoryItem, l => l.InventoryItem.Product!);
         if (listing == null)
             throw ErrorHelper.NotFound("Listing không tồn tại.");
 
@@ -58,10 +79,8 @@ public class TradingService : ITradingService
         if (listing == null || listing.Status != ListingStatus.Active)
             throw ErrorHelper.NotFound("Listing không tồn tại hoặc không còn hoạt động.");
 
-        InventoryItem? offeredItem = null;
-
         // Kiểm tra điều kiện item
-        offeredItem = await ValidateOfferedItem(offeredInventoryId, listing, userId);
+        var offeredItem = await ValidateOfferedItem(offeredInventoryId, listing, userId);
 
         var tradeRequest = new TradeRequest
         {
@@ -75,11 +94,11 @@ public class TradingService : ITradingService
         await _unitOfWork.TradeRequests.AddAsync(tradeRequest);
         await _unitOfWork.SaveChangesAsync();
 
-        return MapTradeRequestToDto(tradeRequest, offeredItem);
+        return await GetByIdAsync(tradeRequest.Id);
     }
 
     // 2. Respond TradeRequest (Chấp nhận hoặc từ chối)
-    public async Task<bool> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted)
+    public async Task<TradeRequestDto> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted)
     {
         var tradeRequest =
             await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId, t => t.Listing, t => t.Listing.InventoryItem);
@@ -97,7 +116,7 @@ public class TradingService : ITradingService
         await _unitOfWork.TradeRequests.Update(tradeRequest);
         await _unitOfWork.SaveChangesAsync();
 
-        return true;
+        return await GetByIdAsync(tradeRequestId);
     }
 
     // 3. Lock Deal - Tự động hoàn thành giao dịch khi cả 2 đều lock
@@ -121,30 +140,10 @@ public class TradingService : ITradingService
         await _unitOfWork.TradeRequests.Update(tradeRequest);
         await _unitOfWork.SaveChangesAsync();
 
-        return MapTradeRequestToDto(tradeRequest, tradeRequest.OfferedInventory);
+        return await GetByIdAsync(tradeRequestId);
     }
 
-    // 4. Expire Deal (Khi không có hành động nào từ 2 bên)
-    public async Task<bool> ExpireDealAsync(Guid tradeRequestId)
-    {
-        var tradeRequest =
-            await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId, t => t.Listing, t => t.Listing.InventoryItem);
-        if (tradeRequest == null || tradeRequest.Status != TradeRequestStatus.PENDING)
-            throw ErrorHelper.NotFound("Trade request không tồn tại hoặc không hết hạn.");
-
-        tradeRequest.Status = TradeRequestStatus.EXPIRED;
-        var listingItem = tradeRequest.Listing.InventoryItem;
-        listingItem.Status = InventoryItemStatus.Available;
-        listingItem.LockedByRequestId = null;
-
-        await _unitOfWork.InventoryItems.Update(listingItem);
-        await _unitOfWork.TradeRequests.Update(tradeRequest);
-        await _unitOfWork.SaveChangesAsync();
-
-        return true;
-    }
-
-    #region Helper methods
+    #region private methods
 
     private async Task<InventoryItem?> ValidateOfferedItem(Guid? offeredInventoryId, Listing listing, Guid userId)
     {
@@ -395,27 +394,27 @@ public class TradingService : ITradingService
 
     private TradeRequestDto MapTradeRequestToDto(TradeRequest tradeRequest, InventoryItem? offeredItem)
     {
-        _logger.Info($"[MapTradeRequestToDto] Mapping trade request {tradeRequest.Id} to DTO");
-
         var listingItemName = tradeRequest.Listing?.InventoryItem?.Product?.Name ?? "Unknown";
         var offeredItemName = offeredItem?.Product?.Name;
-
-        _logger.Info(
-            $"[MapTradeRequestToDto] Mapping data - ListingItemName: {listingItemName}, OfferedItemName: {offeredItemName}, Status: {tradeRequest.Status}");
+        var requesterName = tradeRequest.Requester?.FullName ?? "Unknown";
 
         var dto = new TradeRequestDto
         {
             Id = tradeRequest.Id,
-            ListingId = tradeRequest.Listing.Id,
+            ListingId = tradeRequest.ListingId,
             ListingItemName = listingItemName,
             RequesterId = tradeRequest.RequesterId,
+            RequesterName = requesterName,
             OfferedInventoryId = tradeRequest.OfferedInventoryId,
             OfferedItemName = offeredItemName,
             Status = tradeRequest.Status,
-            RequestedAt = tradeRequest.RequestedAt
-        };
+            RequestedAt = tradeRequest.RequestedAt,
+            RespondedAt = tradeRequest.RespondedAt,
 
-        _logger.Success($"[MapTradeRequestToDto] Đã mapping trade request {tradeRequest.Id} thành công");
+            OwnerLocked = tradeRequest.OwnerLocked,
+            RequesterLocked = tradeRequest.RequesterLocked,
+            LockedAt = tradeRequest.LockedAt
+        };
 
         return dto;
     }

@@ -96,6 +96,4 @@ public class TradingController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-
-
 }

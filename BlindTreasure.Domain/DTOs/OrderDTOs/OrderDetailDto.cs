@@ -19,6 +19,4 @@ public class OrderDetailDto
     public decimal TotalPrice { get; set; }
     public string Status { get; set; }
     public ICollection<ShipmentDto> Shipments { get; set; } = new List<ShipmentDto>();
-
-
 }

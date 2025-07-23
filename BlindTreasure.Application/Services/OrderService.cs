@@ -496,7 +496,6 @@ public class OrderService : IOrderService
 
                 await _unitOfWork.BlindBoxes.Update(blindBox);
                 orderDetail.SellerId = blindBox.SellerId;
-
             }
         }
 

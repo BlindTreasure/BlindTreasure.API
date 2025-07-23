@@ -17,8 +17,8 @@ public class TradeRequest : BaseEntity
     public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
     public DateTime? RespondedAt { get; set; }
 
-    public bool OwnerLocked { get; set; } = false;     // User A lock
+    public bool OwnerLocked { get; set; } = false; // User A lock
     public bool RequesterLocked { get; set; } = false; // User B lock
 
-    public DateTime? LockedAt { get; set; }            // Thời điểm đủ lock (cả 2)
+    public DateTime? LockedAt { get; set; } // Thời điểm đủ lock (cả 2)
 }
