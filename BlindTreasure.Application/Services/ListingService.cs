@@ -93,7 +93,7 @@ public class ListingService : IListingService
         var userId = _claimsService.CurrentUserId;
 
         // Kiểm tra tính toàn vẹn của item trước khi đăng tin
-        // await EnsureItemCanBeListedAsync(dto.InventoryId, userId);
+        await EnsureItemCanBeListedAsync(dto.InventoryId, userId);
 
         var inventory = await _unitOfWork.InventoryItems.FirstOrDefaultAsync(
             x => x.Id == dto.InventoryId &&
@@ -168,33 +168,69 @@ public class ListingService : IListingService
 
     #region private methods
 
-    // private async Task EnsureItemCanBeListedAsync(Guid inventoryId, Guid userId)
-    // {
-    //     // Kiểm tra xem item có tồn tại không
-    //     var inventoryItem = await _unitOfWork.InventoryItems.FirstOrDefaultAsync(
-    //         x => x.Id == inventoryId &&
-    //              x.UserId == userId &&
-    //              !x.IsDeleted &&
-    //              x.Status == InventoryItemStatus.Available,
-    //         i => i.Listings
-    //     );
-    //
-    //     if (inventoryItem == null)
-    //         throw ErrorHelper.NotFound("Không tìm thấy vật phẩm hợp lệ để tạo listing.");
-    //
-    //     // Kiểm tra xem item có listing đang hoạt động không
-    //     if (inventoryItem.Listings?.Any(l => l.Status == ListingStatus.Active) == true)
-    //         throw ErrorHelper.Conflict("Vật phẩm này đã có một listing đang hoạt động.");
-    //
-    //     // Kiểm tra xem item có bị khóa trong giao dịch nào không
-    //     var ongoingTradeRequest = await _unitOfWork.TradeRequests.FirstOrDefaultAsync(t =>
-    //         t.OfferedInventoryId == inventoryId &&
-    //         t.Status == TradeRequestStatus.PENDING
-    //     );
-    //
-    //     if (ongoingTradeRequest != null)
-    //         throw ErrorHelper.Conflict("Vật phẩm này đang có giao dịch chờ xử lý.");
-    // }
+    private async Task EnsureItemCanBeListedAsync(Guid inventoryId, Guid userId)
+    {
+        _logger.Info($"[EnsureItemCanBeListedAsync] Bắt đầu kiểm tra vật phẩm {inventoryId} của người dùng {userId}");
+
+        // Kiểm tra vật phẩm có tồn tại và hợp lệ không
+        var inventoryItem = await _unitOfWork.InventoryItems.FirstOrDefaultAsync(
+            x => x.Id == inventoryId &&
+                 x.UserId == userId &&
+                 !x.IsDeleted &&
+                 x.Status == InventoryItemStatus.Available,
+            i => i.Listings
+        );
+
+        if (inventoryItem == null)
+        {
+            _logger.Warn(
+                $"[EnsureItemCanBeListedAsync] Không tìm thấy vật phẩm {inventoryId} hoặc vật phẩm không hợp lệ cho người dùng {userId}");
+            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm hợp lệ để tạo listing.");
+        }
+
+        _logger.Info(
+            $"[EnsureItemCanBeListedAsync] Đã tìm thấy vật phẩm {inventoryId}: {inventoryItem.Product?.Name ?? "Unknown"} của người dùng {userId}");
+
+        // Kiểm tra vật phẩm đã có listing đang hoạt động chưa
+        if (inventoryItem.Listings?.Any(l => l.Status == ListingStatus.Active) == true)
+        {
+            var activeListing = inventoryItem.Listings.First(l => l.Status == ListingStatus.Active);
+            _logger.Warn(
+                $"[EnsureItemCanBeListedAsync] Vật phẩm {inventoryId} đã có listing {activeListing.Id} đang hoạt động");
+            throw ErrorHelper.Conflict("Vật phẩm này đã có một listing đang hoạt động.");
+        }
+
+        _logger.Info($"[EnsureItemCanBeListedAsync] Vật phẩm {inventoryId} không có listing đang hoạt động");
+
+        // Kiểm tra vật phẩm có đang trong giao dịch nào không
+        try
+        {
+            _logger.Info(
+                $"[EnsureItemCanBeListedAsync] Kiểm tra vật phẩm {inventoryId} trong các giao dịch đang chờ xử lý");
+
+            var ongoingTradeRequest = await _unitOfWork.TradeRequests
+                .GetQueryable()
+                .Include(t => t.OfferedItems)
+                .Where(t => t.Status == TradeRequestStatus.PENDING)
+                .AnyAsync(t => t.OfferedItems.Any(item => item.InventoryItemId == inventoryId));
+
+            if (ongoingTradeRequest)
+            {
+                _logger.Warn($"[EnsureItemCanBeListedAsync] Vật phẩm {inventoryId} đang có giao dịch chờ xử lý");
+                throw ErrorHelper.Conflict("Vật phẩm này đang có giao dịch chờ xử lý.");
+            }
+
+            _logger.Info($"[EnsureItemCanBeListedAsync] Vật phẩm {inventoryId} không có giao dịch đang chờ xử lý");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(
+                $"[EnsureItemCanBeListedAsync] Lỗi khi kiểm tra giao dịch cho vật phẩm {inventoryId}: {ex.Message}");
+            throw ErrorHelper.Internal("Lỗi khi kiểm tra trạng thái giao dịch của vật phẩm.");
+        }
+
+        _logger.Success($"[EnsureItemCanBeListedAsync] Vật phẩm {inventoryId} đủ điều kiện để tạo listing");
+    }
 
     #endregion
 }
