@@ -6,7 +6,6 @@ public class Order : BaseEntity
     public Guid UserId { get; set; }
     public User User { get; set; }
 
-    public Guid? SellerId { get; set; } // Seller của đơn hàng, có thể là null nếu không có seller
 
     // 1-1 hoặc 1-n tuỳ config Fluent API
     public Guid? PaymentId { get; set; }

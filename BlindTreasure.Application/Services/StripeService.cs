@@ -177,7 +177,8 @@ public class StripeService : IStripeService
                 { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
                 { "promotionCode", order.Promotion?.Code ?? "" },
                 { "totalAmount", order.TotalAmount.ToString() },
-                { "finalAmount", order.FinalAmount.ToString() }
+                { "finalAmount", order.FinalAmount.ToString() },
+                { "IsShipment", totalShippingFee > 0 ? "true" : "false" }
             },
 
             CustomerEmail = user.Email,
@@ -297,7 +298,8 @@ public class StripeService : IStripeService
             Metadata = new Dictionary<string, string>
             {
                 { "shipmentIds", string.Join(",", shipments.Select(s => s.Id)) },
-                { "userId", userId.ToString() }
+                { "userId", userId.ToString() },
+                { "IsShipment", true.ToString() }
             },
             CustomerEmail = user.Email,
             PaymentMethodTypes = new List<string> { "card" },
@@ -451,7 +453,7 @@ public class StripeService : IStripeService
                 DiscountRate = 0,
                 NetAmount = order.TotalAmount,
                 Method = "Stripe",
-                Status = "Pending",
+                Status = "PENDING",
                 TransactionId = "",
                 PaidAt = now,
                 RefundedAmount = 0,
@@ -466,7 +468,7 @@ public class StripeService : IStripeService
                 Type = transactionType,
                 Amount = order.TotalAmount,
                 Currency = "vnd",
-                Status = "Pending",
+                Status = "PENDING",
                 OccurredAt = now,
                 ExternalRef = sessionId,
                 CreatedAt = now,
@@ -485,7 +487,7 @@ public class StripeService : IStripeService
                 Type = transactionType,
                 Amount = order.TotalAmount,
                 Currency = "vnd",
-                Status = "Pending",
+                Status = "PENDING",
                 OccurredAt = now,
                 ExternalRef = sessionId,
                 CreatedAt = now,

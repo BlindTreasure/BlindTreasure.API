@@ -1,4 +1,7 @@
-﻿namespace BlindTreasure.Domain.DTOs.OrderDTOs;
+﻿using BlindTreasure.Domain.DTOs.ShipmentDTOs;
+using BlindTreasure.Domain.Entities;
+
+namespace BlindTreasure.Domain.DTOs.OrderDTOs;
 
 public class OrderDetailDto
 {
@@ -15,6 +18,7 @@ public class OrderDetailDto
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public string Status { get; set; }
-    public DateTime? ShippedAt { get; set; }
-    public DateTime? ReceivedAt { get; set; }
+    public ICollection<ShipmentDto> Shipments { get; set; } = new List<ShipmentDto>();
+
+
 }

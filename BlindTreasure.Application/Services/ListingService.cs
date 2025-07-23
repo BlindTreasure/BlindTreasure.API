@@ -214,7 +214,7 @@ public class ListingService : IListingService
         // Kiểm tra xem item có bị khóa trong giao dịch nào không
         var ongoingTradeRequest = await _unitOfWork.TradeRequests.FirstOrDefaultAsync(t =>
             t.OfferedInventoryId == inventoryId &&
-            t.Status == TradeRequestStatus.Pending
+            t.Status == TradeRequestStatus.PENDING
         );
 
         if (ongoingTradeRequest != null)

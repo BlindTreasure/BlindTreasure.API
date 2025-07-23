@@ -11,15 +11,21 @@ public class OrderDetail : BaseEntity
     public Product Product { get; set; }
     public Guid? BlindBoxId { get; set; }
     public BlindBox BlindBox { get; set; }
+    public int? TotalShippingFee { get; set; } // Tổng phí vận chuyển
+
 
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public string Status { get; set; }
-    public DateTime? ShippedAt { get; set; }
-    public DateTime? ReceivedAt { get; set; }
+
+
+    // Tách rõ SellerId ở đây
+    public Guid SellerId { get; set; }
+    public Seller Seller { get; set; }
 
     // 1-n → Shipments
-    public ICollection<Shipment> Shipments { get; set; }
-    public ICollection<CustomerBlindBox>? CustomerBlindBoxes { get; set; }
+    public ICollection<Shipment> Shipments { get; set; } = new List<Shipment>();
+    public ICollection<InventoryItem> InventoryItems { get; set; } = new List<InventoryItem>();
+    public ICollection<CustomerBlindBox>? CustomerBlindBoxes { get; set; } = new List<CustomerBlindBox>();
 }

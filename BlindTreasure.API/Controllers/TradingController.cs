@@ -59,7 +59,7 @@ public class TradingController : ControllerBase
     }
 
     /// <summary>
-    /// A xem được các request đến với mình
+    /// A xem được các requests của 1 listings
     /// </summary>
     [HttpGet("{listingId}/trade-requests")]
     public async Task<IActionResult> GetTradeRequests(Guid listingId)
@@ -79,7 +79,7 @@ public class TradingController : ControllerBase
     }
 
     /// <summary>
-    /// A chốt với requestId nào đó và khóa lại không cho request nữa
+    /// Cả A và B đều phải gọi endpoint này để complete giao dịch
     /// </summary>
     [HttpPost("trade-requests/{tradeRequestId}/lock")]
     public async Task<IActionResult> LockDeal(Guid tradeRequestId)
@@ -97,41 +97,5 @@ public class TradingController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// B (người mua) confirm deal và chuyển quyền sở hữu cho B (người mua)
-    /// </summary>
-    [HttpPost("trade-requests/{tradeRequestId}/confirm")]
-    public async Task<IActionResult> ConfirmDeal(Guid tradeRequestId)
-    {
-        try
-        {
-            var result = await _tradingService.ConfirmDealAsync(tradeRequestId);
-            return Ok(ApiResult<object>.Success(new { result }, "200", "Giao dịch đã được xác nhận thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
 
-    /// <summary>
-    /// User B (người mua) xác nhận giao dịch và chuyển quyền sở hữu item cho User A.
-    /// </summary>
-    [HttpPost("trade-requests/{tradeRequestId}/expire")]
-    public async Task<IActionResult> ExpireDeal(Guid tradeRequestId)
-    {
-        try
-        {
-            var result = await _tradingService.ExpireDealAsync(tradeRequestId);
-            return Ok(ApiResult<object>.Success(new { result }, "200", "Giao dịch đã hết hạn."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
 }

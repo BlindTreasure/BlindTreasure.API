@@ -61,6 +61,7 @@ public class GhnShippingService : IGhnShippingService
         var client = CreateClient();
         var payload = JsonSerializer.Serialize(req, _jsonOptions);
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
+        _logger.Info(await content.ReadAsStringAsync());
 
         var resp = await client.PostAsync(PREVIEW_ORDER, content);
         var body = await resp.Content.ReadAsStringAsync();

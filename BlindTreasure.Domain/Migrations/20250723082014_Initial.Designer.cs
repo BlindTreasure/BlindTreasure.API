@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250716080552_Initial")]
+    [Migration("20250723082014_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -605,56 +605,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.ToTable("CustomerBlindBoxes");
                 });
 
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.CustomerDiscount", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("DiscountRate")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.ToTable("CustomerDiscounts");
-                });
-
             modelBuilder.Entity("BlindTreasure.Domain.Entities.InventoryItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -687,11 +637,17 @@ namespace BlindTreasure.Domain.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid?>("LockedByRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OrderDetailId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("integer");
+                    b.Property<Guid?>("ShipmentId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("SourceCustomerBlindBoxId")
                         .HasColumnType("uuid");
@@ -714,7 +670,13 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.HasIndex("AddressId");
 
+                    b.HasIndex("LockedByRequestId");
+
+                    b.HasIndex("OrderDetailId");
+
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("ShipmentId");
 
                     b.HasIndex("SourceCustomerBlindBoxId");
 
@@ -741,22 +703,28 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("InventoryId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsFree")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("ListedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("Price")
-                        .HasColumnType("numeric");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
+
+                    b.Property<int>("TradeStatus")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -769,6 +737,56 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasIndex("InventoryId");
 
                     b.ToTable("Listings");
+                });
+
+            modelBuilder.Entity("BlindTreasure.Domain.Entities.ListingReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ListingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("ReportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ListingId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ListingReports");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Notification", b =>
@@ -874,9 +892,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("PromotionNote")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("SellerId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid?>("ShippingAddressId")
                         .HasColumnType("uuid");
 
@@ -943,11 +958,8 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime?>("ReceivedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ShippedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -955,6 +967,9 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<decimal>("TotalPrice")
                         .HasColumnType("numeric");
+
+                    b.Property<int?>("TotalShippingFee")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("numeric");
@@ -972,6 +987,8 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasIndex("OrderId");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("SellerId");
 
                     b.ToTable("OrderDetails");
                 });
@@ -1611,7 +1628,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("OrderCode")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("OrderDetailId")
+                    b.Property<Guid?>("OrderDetailId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Provider")
@@ -1708,6 +1725,128 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("SupportTickets");
+                });
+
+            modelBuilder.Entity("BlindTreasure.Domain.Entities.TradeHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FinalStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ListingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OfferedInventoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequesterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ListingId");
+
+                    b.HasIndex("OfferedInventoryId");
+
+                    b.HasIndex("RequesterId");
+
+                    b.ToTable("TradeHistories");
+                });
+
+            modelBuilder.Entity("BlindTreasure.Domain.Entities.TradeRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ListingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LockedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("OfferedInventoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("OwnerLocked")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequesterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("RequesterLocked")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ListingId");
+
+                    b.HasIndex("OfferedInventoryId");
+
+                    b.HasIndex("RequesterId");
+
+                    b.ToTable("TradeRequests");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Transaction", b =>
@@ -1867,111 +2006,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.Wishlist", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("ItemCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Wishlists");
-                });
-
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.WishlistItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("BlindBoxId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Note")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("WishlistId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BlindBoxId");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("WishlistId");
-
-                    b.ToTable("WishlistItems");
-                });
-
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Address", b =>
                 {
                     b.HasOne("BlindTreasure.Domain.Entities.User", "User")
@@ -2126,17 +2160,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.CustomerDiscount", b =>
-                {
-                    b.HasOne("BlindTreasure.Domain.Entities.User", "Customer")
-                        .WithMany("CustomerDiscounts")
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-                });
-
             modelBuilder.Entity("BlindTreasure.Domain.Entities.InventoryItem", b =>
                 {
                     b.HasOne("BlindTreasure.Domain.Entities.Address", "Address")
@@ -2144,11 +2167,23 @@ namespace BlindTreasure.Domain.Migrations
                         .HasForeignKey("AddressId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("BlindTreasure.Domain.Entities.TradeRequest", "LockedByRequest")
+                        .WithMany()
+                        .HasForeignKey("LockedByRequestId");
+
+                    b.HasOne("BlindTreasure.Domain.Entities.OrderDetail", "OrderDetail")
+                        .WithMany("InventoryItems")
+                        .HasForeignKey("OrderDetailId");
+
                     b.HasOne("BlindTreasure.Domain.Entities.Product", "Product")
                         .WithMany("InventoryItems")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("BlindTreasure.Domain.Entities.Shipment", "Shipment")
+                        .WithMany("InventoryItems")
+                        .HasForeignKey("ShipmentId");
 
                     b.HasOne("BlindTreasure.Domain.Entities.CustomerBlindBox", "SourceCustomerBlindBox")
                         .WithMany()
@@ -2162,7 +2197,13 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Navigation("Address");
 
+                    b.Navigation("LockedByRequest");
+
+                    b.Navigation("OrderDetail");
+
                     b.Navigation("Product");
+
+                    b.Navigation("Shipment");
 
                     b.Navigation("SourceCustomerBlindBox");
 
@@ -2178,6 +2219,25 @@ namespace BlindTreasure.Domain.Migrations
                         .IsRequired();
 
                     b.Navigation("InventoryItem");
+                });
+
+            modelBuilder.Entity("BlindTreasure.Domain.Entities.ListingReport", b =>
+                {
+                    b.HasOne("BlindTreasure.Domain.Entities.Listing", "Listing")
+                        .WithMany()
+                        .HasForeignKey("ListingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlindTreasure.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Listing");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Notification", b =>
@@ -2240,11 +2300,19 @@ namespace BlindTreasure.Domain.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("BlindTreasure.Domain.Entities.Seller", "Seller")
+                        .WithMany()
+                        .HasForeignKey("SellerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("BlindBox");
 
                     b.Navigation("Order");
 
                     b.Navigation("Product");
+
+                    b.Navigation("Seller");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.ProbabilityConfig", b =>
@@ -2365,8 +2433,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasOne("BlindTreasure.Domain.Entities.OrderDetail", "OrderDetail")
                         .WithMany("Shipments")
                         .HasForeignKey("OrderDetailId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("OrderDetail");
                 });
@@ -2388,6 +2455,58 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("AssignedToUser");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("BlindTreasure.Domain.Entities.TradeHistory", b =>
+                {
+                    b.HasOne("BlindTreasure.Domain.Entities.Listing", "Listing")
+                        .WithMany()
+                        .HasForeignKey("ListingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlindTreasure.Domain.Entities.InventoryItem", "OfferedInventory")
+                        .WithMany()
+                        .HasForeignKey("OfferedInventoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("BlindTreasure.Domain.Entities.User", "Requester")
+                        .WithMany()
+                        .HasForeignKey("RequesterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Listing");
+
+                    b.Navigation("OfferedInventory");
+
+                    b.Navigation("Requester");
+                });
+
+            modelBuilder.Entity("BlindTreasure.Domain.Entities.TradeRequest", b =>
+                {
+                    b.HasOne("BlindTreasure.Domain.Entities.Listing", "Listing")
+                        .WithMany()
+                        .HasForeignKey("ListingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlindTreasure.Domain.Entities.InventoryItem", "OfferedInventory")
+                        .WithMany()
+                        .HasForeignKey("OfferedInventoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("BlindTreasure.Domain.Entities.User", "Requester")
+                        .WithMany()
+                        .HasForeignKey("RequesterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Listing");
+
+                    b.Navigation("OfferedInventory");
+
+                    b.Navigation("Requester");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Transaction", b =>
@@ -2413,42 +2532,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Role");
                 });
 
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.Wishlist", b =>
-                {
-                    b.HasOne("BlindTreasure.Domain.Entities.User", "User")
-                        .WithMany("Wishlists")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.WishlistItem", b =>
-                {
-                    b.HasOne("BlindTreasure.Domain.Entities.BlindBox", "BlindBox")
-                        .WithMany("WishlistItems")
-                        .HasForeignKey("BlindBoxId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("BlindTreasure.Domain.Entities.Product", "Product")
-                        .WithMany("WishlistItems")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("BlindTreasure.Domain.Entities.Wishlist", "Wishlist")
-                        .WithMany("WishlistItems")
-                        .HasForeignKey("WishlistId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("BlindBox");
-
-                    b.Navigation("Product");
-
-                    b.Navigation("Wishlist");
-                });
-
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Address", b =>
                 {
                     b.Navigation("Orders");
@@ -2465,8 +2548,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("OrderDetails");
 
                     b.Navigation("Reviews");
-
-                    b.Navigation("WishlistItems");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.BlindBoxItem", b =>
@@ -2498,6 +2579,8 @@ namespace BlindTreasure.Domain.Migrations
                 {
                     b.Navigation("CustomerBlindBoxes");
 
+                    b.Navigation("InventoryItems");
+
                     b.Navigation("Shipments");
                 });
 
@@ -2522,8 +2605,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("OrderDetails");
 
                     b.Navigation("Reviews");
-
-                    b.Navigation("WishlistItems");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Promotion", b =>
@@ -2549,6 +2630,11 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("PromotionParticipants");
                 });
 
+            modelBuilder.Entity("BlindTreasure.Domain.Entities.Shipment", b =>
+                {
+                    b.Navigation("InventoryItems");
+                });
+
             modelBuilder.Entity("BlindTreasure.Domain.Entities.User", b =>
                 {
                     b.Navigation("Addresses");
@@ -2558,8 +2644,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("CartItems");
 
                     b.Navigation("CustomerBlindBoxes");
-
-                    b.Navigation("CustomerDiscounts");
 
                     b.Navigation("InventoryItems");
 
@@ -2575,13 +2659,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("SupportTickets");
 
                     b.Navigation("VerifiedCertificates");
-
-                    b.Navigation("Wishlists");
-                });
-
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.Wishlist", b =>
-                {
-                    b.Navigation("WishlistItems");
                 });
 #pragma warning restore 612, 618
         }

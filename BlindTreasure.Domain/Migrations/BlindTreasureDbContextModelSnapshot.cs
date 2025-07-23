@@ -637,11 +637,14 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid?>("LockedByRequestId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("OrderDetailId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("integer");
+                    b.Property<Guid?>("ShipmentId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid?>("SourceCustomerBlindBoxId")
                         .HasColumnType("uuid");
@@ -666,7 +669,11 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.HasIndex("LockedByRequestId");
 
+                    b.HasIndex("OrderDetailId");
+
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("ShipmentId");
 
                     b.HasIndex("SourceCustomerBlindBoxId");
 
@@ -882,9 +889,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("PromotionNote")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("SellerId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid?>("ShippingAddressId")
                         .HasColumnType("uuid");
 
@@ -951,11 +955,8 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime?>("ReceivedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ShippedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -963,6 +964,9 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<decimal>("TotalPrice")
                         .HasColumnType("numeric");
+
+                    b.Property<int?>("TotalShippingFee")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("numeric");
@@ -980,6 +984,8 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasIndex("OrderId");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("SellerId");
 
                     b.ToTable("OrderDetails");
                 });
@@ -1619,7 +1625,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("OrderCode")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("OrderDetailId")
+                    b.Property<Guid?>("OrderDetailId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Provider")
@@ -2162,11 +2168,19 @@ namespace BlindTreasure.Domain.Migrations
                         .WithMany()
                         .HasForeignKey("LockedByRequestId");
 
+                    b.HasOne("BlindTreasure.Domain.Entities.OrderDetail", "OrderDetail")
+                        .WithMany("InventoryItems")
+                        .HasForeignKey("OrderDetailId");
+
                     b.HasOne("BlindTreasure.Domain.Entities.Product", "Product")
                         .WithMany("InventoryItems")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("BlindTreasure.Domain.Entities.Shipment", "Shipment")
+                        .WithMany("InventoryItems")
+                        .HasForeignKey("ShipmentId");
 
                     b.HasOne("BlindTreasure.Domain.Entities.CustomerBlindBox", "SourceCustomerBlindBox")
                         .WithMany()
@@ -2182,7 +2196,11 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Navigation("LockedByRequest");
 
+                    b.Navigation("OrderDetail");
+
                     b.Navigation("Product");
+
+                    b.Navigation("Shipment");
 
                     b.Navigation("SourceCustomerBlindBox");
 
@@ -2279,11 +2297,19 @@ namespace BlindTreasure.Domain.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("BlindTreasure.Domain.Entities.Seller", "Seller")
+                        .WithMany()
+                        .HasForeignKey("SellerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("BlindBox");
 
                     b.Navigation("Order");
 
                     b.Navigation("Product");
+
+                    b.Navigation("Seller");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.ProbabilityConfig", b =>
@@ -2404,8 +2430,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasOne("BlindTreasure.Domain.Entities.OrderDetail", "OrderDetail")
                         .WithMany("Shipments")
                         .HasForeignKey("OrderDetailId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("OrderDetail");
                 });
@@ -2551,6 +2576,8 @@ namespace BlindTreasure.Domain.Migrations
                 {
                     b.Navigation("CustomerBlindBoxes");
 
+                    b.Navigation("InventoryItems");
+
                     b.Navigation("Shipments");
                 });
 
@@ -2598,6 +2625,11 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Products");
 
                     b.Navigation("PromotionParticipants");
+                });
+
+            modelBuilder.Entity("BlindTreasure.Domain.Entities.Shipment", b =>
+                {
+                    b.Navigation("InventoryItems");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.User", b =>

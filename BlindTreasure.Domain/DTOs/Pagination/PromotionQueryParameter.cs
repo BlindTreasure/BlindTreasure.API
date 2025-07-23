@@ -5,7 +5,7 @@ namespace BlindTreasure.Domain.DTOs.Pagination;
 public class PromotionQueryParameter : PaginationParameter
 {
     /// <summary>
-    ///     Lọc theo trạng thái: Pending, Approved, Rejected
+    ///     Lọc theo trạng thái: PENDING, Approved, Rejected
     /// </summary>
     public PromotionStatus? Status { get; set; }
 

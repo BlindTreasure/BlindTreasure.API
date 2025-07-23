@@ -3,6 +3,6 @@
 public enum TradeStatus
 {
     Pending,
-    Accepted,
+    COMPLETED,
     Declined
 }

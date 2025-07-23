@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.PaymentDTOs;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.TransactionDTOs;
 using BlindTreasure.Domain.Entities;
 
@@ -52,8 +53,7 @@ public static class OrderDtoMapper
             UnitPrice = od.UnitPrice,
             TotalPrice = od.TotalPrice,
             Status = od.Status,
-            ShippedAt = od.ShippedAt,
-            ReceivedAt = od.ReceivedAt
+            Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>()
         };
     }
 

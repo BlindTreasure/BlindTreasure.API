@@ -136,7 +136,7 @@ public static class GeminiContext
            - Seller.Status: InfoEmpty → WaitingReview → Approved/Rejected.  
 
         C. Quản lý BlindBox  
-           1. CreateBlindBox(dto) → lưu BlindBox, trạng thái Pending.  
+           1. CreateBlindBox(dto) → lưu BlindBox, trạng thái PENDING.  
            2. AddBlindBoxItems(boxId, items[{productId, quantity, weight, isSecret}]).  
            3. RarityConfig: bảng seed 4 tier (Common, Rare, Epic, Secret) với weight.  
            4. ProbabilityConfig: tính dropRate = weight / sumWeight tại thời điểm submit.  
