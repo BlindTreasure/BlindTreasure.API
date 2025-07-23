@@ -8,6 +8,6 @@ public interface ITradingService
     Task<TradeRequestDto> CreateTradeRequestAsync(Guid listingId, Guid? offeredInventoryId);
     Task<bool> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted);
     Task<bool> ExpireDealAsync(Guid tradeRequestId);
-    Task<bool> LockDealAsync(Guid tradeRequestId);
+    Task<TradeRequestDto> LockDealAsync(Guid tradeRequestId);
     // Task<bool> ConfirmDealAsync(Guid tradeRequestId);
 }
