@@ -6,7 +6,6 @@ public class Shipment : BaseEntity
     public Guid? OrderDetailId { get; set; }
     public OrderDetail? OrderDetail { get; set; }
 
-
     //các field cho GHN 
     public string? OrderCode { get; set; } // Mã đơn hàng của GHN    
     public int? TotalFee { get; set; } // Tổng phí vận chuyển
@@ -21,4 +20,7 @@ public class Shipment : BaseEntity
     public DateTime EstimatedDelivery { get; set; } //expected delivery date
     public DateTime? DeliveredAt { get; set; }
     public string Status { get; set; }
+
+    // 1-n → InventoryItems
+    public ICollection<InventoryItem>? InventoryItems { get; set; }
 }

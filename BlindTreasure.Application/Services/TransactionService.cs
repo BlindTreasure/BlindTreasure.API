@@ -8,6 +8,7 @@ using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
@@ -103,7 +104,7 @@ public class TransactionService : ITransactionService
             await CreateGhnOrdersAndUpdateShipments(order, orderDetails);
 
             // 2. Tạo inventory cho sản phẩm vật lý
-            await CreateInventoryForOrderDetails(order, orderDetails);
+            await CreateInventoryForOrderDetailsAsync(order, orderDetails);
 
             // 3. Tạo customer inventory cho BlindBox
             await CreateCustomerBlindBoxForOrderDetails(order, orderDetails);
@@ -135,7 +136,7 @@ public class TransactionService : ITransactionService
 
     private async Task<List<OrderDetail>> GetOrderDetails(Guid orderId)
     {
-        return await _unitOfWork.OrderDetails.GetAllAsync(od => od.OrderId == orderId)
+        return await _unitOfWork.OrderDetails.GetAllAsync(od => od.OrderId == orderId, x=>x.Shipments)
                ?? new List<OrderDetail>();
     }
 
@@ -231,38 +232,88 @@ public class TransactionService : ITransactionService
         shipment.Status = "REQUESTED";
     }
 
-    private async Task CreateInventoryForOrderDetails(Order order, List<OrderDetail> orderDetails)
+    /// <summary>
+    /// Tạo InventoryItem cho từng sản phẩm vật lý trong order sau khi thanh toán thành công.
+    /// Mỗi OrderDetail có thể có nhiều shipment (nếu chia theo seller hoặc điều kiện khác).
+    /// Mỗi InventoryItem đại diện cho một vật phẩm duy nhất, gắn với đúng OrderDetail và Shipment.
+    /// </summary>
+    private async Task CreateInventoryForOrderDetailsAsync(
+     Order order,
+     List<OrderDetail> orderDetails)
     {
-        var productCount = 0;
+        // 1) Lấy và validate shippingAddress (1 lần)
+        Address? shippingAddress = null;
+        if (order.ShippingAddressId.HasValue)
+        {
+            shippingAddress = await _unitOfWork.Addresses
+                .GetByIdAsync(order.ShippingAddressId.Value);
+            if (shippingAddress == null
+                || shippingAddress.IsDeleted
+                || shippingAddress.UserId != order.UserId)
+            {
+                _logger.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
+                throw ErrorHelper.BadRequest(
+                    ErrorMessages.OrderShippingAddressInvalid);
+            }
+        }
+
+        // 2) Build map: OrderDetailId → List<Shipment>
+        var shipmentsByDetail = orderDetails
+            .Where(od => od.Shipments != null && od.Shipments.Any())
+            .ToDictionary(
+                od => od.Id,
+                od => od.Shipments!
+                        .Select(s => new { s.Id, SellerId = s.OrderDetail.SellerId })
+                        .ToList()
+            );
+
+        // 3) Tạo từng InventoryItem
+        int createdCount = 0;
         foreach (var od in orderDetails.Where(od => od.ProductId.HasValue))
         {
-            _logger.Info(
-                $"[HandleSuccessfulPaymentAsync] Tạo inventory item cho sản phẩm {od.ProductId.Value} trong order {order.Id}.");
+            // danh sách shipment ID cho orderDetail này (có thể rỗng)
+            shipmentsByDetail.TryGetValue(od.Id, out var shipmentInfos);
 
-            var createDto = new CreateInventoryItemDto
+            for (int i = 0; i < od.Quantity; i++)
             {
-                ProductId = od.ProductId.Value,
-                Quantity = od.Quantity,
-                Location = string.Empty,
-                Status = InventoryItemStatus.Available
-            };
-
-            Address? shippingAddress = null;
-            if (order.ShippingAddressId.HasValue)
-            {
-                shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(order.ShippingAddressId.Value);
-                if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != order.UserId)
+                // chọn shipmentId: nếu 1 thì 1, nếu nhiều thì theo seller match
+                Guid? shipmentId = null;
+                if (shipmentInfos != null && shipmentInfos.Count > 0)
                 {
-                    _logger.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
-                    throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
+                    if (shipmentInfos.Count == 1)
+                    {
+                        shipmentId = shipmentInfos[0].Id;
+                    }
+                    else
+                    {
+                        // match theo sellerId (nếu cần)
+                        var info = shipmentInfos
+                            .FirstOrDefault(si => si.SellerId == od.SellerId)
+                            ?? shipmentInfos[0];
+                        shipmentId = info.Id;
+                    }
                 }
 
-                createDto.AddressId = shippingAddress.Id;
-            }
+                // build DTO
+                var dto = new CreateInventoryItemDto
+                {
+                    ProductId = od.ProductId!.Value,
+                    Quantity = 1,
+                    Location = string.Empty,
+                    Status = shipmentId.HasValue
+                                      ? InventoryItemStatus.Delivering
+                                      : InventoryItemStatus.Available,
+                    ShipmentId = shipmentId,
+                    OrderDetailId = od.Id,
+                    AddressId = shippingAddress?.Id
+                };
 
-            await _inventoryItemService.CreateAsync(createDto, order.UserId);
-            _logger.Success(
-                $"[HandleSuccessfulPaymentAsync] Đã tạo inventory item thứ {++productCount} cho sản phẩm {od.ProductId.Value} trong order {order.Id}.");
+                // call service
+                await _inventoryItemService.CreateAsync(dto, order.UserId);
+                _logger.Success(
+                    $"[HandlePayment] Created inventory #{++createdCount} " +
+                    $"for Product {od.ProductId} in Order {order.Id}.");
+            }
         }
     }
 

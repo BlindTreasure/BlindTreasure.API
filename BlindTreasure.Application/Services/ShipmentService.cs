@@ -37,7 +37,7 @@ public class ShipmentService : IShipmentService
     // Lấy shipment theo Id (và kiểm tra quyền user)
     public async Task<ShipmentDto?> GetByIdAsync(Guid shipmentId)
     {
-        var shipment = await _unitOfWork.Shipments.GetQueryable()
+        var shipment = await _unitOfWork.Shipments.GetQueryable().Include(s => s.InventoryItems)
             .Include(s => s.OrderDetail)
             .ThenInclude(od => od.Order)
             .FirstOrDefaultAsync(s => s.Id == shipmentId && !s.IsDeleted);

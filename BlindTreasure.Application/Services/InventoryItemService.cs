@@ -97,11 +97,27 @@ public class InventoryItemService : IInventoryItemService
         {
             UserId = userId.Value,
             ProductId = dto.ProductId,
-            Quantity = dto.Quantity,
             Location = product.Seller.CompanyAddress ?? string.Empty,
             Status = Domain.Enums.InventoryItemStatus.Available,
-            AddressId = address.Id
+
         };
+
+        if (dto.OrderDetailId.HasValue)
+        {
+            var orderDetail = await _unitOfWork.OrderDetails.GetByIdAsync(dto.OrderDetailId.Value);
+            if (orderDetail == null || orderDetail.IsDeleted)
+                throw ErrorHelper.NotFound("Order detail not found.");
+            item.OrderDetailId = dto.OrderDetailId.Value;
+            item.OrderDetail = orderDetail;
+        }
+        if(dto.ShipmentId.HasValue)
+        {
+            var shipment = await _unitOfWork.Shipments.GetByIdAsync(dto.ShipmentId.Value);
+            if (shipment == null || shipment.IsDeleted)
+                throw ErrorHelper.NotFound("Shipment not found.");
+            item.ShipmentId = dto.ShipmentId.Value;
+            item.Shipment = shipment;
+        }
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
         await _unitOfWork.SaveChangesAsync();
@@ -191,8 +207,6 @@ public class InventoryItemService : IInventoryItemService
         if (item == null || item.IsDeleted)
             throw ErrorHelper.NotFound("Inventory item not found.");
 
-        if (dto.Quantity.HasValue)
-            item.Quantity = dto.Quantity.Value;
         if (!string.IsNullOrWhiteSpace(dto.Location))
             item.Location = dto.Location;
         if (dto.Status.HasValue)
@@ -287,7 +301,7 @@ public class InventoryItemService : IInventoryItemService
                 {
                     Name = p.Name,
                     Code = p.Id.ToString(),
-                    Quantity = i.Quantity,
+                    Quantity = 1,
                     Price = Convert.ToInt32(p.Price),
                     Length = length,
                     Width = width,
@@ -416,7 +430,6 @@ public class InventoryItemService : IInventoryItemService
                 {
                     Name = p.Name,
                     Code = p.Id.ToString(),
-                    Quantity = i.Quantity,
                     Price = Convert.ToInt32(p.Price),
                     Length = length,
                     Width = width,
