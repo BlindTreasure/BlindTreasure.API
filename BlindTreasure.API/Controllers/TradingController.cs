@@ -97,24 +97,24 @@ public class TradingController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// B (người mua) confirm deal và chuyển quyền sở hữu cho B (người mua)
-    /// </summary>
-    [HttpPost("trade-requests/{tradeRequestId}/confirm")]
-    public async Task<IActionResult> ConfirmDeal(Guid tradeRequestId)
-    {
-        try
-        {
-            var result = await _tradingService.ConfirmDealAsync(tradeRequestId);
-            return Ok(ApiResult<object>.Success(new { result }, "200", "Giao dịch đã được xác nhận thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
+    // /// <summary>
+    // /// B (người mua) confirm deal và chuyển quyền sở hữu cho B (người mua)
+    // /// </summary>
+    // [HttpPost("trade-requests/{tradeRequestId}/confirm")]
+    // public async Task<IActionResult> ConfirmDeal(Guid tradeRequestId)
+    // {
+    //     try
+    //     {
+    //         var result = await _tradingService.ConfirmDealAsync(tradeRequestId);
+    //         return Ok(ApiResult<object>.Success(new { result }, "200", "Giao dịch đã được xác nhận thành công."));
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+    //         var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+    //         return StatusCode(statusCode, error);
+    //     }
+    // }
 
     /// <summary>
     /// User B (người mua) xác nhận giao dịch và chuyển quyền sở hữu item cho User A.

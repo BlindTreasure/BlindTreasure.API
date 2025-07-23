@@ -9,5 +9,5 @@ public interface ITradingService
     Task<bool> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted);
     Task<bool> ExpireDealAsync(Guid tradeRequestId);
     Task<bool> LockDealAsync(Guid tradeRequestId);
-    Task<bool> ConfirmDealAsync(Guid tradeRequestId);
+    // Task<bool> ConfirmDealAsync(Guid tradeRequestId);
 }

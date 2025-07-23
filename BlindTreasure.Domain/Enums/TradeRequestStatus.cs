@@ -2,8 +2,9 @@
 
 public enum TradeRequestStatus
 {
-    Pending,
-    Accepted,
-    Rejected,
-    Expired
+    PENDING,
+    ACCEPTED,
+    REJECTED,
+    COMPLETED,
+    EXPIRED
 }

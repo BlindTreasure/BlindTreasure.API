@@ -12,7 +12,7 @@ public class PromotionDto
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public int? UsageLimit { get; set; }
-    public PromotionStatus Status { get; set; } // "Approved", "Pending", "Rejected"
+    public PromotionStatus Status { get; set; } // "Approved", "PENDING", "Rejected"
     public Guid? SellerId { get; set; } // null nếu là global
     public string? RejectReason { get; set; }
 

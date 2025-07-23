@@ -16,7 +16,7 @@ public class Promotion : BaseEntity
     public int? UsageLimit { get; set; }
     public string? RejectReason { get; set; }
 
-    public PromotionStatus Status { get; set; } // Enum: [Pending, Approved, Rejected]
+    public PromotionStatus Status { get; set; } // Enum: [PENDING, Approved, Rejected]
 
     public Guid? SellerId { get; set; } // null = Global
 

@@ -57,7 +57,7 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
-    ///     Staff xem dc ho so cua seller Pending
+    ///     Staff xem dc ho so cua seller PENDING
     /// </summary>
     // [Authorize(Roles = "Admin,Staff")]
     [HttpGet("{id}")]

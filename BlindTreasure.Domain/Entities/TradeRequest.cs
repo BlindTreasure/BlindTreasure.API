@@ -13,7 +13,7 @@ public class TradeRequest : BaseEntity
     public Guid? OfferedInventoryId { get; set; } // Item mà requester đề xuất đổi
     public InventoryItem? OfferedInventory { get; set; }
 
-    public TradeRequestStatus Status { get; set; } = TradeRequestStatus.Pending;
+    public TradeRequestStatus Status { get; set; } = TradeRequestStatus.PENDING;
     public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
     public DateTime? RespondedAt { get; set; }
 

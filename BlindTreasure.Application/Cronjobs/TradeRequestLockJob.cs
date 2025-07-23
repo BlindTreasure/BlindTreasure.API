@@ -40,15 +40,15 @@ public class TradeRequestLockJob : IHostedService, IDisposable
         {
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();  // Tiêm IUnitOfWork từ scope mới
 
-            var tradeRequests = await unitOfWork.TradeRequests.GetAllAsync(t => t.Status == TradeRequestStatus.Pending && !t.LockedAt.HasValue);
+            var tradeRequests = await unitOfWork.TradeRequests.GetAllAsync(t => t.Status == TradeRequestStatus.PENDING && !t.LockedAt.HasValue);
 
             if (tradeRequests.Any())
             {
-                _logger.LogInformation("{Count} trade requests found with status Pending and not locked.", tradeRequests.Count());
+                _logger.LogInformation("{Count} trade requests found with status PENDING and not locked.", tradeRequests.Count());
             }
             else
             {
-                _logger.LogInformation("No trade requests found with status Pending and not locked.");
+                _logger.LogInformation("No trade requests found with status PENDING and not locked.");
             }
 
             foreach (var tradeRequest in tradeRequests)
@@ -58,15 +58,15 @@ public class TradeRequestLockJob : IHostedService, IDisposable
                 // Kiểm tra xem thời gian yêu cầu đã vượt quá 2 phút chưa
                 if ((DateTime.UtcNow - tradeRequest.RequestedAt).TotalMinutes > 2)
                 {
-                    _logger.LogWarning("TradeRequest {TradeRequestId} exceeded timeout (2 minutes), resetting to Pending.", tradeRequest.Id);
+                    _logger.LogWarning("TradeRequest {TradeRequestId} exceeded timeout (2 minutes), resetting to PENDING.", tradeRequest.Id);
 
-                    // Nếu vượt quá 2 phút, cập nhật trạng thái của yêu cầu giao dịch thành Pending
-                    tradeRequest.Status = TradeRequestStatus.Pending;
+                    // Nếu vượt quá 2 phút, cập nhật trạng thái của yêu cầu giao dịch thành PENDING
+                    tradeRequest.Status = TradeRequestStatus.PENDING;
 
                     unitOfWork.TradeRequests.Update(tradeRequest);
                     await unitOfWork.SaveChangesAsync();
 
-                    _logger.LogInformation("TradeRequest {TradeRequestId} has been reset to Pending due to timeout.", tradeRequest.Id);
+                    _logger.LogInformation("TradeRequest {TradeRequestId} has been reset to PENDING due to timeout.", tradeRequest.Id);
                 }
                 else
                 {
