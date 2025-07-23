@@ -236,7 +236,6 @@ public class UnboxingService : IUnboxingService
             Id = Guid.NewGuid(),
             ProductId = selectedItem.ProductId,
             UserId = userId,
-            Quantity = 1,
             Location = defaultAddress?.Province ?? "HCM", // giữ "HCM" nếu không có
             Status = InventoryItemStatus.Available,
             AddressId = defaultAddress?.Id,

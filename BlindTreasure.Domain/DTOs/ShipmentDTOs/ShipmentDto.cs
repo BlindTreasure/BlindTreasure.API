@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.DTOs.OrderDTOs;
+﻿using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.Entities;
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,8 @@ namespace BlindTreasure.Domain.DTOs.ShipmentDTOs;
 
 public class ShipmentDto
 {
-    public OrderDetailDto? OrderDetail { get; set; }
+    public Guid? Id { get; set; }
+    public Guid? OrderDetailId { get; set; }
 
 
     //các field cho GHN 
@@ -27,4 +29,7 @@ public class ShipmentDto
     public DateTime? EstimatedDelivery { get; set; } //expected delivery date
     public DateTime? DeliveredAt { get; set; }
     public string? Status { get; set; }
+
+    public ICollection<InventoryItemDto>? InventoryItems { get; set; }
+
 }

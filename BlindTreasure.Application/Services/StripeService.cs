@@ -177,7 +177,8 @@ public class StripeService : IStripeService
                 { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
                 { "promotionCode", order.Promotion?.Code ?? "" },
                 { "totalAmount", order.TotalAmount.ToString() },
-                { "finalAmount", order.FinalAmount.ToString() }
+                { "finalAmount", order.FinalAmount.ToString() },
+                { "IsShipment", totalShippingFee > 0 ? "true" : "false" }
             },
 
             CustomerEmail = user.Email,
@@ -297,7 +298,8 @@ public class StripeService : IStripeService
             Metadata = new Dictionary<string, string>
             {
                 { "shipmentIds", string.Join(",", shipments.Select(s => s.Id)) },
-                { "userId", userId.ToString() }
+                { "userId", userId.ToString() },
+                { "IsShipment", true.ToString() }
             },
             CustomerEmail = user.Email,
             PaymentMethodTypes = new List<string> { "card" },

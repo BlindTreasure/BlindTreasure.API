@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
@@ -19,7 +20,8 @@ public static class ShipmentDtoMapper
 
         return new ShipmentDto
         {
-            OrderDetail = shipment.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(shipment.OrderDetail) : null,
+            Id = shipment.Id,
+            OrderDetailId = shipment.OrderDetailId,
             OrderCode = shipment.OrderCode,
             TotalFee = shipment.TotalFee,
             MainServiceFee = shipment.MainServiceFee,
@@ -28,7 +30,10 @@ public static class ShipmentDtoMapper
             ShippedAt = shipment.ShippedAt,
             EstimatedDelivery = shipment.EstimatedDelivery,
             DeliveredAt = shipment.DeliveredAt,
-            Status = shipment.Status
+            Status = shipment.Status,
+            InventoryItems = shipment.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ?? new List<InventoryItemDto>(),
+            //OrderDetail = shipment.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(shipment.OrderDetail) : null,
+
         };
     }
 }

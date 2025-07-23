@@ -496,9 +496,10 @@ public class StripeController : ControllerBase
 
             if (!string.IsNullOrEmpty(orderId))
             {
-                _logger.Success(
-                    $"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {session.Id}");
+              
                 await _transactionService.HandleSuccessfulPaymentAsync(session.Id, orderId);
+                _logger.Success(
+                  $"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {session.Id}");
             }
             else
             {
@@ -545,6 +546,53 @@ public class StripeController : ControllerBase
         catch (Exception e)
         {
             _logger.Error("[Stripe][Webhook] Unhandled exception while handling payment intent: " + e.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Xử lý khi thanh toán thành công từ Stripe webhook.
+    /// </summary>
+    private async Task HandleSuccessfulItemShipmentRequestPayment(Session session)
+    {
+        try
+        {
+            var IsShipment = session.Metadata != null && session.Metadata.TryGetValue("IsShipment", out var isShipmentStr)
+                ? isShipmentStr
+                : null;
+            if(string.IsNullOrEmpty(IsShipment) || IsShipment != "true")
+            {
+                _logger.Warn("[Stripe][Webhook] Not a shipment payment, skipping.");
+                return;
+            }
+
+            var shipmentIds = session.Metadata != null && session.Metadata.TryGetValue("shipmentIds", out var shipmentIdList)
+               ? shipmentIdList
+               : null;
+
+            // xử lý luồng yêu cầu thanh toán shipment thành công của các inventory item
+
+            //if (string.IsNullOrEmpty(session.Id))
+            //    throw ErrorHelper.WithStatus(400, "Session Id is missing.");
+
+            //if (!string.IsNullOrEmpty(orderId))
+            //{
+
+            //    await _transactionService.HandleSuccessfulPaymentAsync(session.Id, orderId);
+            //    _logger.Success(
+            //      $"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {session.Id}");
+            //}
+            //else
+            //{
+            //    _logger.Warn("[Stripe][Webhook] OrderId not found in Stripe session metadata.");
+            //}
+        }
+        catch (StripeException ex)
+        {
+            _logger.Error("[Stripe][Webhook] StripeException while handling payment: " + ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("[Stripe][Webhook] Unhandled exception while handling payment: " + ex.Message);
         }
     }
 

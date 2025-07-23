@@ -14,7 +14,6 @@ public static class InventoryItemMapper
             ProductId = item.ProductId,
             //ProductName = item.Product?.Name ?? string.Empty,
             //ProductImages = item.Product?.ImageUrls ?? new List<string>(),
-            Quantity = item.Quantity,
             Location = item.Location,
             Status = item.Status,
             CreatedAt = item.CreatedAt,

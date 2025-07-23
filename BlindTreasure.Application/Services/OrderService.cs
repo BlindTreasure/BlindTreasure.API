@@ -174,6 +174,7 @@ public class OrderService : IOrderService
             .Where(o => o.UserId == userId && !o.IsDeleted)
             .Include(o => o.Promotion)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
             .Include(o => o.ShippingAddress)
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
@@ -481,6 +482,7 @@ public class OrderService : IOrderService
                 var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
                 product.Stock -= item.Quantity;
                 await _unitOfWork.Products.Update(product);
+                orderDetail.SellerId = product.SellerId;
             }
             else if (item.BlindBoxId.HasValue)
             {
@@ -493,6 +495,8 @@ public class OrderService : IOrderService
                 }
 
                 await _unitOfWork.BlindBoxes.Update(blindBox);
+                orderDetail.SellerId = blindBox.SellerId;
+
             }
         }
 
@@ -555,7 +559,8 @@ public class OrderService : IOrderService
                     await _unitOfWork.Shipments.AddAsync(shipment);
 
                     od.Status = OrderDetailStatus.DELIVERING.ToString();
-                    od.Shipments = new List<Shipment> { shipment };
+                    od.Shipments.Add(shipment);
+
                     await _unitOfWork.OrderDetails.Update(od);
                 }
             }

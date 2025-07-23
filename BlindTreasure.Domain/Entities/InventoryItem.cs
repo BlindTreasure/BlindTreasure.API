@@ -11,7 +11,6 @@ public class InventoryItem : BaseEntity
     // FK → Product
     public Guid ProductId { get; set; }
     public Product? Product { get; set; }
-    public int Quantity { get; set; }
     public string Location { get; set; } = "HCM"; // Vị trí kho, mặc định là "HCM"
     public InventoryItemStatus Status { get; set; } // enum
     public bool IsFromBlindBox { get; set; } = false;
@@ -19,6 +18,14 @@ public class InventoryItem : BaseEntity
     public CustomerBlindBox? SourceCustomerBlindBox { get; set; }
     public Guid? AddressId { get; set; } // FK → Address, optional
     public Address? Address { get; set; }
+
+    // FK → OrderDetail
+    public Guid? OrderDetailId { get; set; }
+    public OrderDetail? OrderDetail { get; set; }
+
+    // FK → Shipment
+    public Guid? ShipmentId { get; set; }
+    public Shipment? Shipment { get; set; }
 
     // 1-n → Listings
     public ICollection<Listing>? Listings { get; set; }

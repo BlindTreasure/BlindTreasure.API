@@ -3,6 +3,7 @@ using System;
 using BlindTreasure.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    partial class BlindTreasureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250722142505_hanh_requires")]
+    partial class hanh_requires
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -643,8 +646,8 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("ShipmentId")
-                        .HasColumnType("uuid");
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
 
                     b.Property<Guid?>("SourceCustomerBlindBoxId")
                         .HasColumnType("uuid");
@@ -672,8 +675,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasIndex("OrderDetailId");
 
                     b.HasIndex("ProductId");
-
-                    b.HasIndex("ShipmentId");
 
                     b.HasIndex("SourceCustomerBlindBoxId");
 
@@ -889,6 +890,9 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("PromotionNote")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("SellerId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("ShippingAddressId")
                         .HasColumnType("uuid");
 
@@ -955,8 +959,11 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
-                    b.Property<Guid>("SellerId")
-                        .HasColumnType("uuid");
+                    b.Property<DateTime?>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ShippedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -984,8 +991,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasIndex("OrderId");
 
                     b.HasIndex("ProductId");
-
-                    b.HasIndex("SellerId");
 
                     b.ToTable("OrderDetails");
                 });
@@ -1809,17 +1814,11 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid?>("OfferedInventoryId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("OwnerLocked")
-                        .HasColumnType("boolean");
-
                     b.Property<DateTime>("RequestedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("RequesterId")
                         .HasColumnType("uuid");
-
-                    b.Property<bool>("RequesterLocked")
-                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("RespondedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2169,7 +2168,7 @@ namespace BlindTreasure.Domain.Migrations
                         .HasForeignKey("LockedByRequestId");
 
                     b.HasOne("BlindTreasure.Domain.Entities.OrderDetail", "OrderDetail")
-                        .WithMany("InventoryItems")
+                        .WithMany()
                         .HasForeignKey("OrderDetailId");
 
                     b.HasOne("BlindTreasure.Domain.Entities.Product", "Product")
@@ -2177,10 +2176,6 @@ namespace BlindTreasure.Domain.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("BlindTreasure.Domain.Entities.Shipment", "Shipment")
-                        .WithMany("InventoryItems")
-                        .HasForeignKey("ShipmentId");
 
                     b.HasOne("BlindTreasure.Domain.Entities.CustomerBlindBox", "SourceCustomerBlindBox")
                         .WithMany()
@@ -2199,8 +2194,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("OrderDetail");
 
                     b.Navigation("Product");
-
-                    b.Navigation("Shipment");
 
                     b.Navigation("SourceCustomerBlindBox");
 
@@ -2297,19 +2290,11 @@ namespace BlindTreasure.Domain.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("BlindTreasure.Domain.Entities.Seller", "Seller")
-                        .WithMany()
-                        .HasForeignKey("SellerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("BlindBox");
 
                     b.Navigation("Order");
 
                     b.Navigation("Product");
-
-                    b.Navigation("Seller");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.ProbabilityConfig", b =>
@@ -2575,8 +2560,6 @@ namespace BlindTreasure.Domain.Migrations
                 {
                     b.Navigation("CustomerBlindBoxes");
 
-                    b.Navigation("InventoryItems");
-
                     b.Navigation("Shipments");
                 });
 
@@ -2624,11 +2607,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Products");
 
                     b.Navigation("PromotionParticipants");
-                });
-
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.Shipment", b =>
-                {
-                    b.Navigation("InventoryItems");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.User", b =>
