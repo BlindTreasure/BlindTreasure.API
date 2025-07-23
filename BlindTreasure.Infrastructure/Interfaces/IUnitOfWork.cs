@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Domain;
+using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Infrastructure.Interfaces;
 
@@ -30,6 +31,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<Shipment> Shipments { get; }
     IGenericRepository<ListingReport> ListingReports { get; }
     IGenericRepository<TradeRequest> TradeRequests { get; }
+    IGenericRepository<TradeRequestItem> TradeRequestItems { get; }
     IGenericRepository<TradeHistory> TradeHistories { get; }
 
     Task<int> SaveChangesAsync();

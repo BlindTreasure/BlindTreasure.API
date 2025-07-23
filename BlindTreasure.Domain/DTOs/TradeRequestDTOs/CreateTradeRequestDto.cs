@@ -2,5 +2,6 @@
 
 public class CreateTradeRequestDto
 {
-    public Guid? OfferedInventoryId { get; set; }
+    public Guid ListingId { get; set; }
+    public List<Guid> OfferedInventoryIds { get; set; } = new List<Guid>(); // Multiple items
 }

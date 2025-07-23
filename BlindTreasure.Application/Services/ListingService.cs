@@ -93,7 +93,7 @@ public class ListingService : IListingService
         var userId = _claimsService.CurrentUserId;
 
         // Kiểm tra tính toàn vẹn của item trước khi đăng tin
-        await EnsureItemCanBeListedAsync(dto.InventoryId, userId);
+        // await EnsureItemCanBeListedAsync(dto.InventoryId, userId);
 
         var inventory = await _unitOfWork.InventoryItems.FirstOrDefaultAsync(
             x => x.Id == dto.InventoryId &&
@@ -166,60 +166,35 @@ public class ListingService : IListingService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task<int> ExpireOldListingsAsync()
-    {
-        var now = DateTime.UtcNow;
-        var expiredThreshold = now.AddDays(-30);
-
-        var expiredListings = await _unitOfWork.Listings.GetAllAsync(l => l.Status == ListingStatus.Active &&
-                                                                          l.ListedAt < expiredThreshold &&
-                                                                          !l.IsDeleted);
-
-        if (!expiredListings.Any())
-            return 0;
-
-        foreach (var listing in expiredListings)
-        {
-            listing.Status = ListingStatus.Expired;
-            listing.UpdatedAt = now;
-            listing.UpdatedBy = _claimsService.CurrentUserId;
-        }
-
-        await _unitOfWork.Listings.UpdateRange(expiredListings);
-        await _unitOfWork.SaveChangesAsync();
-
-        return expiredListings.Count;
-    }
-
     #region private methods
 
-    private async Task EnsureItemCanBeListedAsync(Guid inventoryId, Guid userId)
-    {
-        // Kiểm tra xem item có tồn tại không
-        var inventoryItem = await _unitOfWork.InventoryItems.FirstOrDefaultAsync(
-            x => x.Id == inventoryId &&
-                 x.UserId == userId &&
-                 !x.IsDeleted &&
-                 x.Status == InventoryItemStatus.Available,
-            i => i.Listings
-        );
-
-        if (inventoryItem == null)
-            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm hợp lệ để tạo listing.");
-
-        // Kiểm tra xem item có listing đang hoạt động không
-        if (inventoryItem.Listings?.Any(l => l.Status == ListingStatus.Active) == true)
-            throw ErrorHelper.Conflict("Vật phẩm này đã có một listing đang hoạt động.");
-
-        // Kiểm tra xem item có bị khóa trong giao dịch nào không
-        var ongoingTradeRequest = await _unitOfWork.TradeRequests.FirstOrDefaultAsync(t =>
-            t.OfferedInventoryId == inventoryId &&
-            t.Status == TradeRequestStatus.PENDING
-        );
-
-        if (ongoingTradeRequest != null)
-            throw ErrorHelper.Conflict("Vật phẩm này đang có giao dịch chờ xử lý.");
-    }
+    // private async Task EnsureItemCanBeListedAsync(Guid inventoryId, Guid userId)
+    // {
+    //     // Kiểm tra xem item có tồn tại không
+    //     var inventoryItem = await _unitOfWork.InventoryItems.FirstOrDefaultAsync(
+    //         x => x.Id == inventoryId &&
+    //              x.UserId == userId &&
+    //              !x.IsDeleted &&
+    //              x.Status == InventoryItemStatus.Available,
+    //         i => i.Listings
+    //     );
+    //
+    //     if (inventoryItem == null)
+    //         throw ErrorHelper.NotFound("Không tìm thấy vật phẩm hợp lệ để tạo listing.");
+    //
+    //     // Kiểm tra xem item có listing đang hoạt động không
+    //     if (inventoryItem.Listings?.Any(l => l.Status == ListingStatus.Active) == true)
+    //         throw ErrorHelper.Conflict("Vật phẩm này đã có một listing đang hoạt động.");
+    //
+    //     // Kiểm tra xem item có bị khóa trong giao dịch nào không
+    //     var ongoingTradeRequest = await _unitOfWork.TradeRequests.FirstOrDefaultAsync(t =>
+    //         t.OfferedInventoryId == inventoryId &&
+    //         t.Status == TradeRequestStatus.PENDING
+    //     );
+    //
+    //     if (ongoingTradeRequest != null)
+    //         throw ErrorHelper.Conflict("Vật phẩm này đang có giao dịch chờ xử lý.");
+    // }
 
     #endregion
 }

@@ -31,5 +31,4 @@ public class ShipmentDto
     public string? Status { get; set; }
 
     public ICollection<InventoryItemDto>? InventoryItems { get; set; }
-
 }
