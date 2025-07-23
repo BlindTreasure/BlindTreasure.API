@@ -9,7 +9,7 @@ public class TradeRequestDto
     public string? ListingItemName { get; set; }
     public Guid RequesterId { get; set; }
     public string? RequesterName { get; set; }
-    public List<OfferedItemDto> OfferedItems { get; set; } = new List<OfferedItemDto>();
+    public List<OfferedItemDto> OfferedItems { get; set; } = new();
     public string? OfferedItemName { get; set; }
     public TradeRequestStatus Status { get; set; }
     public DateTime RequestedAt { get; set; }
@@ -18,6 +18,7 @@ public class TradeRequestDto
     public bool RequesterLocked { get; set; }
     public DateTime? LockedAt { get; set; }
 }
+
 public class OfferedItemDto
 {
     public Guid InventoryItemId { get; set; }

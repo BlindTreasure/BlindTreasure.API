@@ -563,7 +563,6 @@ public class BlindTreasureDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(t => t.RequesterId)
                 .OnDelete(DeleteBehavior.Cascade);
-
         });
 
         modelBuilder.Entity<TradeHistory>(entity =>
