@@ -45,6 +45,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<BlindBoxUnboxLog> BlindBoxUnboxLogs { get; set; }
     public DbSet<ListingReport> ListingReports { get; set; }
     public DbSet<TradeRequest> TradeRequests { get; set; }
+    public DbSet<TradeRequestItem> TradeRequestItems { get; set; }
     public DbSet<TradeHistory> TradeHistories { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -563,10 +564,6 @@ public class BlindTreasureDbContext : DbContext
                 .HasForeignKey(t => t.RequesterId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(t => t.OfferedInventory)
-                .WithMany()
-                .HasForeignKey(t => t.OfferedInventoryId)
-                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<TradeHistory>(entity =>
