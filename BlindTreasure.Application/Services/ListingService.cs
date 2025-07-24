@@ -22,7 +22,8 @@ public class ListingService : IListingService
     private readonly ICacheService _cacheService;
 
     public ListingService(IClaimsService claimsService, ILoggerService logger,
-        IMapperService mapper, IUnitOfWork unitOfWork, INotificationService notificationService, ICacheService cacheService)
+        IMapperService mapper, IUnitOfWork unitOfWork, INotificationService notificationService,
+        ICacheService cacheService)
     {
         _claimsService = claimsService;
         _logger = logger;
@@ -95,6 +96,7 @@ public class ListingService : IListingService
         return items.Select(item =>
         {
             var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
+            dto.InventoryItemId = item.Id; 
             return dto;
         }).ToList();
     }
@@ -260,7 +262,7 @@ public class ListingService : IListingService
         _logger.Success($"[EnsureItemCanBeListedAsync] Vật phẩm {inventoryId} đủ điều kiện để tạo listing");
     }
 
-    
+
     private async Task SendTradeRequestNotificationIfNotSentAsync(User user)
     {
         var cacheKey = $"noti:welcome:{user.Id}";
@@ -278,5 +280,6 @@ public class ListingService : IListingService
 
         await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
     }
+
     #endregion
 }

@@ -162,7 +162,10 @@ public static class IocContainer
         services.AddScoped<IChatMessageService, ChatMessageService>();
         services.AddScoped<IShipmentService, ShipmentService>();
         services.AddScoped<ITradingService, TradingService>();
+        
+        //cron-jobs
         services.AddHostedService<TradeRequestLockJob>();
+        services.AddHostedService<ItemHoldReleaseJob>();
 
         //3rd party
         services.AddHttpClient();

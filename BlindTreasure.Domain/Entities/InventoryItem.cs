@@ -13,7 +13,7 @@ public class InventoryItem : BaseEntity
     public Product? Product { get; set; }
     public string Location { get; set; } = "HCM"; // Vị trí kho, mặc định là "HCM"
     public InventoryItemStatus Status { get; set; } // enum
-    public bool IsFromBlindBox { get; set; } = false;
+    public bool IsFromBlindBox { get; set; }
     public Guid? SourceCustomerBlindBoxId { get; set; } // nếu cần truy vết chi tiết
     public CustomerBlindBox? SourceCustomerBlindBox { get; set; }
     public Guid? AddressId { get; set; } // FK → Address, optional
@@ -33,4 +33,8 @@ public class InventoryItem : BaseEntity
     // Thêm trường LockedByRequestId
     public Guid? LockedByRequestId { get; set; } // Giao dịch đang khóa item này
     public TradeRequest? LockedByRequest { get; set; } // Liên kết với giao dịch khóa item
+    
+    public DateTime? HoldUntil { get; set; } // Thời điểm khi item được giải phóng
+    public Guid? LastTradeHistoryId { get; set; } // ID của giao dịch gần nhất
+    public TradeHistory? LastTradeHistory { get; set; } // Navigation property
 }
