@@ -58,9 +58,18 @@ public class OrderService : IOrderService
             throw ErrorHelper.BadRequest(ErrorMessages.OrderCartEmpty);
         }
 
+        // Lọc product vật lý
+        var hasProduct = cart.Items.Any(i => i.ProductId.HasValue);
+        var hasBlindBox = cart.Items.Any(i => i.BlindBoxId.HasValue);
+
         Guid? shippingAddressId = null;
         if (dto.IsShip == true)
         {
+            if (!hasProduct)
+            {
+                _loggerService.Warn("Cart only contains BlindBox, cannot ship.");
+                throw ErrorHelper.BadRequest("Không thể giao hàng: Giỏ hàng không có sản phẩm vật lý nào để ship.");
+            }
             var userId = _claimsService.CurrentUserId;
             var address = await _unitOfWork.Addresses.GetQueryable()
                 .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
@@ -101,9 +110,18 @@ public class OrderService : IOrderService
             throw ErrorHelper.BadRequest(ErrorMessages.OrderClientCartInvalid);
         }
 
+        // Lọc product vật lý
+        var hasProduct = cartDto.Items.Any(i => i.ProductId.HasValue);
+        var hasBlindBox = cartDto.Items.Any(i => i.BlindBoxId.HasValue);
+
         Guid? shippingAddressId = null;
         if (cartDto.IsShip == true)
         {
+            if (!hasProduct)
+            {
+                _loggerService.Warn("Cart only contains BlindBox, cannot ship.");
+                throw ErrorHelper.BadRequest("Không thể giao hàng: Giỏ hàng không có sản phẩm vật lý nào để ship.");
+            }
             var userId = _claimsService.CurrentUserId;
             var address = await _unitOfWork.Addresses.GetQueryable()
                 .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
@@ -291,8 +309,7 @@ public class OrderService : IOrderService
                 Category = new GhnItemCategory
                 {
                     Level1 = category?.Name,
-                    Level2 = category?.Parent?.Name,
-                    Level3 = category?.Parent?.Parent?.Name
+                    Level2 = category?.Parent?.Name
                 }
             };
         }).ToList();
@@ -347,6 +364,13 @@ public class OrderService : IOrderService
         {
             _loggerService.Warn("Cart is empty or invalid.");
             throw ErrorHelper.BadRequest(ErrorMessages.OrderCartEmptyOrInvalid);
+        }
+
+        // Nếu có yêu cầu ship nhưng không có product vật lý nào
+        if (shippingAddressId.HasValue && !itemList.Any(i => i.ProductId.HasValue))
+        {
+            _loggerService.Warn("Cart only contains BlindBox, cannot ship.");
+            throw ErrorHelper.BadRequest("Không thể giao hàng: Giỏ hàng không có sản phẩm vật lý nào để ship.");
         }
 
         Address? shippingAddress = null;
@@ -533,7 +557,7 @@ public class OrderService : IOrderService
                         .PreviewOrderAsync(
                             ghnOrderRequest); // sửa thành chính thức sang preview vì đây là tạo yêu cầu thanh toán
 
-                order.TotalAmount += ghnCreateResponse?.TotalFee ?? 0;
+                order.FinalAmount += ghnCreateResponse?.TotalFee ?? 0;
                 _loggerService.Info(
                     $"Created GHN shipment for seller {seller.Id}, fee: {ghnCreateResponse?.TotalFee ?? 0}");
 
@@ -557,7 +581,7 @@ public class OrderService : IOrderService
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
 
-                    od.Status = OrderDetailStatus.DELIVERING.ToString();
+                    od.Status = OrderDetailStatus.SHIPPING_REQUESTED.ToString();
                     od.Shipments.Add(shipment);
 
                     await _unitOfWork.OrderDetails.Update(od);
@@ -583,13 +607,18 @@ public class OrderService : IOrderService
         if (items == null || !items.Any())
             throw ErrorHelper.BadRequest("Cart trống.");
 
+        // Chỉ lấy product vật lý để tính shipment
+        var productItems = items.Where(i => i.ProductId.HasValue).ToList();
+        if (!productItems.Any())
+            throw ErrorHelper.BadRequest("Không có sản phẩm vật lý nào để tính phí vận chuyển.");
+
         var address = await _unitOfWork.Addresses.GetQueryable()
             .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
             .FirstOrDefaultAsync();
         if (address == null)
             throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
 
-        var productIds = items.Select(i => i.ProductId.Value).ToList();
+        var productIds = productItems.Select(i => i.ProductId.Value).ToList();
         var products = await _unitOfWork.Products.GetQueryable()
             .Where(p => productIds.Contains(p.Id))
             .Include(p => p.Category)

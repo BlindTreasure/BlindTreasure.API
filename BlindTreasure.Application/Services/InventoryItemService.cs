@@ -288,33 +288,35 @@ public class InventoryItemService : IInventoryItemService
             var seller = group.First().Product.Seller;
             if (seller == null) continue;
 
-            // Build GHN order request cho group này
-            var ghnOrderItems = group.Select(i =>
-            {
-                var p = i.Product;
-                var length = Convert.ToInt32(p.Length ?? 10);
-                var width = Convert.ToInt32(p.Width ?? 10);
-                var height = Convert.ToInt32(p.Height ?? 10);
-                var weight = Convert.ToInt32(p.Weight ?? 1000);
-
-                return new GhnOrderItemDto
+            // Gộp inventory item cùng ProductId
+            var ghnOrderItems = group
+                .GroupBy(i => i.ProductId)
+                .Select(g =>
                 {
-                    Name = p.Name,
-                    Code = p.Id.ToString(),
-                    Quantity = 1,
-                    Price = Convert.ToInt32(p.Price),
-                    Length = length,
-                    Width = width,
-                    Height = height,
-                    Weight = weight,
-                    Category = new GhnItemCategory
+                    var p = g.First().Product;
+                    var length = Convert.ToInt32(p.Length ?? 10);
+                    var width = Convert.ToInt32(p.Width ?? 10);
+                    var height = Convert.ToInt32(p.Height ?? 10);
+                    var weight = Convert.ToInt32(p.Weight ?? 1000);
+
+                    return new GhnOrderItemDto
                     {
-                        Level1 = p.Category?.Name,
-                        Level2 = p.Category?.Parent?.Name,
-                        Level3 = p.Category?.Parent?.Parent?.Name
-                    }
-                };
-            }).ToList();
+                        Name = p.Name,
+                        Code = p.Id.ToString(),
+                        Quantity = g.Count(), // tổng số inventory item cùng product
+                        Price = Convert.ToInt32(p.Price),
+                        Length = length,
+                        Width = width,
+                        Height = height,
+                        Weight = weight,
+                        Category = new GhnItemCategory
+                        {
+                            Level1 = p.Category?.Name,
+                            Level2 = p.Category?.Parent?.Name,
+                            Level3 = p.Category?.Parent?.Parent?.Name
+                        }
+                    };
+                }).ToList();
 
             var ghnOrderRequest = new GhnOrderRequest
             {
@@ -338,7 +340,7 @@ public class InventoryItemService : IInventoryItemService
                 Length = ghnOrderItems.Max(i => i.Length),
                 Width = ghnOrderItems.Max(i => i.Width),
                 Height = ghnOrderItems.Max(i => i.Height),
-                Weight = ghnOrderItems.Sum(i => i.Weight),
+                Weight = ghnOrderItems.Sum(i => i.Weight * i.Quantity),
                 InsuranceValue = ghnOrderItems.Sum(i => i.Price * i.Quantity),
                 ServiceTypeId = 2,
                 Items = ghnOrderItems.ToArray()
@@ -382,7 +384,7 @@ public class InventoryItemService : IInventoryItemService
     // C# BlindTreasure.Application\Services\InventoryItemService.cs
 
     public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShipmentForListItemsAsync(
-        RequestItemShipmentDTO request)
+    RequestItemShipmentDTO request)
     {
         var userId = _claimsService.CurrentUserId;
         if (request.InventoryItemIds == null || !request.InventoryItemIds.Any())
@@ -417,32 +419,34 @@ public class InventoryItemService : IInventoryItemService
             if (address == null)
                 throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
 
-            // Build GHN order request cho group này
-            var ghnOrderItems = group.Select(i =>
-            {
-                var p = i.Product;
-                var length = Convert.ToInt32(p.Length > 0 ? p.Length : 10);
-                var width = Convert.ToInt32(p.Width > 0 ? p.Width : 10);
-                var height = Convert.ToInt32(p.Height > 0 ? p.Height : 10);
-                var weight = Convert.ToInt32(p.Weight > 0 ? p.Weight : 1000);
-
-                return new GhnOrderItemDto
+            // Gộp inventory item cùng ProductId
+            var ghnOrderItems = group
+                .GroupBy(i => i.ProductId)
+                .Select(g =>
                 {
-                    Name = p.Name,
-                    Code = p.Id.ToString(),
-                    Price = Convert.ToInt32(p.Price),
-                    Length = length,
-                    Width = width,
-                    Height = height,
-                    Weight = weight,
-                    Category = new GhnItemCategory
+                    var p = g.First().Product;
+                    var length = Convert.ToInt32(p.Length > 0 ? p.Length : 10);
+                    var width = Convert.ToInt32(p.Width > 0 ? p.Width : 10);
+                    var height = Convert.ToInt32(p.Height > 0 ? p.Height : 10);
+                    var weight = Convert.ToInt32(p.Weight > 0 ? p.Weight : 1000);
+
+                    return new GhnOrderItemDto
                     {
-                        Level1 = p.Category?.Name,
-                        Level2 = p.Category?.Parent?.Name,
-                        Level3 = p.Category?.Parent?.Parent?.Name
-                    }
-                };
-            }).ToList();
+                        Name = p.Name,
+                        Code = p.Id.ToString(),
+                        Price = Convert.ToInt32(p.Price),
+                        Length = length,
+                        Width = width,
+                        Height = height,
+                        Weight = weight,
+                        Quantity = g.Count(), // tổng số inventory item cùng product
+                        Category = new GhnItemCategory
+                        {
+                            Level1 = p.Category?.Name,
+                            Level2 = p.Category?.Parent?.Name
+                        }
+                    };
+                }).ToList();
 
             var ghnOrderRequest = new GhnOrderRequest
             {
@@ -466,7 +470,7 @@ public class InventoryItemService : IInventoryItemService
                 Length = ghnOrderItems.Max(i => i.Length),
                 Width = ghnOrderItems.Max(i => i.Width),
                 Height = ghnOrderItems.Max(i => i.Height),
-                Weight = ghnOrderItems.Sum(i => i.Weight),
+                Weight = ghnOrderItems.Sum(i => i.Weight * i.Quantity),
                 InsuranceValue = ghnOrderItems.Sum(i => i.Price * i.Quantity),
                 ServiceTypeId = 2,
                 Items = ghnOrderItems.ToArray()

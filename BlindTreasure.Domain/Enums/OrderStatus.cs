@@ -5,7 +5,6 @@ public enum OrderStatus
     PENDING,
     CANCELLED,
     PAID,
-    FAILED,
     COMPLETED,
     EXPIRED
 }
