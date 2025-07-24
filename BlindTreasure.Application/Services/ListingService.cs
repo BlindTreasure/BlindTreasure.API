@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.ListingDTOs;
 using BlindTreasure.Domain.Entities;
@@ -17,14 +18,18 @@ public class ListingService : IListingService
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
+    private readonly ICacheService _cacheService;
 
     public ListingService(IClaimsService claimsService, ILoggerService logger,
-        IMapperService mapper, IUnitOfWork unitOfWork)
+        IMapperService mapper, IUnitOfWork unitOfWork, INotificationService notificationService, ICacheService cacheService)
     {
         _claimsService = claimsService;
         _logger = logger;
         _mapper = mapper;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
+        _cacheService = cacheService;
     }
 
     public async Task<ListingDetailDto> GetByIdAsync(Guid id)
@@ -179,6 +184,7 @@ public class ListingService : IListingService
     private ListingDetailDto MapListingToDto(Listing listing)
     {
         var dto = _mapper.Map<Listing, ListingDetailDto>(listing);
+        dto.InventoryId = listing.InventoryId;
         dto.ProductName = listing.InventoryItem?.Product?.Name ?? "Unknown";
         dto.ProductImage = listing.InventoryItem?.Product?.ImageUrls?.FirstOrDefault() ?? "";
         dto.Description = listing.Description;
@@ -254,5 +260,23 @@ public class ListingService : IListingService
         _logger.Success($"[EnsureItemCanBeListedAsync] Vật phẩm {inventoryId} đủ điều kiện để tạo listing");
     }
 
+    
+    private async Task SendTradeRequestNotificationIfNotSentAsync(User user)
+    {
+        var cacheKey = $"noti:welcome:{user.Id}";
+        if (await _cacheService.ExistsAsync(cacheKey)) return;
+
+        await _notificationService.PushNotificationToUser(
+            user.Id,
+            new NotificationDTO
+            {
+                Title = "Chào mừng!",
+                Message = $"Chào mừng {user.FullName} quay trở lại BlindTreasure.",
+                Type = NotificationType.Trading
+            }
+        );
+
+        await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
+    }
     #endregion
 }
