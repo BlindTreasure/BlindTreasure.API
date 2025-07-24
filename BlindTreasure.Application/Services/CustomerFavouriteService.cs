@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerFavouriteDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,12 +31,9 @@ public class CustomerFavouriteService : ICustomerFavouriteService
         if (currentUserId == Guid.Empty)
             throw ErrorHelper.Unauthorized("Vui lòng đăng nhập để thêm vào danh sách yêu thích.");
 
-        // Validate input
-        if (request.Type == "Product" && request.ProductId == null)
-            throw ErrorHelper.BadRequest("ProductId không được để trống khi Type là Product.");
-
-        if (request.Type == "BlindBox" && request.BlindBoxId == null)
-            throw ErrorHelper.BadRequest("BlindBoxId không được để trống khi Type là BlindBox.");
+        // Validate input - cả ProductId và BlindBoxId không được cùng null
+        if (request.ProductId == null && request.BlindBoxId == null)
+            throw ErrorHelper.BadRequest("Vui lòng chọn ít nhất một sản phẩm hoặc blind box để thêm vào yêu thích.");
 
         // Check if already exists
         var existingFavourite = await _unitOfWork.CustomerFavourites
@@ -48,13 +46,14 @@ public class CustomerFavouriteService : ICustomerFavouriteService
             throw ErrorHelper.Conflict("Sản phẩm này đã có trong danh sách yêu thích.");
 
         // Verify product/blindbox exists
-        if (request.Type == "Product")
+        if (request.ProductId != null)
         {
             var product = await _unitOfWork.Products.GetByIdAsync(request.ProductId.Value);
             if (product == null || product.IsDeleted)
                 throw ErrorHelper.NotFound("Không tìm thấy sản phẩm.");
         }
-        else
+
+        if (request.BlindBoxId != null)
         {
             var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(request.BlindBoxId.Value);
             if (blindBox == null || blindBox.IsDeleted)
@@ -67,7 +66,7 @@ public class CustomerFavouriteService : ICustomerFavouriteService
             UserId = currentUserId,
             ProductId = request.ProductId,
             BlindBoxId = request.BlindBoxId,
-            Type = Enum.Parse<FavouriteType>(request.Type)
+            Type = request.Type
         };
 
         await _unitOfWork.CustomerFavourites.AddAsync(favourite);
@@ -100,39 +99,40 @@ public class CustomerFavouriteService : ICustomerFavouriteService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task<FavouriteListResponseDto> GetUserFavouritesAsync(int page = 1, int pageSize = 10)
+    public async Task<Pagination<CustomerFavouriteDto>> GetUserFavouritesAsync(FavouriteQueryParameter param)
     {
         var currentUserId = _claimsService.CurrentUserId;
         if (currentUserId == Guid.Empty)
             throw ErrorHelper.Unauthorized("Vui lòng đăng nhập.");
 
         var query = _unitOfWork.CustomerFavourites.GetQueryable()
-            .Where(cf => cf.UserId == currentUserId && !cf.IsDeleted)
             .Include(cf => cf.Product)
             .ThenInclude(p => p.Category)
             .Include(cf => cf.Product)
             .ThenInclude(p => p.Seller)
             .Include(cf => cf.BlindBox)
             .ThenInclude(b => b.Seller)
-            .OrderByDescending(cf => cf.CreatedAt);
+            .Where(cf => cf.UserId == currentUserId && !cf.IsDeleted)
+            .AsNoTracking();
 
-        var totalCount = await query.CountAsync();
+        // Sắp xếp theo thời gian tạo
+        query = param.Desc 
+            ? query.OrderByDescending(cf => cf.CreatedAt) 
+            : query.OrderBy(cf => cf.CreatedAt);
+
+        var count = await query.CountAsync();
+
         var favourites = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+            .Skip((param.PageIndex - 1) * param.PageSize)
+            .Take(param.PageSize)
             .ToListAsync();
 
         var favouriteDtos = favourites
             .Select(f => _mapperService.Map<CustomerFavourite, CustomerFavouriteDto>(f))
             .ToList();
 
-        return new FavouriteListResponseDto
-        {
-            Favourites = favouriteDtos,
-            TotalCount = totalCount
-        };
+        return new Pagination<CustomerFavouriteDto>(favouriteDtos, count, param.PageIndex, param.PageSize);
     }
-
     public async Task<bool> IsInFavouriteAsync(Guid? productId, Guid? blindBoxId)
     {
         var currentUserId = _claimsService.CurrentUserId;
