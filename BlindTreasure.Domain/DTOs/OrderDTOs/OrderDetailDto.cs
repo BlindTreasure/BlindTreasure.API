@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.DTOs.OrderDTOs;
 
@@ -17,6 +18,6 @@ public class OrderDetailDto
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
-    public string Status { get; set; }
+    public OrderDetailStatus Status { get; set; }
     public ICollection<ShipmentDto> Shipments { get; set; } = new List<ShipmentDto>();
 }

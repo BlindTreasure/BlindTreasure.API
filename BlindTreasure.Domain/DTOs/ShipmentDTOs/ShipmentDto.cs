@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,7 +29,7 @@ public class ShipmentDto
     public DateTime? ShippedAt { get; set; }
     public DateTime? EstimatedDelivery { get; set; } //expected delivery date
     public DateTime? DeliveredAt { get; set; }
-    public string? Status { get; set; }
+    public ShipmentStatus? Status { get; set; }
 
     public ICollection<InventoryItemDto>? InventoryItems { get; set; }
 }

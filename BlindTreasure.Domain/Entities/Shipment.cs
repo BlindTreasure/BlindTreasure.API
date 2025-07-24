@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.Entities;
 
 public class Shipment : BaseEntity
 {
@@ -19,7 +21,7 @@ public class Shipment : BaseEntity
     public DateTime ShippedAt { get; set; }
     public DateTime EstimatedDelivery { get; set; } //expected delivery date
     public DateTime? DeliveredAt { get; set; }
-    public string Status { get; set; }
+    public ShipmentStatus Status { get; set; }
 
     // 1-n → InventoryItems
     public ICollection<InventoryItem>? InventoryItems { get; set; }
