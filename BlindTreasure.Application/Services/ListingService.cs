@@ -92,7 +92,7 @@ public class ListingService : IListingService
         return items.Select(item =>
         {
             var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
-            dto.InventoryItemId = item.Id;
+            dto.Id = item.Id;
             return dto;
         }).ToList();
     }
