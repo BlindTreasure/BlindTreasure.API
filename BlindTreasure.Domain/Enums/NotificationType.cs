@@ -4,6 +4,7 @@ public enum NotificationType
 {
     System,
     Order,
+    Trading,
     Support,
     Voucher,
     Chat,
