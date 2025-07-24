@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.TradeHistoryDTOs;
 using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using BlindTreasure.Domain.Entities;
@@ -16,13 +17,17 @@ public class TradingService : ITradingService
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
+    private readonly ICacheService _cacheService;
 
     public TradingService(IClaimsService claimsService, ILoggerService logger,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork, INotificationService notificationService, ICacheService cacheService)
     {
         _claimsService = claimsService;
         _logger = logger;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
+        _cacheService = cacheService;
     }
 
     public async Task<List<TradeRequestDto>> GetTradeRequestsAsync(Guid listingId)
@@ -144,6 +149,21 @@ public class TradingService : ITradingService
             await _unitOfWork.SaveChangesAsync();
         }
 
+        // Gửi notification cho chủ sở hữu listing
+        try
+        {
+            var listingOwner = await _unitOfWork.Users.GetByIdAsync(listing.InventoryItem.UserId);
+            var requester = await _unitOfWork.Users.GetByIdAsync(userId);
+
+            if (listingOwner != null && requester != null)
+                await SendTradeRequestNotificationIfNotSentAsync(listingOwner, requester.FullName);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[CreateTradeRequestAsync] Lỗi khi gửi notification: {ex.Message}");
+        }
+
+
         return await GetTradeRequestByIdAsync(tradeRequest.Id);
     }
 
@@ -165,6 +185,19 @@ public class TradingService : ITradingService
         await UpdateInventoryItemStatusOnReject(tradeRequest, isAccepted);
         await _unitOfWork.TradeRequests.Update(tradeRequest);
         await _unitOfWork.SaveChangesAsync();
+
+        try
+        {
+            var requester = await _unitOfWork.Users.GetByIdAsync(tradeRequest.RequesterId);
+            var responder = await _unitOfWork.Users.GetByIdAsync(_claimsService.CurrentUserId);
+
+            if (requester != null && responder != null)
+                await SendTradeResponseNotificationAsync(requester, responder.FullName, isAccepted);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[RespondTradeRequestAsync] Lỗi khi gửi notification: {ex.Message}");
+        }
 
         return await GetTradeRequestByIdAsync(tradeRequestId);
     }
@@ -188,6 +221,19 @@ public class TradingService : ITradingService
 
         await _unitOfWork.TradeRequests.Update(tradeRequest);
         await _unitOfWork.SaveChangesAsync();
+
+        try
+        {
+            var requester = await _unitOfWork.Users.GetByIdAsync(tradeRequest.RequesterId);
+            var listingOwner = await _unitOfWork.Users.GetByIdAsync(listingOwnerId);
+
+            if (requester != null && listingOwner != null)
+                await SendDealLockedNotificationAsync(requester, listingOwner);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[LockDealAsync] Lỗi khi gửi notification: {ex.Message}");
+        }
 
         return await GetTradeRequestByIdAsync(tradeRequestId);
     }
@@ -247,6 +293,86 @@ public class TradingService : ITradingService
     }
 
     #region Private Methods
+
+    private async Task SendTradeRequestNotificationIfNotSentAsync(User user, string? requesterName)
+    {
+        var cacheKey = $"noti:trade_request:{user.Id}";
+        if (await _cacheService.ExistsAsync(cacheKey)) return;
+
+        var message = string.IsNullOrEmpty(requesterName)
+            ? "Bạn có một yêu cầu trao đổi vật phẩm mới. Hãy kiểm tra và phản hồi sớm nhé!"
+            : $"{requesterName} đã gửi yêu cầu trao đổi vật phẩm với bạn. Hãy kiểm tra ngay!";
+
+        await _notificationService.PushNotificationToUser(
+            user.Id,
+            new NotificationDTO
+            {
+                Title = "Yêu cầu trao đổi mới!",
+                Message = message,
+                Type = NotificationType.Trading
+            }
+        );
+
+        await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(2));
+    }
+
+    private async Task SendTradeResponseNotificationAsync(User requester, string responderName, bool isAccepted)
+    {
+        var cacheKey = $"noti:trade_response:{requester.Id}";
+        if (await _cacheService.ExistsAsync(cacheKey)) return;
+
+        var title = isAccepted ? "Yêu cầu trao đổi được chấp nhận!" : "Yêu cầu trao đổi bị từ chối";
+        var message = isAccepted
+            ? $"{responderName} đã chấp nhận yêu cầu trao đổi của bạn. Hãy liên hệ để hoàn tất giao dịch!"
+            : $"{responderName} đã từ chối yêu cầu trao đổi của bạn.";
+
+        await _notificationService.PushNotificationToUser(
+            requester.Id,
+            new NotificationDTO
+            {
+                Title = title,
+                Message = message,
+                Type = NotificationType.Trading
+            }
+        );
+
+        await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(15));
+    }
+
+    private async Task SendDealLockedNotificationAsync(User requester, User listingOwner)
+    {
+        var notifications = new[]
+        {
+            new
+            {
+                User = requester, Message = "Giao dịch đã được khóa! Hãy liên hệ với đối tác để hoàn tất việc trao đổi."
+            },
+            new
+            {
+                User = listingOwner,
+                Message = "Giao dịch đã được khóa! Hãy liên hệ với đối tác để hoàn tất việc trao đổi."
+            }
+        };
+
+        foreach (var noti in notifications)
+        {
+            var cacheKey = $"noti:deal_locked:{noti.User.Id}";
+            if (await _cacheService.ExistsAsync(cacheKey)) continue;
+
+            await _notificationService.PushNotificationToUser(
+                noti.User.Id,
+                new NotificationDTO
+                {
+                    Title = "Giao dịch đã được khóa!",
+                    Message = noti.Message,
+                    Type = NotificationType.Trading
+                }
+            );
+
+            await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
+        }
+    }
+
 
     private async Task<List<InventoryItem>> ValidateMultipleOfferedItems(List<Guid> offeredInventoryIds,
         Listing listing, Guid userId)

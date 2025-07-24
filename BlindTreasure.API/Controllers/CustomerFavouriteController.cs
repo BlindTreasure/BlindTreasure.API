@@ -1,13 +1,14 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerFavouriteDTOs;
+using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/customer-favourites")]
 [Authorize(Policy = "CustomerPolicy")]
 public class CustomerFavouriteController : ControllerBase
 {
@@ -59,17 +60,17 @@ public class CustomerFavouriteController : ControllerBase
     /// Lấy danh sách yêu thích của user hiện tại
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetMyFavourites([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetMyFavourites([FromQuery] FavouriteQueryParameter parameter)
     {
         try
         {
-            var result = await _customerFavouriteService.GetUserFavouritesAsync(page, pageSize);
-            return Ok(ApiResult<FavouriteListResponseDto>.Success(result));
+            var pagination = await _customerFavouriteService.GetUserFavouritesAsync(parameter);
+            return Ok(ApiResult<Pagination<CustomerFavouriteDto>>.Success(pagination, "200", "Lấy danh sách yêu thích thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ex.Data["StatusCode"] as int? ?? 500;
-            return StatusCode(statusCode, ApiResult<FavouriteListResponseDto>.Failure(
+            return StatusCode(statusCode, ApiResult<object>.Failure(
                 statusCode.ToString(), ex.Message));
         }
     }

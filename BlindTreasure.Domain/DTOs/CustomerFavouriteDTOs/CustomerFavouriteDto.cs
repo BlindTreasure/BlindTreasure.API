@@ -1,6 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
+using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Domain.DTOs.CustomerFavouriteDTOs;
 
@@ -20,14 +22,14 @@ public class CustomerFavouriteDto
 
 public class AddFavouriteRequestDto
 {
-    [Required] public Guid? ProductId { get; set; }
+    public Guid? ProductId { get; set; }
 
     public Guid? BlindBoxId { get; set; }
 
-    [Required] public string Type { get; set; } // "Product" hoặc "BlindBox"
+    [Required] public FavouriteType Type { get; set; } // "Product" hoặc "BlindBox"
 }
 
-public class FavouriteListResponseDto
+public class FavouriteQueryParameter : PaginationParameter
 {
     public List<CustomerFavouriteDto> Favourites { get; set; } = new();
     public int TotalCount { get; set; }
