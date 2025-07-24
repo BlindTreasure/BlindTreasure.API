@@ -33,7 +33,7 @@ public class InventoryItem : BaseEntity
     // Thêm trường LockedByRequestId
     public Guid? LockedByRequestId { get; set; } // Giao dịch đang khóa item này
     public TradeRequest? LockedByRequest { get; set; } // Liên kết với giao dịch khóa item
-    
+
     public DateTime? HoldUntil { get; set; } // Thời điểm khi item được giải phóng
     public Guid? LastTradeHistoryId { get; set; } // ID của giao dịch gần nhất
     public TradeHistory? LastTradeHistory { get; set; } // Navigation property

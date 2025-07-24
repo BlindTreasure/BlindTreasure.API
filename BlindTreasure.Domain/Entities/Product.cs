@@ -38,4 +38,5 @@ public class Product : BaseEntity
     public ICollection<CartItem> CartItems { get; set; }
     public ICollection<OrderDetail> OrderDetails { get; set; }
     public ICollection<Review> Reviews { get; set; }
+    public virtual ICollection<CustomerFavourite> CustomerFavourites { get; set; } = new List<CustomerFavourite>();
 }

@@ -24,6 +24,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<Address> Addresses { get; }
     IGenericRepository<InventoryItem> InventoryItems { get; }
     IGenericRepository<CustomerBlindBox> CustomerBlindBoxes { get; }
+    IGenericRepository<CustomerFavourite> CustomerFavourites { get; }
     IGenericRepository<Notification> Notifications { get; }
     IGenericRepository<Listing> Listings { get; }
     IGenericRepository<ChatMessage> ChatMessages { get; }
