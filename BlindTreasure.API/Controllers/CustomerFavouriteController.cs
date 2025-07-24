@@ -23,7 +23,7 @@ public class CustomerFavouriteController : ControllerBase
     /// Thêm sản phẩm/blind box vào danh sách yêu thích
     /// </summary>
     [HttpPost]
-    public async Task<IActionResult> AddToFavourite([FromBody] AddFavouriteRequestDto request)
+    public async Task<IActionResult> AddToFavourite([FromForm] AddFavouriteRequestDto request)
     {
         try
         {
@@ -32,9 +32,9 @@ public class CustomerFavouriteController : ControllerBase
         }
         catch (Exception ex)
         {
-            var statusCode = ex.Data["StatusCode"] as int? ?? 500;
-            return StatusCode(statusCode, ApiResult<CustomerFavouriteDto>.Failure(
-                statusCode.ToString(), ex.Message));
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
 
@@ -51,30 +51,34 @@ public class CustomerFavouriteController : ControllerBase
         }
         catch (Exception ex)
         {
-            var statusCode = ex.Data["StatusCode"] as int? ?? 500;
-            return StatusCode(statusCode, ApiResult.Failure(statusCode.ToString(), ex.Message));
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
 
-    /// <summary>
-    /// Lấy danh sách yêu thích của user hiện tại
-    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetMyFavourites([FromQuery] FavouriteQueryParameter parameter)
     {
         try
         {
-            var pagination = await _customerFavouriteService.GetUserFavouritesAsync(parameter);
-            return Ok(ApiResult<Pagination<CustomerFavouriteDto>>.Success(pagination, "200", "Lấy danh sách yêu thích thành công."));
+            var result = await _customerFavouriteService.GetUserFavouritesAsync(parameter);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách sản phẩm yêu thích thành công."));
         }
         catch (Exception ex)
         {
-            var statusCode = ex.Data["StatusCode"] as int? ?? 500;
-            return StatusCode(statusCode, ApiResult<object>.Failure(
-                statusCode.ToString(), ex.Message));
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
-
     /// <summary>
     /// Kiểm tra sản phẩm/blind box có trong danh sách yêu thích không
     /// </summary>
@@ -88,8 +92,9 @@ public class CustomerFavouriteController : ControllerBase
         }
         catch (Exception ex)
         {
-            var statusCode = ex.Data["StatusCode"] as int? ?? 500;
-            return StatusCode(statusCode, ApiResult<bool>.Failure(statusCode.ToString(), ex.Message));
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
 }

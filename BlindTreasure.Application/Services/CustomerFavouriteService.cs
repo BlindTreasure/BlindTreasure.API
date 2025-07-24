@@ -1,8 +1,11 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.DTOs.CustomerFavouriteDTOs;
+using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -78,7 +81,8 @@ public class CustomerFavouriteService : ICustomerFavouriteService
                 cf => cf.Product,
                 cf => cf.BlindBox);
 
-        return _mapperService.Map<CustomerFavourite, CustomerFavouriteDto>(createdFavourite);
+        // Sử dụng phương thức map riêng thay vì dùng _mapperService
+        return MapToCustomerFavouriteDto(createdFavourite);
     }
 
     public async Task RemoveFromFavouriteAsync(Guid favouriteId)
@@ -111,28 +115,78 @@ public class CustomerFavouriteService : ICustomerFavouriteService
             .Include(cf => cf.Product)
             .ThenInclude(p => p.Seller)
             .Include(cf => cf.BlindBox)
+            .ThenInclude(b => b.Category)
+            .Include(cf => cf.BlindBox)
             .ThenInclude(b => b.Seller)
             .Where(cf => cf.UserId == currentUserId && !cf.IsDeleted)
             .AsNoTracking();
 
-        // Sắp xếp theo thời gian tạo
-        query = param.Desc 
-            ? query.OrderByDescending(cf => cf.CreatedAt) 
-            : query.OrderBy(cf => cf.CreatedAt);
-
+        // Tính tổng số bản ghi
         var count = await query.CountAsync();
 
+        // Sắp xếp theo thời gian tạo
+        query = param.Desc
+            ? query.OrderByDescending(cf => cf.CreatedAt)
+            : query.OrderBy(cf => cf.CreatedAt);
+
+        // Phân trang
         var favourites = await query
             .Skip((param.PageIndex - 1) * param.PageSize)
             .Take(param.PageSize)
             .ToListAsync();
 
-        var favouriteDtos = favourites
-            .Select(f => _mapperService.Map<CustomerFavourite, CustomerFavouriteDto>(f))
-            .ToList();
+        // Chuyển đổi sang DTO
+        var favouriteDtos = favourites.Select(MapToCustomerFavouriteDto).ToList();
 
         return new Pagination<CustomerFavouriteDto>(favouriteDtos, count, param.PageIndex, param.PageSize);
     }
+
+    private CustomerFavouriteDto MapToCustomerFavouriteDto(CustomerFavourite cf)
+    {
+        return new CustomerFavouriteDto
+        {
+            Id = cf.Id,
+            UserId = cf.UserId,
+            ProductId = cf.ProductId,
+            BlindBoxId = cf.BlindBoxId,
+            Type = cf.Type.ToString(),
+            CreatedAt = cf.CreatedAt,
+            Product = cf.Product != null
+                ? new ProducDetailDto
+                {
+                    Id = cf.Product.Id,
+                    Name = cf.Product.Name,
+                    Description = cf.Product.Description,
+                    Price = cf.Product.Price,
+                    CategoryId = cf.Product.CategoryId,
+                    ImageUrls = cf.Product.ImageUrls,
+                    SellerId = cf.Product.SellerId,
+                    Status = cf.Product.Status,
+                    ProductType = cf.Product.ProductType,
+                    Stock = cf.Product.Stock,
+                    ProductStockStatus = cf.Product.Stock > 0 ? StockStatus.InStock : StockStatus.OutOfStock
+                }
+                : null,
+            BlindBox = cf.BlindBox != null
+                ? new BlindBoxDetailDto
+                {
+                    Id = cf.BlindBox.Id,
+                    Name = cf.BlindBox.Name,
+                    Description = cf.BlindBox.Description,
+                    Price = cf.BlindBox.Price,
+                    ImageUrl = cf.BlindBox.ImageUrl,
+                    CategoryId = cf.BlindBox.CategoryId,
+                    CategoryName = cf.BlindBox.Category?.Name,
+                    Status = cf.BlindBox.Status,
+                    TotalQuantity = cf.BlindBox.TotalQuantity,
+                    BlindBoxStockStatus = cf.BlindBox.TotalQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock,
+                    Brand = cf.BlindBox.Brand,
+                    BindBoxTags = cf.BlindBox.BindBoxTags
+                }
+                : null
+        };
+    }
+
     public async Task<bool> IsInFavouriteAsync(Guid? productId, Guid? blindBoxId)
     {
         var currentUserId = _claimsService.CurrentUserId;
