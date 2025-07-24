@@ -5,7 +5,7 @@ namespace BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 
 public class InventoryItemDto
 {
-    public Guid InventoryItemId { get; set; }
+    public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public Guid ProductId { get; set; }
     public ProducDetailDto? Product { get; set; }

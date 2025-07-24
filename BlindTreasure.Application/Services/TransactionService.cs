@@ -362,7 +362,7 @@ public class TransactionService : ITransactionService
             if (transaction.Payment != null)
                 transaction.Payment.Status = PaymentStatus.Failed.ToString();
             if (transaction.Payment?.Order != null)
-                transaction.Payment.Order.Status = OrderStatus.FAILED.ToString();
+                transaction.Payment.Order.Status = OrderStatus.EXPIRED.ToString();
 
             await _unitOfWork.Transactions.Update(transaction);
             if (transaction.Payment != null)
