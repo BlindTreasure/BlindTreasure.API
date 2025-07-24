@@ -26,6 +26,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<ProbabilityConfig> ProbabilityConfigs { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
     public DbSet<CustomerBlindBox> CustomerBlindBoxes { get; set; }
+    public DbSet<CustomerBlindBox> CustomerFavourites { get; set; }
     public DbSet<OtpVerification> OtpVerifications { get; set; }
     public DbSet<Listing> Listings { get; set; }
     public DbSet<CartItem> CartItems { get; set; }
@@ -171,24 +172,73 @@ public class BlindTreasureDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<CustomerFavourite>(entity =>
+        {
+            entity.Property(cf => cf.Type)
+                .HasConversion<string>()
+                .HasMaxLength(32)
+                .IsRequired();
+
+            // Relationship với User
+            entity.HasOne(cf => cf.User)
+                .WithMany(u => u.CustomerFavourites)
+                .HasForeignKey(cf => cf.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Relationship với Product (optional)
+            entity.HasOne(cf => cf.Product)
+                .WithMany(p => p.CustomerFavourites)
+                .HasForeignKey(cf => cf.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Relationship với BlindBox (optional)
+            entity.HasOne(cf => cf.BlindBox)
+                .WithMany(b => b.CustomerFavourites)
+                .HasForeignKey(cf => cf.BlindBoxId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Unique constraint: một user chỉ có thể thích một item một lần
+            entity.HasIndex(cf => new { cf.UserId, cf.ProductId, cf.BlindBoxId })
+                .IsUnique()
+                .HasFilter("\"ProductId\" IS NOT NULL OR \"BlindBoxId\" IS NOT NULL");
+
+            // Check constraint: phải có ít nhất một trong ProductId hoặc BlindBoxId
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_CustomerFavourite_OneTypeOnly",
+                "(\"ProductId\" IS NOT NULL AND \"BlindBoxId\" IS NULL) OR (\"ProductId\" IS NULL AND \"BlindBoxId\" IS NOT NULL)"));
+        });
+
         modelBuilder.Entity<BlindBoxUnboxLog>(entity =>
         {
             entity.Property(x => x.Rarity)
                 .HasConversion<string>()
                 .HasMaxLength(32);
 
+            entity.Property(e => e.CustomerName)
+                .HasMaxLength(255)
+                .IsRequired(false); // Vì có thể null
+
             entity.Property(e => e.ProductName)
-                .HasMaxLength(255);
+                .HasMaxLength(255)
+                .IsRequired(); // Required vì không có ?
 
             entity.Property(e => e.ProbabilityTableJson)
-                .HasColumnType("jsonb");
+                .HasColumnType("jsonb"); // PostgreSQL JSONB type
+            // Không cần MaxLength cho JSONB
 
             entity.Property(e => e.BlindBoxName)
-                .HasMaxLength(255);
+                .HasMaxLength(255)
+                .IsRequired();
 
             entity.Property(e => e.Reason)
-                .HasColumnType("text")
-                .IsRequired();
+                .HasColumnType("text") // Cho phép text dài
+                .IsRequired(); // Required vì có default value
+
+            // Navigation property
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ChatMessage>()
@@ -563,7 +613,6 @@ public class BlindTreasureDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(t => t.RequesterId)
                 .OnDelete(DeleteBehavior.Cascade);
-
         });
 
         modelBuilder.Entity<TradeHistory>(entity =>

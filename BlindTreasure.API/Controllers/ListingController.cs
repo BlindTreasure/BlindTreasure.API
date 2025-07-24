@@ -28,8 +28,14 @@ public class ListingController : ControllerBase
         try
         {
             var result = await _listingService.GetAllListingsAsync(param);
-            return Ok(ApiResult<Pagination<ListingDetailDto>>.Success(result, "200",
-                "Lấy danh sách listing thành công."));
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách listing thành công."));
         }
         catch (Exception ex)
         {
@@ -39,6 +45,23 @@ public class ListingController : ControllerBase
         }
     }
 
+    [HttpGet("{listingId}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetListingDetails(Guid listingId)
+    {
+        try
+        {
+            var result = await _listingService.GetByIdAsync(listingId);
+            return Ok(ApiResult<object>.Success(result, "200",
+                "Lấy chi tiết listing thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
 
     /// <summary>
     ///     Tạo listing (free hoặc trade) cho item trong kho.
@@ -49,7 +72,7 @@ public class ListingController : ControllerBase
         try
         {
             var result = await _listingService.CreateListingAsync(dto);
-            return Ok(ApiResult<ListingDto>.Success(result, "200", "Tạo listing thành công."));
+            return Ok(ApiResult<object>.Success(result, "200", "Tạo listing thành công."));
         }
         catch (Exception ex)
         {

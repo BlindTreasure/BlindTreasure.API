@@ -8,7 +8,7 @@ public class TradeRequest : BaseEntity
     public Listing? Listing { get; set; }
     public Guid RequesterId { get; set; } // User B
     public User? Requester { get; set; }
-    public List<TradeRequestItem> OfferedItems { get; set; } = new List<TradeRequestItem>();
+    public List<TradeRequestItem> OfferedItems { get; set; } = new();
     public InventoryItem? OfferedInventory { get; set; }
     public TradeRequestStatus Status { get; set; } = TradeRequestStatus.PENDING;
     public DateTime RequestedAt { get; set; } = DateTime.UtcNow;

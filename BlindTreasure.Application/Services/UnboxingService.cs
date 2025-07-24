@@ -109,14 +109,15 @@ public class UnboxingService : IUnboxingService
             {
                 Id = x.Id,
                 CustomerBlindBoxId = x.CustomerBlindBoxId,
+                CustomerName = x.User!.FullName,
                 ProductId = x.ProductId,
                 ProductName = x.ProductName,
                 Rarity = x.Rarity,
                 DropRate = x.DropRate,
                 RollValue = x.RollValue,
                 UnboxedAt = x.UnboxedAt,
-                BlindBoxName = x.BlindBoxName,
-                Reason = x.Reason
+                BlindBoxName = x.BlindBoxName!,
+                Reason = x.Reason!
             })
             .ToListAsync();
 

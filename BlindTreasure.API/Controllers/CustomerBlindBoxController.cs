@@ -10,11 +10,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
 
-/// <summary>
-///     API quản lý kho BlindBox (CustomerInventory) của người dùng.
-///     Cho phép xem danh sách, chi tiết, đánh dấu mở box và xóa mềm.
-///     Không cho phép tạo trực tiếp qua API (chỉ tạo qua luồng thanh toán).
-/// </summary>
 [Route("api/customer-blindboxes")]
 [ApiController]
 [Authorize]

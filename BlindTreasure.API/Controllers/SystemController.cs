@@ -392,22 +392,17 @@ public class SystemController : ControllerBase
                 var tablesToDelete = new List<Func<Task>>
                 {
                     () => context.InventoryItems.ExecuteDeleteAsync(),
-
-
+                    () => context.CustomerFavourites.ExecuteDeleteAsync(),
                     () => context.ChatMessages.ExecuteDeleteAsync(),
                     () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
-
-
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
                     () => context.RarityConfigs.ExecuteDeleteAsync(),
-
                     () => context.BlindBoxItems.ExecuteDeleteAsync(),
                     () => context.CartItems.ExecuteDeleteAsync(),
                     () => context.OrderDetails.ExecuteDeleteAsync(),
                     () => context.Shipments.ExecuteDeleteAsync(),
                     () => context.Listings.ExecuteDeleteAsync(),
                     () => context.InventoryItems.ExecuteDeleteAsync(),
-
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
 
                     () => context.TradeHistories.ExecuteDeleteAsync(),

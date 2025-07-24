@@ -157,12 +157,16 @@ public static class IocContainer
         services.AddScoped<IListingService, ListingService>();
         services.AddScoped<IInventoryItemService, InventoryItemService>();
         services.AddScoped<ICustomerBlindBoxService, CustomerBlindBoxService>();
+        services.AddScoped<ICustomerFavouriteService, CustomerFavouriteService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IUnboxingService, UnboxingService>();
         services.AddScoped<IChatMessageService, ChatMessageService>();
         services.AddScoped<IShipmentService, ShipmentService>();
         services.AddScoped<ITradingService, TradingService>();
+
+        //cron-jobs
         services.AddHostedService<TradeRequestLockJob>();
+        services.AddHostedService<ItemHoldReleaseJob>();
 
         //3rd party
         services.AddHttpClient();

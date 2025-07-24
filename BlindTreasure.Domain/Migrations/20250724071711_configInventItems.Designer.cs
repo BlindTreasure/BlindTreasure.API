@@ -3,6 +3,7 @@ using System;
 using BlindTreasure.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    partial class BlindTreasureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250724071711_configInventItems")]
+    partial class configInventItems
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -259,10 +262,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid>("CustomerBlindBoxId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("CustomerName")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -276,6 +275,7 @@ namespace BlindTreasure.Domain.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("ProbabilityTableJson")
+                        .IsRequired()
                         .HasColumnType("jsonb");
 
                     b.Property<Guid>("ProductId")
@@ -311,8 +311,6 @@ namespace BlindTreasure.Domain.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("BlindBoxUnboxLogs");
                 });
@@ -605,63 +603,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("CustomerBlindBoxes");
-                });
-
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.CustomerFavourite", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("BlindBoxId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid?>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BlindBoxId");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("UserId", "ProductId", "BlindBoxId")
-                        .IsUnique()
-                        .HasFilter("\"ProductId\" IS NOT NULL OR \"BlindBoxId\" IS NOT NULL");
-
-                    b.ToTable("CustomerFavourite", t =>
-                        {
-                            t.HasCheckConstraint("CK_CustomerFavourite_OneTypeOnly", "(\"ProductId\" IS NOT NULL AND \"BlindBoxId\" IS NULL) OR (\"ProductId\" IS NULL AND \"BlindBoxId\" IS NOT NULL)");
-                        });
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.InventoryItem", b =>
@@ -2160,17 +2101,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.BlindBoxUnboxLog", b =>
-                {
-                    b.HasOne("BlindTreasure.Domain.Entities.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("BlindTreasure.Domain.Entities.CartItem", b =>
                 {
                     b.HasOne("BlindTreasure.Domain.Entities.BlindBox", "BlindBox")
@@ -2272,31 +2202,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("BlindBox");
 
                     b.Navigation("OrderDetail");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.CustomerFavourite", b =>
-                {
-                    b.HasOne("BlindTreasure.Domain.Entities.BlindBox", "BlindBox")
-                        .WithMany("CustomerFavourites")
-                        .HasForeignKey("BlindBoxId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("BlindTreasure.Domain.Entities.Product", "Product")
-                        .WithMany("CustomerFavourites")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("BlindTreasure.Domain.Entities.User", "User")
-                        .WithMany("CustomerFavourites")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("BlindBox");
-
-                    b.Navigation("Product");
 
                     b.Navigation("User");
                 });
@@ -2704,8 +2609,6 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Navigation("CustomerBlindBoxes");
 
-                    b.Navigation("CustomerFavourites");
-
                     b.Navigation("OrderDetails");
 
                     b.Navigation("Reviews");
@@ -2761,8 +2664,6 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Navigation("Certificates");
 
-                    b.Navigation("CustomerFavourites");
-
                     b.Navigation("InventoryItems");
 
                     b.Navigation("OrderDetails");
@@ -2814,8 +2715,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("CartItems");
 
                     b.Navigation("CustomerBlindBoxes");
-
-                    b.Navigation("CustomerFavourites");
 
                     b.Navigation("InventoryItems");
 

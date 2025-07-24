@@ -6,8 +6,9 @@ public class UnboxLogDto
 {
     public Guid Id { get; set; }
     public Guid CustomerBlindBoxId { get; set; }
+    public string? CustomerName { get; set; }
     public Guid ProductId { get; set; }
-    public string ProductName { get; set; }
+    public string? ProductName { get; set; }
     public RarityName Rarity { get; set; }
     public decimal DropRate { get; set; }
     public decimal RollValue { get; set; }

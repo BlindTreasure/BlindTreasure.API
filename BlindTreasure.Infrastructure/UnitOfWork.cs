@@ -33,7 +33,8 @@ public class UnitOfWork(
     IGenericRepository<ListingReport> listingReports,
     IGenericRepository<TradeHistory> tradeHistories,
     IGenericRepository<TradeRequest> tradeRequests,
-    IGenericRepository<TradeRequestItem> tradeRequestItems)
+    IGenericRepository<TradeRequestItem> tradeRequestItems,
+    IGenericRepository<CustomerFavourite> customerFavourites)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
@@ -54,6 +55,7 @@ public class UnitOfWork(
     public IGenericRepository<Address> Addresses { get; } = addresses;
     public IGenericRepository<InventoryItem> InventoryItems { get; } = inventoryItems;
     public IGenericRepository<CustomerBlindBox> CustomerBlindBoxes { get; } = customerBlindboxes;
+    public IGenericRepository<CustomerFavourite> CustomerFavourites { get; } = customerFavourites;
     public IGenericRepository<Notification> Notifications { get; } = notifications;
     public IGenericRepository<PromotionParticipant> PromotionParticipants { get; } = promotionParticipants;
     public IGenericRepository<Listing> Listings { get; } = listings;

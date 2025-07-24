@@ -1,14 +1,17 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.ListingDTOs;
+using BlindTreasure.Domain.DTOs.TradeHistoryDTOs;
 using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
+using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
 
-[Route("api/trades")]
+[Route("api/trading")]
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Customer")]
 public class TradingController : ControllerBase
 {
     private readonly ITradingService _tradingService;
@@ -18,9 +21,26 @@ public class TradingController : ControllerBase
         _tradingService = tradingService;
     }
 
+    [HttpGet("histories")]
+    public async Task<IActionResult> GetAllListings([FromQuery] TradeHistoryQueryParameter param)
+    {
+        try
+        {
+            var result = await _tradingService.GetAllTradeHistoriesAsync(param);
+            return Ok(ApiResult<Pagination<TradeHistoryDto>>.Success(result, "200",
+                "Lấy lịch sử TRADING thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
     /// <summary>
     /// User B tạo yêu cầu giao dịch với User A cho một Listing.
-    /// Nếu Listing miễn phí, User B không cần cung cấp item để trao đổi, nếu không, User A phải cung cấp item hợp lệ.
+    /// Nếu Listing miễn phí, User B không cần cung cấp item để trao đổi, nếu không, User B nhập item trong invent
     /// </summary>
     [HttpPost("{listingId}/trade-requests")]
     public async Task<IActionResult> CreateTradeRequest([FromBody] CreateTradeRequestDto dto)
