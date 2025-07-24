@@ -29,8 +29,3 @@ public class AddFavouriteRequestDto
     [Required] public FavouriteType Type { get; set; } // "Product" hoặc "BlindBox"
 }
 
-public class FavouriteQueryParameter : PaginationParameter
-{
-    public List<CustomerFavouriteDto> Favourites { get; set; } = new();
-    public int TotalCount { get; set; }
-}
