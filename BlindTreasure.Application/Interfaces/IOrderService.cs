@@ -12,6 +12,7 @@ public interface IOrderService
     Task<string> CheckoutAsync(CreateCheckoutRequestDto dto);
     Task<string> CheckoutFromClientCartAsync(DirectCartCheckoutDto cartDto);
     Task DeleteOrderAsync(Guid orderId);
+    Task<Pagination<OrderDetailDto>> GetMyOrderDetailsAsync(OrderDetailQueryParameter param);
     Task<Pagination<OrderDto>> GetMyOrdersAsync(OrderQueryParameter param);
     Task<OrderDto> GetOrderByIdAsync(Guid orderId);
 
