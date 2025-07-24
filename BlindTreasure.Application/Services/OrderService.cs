@@ -153,6 +153,42 @@ public class OrderService : IOrderService
         return result;
     }
 
+    public async Task<Pagination<OrderDetailDto>> GetMyOrderDetailsAsync(OrderDetailQueryParameter param)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var query = _unitOfWork.OrderDetails.GetQueryable()
+            .Include(od => od.Order)
+            .Include(od => od.Product)
+            .Include(od => od.BlindBox)
+            .Include(od => od.Shipments)
+            .Where(od => od.Order.UserId == userId && !od.Order.IsDeleted);
+
+        if (param.Status.HasValue)
+            query = query.Where(od => od.Status == param.Status.Value);
+        if (param.OrderId.HasValue)
+            query = query.Where(od => od.OrderId == param.OrderId.Value);
+        if (param.MinPrice.HasValue)
+            query = query.Where(od => od.UnitPrice >= param.MinPrice.Value);
+        if (param.MaxPrice.HasValue)
+            query = query.Where(od => od.UnitPrice <= param.MaxPrice.Value);
+        if (param.IsBlindBox == true)
+            query = query.Where(od => od.BlindBoxId != null);
+        if (param.IsProduct == true)
+            query = query.Where(od => od.ProductId != null);
+
+        query = param.Desc
+            ? query.OrderByDescending(od => od.Order.UpdatedAt ?? od.Order.CreatedAt)
+            : query.OrderBy(od => od.Order.UpdatedAt ?? od.Order.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+        var orderDetails = param.PageIndex == 0
+            ? await query.ToListAsync()
+            : await query.Skip((param.PageIndex - 1) * param.PageSize).Take(param.PageSize).ToListAsync();
+
+        var dtos = orderDetails.Select(OrderDtoMapper.ToOrderDetailDto).ToList();
+        return new Pagination<OrderDetailDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
+
     public async Task<OrderDto> GetOrderByIdAsync(Guid orderId)
     {
         var userId = _claimsService.CurrentUserId;
@@ -253,7 +289,7 @@ public class OrderService : IOrderService
                 await _unitOfWork.BlindBoxes.Update(blindBox);
             }
 
-            od.Status = OrderDetailStatus.CANCELLED.ToString();
+            od.Status = OrderDetailStatus.CANCELLED;
         }
 
         await _unitOfWork.Orders.Update(order);
@@ -495,7 +531,7 @@ public class OrderService : IOrderService
                 Quantity = item.Quantity,
                 UnitPrice = item.UnitPrice,
                 TotalPrice = item.TotalPrice,
-                Status = OrderDetailStatus.PENDING.ToString(),
+                Status = OrderDetailStatus.PENDING,
                 CreatedAt = DateTime.UtcNow
             };
             order.OrderDetails.Add(orderDetail);
@@ -577,11 +613,11 @@ public class OrderService : IOrderService
                         EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
                             ? ghnCreateResponse.ExpectedDeliveryTime
                             : DateTime.UtcNow.AddDays(3),
-                        Status = "WAITING_PAYMENT" // chưa thanh toán, chờ xác nhận
+                        Status = ShipmentStatus.WAITING_PAYMENT // chưa thanh toán, chờ xác nhận
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
 
-                    od.Status = OrderDetailStatus.SHIPPING_REQUESTED.ToString();
+                    od.Status = OrderDetailStatus.SHIPPING_REQUESTED;
                     od.Shipments.Add(shipment);
 
                     await _unitOfWork.OrderDetails.Update(od);

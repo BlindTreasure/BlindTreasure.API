@@ -6,6 +6,7 @@ using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -361,7 +362,7 @@ public class InventoryItemService : IInventoryItemService
                 EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
                     ? ghnCreateResponse.ExpectedDeliveryTime
                     : DateTime.UtcNow.AddDays(3),
-                Status = "WAITING_PAYMENT"
+                Status = ShipmentStatus.WAITING_PAYMENT
             };
             shipment = await _unitOfWork.Shipments.AddAsync(shipment);
             await _unitOfWork.SaveChangesAsync();

@@ -587,5 +587,22 @@ public class BlindTreasureDbContext : DbContext
                 .HasForeignKey(t => t.OfferedInventoryId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
+
+        modelBuilder.Entity<Shipment>(entity =>
+        {
+
+            entity.Property(e => e.Status)
+                .HasConversion<string>()
+                .HasMaxLength(16);
+        });
+
+
+        modelBuilder.Entity<OrderDetail>(entity =>
+        {
+
+            entity.Property(e => e.Status)
+                .HasConversion<string>()
+                .HasMaxLength(50);
+        });
     }
 }

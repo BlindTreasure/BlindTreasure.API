@@ -3,6 +3,7 @@
 public enum InventoryItemStatus
 {
     Available,
+    Shipment_requested,
     Delivering,
     Reserved,
     Listed,
