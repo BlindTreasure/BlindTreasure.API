@@ -47,21 +47,21 @@ public class StripeService : IStripeService
 
     public async Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false)
     {
-        // Lấy user hiện tại
+        // 1. Lấy user hiện tại
         var userId = _claimsService.CurrentUserId;
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null)
             throw ErrorHelper.NotFound("User không tồn tại.");
 
-        // Lấy order và kiểm tra quyền sở hữu, include Promotion để lấy thông tin voucher
+        // 2. Lấy order và kiểm tra quyền sở hữu, include Promotion để lấy thông tin voucher
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.Product)
+                .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.BlindBox)
+                .ThenInclude(od => od.BlindBox)
             .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.Shipments)
+                .ThenInclude(od => od.Shipments)
             .Include(o => o.Promotion)
             .FirstOrDefaultAsync();
 
@@ -79,56 +79,34 @@ public class StripeService : IStripeService
                 throw ErrorHelper.BadRequest("Chỉ có thể gia hạn đơn hàng đã hoàn thành hoặc hết hạn.");
         }
 
-        // Lấy thông tin promotion từ order nếu có
+        // 3. Lấy thông tin promotion từ order nếu có
         var promotionDesc = GetPromotionDescription(order);
 
-        // Tổng hợp thông tin shipment/fee cho description
-        var shipmentDescriptions = new List<string>();
-        decimal totalShippingFee = 0;
-        foreach (var od in order.OrderDetails)
-            if (od.Shipments != null && od.Shipments.Any())
-                foreach (var shipment in od.Shipments)
-                {
-                    shipmentDescriptions.Add(
-                        $"Giao hàng bởi: {shipment.Provider}, Mã vận đơn: {shipment.OrderCode}, Phí ship: {shipment.TotalFee:N0} VND, Trạng thái: {shipment.Status}"
-                    );
-                    totalShippingFee += shipment.TotalFee ?? 0;
-                }
-
-        var shipmentDesc = shipmentDescriptions.Any()
-            ? string.Join(" | ", shipmentDescriptions)
-            : "Không có thông tin giao hàng.";
-
-        // Chuẩn bị line items cho Stripe
+        // 4. Chuẩn bị line items cho Stripe: xen kẽ Product/BlindBox và phí ship từng sản phẩm (nếu có)
         var lineItems = new List<SessionLineItemOptions>();
-        foreach (var item in order.OrderDetails)
+        decimal totalShippingFee = 0;
+        var shipmentDescriptions = new List<string>();
+
+        foreach (var od in order.OrderDetails)
         {
+            // 4.1. Add product/blindbox line item
             string name;
             decimal unitPrice;
-            if (item.ProductId.HasValue && item.Product != null)
+            if (od.ProductId.HasValue && od.Product != null)
             {
-                name = item.Product.Name;
-                unitPrice = item.Product.Price;
+                name = od.Product.Name;
+                unitPrice = od.Product.Price;
             }
-            else if (item.BlindBoxId.HasValue && item.BlindBox != null)
+            else if (od.BlindBoxId.HasValue && od.BlindBox != null)
             {
-                name = item.BlindBox.Name;
-                unitPrice = item.BlindBox.Price;
+                name = od.BlindBox.Name;
+                unitPrice = od.BlindBox.Price;
             }
             else
             {
                 throw ErrorHelper.BadRequest("Sản phẩm hoặc BlindBox trong đơn hàng không hợp lệ.");
             }
 
-            // Thêm thông tin shipment cho từng sản phẩm nếu có
-            var shipmentInfo = "";
-            if (item.Shipments != null && item.Shipments.Any())
-            {
-                var shipment = item.Shipments.First();
-                shipmentInfo =
-                    $", Ship: {shipment.Provider} - {shipment.TotalFee:N0} VND, Tracking: {shipment.OrderCode}";
-            }
-
             lineItems.Add(new SessionLineItemOptions
             {
                 PriceData = new SessionLineItemPriceDataOptions
@@ -136,36 +114,47 @@ public class StripeService : IStripeService
                     Currency = "vnd",
                     ProductData = new SessionLineItemPriceDataProductDataOptions
                     {
-                        Name =
-                            $"Product/Blindbox Name: {name} , Order Detail id {item.Id} belongs to Order {order.Id} paid by {user.Email}",
+                        Name = $"Product/Blindbox Name: {name} , Order Detail id {od.Id} belongs to Order {order.Id} paid by {user.Email}",
                         Description =
-                            $"Sản phẩm: {name}, Số lượng: {item.Quantity}, Tổng: {item.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
-                            (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "") +
-                            (!string.IsNullOrEmpty(shipmentInfo) ? shipmentInfo : "")
+                            $"Sản phẩm: {name}, Số lượng: {od.Quantity}, Tổng: {od.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
+                            (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "")
                     },
-                    UnitAmount = (long)unitPrice // Stripe expects amount in cents
+                    UnitAmount = (long)unitPrice
                 },
-                Quantity = item.Quantity
+                Quantity = od.Quantity
             });
+
+            // 4.2. Nếu là product và có shipment, add shipment line item ngay sau đó
+            if (od.ProductId.HasValue && od.Shipments != null && od.Shipments.Any())
+            {
+                var shipment = od.Shipments.First();
+                var shipDesc = $"Giao hàng bởi: {shipment.Provider}, Mã vận đơn: {shipment.OrderCode ?? "WAITING FOR PAYMENT"}, Phí ship: {shipment.TotalFee:N0} VND, Trạng thái: {shipment.Status}";
+                shipmentDescriptions.Add(shipDesc);
+                totalShippingFee += shipment.TotalFee ?? 0;
+
+                lineItems.Add(new SessionLineItemOptions
+                {
+                    PriceData = new SessionLineItemPriceDataOptions
+                    {
+                        Currency = "vnd",
+                        ProductData = new SessionLineItemPriceDataProductDataOptions
+                        {
+                            Name = $"Phí vận chuyển cho {name}",
+                            Description = shipDesc
+                        },
+                        UnitAmount = (long)(shipment.TotalFee ?? 0)
+                    },
+                    Quantity = 1
+                });
+            }
         }
 
-        // Thêm một line item cho phí ship tổng nếu có
-        if (totalShippingFee > 0)
-            lineItems.Add(new SessionLineItemOptions
-            {
-                PriceData = new SessionLineItemPriceDataOptions
-                {
-                    Currency = "vnd",
-                    ProductData = new SessionLineItemPriceDataProductDataOptions
-                    {
-                        Name = "Phí vận chuyển",
-                        Description = shipmentDesc
-                    },
-                    UnitAmount = (long)totalShippingFee
-                },
-                Quantity = 1
-            });
+        // 5. Metadata shipmentDesc tổng hợp (nếu cần)
+        var shipmentDesc = shipmentDescriptions.Any()
+            ? string.Join(" | ", shipmentDescriptions)
+            : "Không có thông tin giao hàng.";
 
+        // 6. Tạo session Stripe
         var options = new SessionCreateOptions
         {
             Metadata = new Dictionary<string, string>
@@ -213,10 +202,8 @@ public class StripeService : IStripeService
         var service = new SessionService(_stripeClient);
         var session = await service.CreateAsync(options);
 
-        // Tạo Payment và Transaction như cũ
+        // 7. Tạo Payment và Transaction như cũ
         await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew);
-
-
         await _unitOfWork.SaveChangesAsync();
 
         return session.Url;

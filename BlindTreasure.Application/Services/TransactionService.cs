@@ -144,7 +144,7 @@ public class TransactionService : ITransactionService
     {
         var shipments = await _unitOfWork.Shipments.GetQueryable()
             .Where(s => orderDetails.Select(od => od.Id).Contains(s.OrderDetailId.Value) &&
-                        s.Status == "WAITING_PAYMENT")
+                        s.Status == ShipmentStatus.WAITING_PAYMENT)
             .Include(s => s.OrderDetail).ThenInclude(od => od.Product).ThenInclude(p => p.Seller)
             .ToListAsync();
 
@@ -230,7 +230,7 @@ public class TransactionService : ITransactionService
         shipment.TrackingNumber = ghnCreateResponse?.OrderCode ?? "";
         shipment.ShippedAt = DateTime.UtcNow;
         shipment.EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime ?? DateTime.UtcNow.AddDays(3);
-        shipment.Status = "REQUESTED";
+        shipment.Status = ShipmentStatus.PROCESSING;
     }
 
     /// <summary>
@@ -362,7 +362,7 @@ public class TransactionService : ITransactionService
             if (transaction.Payment != null)
                 transaction.Payment.Status = PaymentStatus.Failed.ToString();
             if (transaction.Payment?.Order != null)
-                transaction.Payment.Order.Status = OrderStatus.FAILED.ToString();
+                transaction.Payment.Order.Status = OrderStatus.EXPIRED.ToString();
 
             await _unitOfWork.Transactions.Update(transaction);
             if (transaction.Payment != null)

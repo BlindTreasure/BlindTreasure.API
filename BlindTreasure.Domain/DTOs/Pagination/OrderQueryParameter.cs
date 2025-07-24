@@ -5,7 +5,7 @@ namespace BlindTreasure.Domain.DTOs.Pagination;
 public class OrderQueryParameter : PaginationParameter
 {
     /// <summary>
-    ///     Lọc theo trạng thái đơn hàng (PENDING, PAID, COMPLETED, CANCELLED, FAILED, EXPIRED)
+    ///     Lọc theo trạng thái đơn hàng (PENDING, PAID, COMPLETED, CANCELLED, EXPIRED)
     /// </summary>
     public OrderStatus? Status { get; set; }
 
