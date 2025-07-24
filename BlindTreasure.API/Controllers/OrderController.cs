@@ -102,6 +102,34 @@ public class OrderController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+    /// <summary>
+    ///     Lấy danh sách chi tiết đơn hàng của user hiện tại (có phân trang, filter).
+    /// </summary>
+    /// <returns>Danh sách chi tiết đơn hàng phân trang</returns>
+    [Authorize]
+    [HttpGet("order-details")]
+    [ProducesResponseType(typeof(ApiResult<Pagination<OrderDetailDto>>), 200)]
+    public async Task<IActionResult> GetMyOrderDetails([FromQuery] OrderDetailQueryParameter param)
+    {
+        try
+        {
+            var result = await _orderService.GetMyOrderDetailsAsync(param);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách chi tiết đơn hàng thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 
     /// <summary>
     ///     Lấy danh sách đơn hàng của user hiện tại (có phân trang, filter).
