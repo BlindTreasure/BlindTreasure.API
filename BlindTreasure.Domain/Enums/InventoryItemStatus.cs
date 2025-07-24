@@ -7,5 +7,6 @@ public enum InventoryItemStatus
     Reserved,
     Listed,
     Sold,
-    Archived
+    Archived,
+    OnHold
 }

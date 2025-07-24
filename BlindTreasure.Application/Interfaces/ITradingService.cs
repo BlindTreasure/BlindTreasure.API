@@ -11,4 +11,5 @@ public interface ITradingService
     Task<TradeRequestDto> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted);
     Task<Pagination<TradeHistoryDto>> GetAllTradeHistoriesAsync(TradeHistoryQueryParameter param);
     Task<TradeRequestDto> LockDealAsync(Guid tradeRequestId);
+    Task ReleaseHeldItemsAsync();
 }

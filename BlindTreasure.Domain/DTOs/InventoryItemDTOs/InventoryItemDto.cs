@@ -17,4 +17,5 @@ public class InventoryItemDto
 
     public bool IsFromBlindBox { get; set; }
     public Guid? SourceCustomerBlindBoxId { get; set; }
+    public HoldInfoDto? HoldInfo { get; set; }
 }
