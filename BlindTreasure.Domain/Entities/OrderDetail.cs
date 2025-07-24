@@ -1,4 +1,6 @@
-﻿namespace BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Domain.Enums;
+
+namespace BlindTreasure.Domain.Entities;
 
 public class OrderDetail : BaseEntity
 {
@@ -17,7 +19,7 @@ public class OrderDetail : BaseEntity
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
-    public string Status { get; set; }
+    public OrderDetailStatus Status { get; set; }
 
 
     // Tách rõ SellerId ở đây
