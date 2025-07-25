@@ -1,10 +1,12 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
 using BlindTreasure.Domain.DTOs.UnboxDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,7 +43,6 @@ public class SystemController : ControllerBase
             await SeedCategories();
             await SeedProducts();
             await SeedBlindBoxes();
-            // await SeedCounterStrikeCases();
             await SeedPromotions();
             await SeedPromotionParticipants();
             return Ok(ApiResult<object>.Success(new
@@ -61,6 +62,11 @@ public class SystemController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Seed blind boxes cho user để test chức năng mở hộp
+    /// </summary>
+    /// <param name="userId">ID của user cần seed blind box. Nếu không truyền sẽ mặc định là user trangiaphuc362003181@gmail.com</param>
+    /// <returns>Thông tin seed thành công với số lượng hộp đã tạo</returns>
     [HttpPost("dev/seed-user-blind-boxes")]
     public async Task<IActionResult> SeedBlindBoxUsers([FromQuery] Guid? userId = null)
     {
@@ -177,6 +183,11 @@ public class SystemController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Seed inventory items cho user bằng cách tự động mở 2 blind box ngẫu nhiên
+    /// </summary>
+    /// <param name="userId">ID của user cần seed inventory. Nếu không truyền sẽ mặc định là user trangiaphuc362003181@gmail.com</param>
+    /// <returns>Thông tin các items đã được thêm vào inventory</returns>
     [HttpPost("dev/seed-user-inventoryItems")]
     public async Task<IActionResult> SeedUserInventory([FromQuery] Guid? userId = null)
     {
@@ -230,14 +241,33 @@ public class SystemController : ControllerBase
 
             _logger.Info($"[SeedUserInventory] Đã chọn {selectedBoxes.Count} hộp để unbox");
 
+            // Tạo UnboxingService với mock ClaimsService
+            var mockClaimsService = new MockClaimsService(user.Id);
+
+            // Lấy các dependencies cần thiết từ DI container
+            var loggerService = HttpContext.RequestServices.GetRequiredService<ILoggerService>();
+            var unitOfWork = HttpContext.RequestServices.GetRequiredService<IUnitOfWork>();
+            var currentTime = HttpContext.RequestServices.GetRequiredService<ICurrentTime>();
+            var notificationService = HttpContext.RequestServices.GetRequiredService<INotificationService>();
+
+            // Tạo instance UnboxingService mới với mock ClaimsService (đúng thứ tự tham số)
+            var unboxingService = new UnboxingService(
+                loggerService,
+                unitOfWork,
+                mockClaimsService, // Sử dụng mock thay vì service thật
+                currentTime,
+                notificationService
+            );
+
             var unboxResults = new List<UnboxResultDto>();
 
             // Unbox từng hộp đã chọn
             foreach (var box in selectedBoxes)
+            {
                 try
                 {
                     _logger.Info($"[SeedUserInventory] Đang unbox hộp Id: {box.Id}");
-                    var result = await _unboxService.UnboxAsync(box.Id);
+                    var result = await unboxingService.UnboxAsync(box.Id);
                     unboxResults.Add(result);
                 }
                 catch (Exception ex)
@@ -245,8 +275,12 @@ public class SystemController : ControllerBase
                     _logger.Error($"[SeedUserInventory] Lỗi khi unbox hộp Id {box.Id}: {ex.Message}");
                     // Tiếp tục với hộp tiếp theo nếu có lỗi
                 }
+            }
 
-            if (!unboxResults.Any()) return BadRequest("Không thể unbox bất kỳ hộp nào. Vui lòng kiểm tra lại.");
+            if (!unboxResults.Any())
+            {
+                return BadRequest("Không thể unbox bất kỳ hộp nào. Vui lòng kiểm tra lại.");
+            }
 
             // Đếm số lượng inventory items của user sau khi unbox
             var inventoryCount = await _context.InventoryItems
@@ -256,7 +290,12 @@ public class SystemController : ControllerBase
             var response = new
             {
                 Message = $"Đã seed {unboxResults.Count} inventory items cho user {user.Email}",
-                TotalInventoryItems = inventoryCount
+                TotalInventoryItems = inventoryCount,
+                UnboxedItems = unboxResults.Select(r => new
+                {
+                    r.ProductId,
+                    r.Rarity,
+                })
             };
 
             _logger.Success(
@@ -271,75 +310,7 @@ public class SystemController : ControllerBase
             _logger.Error($"[SeedUserInventory] Exception: {ex.Message}");
             return StatusCode(statusCode, errorResponse);
         }
-    }
-
-    // [HttpPost("dev/seed-cs-cases")]
-    // public async Task<IActionResult> SeedCasesForUsers([FromQuery] Guid? userId = null)
-    // {
-    //     try
-    //     {
-    //         User? user;
-    //
-    //         if (userId.HasValue)
-    //         {
-    //             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
-    //             if (user == null)
-    //             {
-    //                 _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với Id: {userId}");
-    //                 return NotFound($"Không tìm thấy user với Id: {userId}");
-    //             }
-    //
-    //             _logger.Info($"[SeedUserBoxes] Bắt đầu seed CS case cho user Id: {userId}");
-    //         }
-    //         else
-    //         {
-    //             var email = "trangiaphuc362003181@gmail.com";
-    //             user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-    //             if (user == null)
-    //             {
-    //                 _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với email: {email}");
-    //                 return NotFound($"Không tìm thấy user với email: {email}");
-    //             }
-    //
-    //             _logger.Info($"[SeedUserBoxes] Bắt đầu seed CS case cho user: {email}");
-    //         }
-    //
-    //         // 2. Lấy tất cả blind box theo tên chứa "Counter-Strike Midnight Case"
-    //         var csBoxes = await _context.BlindBoxes
-    //             .Where(b => !b.IsDeleted
-    //                         && b.Status == BlindBoxStatus.Approved
-    //                         && b.Name.Contains("Counter-Strike Midnight Case"))
-    //             .ToListAsync();
-    //
-    //         if (!csBoxes.Any()) return BadRequest("Không tìm thấy hộp Counter-Strike Midnight Case nào để seed.");
-    //
-    //         // 3. Seed cho user
-    //         var customerBoxes = csBoxes.Select(b => new CustomerBlindBox
-    //         {
-    //             Id = Guid.NewGuid(),
-    //             UserId = user.Id,
-    //             BlindBoxId = b.Id,
-    //             IsOpened = false,
-    //             CreatedAt = DateTime.UtcNow,
-    //             UpdatedAt = DateTime.UtcNow
-    //         }).ToList();
-    //
-    //         await _context.CustomerBlindBoxes.AddRangeAsync(customerBoxes);
-    //         await _context.SaveChangesAsync();
-    //
-    //         _logger.Success($"[SeedUserBoxes] Đã seed {customerBoxes.Count} hộp CS cho user {user.Email}");
-    //
-    //         return Ok(ApiResult<object>.Success("200",
-    //             $"Đã seed {customerBoxes.Count} hộp Counter-Strike Midnight Case cho user {user.Email}."));
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-    //         var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-    //         _logger.Error($"[SeedUserBoxes] Exception: {ex.Message}");
-    //         return StatusCode(statusCode, errorResponse);
-    //     }
-    // }
+    } 
 
     [HttpDelete("clear-caching")]
     public async Task<IActionResult> ClearCaching()
@@ -1849,4 +1820,17 @@ public class SystemController : ControllerBase
     }
 
     #endregion
+}
+
+public class MockClaimsService : IClaimsService
+{
+    private readonly Guid _userId;
+
+    public MockClaimsService(Guid userId)
+    {
+        _userId = userId;
+    }
+
+    public Guid CurrentUserId => _userId;
+    public string? IpAddress => "127.0.0.1";
 }
