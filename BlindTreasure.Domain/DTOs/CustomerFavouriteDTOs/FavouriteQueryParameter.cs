@@ -4,5 +4,4 @@ using BlindTreasure.Domain.Enums;
 
 public class FavouriteQueryParameter : PaginationParameter
 {
-
 }

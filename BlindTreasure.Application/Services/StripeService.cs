@@ -57,11 +57,11 @@ public class StripeService : IStripeService
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
+            .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
+            .ThenInclude(od => od.BlindBox)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Shipments)
+            .ThenInclude(od => od.Shipments)
             .Include(o => o.Promotion)
             .FirstOrDefaultAsync();
 
@@ -114,7 +114,8 @@ public class StripeService : IStripeService
                     Currency = "vnd",
                     ProductData = new SessionLineItemPriceDataProductDataOptions
                     {
-                        Name = $"Product/Blindbox Name: {name} , Order Detail id {od.Id} belongs to Order {order.Id} paid by {user.Email}",
+                        Name =
+                            $"Product/Blindbox Name: {name} , Order Detail id {od.Id} belongs to Order {order.Id} paid by {user.Email}",
                         Description =
                             $"Sản phẩm: {name}, Số lượng: {od.Quantity}, Tổng: {od.TotalPrice} VND, Đơn hàng: {order.Id}, Người mua: {user.Email}" +
                             (!string.IsNullOrEmpty(promotionDesc) ? $", {promotionDesc}" : "")
@@ -128,7 +129,8 @@ public class StripeService : IStripeService
             if (od.ProductId.HasValue && od.Shipments != null && od.Shipments.Any())
             {
                 var shipment = od.Shipments.First();
-                var shipDesc = $"Giao hàng bởi: {shipment.Provider}, Mã vận đơn: {shipment.OrderCode ?? "WAITING FOR PAYMENT"}, Phí ship: {shipment.TotalFee:N0} VND, Trạng thái: {shipment.Status}";
+                var shipDesc =
+                    $"Giao hàng bởi: {shipment.Provider}, Mã vận đơn: {shipment.OrderCode ?? "WAITING FOR PAYMENT"}, Phí ship: {shipment.TotalFee:N0} VND, Trạng thái: {shipment.Status}";
                 shipmentDescriptions.Add(shipDesc);
                 totalShippingFee += shipment.TotalFee ?? 0;
 

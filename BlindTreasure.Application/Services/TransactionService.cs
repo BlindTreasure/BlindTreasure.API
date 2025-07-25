@@ -239,8 +239,8 @@ public class TransactionService : ITransactionService
     /// Mỗi InventoryItem đại diện cho một vật phẩm duy nhất, gắn với đúng OrderDetail và Shipment.
     /// </summary>
     private async Task CreateInventoryForOrderDetailsAsync(
-     Order order
-     )
+        Order order
+    )
     {
         // 1) Lấy và validate shippingAddress (1 lần)
         Address? shippingAddress = null;
@@ -286,7 +286,7 @@ public class TransactionService : ITransactionService
             for (var i = 0; i < od.Quantity; i++)
             {
                 Guid? shipmentId = null;
-                InventoryItemStatus status = InventoryItemStatus.Available;
+                var status = InventoryItemStatus.Available;
 
                 if (shipmentInfos != null && shipmentInfos.Count > 0)
                 {

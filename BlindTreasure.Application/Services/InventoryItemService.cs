@@ -57,7 +57,7 @@ public class InventoryItemService : IInventoryItemService
                         && i.IsFromBlindBox
                         && !i.IsDeleted
                         && i.SourceCustomerBlindBox != null
-                        && i.SourceCustomerBlindBox.BlindBoxId == blindBoxId).Include(x=> x.Shipment)
+                        && i.SourceCustomerBlindBox.BlindBoxId == blindBoxId).Include(x => x.Shipment)
             .Include(i => i.Product)
             .Include(i => i.SourceCustomerBlindBox)
             .AsNoTracking();
@@ -99,7 +99,7 @@ public class InventoryItemService : IInventoryItemService
             UserId = userId.Value,
             ProductId = dto.ProductId,
             Location = product.Seller.CompanyAddress ?? string.Empty,
-            Status =  dto.Status 
+            Status = dto.Status
         };
 
         if (dto.OrderDetailId.HasValue)
@@ -385,7 +385,7 @@ public class InventoryItemService : IInventoryItemService
     // C# BlindTreasure.Application\Services\InventoryItemService.cs
 
     public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShipmentForListItemsAsync(
-    RequestItemShipmentDTO request)
+        RequestItemShipmentDTO request)
     {
         var userId = _claimsService.CurrentUserId;
         if (request.InventoryItemIds == null || !request.InventoryItemIds.Any())

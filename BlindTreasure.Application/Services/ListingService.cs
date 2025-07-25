@@ -93,6 +93,15 @@ public class ListingService : IListingService
         {
             var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
             dto.Id = item.Id;
+
+            // Thêm thông tin về tên sản phẩm và hình ảnh
+            if (item.Product != null)
+            {
+                // Nếu Product đã được include, sử dụng trực tiếp
+                dto.ProductName = item.Product.Name;
+                dto.Image = item.Product.ImageUrls?.FirstOrDefault() ?? "";
+            }
+
             return dto;
         }).ToList();
     }
