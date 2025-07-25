@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250724084227_configCustomerFavourite2")]
-    partial class configCustomerFavourite2
+    [Migration("20250725140411_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -607,7 +607,7 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("CustomerBlindBox");
+                    b.ToTable("CustomerBlindBoxes");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.CustomerFavourite", b =>
@@ -661,7 +661,7 @@ namespace BlindTreasure.Domain.Migrations
                         .IsUnique()
                         .HasFilter("\"ProductId\" IS NOT NULL OR \"BlindBoxId\" IS NOT NULL");
 
-                    b.ToTable("CustomerFavourite", t =>
+                    b.ToTable("CustomerFavourites", t =>
                         {
                             t.HasCheckConstraint("CK_CustomerFavourite_OneTypeOnly", "(\"ProductId\" IS NOT NULL AND \"BlindBoxId\" IS NULL) OR (\"ProductId\" IS NULL AND \"BlindBoxId\" IS NOT NULL)");
                         });
@@ -1034,7 +1034,8 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<decimal>("TotalPrice")
                         .HasColumnType("numeric");
@@ -1711,7 +1712,8 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.Property<int?>("TotalFee")
                         .HasColumnType("integer");

@@ -26,7 +26,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<ProbabilityConfig> ProbabilityConfigs { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
     public DbSet<CustomerBlindBox> CustomerBlindBoxes { get; set; }
-    public DbSet<CustomerBlindBox> CustomerFavourites { get; set; }
+    public DbSet<CustomerFavourite> CustomerFavourites { get; set; }
     public DbSet<OtpVerification> OtpVerifications { get; set; }
     public DbSet<Listing> Listings { get; set; }
     public DbSet<CartItem> CartItems { get; set; }

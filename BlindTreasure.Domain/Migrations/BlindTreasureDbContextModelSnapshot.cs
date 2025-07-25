@@ -604,7 +604,7 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("CustomerBlindBox");
+                    b.ToTable("CustomerBlindBoxes");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.CustomerFavourite", b =>
@@ -658,7 +658,7 @@ namespace BlindTreasure.Domain.Migrations
                         .IsUnique()
                         .HasFilter("\"ProductId\" IS NOT NULL OR \"BlindBoxId\" IS NOT NULL");
 
-                    b.ToTable("CustomerFavourite", t =>
+                    b.ToTable("CustomerFavourites", t =>
                         {
                             t.HasCheckConstraint("CK_CustomerFavourite_OneTypeOnly", "(\"ProductId\" IS NOT NULL AND \"BlindBoxId\" IS NULL) OR (\"ProductId\" IS NULL AND \"BlindBoxId\" IS NOT NULL)");
                         });
