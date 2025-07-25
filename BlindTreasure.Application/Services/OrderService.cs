@@ -70,6 +70,7 @@ public class OrderService : IOrderService
                 _loggerService.Warn("Cart only contains BlindBox, cannot ship.");
                 throw ErrorHelper.BadRequest("Không thể giao hàng: Giỏ hàng không có sản phẩm vật lý nào để ship.");
             }
+
             var userId = _claimsService.CurrentUserId;
             var address = await _unitOfWork.Addresses.GetQueryable()
                 .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
@@ -93,7 +94,6 @@ public class OrderService : IOrderService
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
                 TotalPrice = i.TotalPrice
-               
             }),
             shippingAddressId,
             dto.PromotionId
@@ -123,6 +123,7 @@ public class OrderService : IOrderService
                 _loggerService.Warn("Cart only contains BlindBox, cannot ship.");
                 throw ErrorHelper.BadRequest("Không thể giao hàng: Giỏ hàng không có sản phẩm vật lý nào để ship.");
             }
+
             var userId = _claimsService.CurrentUserId;
             var address = await _unitOfWork.Addresses.GetQueryable()
                 .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
@@ -533,21 +534,21 @@ public class OrderService : IOrderService
                 UnitPrice = item.UnitPrice,
                 TotalPrice = item.TotalPrice,
                 Status = OrderDetailStatus.PENDING,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
             };
             order.OrderDetails.Add(orderDetail);
             orderDetails.Add(orderDetail);
 
             if (item.ProductId.HasValue)
             {
-                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value , x=> x.Seller);
+                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value, x => x.Seller);
                 product.Stock -= item.Quantity;
                 await _unitOfWork.Products.Update(product);
                 orderDetail.SellerId = product.SellerId;
             }
             else if (item.BlindBoxId.HasValue)
             {
-                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value, x=> x.SellerId);
+                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value, x => x.SellerId);
                 blindBox.TotalQuantity -= item.Quantity;
                 if (blindBox.TotalQuantity <= 0 && blindBox.Status == BlindBoxStatus.Approved)
                 {
@@ -614,7 +615,7 @@ public class OrderService : IOrderService
                         EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
                             ? ghnCreateResponse.ExpectedDeliveryTime
                             : DateTime.UtcNow.AddDays(3),
-                        Status = ShipmentStatus.WAITING_PAYMENT, // chưa thanh toán, chờ xác nhận
+                        Status = ShipmentStatus.WAITING_PAYMENT // chưa thanh toán, chờ xác nhận
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
 

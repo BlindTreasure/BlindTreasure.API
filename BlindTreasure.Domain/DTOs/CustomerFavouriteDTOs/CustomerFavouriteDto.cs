@@ -28,4 +28,3 @@ public class AddFavouriteRequestDto
 
     [Required] public FavouriteType Type { get; set; } // "Product" hoặc "BlindBox"
 }
-

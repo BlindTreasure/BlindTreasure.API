@@ -639,7 +639,6 @@ public class BlindTreasureDbContext : DbContext
 
         modelBuilder.Entity<Shipment>(entity =>
         {
-
             entity.Property(e => e.Status)
                 .HasConversion<string>()
                 .HasMaxLength(16);
@@ -648,7 +647,6 @@ public class BlindTreasureDbContext : DbContext
 
         modelBuilder.Entity<OrderDetail>(entity =>
         {
-
             entity.Property(e => e.Status)
                 .HasConversion<string>()
                 .HasMaxLength(50);

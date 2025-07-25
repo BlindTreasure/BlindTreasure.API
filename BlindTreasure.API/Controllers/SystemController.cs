@@ -263,7 +263,6 @@ public class SystemController : ControllerBase
 
             // Unbox từng hộp đã chọn
             foreach (var box in selectedBoxes)
-            {
                 try
                 {
                     _logger.Info($"[SeedUserInventory] Đang unbox hộp Id: {box.Id}");
@@ -275,12 +274,8 @@ public class SystemController : ControllerBase
                     _logger.Error($"[SeedUserInventory] Lỗi khi unbox hộp Id {box.Id}: {ex.Message}");
                     // Tiếp tục với hộp tiếp theo nếu có lỗi
                 }
-            }
 
-            if (!unboxResults.Any())
-            {
-                return BadRequest("Không thể unbox bất kỳ hộp nào. Vui lòng kiểm tra lại.");
-            }
+            if (!unboxResults.Any()) return BadRequest("Không thể unbox bất kỳ hộp nào. Vui lòng kiểm tra lại.");
 
             // Đếm số lượng inventory items của user sau khi unbox
             var inventoryCount = await _context.InventoryItems
@@ -294,7 +289,7 @@ public class SystemController : ControllerBase
                 UnboxedItems = unboxResults.Select(r => new
                 {
                     r.ProductId,
-                    r.Rarity,
+                    r.Rarity
                 })
             };
 
@@ -310,7 +305,7 @@ public class SystemController : ControllerBase
             _logger.Error($"[SeedUserInventory] Exception: {ex.Message}");
             return StatusCode(statusCode, errorResponse);
         }
-    } 
+    }
 
     [HttpDelete("clear-caching")]
     public async Task<IActionResult> ClearCaching()

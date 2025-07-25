@@ -23,8 +23,7 @@ public static class InventoryItemMapper
             OrderDetailId = item.OrderDetailId,
             OrderDetail = item.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(item.OrderDetail) : null,
             ShipmentId = item.ShipmentId,
-            Shipment = item.Shipment != null ? ShipmentDtoMapper.ToShipmentDto(item.Shipment) : null,
-
+            Shipment = item.Shipment != null ? ShipmentDtoMapper.ToShipmentDto(item.Shipment) : null
         };
     }
 }
