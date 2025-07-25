@@ -8,7 +8,6 @@ public class CustomerFavourite : BaseEntity
     // Có thể là Product hoặc BlindBox (chỉ một trong hai)
     public Guid? ProductId { get; set; }
     public Product? Product { get; set; }
-
     public Guid? BlindBoxId { get; set; }
     public BlindBox? BlindBox { get; set; }
 

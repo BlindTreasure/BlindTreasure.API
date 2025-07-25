@@ -1,13 +1,14 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerFavouriteDTOs;
+using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BlindTreasure.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/customer-favourites")]
 [Authorize(Policy = "CustomerPolicy")]
 public class CustomerFavouriteController : ControllerBase
 {
@@ -22,7 +23,7 @@ public class CustomerFavouriteController : ControllerBase
     /// Thêm sản phẩm/blind box vào danh sách yêu thích
     /// </summary>
     [HttpPost]
-    public async Task<IActionResult> AddToFavourite([FromBody] AddFavouriteRequestDto request)
+    public async Task<IActionResult> AddToFavourite([FromForm] AddFavouriteRequestDto request)
     {
         try
         {
@@ -31,9 +32,9 @@ public class CustomerFavouriteController : ControllerBase
         }
         catch (Exception ex)
         {
-            var statusCode = ex.Data["StatusCode"] as int? ?? 500;
-            return StatusCode(statusCode, ApiResult<CustomerFavouriteDto>.Failure(
-                statusCode.ToString(), ex.Message));
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
 
@@ -50,30 +51,34 @@ public class CustomerFavouriteController : ControllerBase
         }
         catch (Exception ex)
         {
-            var statusCode = ex.Data["StatusCode"] as int? ?? 500;
-            return StatusCode(statusCode, ApiResult.Failure(statusCode.ToString(), ex.Message));
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
 
-    /// <summary>
-    /// Lấy danh sách yêu thích của user hiện tại
-    /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetMyFavourites([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetMyFavourites([FromQuery] FavouriteQueryParameter parameter)
     {
         try
         {
-            var result = await _customerFavouriteService.GetUserFavouritesAsync(page, pageSize);
-            return Ok(ApiResult<FavouriteListResponseDto>.Success(result));
+            var result = await _customerFavouriteService.GetUserFavouritesAsync(parameter);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách sản phẩm yêu thích thành công."));
         }
         catch (Exception ex)
         {
-            var statusCode = ex.Data["StatusCode"] as int? ?? 500;
-            return StatusCode(statusCode, ApiResult<FavouriteListResponseDto>.Failure(
-                statusCode.ToString(), ex.Message));
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
-
     /// <summary>
     /// Kiểm tra sản phẩm/blind box có trong danh sách yêu thích không
     /// </summary>
@@ -87,8 +92,9 @@ public class CustomerFavouriteController : ControllerBase
         }
         catch (Exception ex)
         {
-            var statusCode = ex.Data["StatusCode"] as int? ?? 500;
-            return StatusCode(statusCode, ApiResult<bool>.Failure(statusCode.ToString(), ex.Message));
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
         }
     }
 }

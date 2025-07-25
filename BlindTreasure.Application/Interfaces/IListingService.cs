@@ -12,6 +12,5 @@ public interface IListingService
     Task<List<InventoryItemDto>> GetAvailableItemsForListingAsync();
     Task<Pagination<ListingDetailDto>> GetAllListingsAsync(ListingQueryParameter param);
     Task ReportListingAsync(Guid listingId, string reason);
-
     Task<ListingDetailDto> CloseListingAsync(Guid listingId);
 }
