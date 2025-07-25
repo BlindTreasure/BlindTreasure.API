@@ -1,4 +1,7 @@
-﻿using BlindTreasure.Domain.DTOs.ProductDTOs;
+﻿using BlindTreasure.Domain.DTOs.OrderDTOs;
+using BlindTreasure.Domain.DTOs.ProductDTOs;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
+using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.DTOs.InventoryItemDTOs;
@@ -10,7 +13,6 @@ public class InventoryItemDto
     public Guid ProductId { get; set; }
     public ProducDetailDto? Product { get; set; }
 
-    public int Quantity { get; set; }
     public string Location { get; set; }
     public InventoryItemStatus Status { get; set; } // enum
     public DateTime CreatedAt { get; set; }
@@ -18,4 +20,8 @@ public class InventoryItemDto
     public bool IsFromBlindBox { get; set; }
     public Guid? SourceCustomerBlindBoxId { get; set; }
     public HoldInfoDto? HoldInfo { get; set; }
+    public Guid? OrderDetailId { get; set; }
+    public OrderDetailDto? OrderDetail { get; set; }
+    public Guid? ShipmentId { get; set; }
+    public ShipmentDto? Shipment { get; set; }
 }

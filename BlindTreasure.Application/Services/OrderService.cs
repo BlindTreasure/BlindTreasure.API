@@ -93,6 +93,7 @@ public class OrderService : IOrderService
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
                 TotalPrice = i.TotalPrice
+               
             }),
             shippingAddressId,
             dto.PromotionId
@@ -532,21 +533,21 @@ public class OrderService : IOrderService
                 UnitPrice = item.UnitPrice,
                 TotalPrice = item.TotalPrice,
                 Status = OrderDetailStatus.PENDING,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
             };
             order.OrderDetails.Add(orderDetail);
             orderDetails.Add(orderDetail);
 
             if (item.ProductId.HasValue)
             {
-                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
+                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value , x=> x.Seller);
                 product.Stock -= item.Quantity;
                 await _unitOfWork.Products.Update(product);
                 orderDetail.SellerId = product.SellerId;
             }
             else if (item.BlindBoxId.HasValue)
             {
-                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value);
+                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value, x=> x.SellerId);
                 blindBox.TotalQuantity -= item.Quantity;
                 if (blindBox.TotalQuantity <= 0 && blindBox.Status == BlindBoxStatus.Approved)
                 {
@@ -613,7 +614,7 @@ public class OrderService : IOrderService
                         EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
                             ? ghnCreateResponse.ExpectedDeliveryTime
                             : DateTime.UtcNow.AddDays(3),
-                        Status = ShipmentStatus.WAITING_PAYMENT // chưa thanh toán, chờ xác nhận
+                        Status = ShipmentStatus.WAITING_PAYMENT, // chưa thanh toán, chờ xác nhận
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
 
@@ -716,5 +717,6 @@ public class OrderService : IOrderService
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
+        public Guid? SellerId { get; set; } // Thêm SellerId nếu cần
     }
 }

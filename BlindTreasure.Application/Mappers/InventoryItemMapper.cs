@@ -19,7 +19,12 @@ public static class InventoryItemMapper
             CreatedAt = item.CreatedAt,
             Product = item.Product != null ? ProductDtoMapper.ToProducDetailDto(item.Product) : null,
             IsFromBlindBox = item.IsFromBlindBox,
-            SourceCustomerBlindBoxId = item.SourceCustomerBlindBoxId
+            SourceCustomerBlindBoxId = item.SourceCustomerBlindBoxId,
+            OrderDetailId = item.OrderDetailId,
+            OrderDetail = item.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(item.OrderDetail) : null,
+            ShipmentId = item.ShipmentId,
+            Shipment = item.Shipment != null ? ShipmentDtoMapper.ToShipmentDto(item.Shipment) : null,
+
         };
     }
 }
