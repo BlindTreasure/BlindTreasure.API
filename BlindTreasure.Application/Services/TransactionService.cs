@@ -104,7 +104,7 @@ public class TransactionService : ITransactionService
             await CreateGhnOrdersAndUpdateShipments(order, orderDetails);
 
             // 2. Tạo inventory cho sản phẩm vật lý
-            await CreateInventoryForOrderDetailsAsync(order, orderDetails);
+            await CreateInventoryForOrderDetailsAsync(order);
 
             // 3. Tạo customer inventory cho BlindBox
             await CreateCustomerBlindBoxForOrderDetails(order, orderDetails);
@@ -239,8 +239,8 @@ public class TransactionService : ITransactionService
     /// Mỗi InventoryItem đại diện cho một vật phẩm duy nhất, gắn với đúng OrderDetail và Shipment.
     /// </summary>
     private async Task CreateInventoryForOrderDetailsAsync(
-        Order order,
-        List<OrderDetail> orderDetails)
+     Order order
+     )
     {
         // 1) Lấy và validate shippingAddress (1 lần)
         Address? shippingAddress = null;
@@ -258,13 +258,21 @@ public class TransactionService : ITransactionService
             }
         }
 
+        // Đảm bảo lấy đầy đủ các shipment cho từng order detail
+        var orderDetails = await _unitOfWork.OrderDetails
+            .GetQueryable()
+            .Where(od => od.OrderId == order.Id)
+            .Include(od => od.Shipments)
+            .Include(od => od.Seller)
+            .ToListAsync();
+
         // 2) Build map: OrderDetailId → List<Shipment>
         var shipmentsByDetail = orderDetails
             .Where(od => od.Shipments != null && od.Shipments.Any())
             .ToDictionary(
                 od => od.Id,
                 od => od.Shipments!
-                    .Select(s => new { s.Id, SellerId = s.OrderDetail.SellerId })
+                    .Select(s => new { s.Id, s.Status, SellerId = s.OrderDetail.SellerId })
                     .ToList()
             );
 
@@ -272,44 +280,38 @@ public class TransactionService : ITransactionService
         var createdCount = 0;
         foreach (var od in orderDetails.Where(od => od.ProductId.HasValue))
         {
-            // danh sách shipment ID cho orderDetail này (có thể rỗng)
             shipmentsByDetail.TryGetValue(od.Id, out var shipmentInfos);
+            _logger.Info($"[CreateInventory] OrderDetail {od.Id} có {shipmentInfos?.Count ?? 0} shipment.");
 
             for (var i = 0; i < od.Quantity; i++)
             {
-                // chọn shipmentId: nếu 1 thì 1, nếu nhiều thì theo seller match
                 Guid? shipmentId = null;
+                InventoryItemStatus status = InventoryItemStatus.Available;
+
                 if (shipmentInfos != null && shipmentInfos.Count > 0)
                 {
-                    if (shipmentInfos.Count == 1)
-                    {
-                        shipmentId = shipmentInfos[0].Id;
-                    }
-                    else
-                    {
-                        // match theo sellerId (nếu cần)
-                        var info = shipmentInfos
-                                       .FirstOrDefault(si => si.SellerId == od.SellerId)
-                                   ?? shipmentInfos[0];
-                        shipmentId = info.Id;
-                    }
+                    var selectedShipment = shipmentInfos.Count == 1
+                        ? shipmentInfos[0]
+                        : shipmentInfos.FirstOrDefault(si => si.SellerId == od.SellerId) ?? shipmentInfos[0];
+
+                    shipmentId = selectedShipment.Id;
+                    // Gắn trạng thái dựa trên shipment thực tế
+                    status = selectedShipment.Status == ShipmentStatus.PROCESSING
+                        ? InventoryItemStatus.Delivering
+                        : InventoryItemStatus.Available;
                 }
 
-                // build DTO
                 var dto = new CreateInventoryItemDto
                 {
                     ProductId = od.ProductId!.Value,
                     Quantity = 1,
-                    Location = string.Empty,
-                    Status = shipmentId.HasValue
-                        ? InventoryItemStatus.Delivering
-                        : InventoryItemStatus.Available,
+                    Location = od.Seller.CompanyAddress,
+                    Status = status,
                     ShipmentId = shipmentId,
                     OrderDetailId = od.Id,
                     AddressId = shippingAddress?.Id
                 };
 
-                // call service
                 await _inventoryItemService.CreateAsync(dto, order.UserId);
                 _logger.Success(
                     $"[HandlePayment] Created inventory #{++createdCount} " +

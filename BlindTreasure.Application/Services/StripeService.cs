@@ -177,7 +177,7 @@ public class StripeService : IStripeService
             SuccessUrl =
                 $"{_successRedirectUrl}?status=success&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             CancelUrl =
-                $"{_failRedirectUrl}?status=failed&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
+                $"{_failRedirectUrl}?status=pending&session_id={{CHECKOUT_SESSION_ID}}&order_id={orderId}",
             ExpiresAt = DateTime.UtcNow.AddMinutes(30),
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
