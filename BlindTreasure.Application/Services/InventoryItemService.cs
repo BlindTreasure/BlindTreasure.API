@@ -57,7 +57,7 @@ public class InventoryItemService : IInventoryItemService
                         && i.IsFromBlindBox
                         && !i.IsDeleted
                         && i.SourceCustomerBlindBox != null
-                        && i.SourceCustomerBlindBox.BlindBoxId == blindBoxId)
+                        && i.SourceCustomerBlindBox.BlindBoxId == blindBoxId).Include(x=> x.Shipment)
             .Include(i => i.Product)
             .Include(i => i.SourceCustomerBlindBox)
             .AsNoTracking();
@@ -99,7 +99,7 @@ public class InventoryItemService : IInventoryItemService
             UserId = userId.Value,
             ProductId = dto.ProductId,
             Location = product.Seller.CompanyAddress ?? string.Empty,
-            Status = Domain.Enums.InventoryItemStatus.Available
+            Status =  dto.Status 
         };
 
         if (dto.OrderDetailId.HasValue)
@@ -141,7 +141,7 @@ public class InventoryItemService : IInventoryItemService
             return InventoryItemMapper.ToInventoryItemDto(cached);
         }
 
-        var item = await _unitOfWork.InventoryItems.GetByIdAsync(id, i => i.Product);
+        var item = await _unitOfWork.InventoryItems.GetByIdAsync(id, i => i.Product, i => i.Shipment);
         if (item == null || item.IsDeleted)
             return null;
 
@@ -155,7 +155,7 @@ public class InventoryItemService : IInventoryItemService
         var userId = _claimsService.CurrentUserId;
 
         var query = _unitOfWork.InventoryItems.GetQueryable()
-            .Where(i => i.UserId == userId && !i.IsDeleted)
+            .Where(i => i.UserId == userId && !i.IsDeleted).Include(i => i.Shipment)
             .Include(i => i.Product)
             .ThenInclude(p => p.Category).AsNoTracking();
 
