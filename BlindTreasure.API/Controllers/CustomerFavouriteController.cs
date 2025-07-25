@@ -79,6 +79,7 @@ public class CustomerFavouriteController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
     /// <summary>
     /// Kiểm tra sản phẩm/blind box có trong danh sách yêu thích không
     /// </summary>

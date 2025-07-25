@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
+using BlindTreasure.Domain.DTOs.UnboxDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
@@ -14,14 +15,17 @@ namespace BlindTreasure.API.Controllers;
 public class SystemController : ControllerBase
 {
     private readonly ICacheService _cacheService;
+    private readonly IUnboxingService _unboxService;
     private readonly BlindTreasureDbContext _context;
     private readonly ILoggerService _logger;
 
-    public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService)
+    public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService,
+        IUnboxingService unboxService)
     {
         _context = context;
         _logger = logger;
         _cacheService = cacheService;
+        _unboxService = unboxService;
     }
 
     [HttpPost("seed-all-data")]
@@ -37,7 +41,7 @@ public class SystemController : ControllerBase
             await SeedCategories();
             await SeedProducts();
             await SeedBlindBoxes();
-            await SeedCounterStrikeCases();
+            // await SeedCounterStrikeCases();
             await SeedPromotions();
             await SeedPromotionParticipants();
             return Ok(ApiResult<object>.Success(new
@@ -173,8 +177,8 @@ public class SystemController : ControllerBase
         }
     }
 
-    [HttpPost("dev/seed-cs-cases")]
-    public async Task<IActionResult> SeedCasesForUsers([FromQuery] Guid? userId = null)
+    [HttpPost("dev/seed-user-inventoryItems")]
+    public async Task<IActionResult> SeedUserInventory([FromQuery] Guid? userId = null)
     {
         try
         {
@@ -185,11 +189,11 @@ public class SystemController : ControllerBase
                 user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
                 if (user == null)
                 {
-                    _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với Id: {userId}");
+                    _logger.Warn($"[SeedUserInventory] Không tìm thấy user với Id: {userId}");
                     return NotFound($"Không tìm thấy user với Id: {userId}");
                 }
 
-                _logger.Info($"[SeedUserBoxes] Bắt đầu seed CS case cho user Id: {userId}");
+                _logger.Info($"[SeedUserInventory] Bắt đầu seed inventory cho user Id: {userId}");
             }
             else
             {
@@ -197,49 +201,145 @@ public class SystemController : ControllerBase
                 user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
                 if (user == null)
                 {
-                    _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với email: {email}");
+                    _logger.Warn($"[SeedUserInventory] Không tìm thấy user với email: {email}");
                     return NotFound($"Không tìm thấy user với email: {email}");
                 }
 
-                _logger.Info($"[SeedUserBoxes] Bắt đầu seed CS case cho user: {email}");
+                _logger.Info($"[SeedUserInventory] Bắt đầu seed inventory cho user: {email}");
             }
 
-            // 2. Lấy tất cả blind box theo tên chứa "Counter-Strike Midnight Case"
-            var csBoxes = await _context.BlindBoxes
-                .Where(b => !b.IsDeleted
-                            && b.Status == BlindBoxStatus.Approved
-                            && b.Name.Contains("Counter-Strike Midnight Case"))
+            // Lấy tất cả CustomerBlindBoxes chưa mở của user
+            var unopenedBoxes = await _context.CustomerBlindBoxes
+                .Where(cb => cb.UserId == user.Id && !cb.IsOpened && !cb.IsDeleted)
                 .ToListAsync();
 
-            if (!csBoxes.Any()) return BadRequest("Không tìm thấy hộp Counter-Strike Midnight Case nào để seed.");
-
-            // 3. Seed cho user
-            var customerBoxes = csBoxes.Select(b => new CustomerBlindBox
+            if (unopenedBoxes.Count < 2)
             {
-                Id = Guid.NewGuid(),
-                UserId = user.Id,
-                BlindBoxId = b.Id,
-                IsOpened = false,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            }).ToList();
+                _logger.Warn(
+                    $"[SeedUserInventory] User {user.Email} không có đủ hộp chưa mở. Cần ít nhất 2 hộp, hiện có {unopenedBoxes.Count}");
+                return BadRequest(
+                    $"User không có đủ hộp chưa mở. Cần ít nhất 2 hộp, hiện có {unopenedBoxes.Count} hộp.");
+            }
 
-            await _context.CustomerBlindBoxes.AddRangeAsync(customerBoxes);
-            await _context.SaveChangesAsync();
+            // Random chọn 2 hộp
+            var random = new Random();
+            var selectedBoxes = unopenedBoxes
+                .OrderBy(_ => random.Next())
+                .Take(2)
+                .ToList();
 
-            _logger.Success($"[SeedUserBoxes] Đã seed {customerBoxes.Count} hộp CS cho user {user.Email}");
+            _logger.Info($"[SeedUserInventory] Đã chọn {selectedBoxes.Count} hộp để unbox");
 
-            return Ok(ApiResult<object>.Success("200",
-                $"Đã seed {customerBoxes.Count} hộp Counter-Strike Midnight Case cho user {user.Email}."));
+            var unboxResults = new List<UnboxResultDto>();
+
+            // Unbox từng hộp đã chọn
+            foreach (var box in selectedBoxes)
+                try
+                {
+                    _logger.Info($"[SeedUserInventory] Đang unbox hộp Id: {box.Id}");
+                    var result = await _unboxService.UnboxAsync(box.Id);
+                    unboxResults.Add(result);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error($"[SeedUserInventory] Lỗi khi unbox hộp Id {box.Id}: {ex.Message}");
+                    // Tiếp tục với hộp tiếp theo nếu có lỗi
+                }
+
+            if (!unboxResults.Any()) return BadRequest("Không thể unbox bất kỳ hộp nào. Vui lòng kiểm tra lại.");
+
+            // Đếm số lượng inventory items của user sau khi unbox
+            var inventoryCount = await _context.InventoryItems
+                .Where(ii => ii.UserId == user.Id && !ii.IsDeleted)
+                .CountAsync();
+
+            var response = new
+            {
+                Message = $"Đã seed {unboxResults.Count} inventory items cho user {user.Email}",
+                TotalInventoryItems = inventoryCount
+            };
+
+            _logger.Success(
+                $"[SeedUserInventory] Hoàn thành seed inventory cho user {user.Email}. Tổng cộng {inventoryCount} items trong kho.");
+
+            return Ok(ApiResult<object>.Success(response, "200", "Seed inventory thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-            _logger.Error($"[SeedUserBoxes] Exception: {ex.Message}");
+            _logger.Error($"[SeedUserInventory] Exception: {ex.Message}");
             return StatusCode(statusCode, errorResponse);
         }
     }
+
+    // [HttpPost("dev/seed-cs-cases")]
+    // public async Task<IActionResult> SeedCasesForUsers([FromQuery] Guid? userId = null)
+    // {
+    //     try
+    //     {
+    //         User? user;
+    //
+    //         if (userId.HasValue)
+    //         {
+    //             user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
+    //             if (user == null)
+    //             {
+    //                 _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với Id: {userId}");
+    //                 return NotFound($"Không tìm thấy user với Id: {userId}");
+    //             }
+    //
+    //             _logger.Info($"[SeedUserBoxes] Bắt đầu seed CS case cho user Id: {userId}");
+    //         }
+    //         else
+    //         {
+    //             var email = "trangiaphuc362003181@gmail.com";
+    //             user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+    //             if (user == null)
+    //             {
+    //                 _logger.Warn($"[SeedUserBoxes] Không tìm thấy user với email: {email}");
+    //                 return NotFound($"Không tìm thấy user với email: {email}");
+    //             }
+    //
+    //             _logger.Info($"[SeedUserBoxes] Bắt đầu seed CS case cho user: {email}");
+    //         }
+    //
+    //         // 2. Lấy tất cả blind box theo tên chứa "Counter-Strike Midnight Case"
+    //         var csBoxes = await _context.BlindBoxes
+    //             .Where(b => !b.IsDeleted
+    //                         && b.Status == BlindBoxStatus.Approved
+    //                         && b.Name.Contains("Counter-Strike Midnight Case"))
+    //             .ToListAsync();
+    //
+    //         if (!csBoxes.Any()) return BadRequest("Không tìm thấy hộp Counter-Strike Midnight Case nào để seed.");
+    //
+    //         // 3. Seed cho user
+    //         var customerBoxes = csBoxes.Select(b => new CustomerBlindBox
+    //         {
+    //             Id = Guid.NewGuid(),
+    //             UserId = user.Id,
+    //             BlindBoxId = b.Id,
+    //             IsOpened = false,
+    //             CreatedAt = DateTime.UtcNow,
+    //             UpdatedAt = DateTime.UtcNow
+    //         }).ToList();
+    //
+    //         await _context.CustomerBlindBoxes.AddRangeAsync(customerBoxes);
+    //         await _context.SaveChangesAsync();
+    //
+    //         _logger.Success($"[SeedUserBoxes] Đã seed {customerBoxes.Count} hộp CS cho user {user.Email}");
+    //
+    //         return Ok(ApiResult<object>.Success("200",
+    //             $"Đã seed {customerBoxes.Count} hộp Counter-Strike Midnight Case cho user {user.Email}."));
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+    //         var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+    //         _logger.Error($"[SeedUserBoxes] Exception: {ex.Message}");
+    //         return StatusCode(statusCode, errorResponse);
+    //     }
+    // }
 
     [HttpDelete("clear-caching")]
     public async Task<IActionResult> ClearCaching()
