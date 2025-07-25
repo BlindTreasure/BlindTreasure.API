@@ -104,7 +104,7 @@ public class TransactionService : ITransactionService
             await CreateGhnOrdersAndUpdateShipments(order, orderDetails);
 
             // 2. Tạo inventory cho sản phẩm vật lý
-            await CreateInventoryForOrderDetailsAsync(order, orderDetails);
+            await CreateInventoryForOrderDetailsAsync(order);
 
             // 3. Tạo customer inventory cho BlindBox
             await CreateCustomerBlindBoxForOrderDetails(order, orderDetails);
@@ -239,8 +239,8 @@ public class TransactionService : ITransactionService
     /// Mỗi InventoryItem đại diện cho một vật phẩm duy nhất, gắn với đúng OrderDetail và Shipment.
     /// </summary>
     private async Task CreateInventoryForOrderDetailsAsync(
-     Order order,
-     List<OrderDetail> orderDetails)
+     Order order
+     )
     {
         // 1) Lấy và validate shippingAddress (1 lần)
         Address? shippingAddress = null;
@@ -259,7 +259,7 @@ public class TransactionService : ITransactionService
         }
 
         // Đảm bảo lấy đầy đủ các shipment cho từng order detail
-        orderDetails = await _unitOfWork.OrderDetails
+        var orderDetails = await _unitOfWork.OrderDetails
             .GetQueryable()
             .Where(od => od.OrderId == order.Id)
             .Include(od => od.Shipments)
