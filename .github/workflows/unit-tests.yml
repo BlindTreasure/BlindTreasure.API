@@ -1,0 +1,367 @@
+name: 🧪 Unit Tests & Report Generation
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      generate_coverage:
+        description: 'Generate code coverage report'
+        required: false
+        default: 'true'
+        type: boolean
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_PATH: './BlindTreasure.API.sln'
+  TEST_PROJECT_PATH: './BlindTreaure.UnitTest/BlindTreaure.UnitTest.csproj'
+  TEST_RESULTS_DIR: './TestResults'
+  REPORTS_DIR: './Reports'
+
+jobs:
+  # Job 1: Build và validate
+  build-validation:
+    name: 🏗️ Build Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🔧 Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: 📦 Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: 🔄 Restore Dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+    - name: 🏗️ Build Solution
+      run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
+
+    - name: ✅ Build Status Check
+      run: echo "Build completed successfully ✅"
+
+  # Job 2: Database setup và dependencies
+  setup-infrastructure:
+    name: 🗄️ Infrastructure Setup
+    runs-on: ubuntu-latest
+    needs: build-validation
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: BlindTreasureDB_Test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 30s
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:6.2-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: 🔧 Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: 🗄️ Verify Database Connection
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client
+        PGPASSWORD=postgres psql -h localhost -U postgres -d BlindTreasureDB_Test -c "SELECT version();"
+
+    - name: 📊 Verify Redis Connection
+      run: |
+        sudo apt-get install -y redis-tools
+        redis-cli -h localhost ping
+
+    - name: ✅ Infrastructure Ready
+      run: echo "Infrastructure setup completed ✅"
+
+  # Job 3: Chạy unit tests
+  run-unit-tests:
+    name: 🧪 Execute Unit Tests
+    runs-on: ubuntu-latest
+    needs: [build-validation, setup-infrastructure]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: BlindTreasureDB_Test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:6.2-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      # Test environment variables
+      ConnectionStrings__DefaultConnection: "Host=localhost;Port=5432;Database=BlindTreasureDB_Test;Username=postgres;Password=postgres;Timeout=300"
+      ConnectionStrings__Redis: "localhost:6379,abortConnect=false"
+      ASPNETCORE_ENVIRONMENT: Testing
+      JWT__SecretKey: "TestSecretKey_ForUnitTestsOnly_AtLeast32Characters"
+      JWT__Issuer: "BlindTreasure_TestIssuer"
+      JWT__Audience: "BlindTreasure_TestAudience"
+
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: 🔧 Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: 📦 Restore Dependencies
+      run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+    - name: 🏗️ Build for Testing
+      run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
+
+    - name: 📁 Create Test Results Directory
+      run: |
+        mkdir -p ${{ env.TEST_RESULTS_DIR }}
+        mkdir -p ${{ env.REPORTS_DIR }}
+
+    - name: 🧪 Run Unit Tests with Coverage
+      run: |
+        dotnet test ${{ env.TEST_PROJECT_PATH }} \
+          --configuration Release \
+          --no-build \
+          --verbosity normal \
+          --logger "trx;LogFileName=test-results.trx" \
+          --logger "console;verbosity=detailed" \
+          --logger "junit;LogFileName=junit-results.xml" \
+          --collect:"XPlat Code Coverage" \
+          --results-directory ${{ env.TEST_RESULTS_DIR }} \
+          --settings ./coverlet.runsettings \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover \
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[*.Tests]*"
+
+    - name: 📊 Install Coverage Tools
+      if: inputs.generate_coverage == 'true' || github.event_name != 'workflow_dispatch'
+      run: |
+        dotnet tool install -g dotnet-reportgenerator-globaltool
+
+    - name: 📈 Generate Coverage Report
+      if: inputs.generate_coverage == 'true' || github.event_name != 'workflow_dispatch'
+      run: |
+        reportgenerator \
+          "-reports:${{ env.TEST_RESULTS_DIR }}/**/coverage.opencover.xml" \
+          "-targetdir:${{ env.REPORTS_DIR }}/coverage" \
+          "-reporttypes:Html;Cobertura;JsonSummary;Badges" \
+          "-title:BlindTreasure Unit Test Coverage" \
+          "-tag:${{ github.sha }}"
+
+    - name: 📄 Upload Test Results (Raw)
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: raw-test-results
+        path: |
+          ${{ env.TEST_RESULTS_DIR }}/
+          ${{ env.REPORTS_DIR }}/
+        retention-days: 30
+
+    # Job outputs for next step
+    outputs:
+      test-results-path: ${{ env.TEST_RESULTS_DIR }}
+      reports-path: ${{ env.REPORTS_DIR }}
+
+  # Job 4: Generate Excel Report
+  generate-excel-report:
+    name: 📊 Generate Excel Test Report
+    runs-on: ubuntu-latest
+    needs: run-unit-tests
+    if: always()
+
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: 📄 Download Test Results
+      uses: actions/download-artifact@v4
+      with:
+        name: raw-test-results
+        path: ./
+
+    - name: 🐍 Setup Python Environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: 📦 Install Python Dependencies
+      run: |
+        pip install --upgrade pip
+        pip install pandas openpyxl lxml beautifulsoup4 jinja2 matplotlib seaborn
+
+    - name: 📊 Generate Excel Test Report
+      run: |
+        python .github/scripts/convert-tests-to-excel.py \
+          --test-results-dir "./TestResults" \
+          --reports-dir "./Reports" \
+          --output-file "BlindTreasure-TestReport-${{ github.run_number }}.xlsx" \
+          --project-name "BlindTreasure API" \
+          --version "${{ github.sha }}" \
+          --branch "${{ github.ref_name }}" \
+          --build-number "${{ github.run_number }}"
+
+    - name: 📊 Upload Excel Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: excel-test-report
+        path: "BlindTreasure-TestReport-*.xlsx"
+        retention-days: 90
+
+    - name: 📈 Upload Coverage Report  
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-report
+        path: "./Reports/coverage/"
+        retention-days: 30
+
+  # Job 5: Publish Test Results
+  publish-test-results:
+    name: 📋 Publish Test Results
+    runs-on: ubuntu-latest
+    needs: [run-unit-tests, generate-excel-report]
+    if: always()
+
+    steps:
+    - name: 📄 Download Test Results
+      uses: actions/download-artifact@v4
+      with:
+        name: raw-test-results
+
+    - name: 📊 Publish Test Results Summary
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: 'Unit Test Results Summary'
+        path: './TestResults/*.trx'
+        reporter: dotnet-trx
+        fail-on-error: true
+        max-annotations: 50
+
+    - name: 📈 Comment Coverage on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          try {
+            const coverageFile = './Reports/coverage/Summary.json';
+            if (fs.existsSync(coverageFile)) {
+              const coverage = JSON.parse(fs.readFileSync(coverageFile, 'utf8'));
+              const lineRate = (coverage.summary.linecoverage * 100).toFixed(2);
+              const branchRate = (coverage.summary.branchcoverage * 100).toFixed(2);
+              
+              const comment = `## 📊 Test Coverage Report
+              
+              | Metric | Coverage |
+              |--------|----------|
+              | Line Coverage | ${lineRate}% |
+              | Branch Coverage | ${branchRate}% |
+              
+              📄 [Full Coverage Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+              `;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
+          } catch (error) {
+            console.log('Could not read coverage file:', error);
+          }
+
+  # Job 6: Cleanup và notification
+  cleanup-and-notify:
+    name: 🧹 Cleanup & Notification
+    runs-on: ubuntu-latest
+    needs: [run-unit-tests, generate-excel-report, publish-test-results]
+    if: always()
+
+    steps:
+    - name: 📊 Test Results Summary
+      run: |
+        echo "## 🧪 Test Execution Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Number**: ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Triggered by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Test Results**: [Download Excel Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+
+    - name: 🔔 Slack Notification (on failure)
+      if: failure() && github.ref == 'refs/heads/main'
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        channel: '#blindtreasure-ci'
+        text: |
+          🚨 Unit Tests Failed! 
+          Repository: ${{ github.repository }}
+          Branch: ${{ github.ref_name }}
+          Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: ✅ Success Notification
+      if: success()
+      run: |
+        echo "✅ All unit tests passed successfully!"
+        echo "📊 Excel report generated and uploaded as artifact"
+        echo "🎉 Build ${{ github.run_number }} completed successfully"
