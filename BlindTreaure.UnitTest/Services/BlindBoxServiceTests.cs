@@ -141,7 +141,7 @@ public class BlindBoxServiceTests
 
         var blindBoxItems = new List<BlindBoxItem>
         {
-            new BlindBoxItem
+            new()
             {
                 Id = Guid.NewGuid(),
                 BlindBoxId = blindBoxId,
@@ -431,12 +431,12 @@ public class BlindBoxServiceTests
             .ReturnsAsync((BlindBox)null!);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(
-            () => _blindBoxService.UpdateBlindBoxAsync(blindBoxId, dto));
-    
+        var exception =
+            await Assert.ThrowsAsync<Exception>(() => _blindBoxService.UpdateBlindBoxAsync(blindBoxId, dto));
+
         Assert.Equal(404, exception.Data["StatusCode"]);
     }
-   
+
     [Fact]
     public async Task UpdateBlindBoxAsync_ShouldThrowForbidden_WhenSellerNotOwnsBlindBox()
     {
@@ -464,9 +464,9 @@ public class BlindBoxServiceTests
             .ReturnsAsync((Seller)null!); // Seller not found because it's different user
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(
-            () => _blindBoxService.UpdateBlindBoxAsync(blindBoxId, dto));
-    
+        var exception =
+            await Assert.ThrowsAsync<Exception>(() => _blindBoxService.UpdateBlindBoxAsync(blindBoxId, dto));
+
         Assert.Equal(403, exception.Data["StatusCode"]);
     }
 
@@ -474,146 +474,147 @@ public class BlindBoxServiceTests
 
     #region AddItemsToBlindBoxAsync Tests
 
-   [Fact]
-public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
-{
-    // Arrange
-    var blindBoxId = Guid.NewGuid();
-    var productIds = Enumerable.Range(0, 6).Select(_ => Guid.NewGuid()).ToList();
-
-    var existingBlindBox = new BlindBox
+    [Fact]
+    public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
     {
-        Id = blindBoxId,
-        Name = "Test BlindBox",
-        Description = "Test Description",
-        SellerId = _sellerId,
-        Status = BlindBoxStatus.Draft,
-        IsDeleted = false,
-        BlindBoxItems = new List<BlindBoxItem>()
-    };
+        // Arrange
+        var blindBoxId = Guid.NewGuid();
+        var productIds = Enumerable.Range(0, 6).Select(_ => Guid.NewGuid()).ToList();
 
-    var seller = new Seller
-    {
-        Id = _sellerId,
-        UserId = _currentUserId,
-        Status = SellerStatus.Approved,
-        IsDeleted = false
-    };
-
-    // Tạo 6 items với 1 Secret và 5 Common, tổng weight = 100
-    var items = new List<BlindBoxItemRequestDto>
-    {
-        new BlindBoxItemRequestDto
+        var existingBlindBox = new BlindBox
         {
-            ProductId = productIds[0],
-            Quantity = 10,
-            Rarity = RarityName.Common,
-            Weight = 20
-        },
-        new BlindBoxItemRequestDto
+            Id = blindBoxId,
+            Name = "Test BlindBox",
+            Description = "Test Description",
+            SellerId = _sellerId,
+            Status = BlindBoxStatus.Draft,
+            IsDeleted = false,
+            BlindBoxItems = new List<BlindBoxItem>()
+        };
+
+        var seller = new Seller
         {
-            ProductId = productIds[1],
-            Quantity = 10,
-            Rarity = RarityName.Common,
-            Weight = 20
-        },
-        new BlindBoxItemRequestDto
+            Id = _sellerId,
+            UserId = _currentUserId,
+            Status = SellerStatus.Approved,
+            IsDeleted = false
+        };
+
+        // Tạo 6 items với 1 Secret và 5 Common, tổng weight = 100
+        var items = new List<BlindBoxItemRequestDto>
         {
-            ProductId = productIds[2],
-            Quantity = 10,
-            Rarity = RarityName.Common,
-            Weight = 20
-        },
-        new BlindBoxItemRequestDto
+            new()
+            {
+                ProductId = productIds[0],
+                Quantity = 10,
+                Rarity = RarityName.Common,
+                Weight = 20
+            },
+            new()
+            {
+                ProductId = productIds[1],
+                Quantity = 10,
+                Rarity = RarityName.Common,
+                Weight = 20
+            },
+            new()
+            {
+                ProductId = productIds[2],
+                Quantity = 10,
+                Rarity = RarityName.Common,
+                Weight = 20
+            },
+            new()
+            {
+                ProductId = productIds[3],
+                Quantity = 10,
+                Rarity = RarityName.Common,
+                Weight = 20
+            },
+            new()
+            {
+                ProductId = productIds[4],
+                Quantity = 10,
+                Rarity = RarityName.Rare,
+                Weight = 15
+            },
+            new()
+            {
+                ProductId = productIds[5],
+                Quantity = 5,
+                Rarity = RarityName.Secret, // Phải có ít nhất 1 Secret
+                Weight = 5
+            }
+        };
+
+        // Tạo products tương ứng
+        var products = productIds.Select((id, index) => new Product
         {
-            ProductId = productIds[3],
-            Quantity = 10,
-            Rarity = RarityName.Common,
-            Weight = 20
-        },
-        new BlindBoxItemRequestDto
-        {
-            ProductId = productIds[4],
-            Quantity = 10,
-            Rarity = RarityName.Rare,
-            Weight = 15
-        },
-        new BlindBoxItemRequestDto
-        {
-            ProductId = productIds[5],
-            Quantity = 5,
-            Rarity = RarityName.Secret, // Phải có ít nhất 1 Secret
-            Weight = 5
-        }
-    };
+            Id = id,
+            Name = $"Product {index + 1}",
+            SellerId = _sellerId,
+            Stock = 100,
+            Status = ProductStatus.Active,
+            IsDeleted = false
+        }).ToList();
 
-    // Tạo products tương ứng
-    var products = productIds.Select((id, index) => new Product
-    {
-        Id = id,
-        Name = $"Product {index + 1}",
-        SellerId = _sellerId,
-        Stock = 100,
-        Status = ProductStatus.Active,
-        IsDeleted = false
-    }).ToList();
+        // Setup mocks
+        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(
+                It.IsAny<Expression<Func<BlindBox, bool>>>(),
+                It.IsAny<Expression<Func<BlindBox, object>>[]>()))
+            .ReturnsAsync(existingBlindBox);
 
-    // Setup mocks
-    _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(
-            It.IsAny<Expression<Func<BlindBox, bool>>>(),
-            It.IsAny<Expression<Func<BlindBox, object>>[]>()))
-        .ReturnsAsync(existingBlindBox);
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
+            .ReturnsAsync(seller);
 
-    _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
-        .ReturnsAsync(seller);
+        _productRepoMock.Setup(x => x.GetAllAsync(
+                It.IsAny<Expression<Func<Product, bool>>>(),
+                It.IsAny<Expression<Func<Product, object>>[]>()))
+            .ReturnsAsync(products);
 
-    _productRepoMock.Setup(x => x.GetAllAsync(
-            It.IsAny<Expression<Func<Product, bool>>>(),
-            It.IsAny<Expression<Func<Product, object>>[]>()))
-        .ReturnsAsync(products);
+        _blindBoxItemRepoMock.Setup(x => x.AddRangeAsync(It.IsAny<List<BlindBoxItem>>()))
+            .Returns(Task.CompletedTask);
 
-    _blindBoxItemRepoMock.Setup(x => x.AddRangeAsync(It.IsAny<List<BlindBoxItem>>()))
-        .Returns(Task.CompletedTask);
+        _rarityConfigRepoMock.Setup(x => x.AddRangeAsync(It.IsAny<List<RarityConfig>>()))
+            .Returns(Task.CompletedTask);
 
-    _rarityConfigRepoMock.Setup(x => x.AddRangeAsync(It.IsAny<List<RarityConfig>>()))
-        .Returns(Task.CompletedTask);
+        _blindBoxRepoMock.Setup(x => x.Update(It.IsAny<BlindBox>()))
+            .ReturnsAsync(true);
 
-    _blindBoxRepoMock.Setup(x => x.Update(It.IsAny<BlindBox>()))
-        .ReturnsAsync(true);
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
 
-    _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
-        .ReturnsAsync(1);
+        // Mock GetBlindBoxByIdAsync call at the end
+        _cacheServiceMock.Setup(x => x.GetAsync<BlindBoxDetailDto>(It.IsAny<string>()))
+            .ReturnsAsync((BlindBoxDetailDto)null!);
 
-    // Mock GetBlindBoxByIdAsync call at the end
-    _cacheServiceMock.Setup(x => x.GetAsync<BlindBoxDetailDto>(It.IsAny<string>()))
-        .ReturnsAsync((BlindBoxDetailDto)null!);
+        _blindBoxItemRepoMock.Setup(x => x.GetQueryable())
+            .Returns(new List<BlindBoxItem>().AsQueryable().BuildMock());
 
-    _blindBoxItemRepoMock.Setup(x => x.GetQueryable())
-        .Returns(new List<BlindBoxItem>().AsQueryable().BuildMock());
+        _mapperServiceMock.Setup(x => x.Map<BlindBox, BlindBoxDetailDto>(It.IsAny<BlindBox>()))
+            .Returns(new BlindBoxDetailDto { Id = blindBoxId, Name = "Test BlindBox" });
 
-    _mapperServiceMock.Setup(x => x.Map<BlindBox, BlindBoxDetailDto>(It.IsAny<BlindBox>()))
-        .Returns(new BlindBoxDetailDto { Id = blindBoxId, Name = "Test BlindBox" });
+        _cacheServiceMock
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
 
-    _cacheServiceMock
-        .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
-        .Returns(Task.CompletedTask);
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
 
-    _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
-        .Returns(Task.CompletedTask);
+        _cacheServiceMock.Setup(x => x.RemoveByPatternAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
 
-    _cacheServiceMock.Setup(x => x.RemoveByPatternAsync(It.IsAny<string>()))
-        .Returns(Task.CompletedTask);
+        // Act
+        var result = await _blindBoxService.AddItemsToBlindBoxAsync(blindBoxId, items);
 
-    // Act
-    var result = await _blindBoxService.AddItemsToBlindBoxAsync(blindBoxId, items);
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(blindBoxId, result.Id);
+        _blindBoxItemRepoMock.Verify(x => x.AddRangeAsync(It.IsAny<List<BlindBoxItem>>()), Times.Once);
+        _rarityConfigRepoMock.Verify(x => x.AddRangeAsync(It.IsAny<List<RarityConfig>>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
+    }
 
-    // Assert
-    Assert.NotNull(result);
-    Assert.Equal(blindBoxId, result.Id);
-    _blindBoxItemRepoMock.Verify(x => x.AddRangeAsync(It.IsAny<List<BlindBoxItem>>()), Times.Once);
-    _rarityConfigRepoMock.Verify(x => x.AddRangeAsync(It.IsAny<List<RarityConfig>>()), Times.Once);
-    _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
-}
     [Fact]
     public async Task AddItemsToBlindBoxAsync_ShouldThrowBadRequest_WhenInvalidItemCount()
     {
@@ -621,7 +622,7 @@ public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
         var blindBoxId = Guid.NewGuid();
         var items = new List<BlindBoxItemRequestDto>
         {
-            new BlindBoxItemRequestDto
+            new()
             {
                 ProductId = Guid.NewGuid(),
                 Quantity = 10,
@@ -646,8 +647,7 @@ public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
         var items = new List<BlindBoxItemRequestDto>();
 
         // Create 6 items but no Secret rarity
-        for (int i = 0; i < 6; i++)
-        {
+        for (var i = 0; i < 6; i++)
             items.Add(new BlindBoxItemRequestDto
             {
                 ProductId = Guid.NewGuid(),
@@ -655,7 +655,6 @@ public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
                 Rarity = RarityName.Common, // All Common, no Secret
                 Weight = 100 / 6 // Equal weight distribution
             });
-        }
 
         var existingBlindBox = new BlindBox
         {
@@ -689,17 +688,17 @@ public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
             .Where(e => e.Data["StatusCode"].Equals(400) &&
                         e.Message.Contains("ít nhất 1 item Secret"));
     }
+
     [Fact]
     public async Task AddItemsToBlindBoxAsync_ShouldThrowForbidden_WhenSellerNotOwnsBlindBox()
     {
         // Arrange
         var blindBoxId = Guid.NewGuid();
         var differentSellerId = Guid.NewGuid();
-    
+
         // Tạo 6 items hợp lệ để vượt qua validation đầu tiên
         var items = new List<BlindBoxItemRequestDto>();
-        for (int i = 0; i < 6; i++)
-        {
+        for (var i = 0; i < 6; i++)
             items.Add(new BlindBoxItemRequestDto
             {
                 ProductId = Guid.NewGuid(),
@@ -707,7 +706,6 @@ public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
                 Rarity = i == 5 ? RarityName.Secret : RarityName.Common, // Item cuối là Secret
                 Weight = i == 5 ? 10 : 18 // Tổng = 18*5 + 10 = 100
             });
-        }
 
         var existingBlindBox = new BlindBox
         {
@@ -728,13 +726,161 @@ public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
             .ReturnsAsync((Seller)null!); // Seller not found
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(
-            () => _blindBoxService.AddItemsToBlindBoxAsync(blindBoxId, items));
-    
+        var exception =
+            await Assert.ThrowsAsync<Exception>(() => _blindBoxService.AddItemsToBlindBoxAsync(blindBoxId, items));
+
         // Sử dụng ExceptionUtils nếu muốn
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         Assert.Equal(403, statusCode);
-    
+    }
+
+    #endregion
+
+    #region SubmitBlindBoxAsync Tests
+
+    [Fact]
+    public async Task SubmitBlindBoxAsync_ShouldSubmitBlindBox_WhenBlindBoxHasValidItems()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var blindBoxId = Guid.NewGuid();
+
+        // Tạo product trước và đảm bảo ID giống nhau
+        var product = new Product
+        {
+            Id = productId,
+            Name = "Test Product",
+            SellerId = _sellerId,
+            Stock = 100,
+            Status = ProductStatus.Active
+        };
+
+        var existingBlindBox = new BlindBox
+        {
+            Id = blindBoxId,
+            Name = "Test BlindBox",
+            Description = "Test Description",
+            SellerId = _sellerId,
+            Status = BlindBoxStatus.Draft,
+            IsDeleted = false,
+            BlindBoxItems = new List<BlindBoxItem>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxId = blindBoxId,
+                    ProductId = productId, // Sử dụng ID giống với product đã tạo
+                    Quantity = 10,
+                    DropRate = 50m,
+                    IsDeleted = false
+                }
+            }
+        };
+
+        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(
+                It.IsAny<Expression<Func<BlindBox, bool>>>(),
+                It.IsAny<Expression<Func<BlindBox, object>>[]>()))
+            .ReturnsAsync(existingBlindBox);
+
+        // Thiết lập mock để trả về đúng sản phẩm với ID trùng khớp
+        _productRepoMock.Setup(x => x.GetAllAsync(
+                It.Is<Expression<Func<Product, bool>>>(expr => true),
+                It.IsAny<Expression<Func<Product, object>>[]>()))
+            .ReturnsAsync(new List<Product> { product });
+
+        _blindBoxRepoMock.Setup(x => x.Update(It.IsAny<BlindBox>()))
+            .ReturnsAsync(true);
+
+        _productRepoMock.Setup(x => x.UpdateRange(It.IsAny<List<Product>>()))
+            .ReturnsAsync(true);
+
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+
+        // Mock GetBlindBoxByIdAsync call at the end
+        _cacheServiceMock.Setup(x => x.GetAsync<BlindBoxDetailDto>(It.IsAny<string>()))
+            .ReturnsAsync((BlindBoxDetailDto)null!);
+
+        _blindBoxItemRepoMock.Setup(x => x.GetQueryable())
+            .Returns(existingBlindBox.BlindBoxItems.AsQueryable().BuildMock());
+
+        _mapperServiceMock.Setup(x => x.Map<BlindBox, BlindBoxDetailDto>(It.IsAny<BlindBox>()))
+            .Returns(new BlindBoxDetailDto { Id = blindBoxId, Name = "Test BlindBox" });
+
+        _cacheServiceMock
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _blindBoxService.SubmitBlindBoxAsync(blindBoxId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Id.Should().Be(blindBoxId);
+        _blindBoxRepoMock.Verify(x => x.Update(It.IsAny<BlindBox>()), Times.Once);
+        _productRepoMock.Verify(x => x.UpdateRange(It.IsAny<List<Product>>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task SubmitBlindBoxAsync_ShouldThrowBadRequest_WhenProductHasInsufficientStock()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var blindBoxId = Guid.NewGuid();
+
+        // Tạo product với ID cụ thể và stock thấp
+        var product = new Product
+        {
+            Id = productId,
+            Name = "Test Product",
+            SellerId = _sellerId,
+            Stock = 20, // Stock không đủ
+            Status = ProductStatus.Active
+        };
+
+        var existingBlindBox = new BlindBox
+        {
+            Id = blindBoxId,
+            Name = "Test BlindBox",
+            Description = "Test Description",
+            SellerId = _sellerId,
+            Status = BlindBoxStatus.Draft,
+            IsDeleted = false,
+            BlindBoxItems = new List<BlindBoxItem>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    BlindBoxId = blindBoxId,
+                    ProductId = productId, // Sử dụng ID trùng với product đã tạo
+                    Quantity = 50, // Yêu cầu nhiều hơn stock
+                    DropRate = 50m,
+                    IsDeleted = false
+                }
+            }
+        };
+
+        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(
+                It.IsAny<Expression<Func<BlindBox, bool>>>(),
+                It.IsAny<Expression<Func<BlindBox, object>>[]>()))
+            .ReturnsAsync(existingBlindBox);
+
+        // Thiết lập mock để trả về đúng sản phẩm có ID trùng khớp
+        _productRepoMock.Setup(x => x.GetAllAsync(
+                It.Is<Expression<Func<Product, bool>>>(expr => true),
+                It.IsAny<Expression<Func<Product, object>>[]>()))
+            .ReturnsAsync(new List<Product> { product });
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => _blindBoxService.SubmitBlindBoxAsync(blindBoxId));
+
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        Assert.Equal(400, statusCode);
+        Assert.Contains("không đủ tồn kho", exception.Message.ToLower());
     }
 
     #endregion
