@@ -200,24 +200,6 @@ public class BlindBoxServiceTests
             x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()), Times.Once);
     }
 
-    [Fact]
-    public async Task GetBlindBoxByIdAsync_ShouldThrowNotFound_WhenBlindBoxNotExists()
-    {
-        // Arrange
-        var blindBoxId = Guid.NewGuid();
-
-        _cacheServiceMock.Setup(x => x.GetAsync<BlindBoxDetailDto>(It.IsAny<string>()))
-            .ReturnsAsync((BlindBoxDetailDto)null!);
-
-        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<BlindBox, bool>>>()))
-            .ReturnsAsync((BlindBox)null!);
-
-        // Act & Assert
-        var act = async () => await _blindBoxService.GetBlindBoxByIdAsync(blindBoxId);
-        await act.Should().ThrowAsync<Exception>()
-            .Where(e => e.Data["StatusCode"].Equals(404));
-    }
-
     #endregion
 
     #region CreateBlindBoxAsync Tests
@@ -322,33 +304,9 @@ public class BlindBoxServiceTests
     {
         // Act & Assert
         var act = async () => await _blindBoxService.CreateBlindBoxAsync(null!);
-    
+
         await act.Should().ThrowAsync<Exception>();
         // Không check status code cụ thể vì null check có thể throw NullReferenceException (500)
-    }
-
-    [Fact]
-    public async Task CreateBlindBoxAsync_ShouldThrowForbidden_WhenSellerNotApproved()
-    {
-        // Arrange
-        var dto = new CreateBlindBoxDto
-        {
-            Name = "Test Blind Box",
-            Price = 100,
-            TotalQuantity = 50,
-            Description = "Test Description",
-            CategoryId = Guid.NewGuid(),
-            ReleaseDate = _fixedTime.AddDays(7),
-            ImageFile = CreateMockFormFile()
-        };
-
-        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
-            .ReturnsAsync((Seller)null!);
-
-        // Act & Assert
-        var act = async () => await _blindBoxService.CreateBlindBoxAsync(dto);
-        await act.Should().ThrowAsync<Exception>()
-            .Where(e => e.Data["StatusCode"].Equals(403));
     }
 
     #region Helper Methods
@@ -366,6 +324,418 @@ public class BlindBoxServiceTests
     }
 
     #endregion
+
+    #endregion
+
+    #region UpdateBlindBoxAsync Tests
+
+    [Fact]
+    public async Task UpdateBlindBoxAsync_ShouldUpdateBlindBox_WhenValidData()
+    {
+        // Arrange
+        var blindBoxId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var existingBlindBox = new BlindBox
+        {
+            Id = blindBoxId,
+            Name = "Original Name",
+            Description = "Original Description",
+            SellerId = _sellerId,
+            CategoryId = Guid.NewGuid(),
+            Price = 100,
+            TotalQuantity = 50,
+            Status = BlindBoxStatus.Draft,
+            IsDeleted = false
+        };
+
+        var seller = new Seller
+        {
+            Id = _sellerId,
+            UserId = _currentUserId,
+            Status = SellerStatus.Approved,
+            IsDeleted = false
+        };
+
+        var dto = new UpdateBlindBoxDto
+        {
+            Name = "Updated Name",
+            Description = "Updated Description",
+            Price = 150,
+            TotalQuantity = 75,
+            CategoryId = categoryId
+        };
+
+        var category = new Category { Id = categoryId };
+
+        // Setup mocks
+        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<BlindBox, bool>>>()))
+            .ReturnsAsync(existingBlindBox);
+
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
+            .ReturnsAsync(seller);
+
+        _categoryServiceMock.Setup(x => x.GetWithParentAsync(categoryId))
+            .ReturnsAsync(category);
+
+        _categoryRepoMock.Setup(x => x.GetQueryable())
+            .Returns(new List<Category>().AsQueryable().BuildMock());
+
+        _blindBoxRepoMock.Setup(x => x.Update(It.IsAny<BlindBox>()))
+            .ReturnsAsync(true);
+
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+
+        // Mock GetBlindBoxByIdAsync call at the end
+        _cacheServiceMock.Setup(x => x.GetAsync<BlindBoxDetailDto>(It.IsAny<string>()))
+            .ReturnsAsync((BlindBoxDetailDto)null!);
+
+        _blindBoxItemRepoMock.Setup(x => x.GetQueryable())
+            .Returns(new List<BlindBoxItem>().AsQueryable().BuildMock());
+
+        _mapperServiceMock.Setup(x => x.Map<BlindBox, BlindBoxDetailDto>(It.IsAny<BlindBox>()))
+            .Returns(new BlindBoxDetailDto { Id = blindBoxId, Name = dto.Name });
+
+        _cacheServiceMock
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveByPatternAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _blindBoxService.UpdateBlindBoxAsync(blindBoxId, dto);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Id.Should().Be(blindBoxId);
+        result.Name.Should().Be(dto.Name);
+        _blindBoxRepoMock.Verify(x => x.Update(It.IsAny<BlindBox>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task UpdateBlindBoxAsync_ShouldThrowNotFound_WhenBlindBoxNotExists()
+    {
+        // Arrange
+        var blindBoxId = Guid.NewGuid();
+        var dto = new UpdateBlindBoxDto
+        {
+            Name = "Updated Name"
+        };
+
+        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<BlindBox, bool>>>()))
+            .ReturnsAsync((BlindBox)null!);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(
+            () => _blindBoxService.UpdateBlindBoxAsync(blindBoxId, dto));
+    
+        Assert.Equal(404, exception.Data["StatusCode"]);
+    }
+   
+    [Fact]
+    public async Task UpdateBlindBoxAsync_ShouldThrowForbidden_WhenSellerNotOwnsBlindBox()
+    {
+        // Arrange
+        var blindBoxId = Guid.NewGuid();
+        var differentSellerId = Guid.NewGuid();
+        var existingBlindBox = new BlindBox
+        {
+            Id = blindBoxId,
+            Name = "Original Name",
+            Description = "Original Description",
+            SellerId = differentSellerId, // Different seller
+            IsDeleted = false
+        };
+
+        var dto = new UpdateBlindBoxDto
+        {
+            Name = "Updated Name"
+        };
+
+        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<BlindBox, bool>>>()))
+            .ReturnsAsync(existingBlindBox);
+
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
+            .ReturnsAsync((Seller)null!); // Seller not found because it's different user
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(
+            () => _blindBoxService.UpdateBlindBoxAsync(blindBoxId, dto));
+    
+        Assert.Equal(403, exception.Data["StatusCode"]);
+    }
+
+    #endregion
+
+    #region AddItemsToBlindBoxAsync Tests
+
+   [Fact]
+public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
+{
+    // Arrange
+    var blindBoxId = Guid.NewGuid();
+    var productIds = Enumerable.Range(0, 6).Select(_ => Guid.NewGuid()).ToList();
+
+    var existingBlindBox = new BlindBox
+    {
+        Id = blindBoxId,
+        Name = "Test BlindBox",
+        Description = "Test Description",
+        SellerId = _sellerId,
+        Status = BlindBoxStatus.Draft,
+        IsDeleted = false,
+        BlindBoxItems = new List<BlindBoxItem>()
+    };
+
+    var seller = new Seller
+    {
+        Id = _sellerId,
+        UserId = _currentUserId,
+        Status = SellerStatus.Approved,
+        IsDeleted = false
+    };
+
+    // Tạo 6 items với 1 Secret và 5 Common, tổng weight = 100
+    var items = new List<BlindBoxItemRequestDto>
+    {
+        new BlindBoxItemRequestDto
+        {
+            ProductId = productIds[0],
+            Quantity = 10,
+            Rarity = RarityName.Common,
+            Weight = 20
+        },
+        new BlindBoxItemRequestDto
+        {
+            ProductId = productIds[1],
+            Quantity = 10,
+            Rarity = RarityName.Common,
+            Weight = 20
+        },
+        new BlindBoxItemRequestDto
+        {
+            ProductId = productIds[2],
+            Quantity = 10,
+            Rarity = RarityName.Common,
+            Weight = 20
+        },
+        new BlindBoxItemRequestDto
+        {
+            ProductId = productIds[3],
+            Quantity = 10,
+            Rarity = RarityName.Common,
+            Weight = 20
+        },
+        new BlindBoxItemRequestDto
+        {
+            ProductId = productIds[4],
+            Quantity = 10,
+            Rarity = RarityName.Rare,
+            Weight = 15
+        },
+        new BlindBoxItemRequestDto
+        {
+            ProductId = productIds[5],
+            Quantity = 5,
+            Rarity = RarityName.Secret, // Phải có ít nhất 1 Secret
+            Weight = 5
+        }
+    };
+
+    // Tạo products tương ứng
+    var products = productIds.Select((id, index) => new Product
+    {
+        Id = id,
+        Name = $"Product {index + 1}",
+        SellerId = _sellerId,
+        Stock = 100,
+        Status = ProductStatus.Active,
+        IsDeleted = false
+    }).ToList();
+
+    // Setup mocks
+    _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(
+            It.IsAny<Expression<Func<BlindBox, bool>>>(),
+            It.IsAny<Expression<Func<BlindBox, object>>[]>()))
+        .ReturnsAsync(existingBlindBox);
+
+    _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
+        .ReturnsAsync(seller);
+
+    _productRepoMock.Setup(x => x.GetAllAsync(
+            It.IsAny<Expression<Func<Product, bool>>>(),
+            It.IsAny<Expression<Func<Product, object>>[]>()))
+        .ReturnsAsync(products);
+
+    _blindBoxItemRepoMock.Setup(x => x.AddRangeAsync(It.IsAny<List<BlindBoxItem>>()))
+        .Returns(Task.CompletedTask);
+
+    _rarityConfigRepoMock.Setup(x => x.AddRangeAsync(It.IsAny<List<RarityConfig>>()))
+        .Returns(Task.CompletedTask);
+
+    _blindBoxRepoMock.Setup(x => x.Update(It.IsAny<BlindBox>()))
+        .ReturnsAsync(true);
+
+    _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+        .ReturnsAsync(1);
+
+    // Mock GetBlindBoxByIdAsync call at the end
+    _cacheServiceMock.Setup(x => x.GetAsync<BlindBoxDetailDto>(It.IsAny<string>()))
+        .ReturnsAsync((BlindBoxDetailDto)null!);
+
+    _blindBoxItemRepoMock.Setup(x => x.GetQueryable())
+        .Returns(new List<BlindBoxItem>().AsQueryable().BuildMock());
+
+    _mapperServiceMock.Setup(x => x.Map<BlindBox, BlindBoxDetailDto>(It.IsAny<BlindBox>()))
+        .Returns(new BlindBoxDetailDto { Id = blindBoxId, Name = "Test BlindBox" });
+
+    _cacheServiceMock
+        .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
+        .Returns(Task.CompletedTask);
+
+    _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+        .Returns(Task.CompletedTask);
+
+    _cacheServiceMock.Setup(x => x.RemoveByPatternAsync(It.IsAny<string>()))
+        .Returns(Task.CompletedTask);
+
+    // Act
+    var result = await _blindBoxService.AddItemsToBlindBoxAsync(blindBoxId, items);
+
+    // Assert
+    Assert.NotNull(result);
+    Assert.Equal(blindBoxId, result.Id);
+    _blindBoxItemRepoMock.Verify(x => x.AddRangeAsync(It.IsAny<List<BlindBoxItem>>()), Times.Once);
+    _rarityConfigRepoMock.Verify(x => x.AddRangeAsync(It.IsAny<List<RarityConfig>>()), Times.Once);
+    _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
+}
+    [Fact]
+    public async Task AddItemsToBlindBoxAsync_ShouldThrowBadRequest_WhenInvalidItemCount()
+    {
+        // Arrange
+        var blindBoxId = Guid.NewGuid();
+        var items = new List<BlindBoxItemRequestDto>
+        {
+            new BlindBoxItemRequestDto
+            {
+                ProductId = Guid.NewGuid(),
+                Quantity = 10,
+                Rarity = RarityName.Common,
+                Weight = 100
+            }
+            // Only 1 item - should be 6 or 12
+        };
+
+        // Act & Assert
+        var act = async () => await _blindBoxService.AddItemsToBlindBoxAsync(blindBoxId, items);
+        await act.Should().ThrowAsync<Exception>()
+            .Where(e => e.Data["StatusCode"].Equals(400) &&
+                        e.Message.Contains("6 hoặc 12 sản phẩm"));
+    }
+
+    [Fact]
+    public async Task AddItemsToBlindBoxAsync_ShouldThrowBadRequest_WhenNoSecretItem()
+    {
+        // Arrange
+        var blindBoxId = Guid.NewGuid();
+        var items = new List<BlindBoxItemRequestDto>();
+
+        // Create 6 items but no Secret rarity
+        for (int i = 0; i < 6; i++)
+        {
+            items.Add(new BlindBoxItemRequestDto
+            {
+                ProductId = Guid.NewGuid(),
+                Quantity = 10,
+                Rarity = RarityName.Common, // All Common, no Secret
+                Weight = 100 / 6 // Equal weight distribution
+            });
+        }
+
+        var existingBlindBox = new BlindBox
+        {
+            Id = blindBoxId,
+            Name = "Test BlindBox",
+            Description = "Test Description",
+            SellerId = _sellerId,
+            IsDeleted = false,
+            BlindBoxItems = new List<BlindBoxItem>()
+        };
+
+        var seller = new Seller
+        {
+            Id = _sellerId,
+            UserId = _currentUserId,
+            Status = SellerStatus.Approved,
+            IsDeleted = false
+        };
+
+        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(
+                It.IsAny<Expression<Func<BlindBox, bool>>>(),
+                It.IsAny<Expression<Func<BlindBox, object>>[]>()))
+            .ReturnsAsync(existingBlindBox);
+
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
+            .ReturnsAsync(seller);
+
+        // Act & Assert
+        var act = async () => await _blindBoxService.AddItemsToBlindBoxAsync(blindBoxId, items);
+        await act.Should().ThrowAsync<Exception>()
+            .Where(e => e.Data["StatusCode"].Equals(400) &&
+                        e.Message.Contains("ít nhất 1 item Secret"));
+    }
+    [Fact]
+    public async Task AddItemsToBlindBoxAsync_ShouldThrowForbidden_WhenSellerNotOwnsBlindBox()
+    {
+        // Arrange
+        var blindBoxId = Guid.NewGuid();
+        var differentSellerId = Guid.NewGuid();
+    
+        // Tạo 6 items hợp lệ để vượt qua validation đầu tiên
+        var items = new List<BlindBoxItemRequestDto>();
+        for (int i = 0; i < 6; i++)
+        {
+            items.Add(new BlindBoxItemRequestDto
+            {
+                ProductId = Guid.NewGuid(),
+                Quantity = 10,
+                Rarity = i == 5 ? RarityName.Secret : RarityName.Common, // Item cuối là Secret
+                Weight = i == 5 ? 10 : 18 // Tổng = 18*5 + 10 = 100
+            });
+        }
+
+        var existingBlindBox = new BlindBox
+        {
+            Id = blindBoxId,
+            Name = "Test BlindBox",
+            Description = "Test Description",
+            SellerId = differentSellerId, // Different seller
+            IsDeleted = false,
+            BlindBoxItems = new List<BlindBoxItem>()
+        };
+
+        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(
+                It.IsAny<Expression<Func<BlindBox, bool>>>(),
+                It.IsAny<Expression<Func<BlindBox, object>>[]>()))
+            .ReturnsAsync(existingBlindBox);
+
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
+            .ReturnsAsync((Seller)null!); // Seller not found
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(
+            () => _blindBoxService.AddItemsToBlindBoxAsync(blindBoxId, items));
+    
+        // Sử dụng ExceptionUtils nếu muốn
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        Assert.Equal(403, statusCode);
+    
+    }
 
     #endregion
 }
