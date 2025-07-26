@@ -2,11 +2,13 @@
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services;
+using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using FluentAssertions;
+using Microsoft.AspNetCore.Http;
 using MockQueryable.Moq;
 using Moq;
 
@@ -215,6 +217,155 @@ public class BlindBoxServiceTests
         await act.Should().ThrowAsync<Exception>()
             .Where(e => e.Data["StatusCode"].Equals(404));
     }
+
+    #endregion
+
+    #region CreateBlindBoxAsync Tests
+
+    [Fact]
+    public async Task CreateBlindBoxAsync_ShouldCreateBlindBox_WhenValidData()
+    {
+        // Arrange
+        var categoryId = Guid.NewGuid();
+        var dto = new CreateBlindBoxDto
+        {
+            Name = "Test Blind Box",
+            Price = 100,
+            TotalQuantity = 50,
+            Description = "Test Description",
+            CategoryId = categoryId,
+            ReleaseDate = _fixedTime.AddDays(7),
+            ImageFile = CreateMockFormFile()
+        };
+
+        var seller = new Seller
+        {
+            Id = _sellerId,
+            UserId = _currentUserId,
+            Status = SellerStatus.Approved,
+            IsDeleted = false
+        };
+
+        var category = new Category { Id = categoryId };
+        var createdBlindBox = new BlindBox
+        {
+            Id = Guid.NewGuid(),
+            Name = dto.Name,
+            Description = dto.Description,
+            SellerId = _sellerId,
+            CategoryId = categoryId,
+            Price = dto.Price,
+            TotalQuantity = dto.TotalQuantity,
+            Status = BlindBoxStatus.Draft,
+            ReleaseDate = _fixedTime.AddDays(7),
+            IsDeleted = false
+        };
+
+        // Setup mocks
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
+            .ReturnsAsync(seller);
+
+        _categoryServiceMock.Setup(x => x.GetWithParentAsync(categoryId))
+            .ReturnsAsync(category);
+
+        _categoryRepoMock.Setup(x => x.GetQueryable())
+            .Returns(new List<Category>().AsQueryable().BuildMock());
+
+        _blobServiceMock.Setup(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<Stream>()))
+            .Returns(Task.CompletedTask);
+
+        _blobServiceMock.Setup(x => x.GetPreviewUrlAsync(It.IsAny<string>()))
+            .ReturnsAsync("https://example.com/image.jpg");
+
+        _blindBoxRepoMock.Setup(x => x.AddAsync(It.IsAny<BlindBox>()))
+            .ReturnsAsync(createdBlindBox);
+
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+
+        // Mock recursive call to GetBlindBoxByIdAsync
+        _cacheServiceMock.SetupSequence(x => x.GetAsync<BlindBoxDetailDto>(It.IsAny<string>()))
+            .ReturnsAsync((BlindBoxDetailDto)null!) // First call in CreateBlindBoxAsync
+            .ReturnsAsync((BlindBoxDetailDto)null!); // Second call in GetBlindBoxByIdAsync
+
+        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<BlindBox, bool>>>()))
+            .ReturnsAsync(createdBlindBox);
+
+        _blindBoxItemRepoMock.Setup(x => x.GetQueryable())
+            .Returns(new List<BlindBoxItem>().AsQueryable().BuildMock());
+
+        _mapperServiceMock.Setup(x => x.Map<BlindBox, BlindBoxDetailDto>(It.IsAny<BlindBox>()))
+            .Returns(new BlindBoxDetailDto { Id = createdBlindBox.Id, Name = dto.Name });
+
+        _cacheServiceMock
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveByPatternAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _blindBoxService.CreateBlindBoxAsync(dto);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Name.Should().Be(dto.Name);
+        _blindBoxRepoMock.Verify(x => x.AddAsync(It.IsAny<BlindBox>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task CreateBlindBoxAsync_ShouldThrowException_WhenDataIsNull()
+    {
+        // Act & Assert
+        var act = async () => await _blindBoxService.CreateBlindBoxAsync(null!);
+    
+        await act.Should().ThrowAsync<Exception>();
+        // Không check status code cụ thể vì null check có thể throw NullReferenceException (500)
+    }
+
+    [Fact]
+    public async Task CreateBlindBoxAsync_ShouldThrowForbidden_WhenSellerNotApproved()
+    {
+        // Arrange
+        var dto = new CreateBlindBoxDto
+        {
+            Name = "Test Blind Box",
+            Price = 100,
+            TotalQuantity = 50,
+            Description = "Test Description",
+            CategoryId = Guid.NewGuid(),
+            ReleaseDate = _fixedTime.AddDays(7),
+            ImageFile = CreateMockFormFile()
+        };
+
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
+            .ReturnsAsync((Seller)null!);
+
+        // Act & Assert
+        var act = async () => await _blindBoxService.CreateBlindBoxAsync(dto);
+        await act.Should().ThrowAsync<Exception>()
+            .Where(e => e.Data["StatusCode"].Equals(403));
+    }
+
+    #region Helper Methods
+
+    private static IFormFile CreateMockFormFile()
+    {
+        var content = "Hello World from a Fake File"u8.ToArray();
+        var stream = new MemoryStream(content);
+        var file = new FormFile(stream, 0, stream.Length, "Data", "dummy.jpg")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "image/jpeg"
+        };
+        return file;
+    }
+
+    #endregion
 
     #endregion
 }
