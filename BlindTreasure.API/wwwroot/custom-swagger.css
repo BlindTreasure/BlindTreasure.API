@@ -1,75 +1,112 @@
 ﻿/* Base Styles and Background Pattern */
+:root {
+  /* Light Theme Variables */
+  --light-bg: #ffffff;
+  --light-text: #212121;
+  --light-border: #e2e8f0;
+  --light-input-bg: #ffffff;
+  --light-hover: #f1f5f9;
+  --light-accent: #3b82f6;
+  --light-secondary: #64748b;
+  
+  /* Dark Theme Variables */
+  --dark-bg: #0f172a;
+  --dark-panel: #1e293b;
+  --dark-surface: #334155;
+  --dark-border: #475569;
+  --dark-text: #f1f5f9;
+  --dark-secondary-text: #94a3b8;
+  --dark-hover: #475569;
+  --dark-accent: #3b82f6;
+  
+  /* Method colors */
+  --method-get: #0ea5e9;
+  --method-post: #22c55e;
+  --method-put: #f59e0b;
+  --method-delete: #ef4444;
+  --method-patch: #8b5cf6;
+}
+
+.swagger-ui {
+  position: relative;
+}
+
 .swagger-ui::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -1;
-    background-color: #e5e5f7;
-    opacity: 0.05;
-    background-image: linear-gradient(#4551f7 1.4px, transparent 1.4px), linear-gradient(to right, #4551f7 1.4px, #e5e5f7 1.4px);
-    background-size: 28px 28px;
+  content: "";
+  position: fixed; /* Changed from absolute to fixed */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  background-color: #e5e5f7;
+  opacity: 0.05;
+  background-image: linear-gradient(#4551f7 1.4px, transparent 1.4px), linear-gradient(to right, #4551f7 1.4px, #e5e5f7 1.4px);
+  background-size: 28px 28px;
+  pointer-events: none; /* Ensures the background doesn't interfere with clicking */
 }
 
-/* Add smooth transition for theme switching */
-.swagger-ui,
-.swagger-ui *,
-.swagger-ui *:before,
-.swagger-ui *:after {
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+/* Add smooth transition for theme switching - limit to important properties only */
+.swagger-ui * {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Dark Mode Styles */
+/* Dark Mode Base */
 .swagger-ui.dark-mode {
-    background-color: #0f172a; /* Darker background */
-    color: #f1f5f9; /* Light text with better contrast */
+  background-color: var(--dark-bg);
+  color: var(--dark-text);
 }
 
-.swagger-ui.dark-mode * {
-    color: #f1f5f9 !important; /* Ensure all text is light with better contrast */
+/* Apply color to all elements in dark mode using a single selector */
+.swagger-ui.dark-mode .opblock,
+.swagger-ui.dark-mode .opblock *,
+.swagger-ui.dark-mode .model,
+.swagger-ui.dark-mode .model *,
+.swagger-ui.dark-mode .responses-inner,
+.swagger-ui.dark-mode .responses-inner *,
+.swagger-ui.dark-mode h1,
+.swagger-ui.dark-mode h2,
+.swagger-ui.dark-mode h3,
+.swagger-ui.dark-mode h4,
+.swagger-ui.dark-mode h5,
+.swagger-ui.dark-mode h6,
+.swagger-ui.dark-mode p,
+.swagger-ui.dark-mode table,
+.swagger-ui.dark-mode .parameter__name,
+.swagger-ui.dark-mode .parameter__type {
+  color: var(--dark-text);
 }
 
-.swagger-ui.dark-mode .opblock {
-    background-color: #1e293b; /* Darker background for sections */
-    border-radius: 6px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-    margin-bottom: 10px;
+/* Group common styles for dark mode blocks */
+.swagger-ui.dark-mode .opblock,
+.swagger-ui.dark-mode .model,
+.swagger-ui.dark-mode pre,
+.swagger-ui.dark-mode code,
+.swagger-ui.dark-mode .dialog-ux .modal {
+  background-color: var(--dark-panel);
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
 }
 
+/* Dark mode summary sections */
 .swagger-ui.dark-mode .opblock-summary {
-    background-color: #334155; /* Summary section background */
-    border-radius: 6px 6px 0 0;
-    padding: 10px;
+  background-color: var(--dark-surface);
+  border-radius: 6px 6px 0 0;
+  padding: 10px;
 }
 
 .swagger-ui.dark-mode .opblock-summary:hover {
-    background-color: #475569; /* Hover effect */
+  background-color: var(--dark-hover);
 }
 
-/* Method colors in dark mode */
-.swagger-ui.dark-mode .opblock-get {
-    border-color: #0ea5e9 !important;
-}
+/* Method colors in dark mode - consolidated */
+.swagger-ui.dark-mode .opblock-get { border-color: var(--method-get); }
+.swagger-ui.dark-mode .opblock-post { border-color: var(--method-post); }
+.swagger-ui.dark-mode .opblock-put { border-color: var(--method-put); }
+.swagger-ui.dark-mode .opblock-delete { border-color: var(--method-delete); }
+.swagger-ui.dark-mode .opblock-patch { border-color: var(--method-patch); }
 
-.swagger-ui.dark-mode .opblock-post {
-    border-color: #22c55e !important;
-}
-
-.swagger-ui.dark-mode .opblock-put {
-    border-color: #f59e0b !important;
-}
-
-.swagger-ui.dark-mode .opblock-delete {
-    border-color: #ef4444 !important;
-}
-
-.swagger-ui.dark-mode .opblock-patch {
-    border-color: #8b5cf6 !important;
-}
-
-/* Form controls */
+/* Form controls in dark mode - consolidated */
 .swagger-ui.dark-mode input[type="text"],
 .swagger-ui.dark-mode input[type="password"],
 .swagger-ui.dark-mode input[type="search"],
@@ -77,186 +114,138 @@
 .swagger-ui.dark-mode input[type="number"],
 .swagger-ui.dark-mode select,
 .swagger-ui.dark-mode textarea {
-    background-color: #1e293b;
-    color: #f1f5f9;
-    border: 1px solid #475569;
-    border-radius: 6px;
-    padding: 8px 12px;
+  background-color: var(--dark-panel);
+  color: var(--dark-text);
+  border: 1px solid var(--dark-border);
+  border-radius: 6px;
+  padding: 8px 12px;
 }
 
-.swagger-ui.dark-mode input[type="text"]:focus,
-.swagger-ui.dark-mode input[type="password"]:focus,
-.swagger-ui.dark-mode input[type="search"]:focus,
-.swagger-ui.dark-mode input[type="email"]:focus,
-.swagger-ui.dark-mode input[type="number"]:focus,
+/* Focus state for inputs */
+.swagger-ui.dark-mode input:focus,
 .swagger-ui.dark-mode select:focus,
 .swagger-ui.dark-mode textarea:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
-    outline: none;
+  border-color: var(--dark-accent);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  outline: none;
 }
 
 /* Checkboxes */
 .swagger-ui.dark-mode input[type="checkbox"] {
-    accent-color: #3b82f6;
+  accent-color: var(--dark-accent);
 }
 
-/* Buttons */
+/* Buttons - consolidated */
 .swagger-ui.dark-mode .btn {
-    background-color: #334155;
-    color: #f1f5f9;
-    border: 1px solid #475569;
-    border-radius: 6px;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-weight: 500;
+  background-color: var(--dark-surface);
+  color: var(--dark-text);
+  border: 1px solid var(--dark-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 500;
 }
 
 .swagger-ui.dark-mode .btn:hover {
-    background-color: #475569;
+  background-color: var(--dark-hover);
 }
 
+/* Special buttons */
 .swagger-ui.dark-mode .btn.execute {
-    background-color: #3b82f6 !important;
-    border-color: #2563eb !important;
-}
-
-.swagger-ui.dark-mode .btn.execute:hover {
-    background-color: #2563eb !important;
+  background-color: var(--dark-accent);
+  border-color: var(--dark-accent);
 }
 
 .swagger-ui.dark-mode .btn.cancel {
-    background-color: #64748b !important;
-    border-color: #475569 !important;
-}
-
-/* Headers and Titles */
-.swagger-ui.dark-mode h1,
-.swagger-ui.dark-mode h2,
-.swagger-ui.dark-mode h3,
-.swagger-ui.dark-mode h4,
-.swagger-ui.dark-mode h5,
-.swagger-ui.dark-mode h6 {
-    color: #f1f5f9 !important;
-}
-
-.swagger-ui.dark-mode .title {
-    color: #3b82f6 !important;
+  background-color: var(--dark-secondary-text);
+  border-color: var(--dark-border);
 }
 
 /* Links */
 .swagger-ui.dark-mode a {
-    color: #38bdf8 !important; /* Brighter blue for links */
-    text-decoration: none;
+  color: #38bdf8;
+  text-decoration: none;
 }
 
 .swagger-ui.dark-mode a:hover {
-    color: #7dd3fc !important; /* Lighter blue for hover */
-    text-decoration: underline;
+  color: #7dd3fc;
+  text-decoration: underline;
 }
 
-/* Code blocks */
-.swagger-ui.dark-mode pre,
-.swagger-ui.dark-mode code {
-    background-color: #334155 !important; /* Dark background for code blocks */
-    color: #f1f5f9 !important;
-    border-radius: 4px;
-    padding: 8px;
-    font-family: 'Fira Code', monospace;
-    border: 1px solid #475569;
-}
-
-/* Tables */
+/* Tables - consolidated */
 .swagger-ui.dark-mode table {
-    background-color: #1e293b !important;
-    color: #f1f5f9 !important;
+  background-color: var(--dark-panel);
 }
 
 .swagger-ui.dark-mode table thead tr {
-    background-color: #334155 !important;
-    color: #f1f5f9 !important;
-}
-
-.swagger-ui.dark-mode table tbody tr {
-    background-color: #1e293b !important;
-    color: #f1f5f9 !important;
+  background-color: var(--dark-surface);
 }
 
 .swagger-ui.dark-mode table tbody tr:nth-child(odd) {
-    background-color: #283548 !important;
+  background-color: #283548;
 }
 
 /* Models */
-.swagger-ui.dark-mode .model {
-    background-color: #1e293b !important;
-    border-radius: 6px;
-    border: 1px solid #475569;
-}
-
+.swagger-ui.dark-mode .model,
 .swagger-ui.dark-mode .model-container {
-    background-color: #1e293b !important;
-    border-radius: 6px;
+  background-color: var(--dark-panel);
+  border-radius: 6px;
+  border: 1px solid var(--dark-border);
 }
 
 /* Parameter row */
 .swagger-ui.dark-mode .parameters-col_description {
-    border-left: 1px solid #475569 !important;
+  border-left: 1px solid var(--dark-border);
 }
 
 .swagger-ui.dark-mode .parameter__name {
-    color: #f1f5f9 !important;
-    font-weight: 600 !important;
+  font-weight: 600;
 }
 
 .swagger-ui.dark-mode .parameter__type {
-    color: #94a3b8 !important;
-}
-
-/* Response section */
-.swagger-ui.dark-mode .responses-inner {
-    background-color: #1e293b !important;
-}
-
-.swagger-ui.dark-mode .response-col_status {
-    color: #f1f5f9 !important;
+  color: var(--dark-secondary-text);
 }
 
 /* Authorize button */
 .swagger-ui.dark-mode .btn.authorize {
-    background-color: transparent !important;
-    border-color: #3b82f6 !important;
-    color: #3b82f6 !important;
+  background-color: transparent;
+  border-color: var(--dark-accent);
+  color: var(--dark-accent);
 }
 
 .swagger-ui.dark-mode .btn.authorize svg {
-    fill: #3b82f6 !important;
+  fill: var(--dark-accent);
 }
 
 /* Authorization dialog */
-.swagger-ui.dark-mode .dialog-ux .modal {
-    background-color: #1e293b !important;
-    border: 1px solid #475569 !important;
-    border-radius: 6px !important;
-}
-
 .swagger-ui.dark-mode .dialog-ux .modal-ux-header {
-    background-color: #334155 !important;
-    border-bottom: 1px solid #475569 !important;
-}
-
-.swagger-ui.dark-mode .dialog-ux .modal-ux-header h3 {
-    color: #f1f5f9 !important;
-}
-
-.swagger-ui.dark-mode .dialog-ux .modal-ux-content {
-    background-color: #1e293b !important;
-}
-
-.swagger-ui.dark-mode .scopes-table {
-    background-color: #1e293b !important;
+  background-color: var(--dark-surface);
+  border-bottom: 1px solid var(--dark-border);
 }
 
 .swagger-ui.dark-mode .scopes-table th {
-    background-color: #334155 !important;
-    color: #f1f5f9 !important;
+  background-color: var(--dark-surface);
+}
+
+/* Improve performance with hardware acceleration */
+.swagger-ui * {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Add prefers-color-scheme media query for automatic theme based on system preference */
+@media (prefers-color-scheme: dark) {
+  .swagger-ui.auto-theme {
+    background-color: var(--dark-bg);
+    color: var(--dark-text);
+  }
+  
+  /* Apply the same dark mode styles to auto-theme */
+  .swagger-ui.auto-theme .opblock,
+  .swagger-ui.auto-theme .model,
+  .swagger-ui.auto-theme pre,
+  .swagger-ui.auto-theme code {
+    background-color: var(--dark-panel);
+    color: var(--dark-text);
+  }
 }
