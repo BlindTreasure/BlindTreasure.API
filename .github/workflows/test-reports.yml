@@ -9,7 +9,7 @@ on:
 jobs:
   generate-reports:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure' }}
     permissions:
       contents: read
       pull-requests: write
@@ -21,12 +21,14 @@ jobs:
       
     - name: Download test artifacts
       uses: actions/download-artifact@v4
+      continue-on-error: true
       with:
         name: test-results
         path: ./TestResults/
         
     - name: Download coverage artifacts
       uses: actions/download-artifact@v4
+      continue-on-error: true
       with:
         name: coverage-report
         path: ./coveragereport/
@@ -40,7 +42,28 @@ jobs:
       run: |
         pip install pandas openpyxl xlsxwriter lxml beautifulsoup4
         
+    - name: Check if artifacts exist
+      run: |
+        echo "Checking for test artifacts..."
+        if [ -d "./TestResults" ] && [ "$(ls -A ./TestResults 2>/dev/null)" ]; then
+          echo "✅ Test artifacts found"
+          echo "HAS_TEST_ARTIFACTS=true" >> $GITHUB_ENV
+        else
+          echo "⚠️ No test artifacts found"
+          echo "HAS_TEST_ARTIFACTS=false" >> $GITHUB_ENV
+        fi
+        
+        echo "Checking for coverage artifacts..."
+        if [ -d "./coveragereport" ] && [ "$(ls -A ./coveragereport 2>/dev/null)" ]; then
+          echo "✅ Coverage artifacts found"
+          echo "HAS_COVERAGE_ARTIFACTS=true" >> $GITHUB_ENV
+        else
+          echo "⚠️ No coverage artifacts found"
+          echo "HAS_COVERAGE_ARTIFACTS=false" >> $GITHUB_ENV
+        fi
+        
     - name: Create Excel coverage report
+      if: env.HAS_TEST_ARTIFACTS == 'true' || env.HAS_COVERAGE_ARTIFACTS == 'true'
       run: |
         cat > generate_excel_report.py << 'EOF'
         import pandas as pd
@@ -317,6 +340,7 @@ jobs:
         python generate_excel_report.py
       
     - name: Extract coverage for summary
+      if: env.HAS_COVERAGE_ARTIFACTS == 'true'
       run: |
         # Method 1: Try từ Summary.txt (dễ parse hơn)
         if [ -f "./coveragereport/Summary.txt" ]; then
@@ -361,6 +385,7 @@ jobs:
         fi
       
     - name: Display detailed report summary
+      if: env.HAS_TEST_ARTIFACTS == 'true' || env.HAS_COVERAGE_ARTIFACTS == 'true'
       run: |
         echo "## 📊 Detailed Test Reports Generated" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -388,7 +413,7 @@ jobs:
       
     - name: Upload Excel coverage reports
       uses: actions/upload-artifact@v4
-      if: always()
+      if: always() && (env.HAS_TEST_ARTIFACTS == 'true' || env.HAS_COVERAGE_ARTIFACTS == 'true')
       with:
         name: excel-coverage-report
         path: ./coveragereport/Coverage_Report_*.xlsx
@@ -396,8 +421,21 @@ jobs:
         
     - name: Upload detailed coverage reports
       uses: actions/upload-artifact@v4
-      if: always()
+      if: always() && (env.HAS_TEST_ARTIFACTS == 'true' || env.HAS_COVERAGE_ARTIFACTS == 'true')
       with:
         name: detailed-coverage-report
         path: ./coveragereport/**/*
-        retention-days: 30 
+        retention-days: 30
+        
+    - name: Handle no artifacts case
+      if: always() && env.HAS_TEST_ARTIFACTS == 'false' && env.HAS_COVERAGE_ARTIFACTS == 'false'
+      run: |
+        echo "## ⚠️ No Test Artifacts Available" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "No test results or coverage artifacts were found to generate reports." >> $GITHUB_STEP_SUMMARY
+        echo "This could happen if:" >> $GITHUB_STEP_SUMMARY
+        echo "- The unit tests workflow failed before generating artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Artifacts have expired" >> $GITHUB_STEP_SUMMARY
+        echo "- There was an issue with the test execution" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Please check the unit tests workflow for more details." >> $GITHUB_STEP_SUMMARY 
