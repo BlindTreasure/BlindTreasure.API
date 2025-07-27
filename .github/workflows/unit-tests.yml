@@ -14,16 +14,30 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          nuget-${{ runner.os }}-
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
+        cache: true
+        cache-dependency-path: '**/*.csproj'
+        # cache: true sẽ tự động cache nuget nếu dùng setup-dotnet@v4
         
     - name: Restore dependencies
       run: dotnet restore BlindTreasure.API.sln
       
     - name: Build
       run: dotnet build BlindTreasure.API.sln --no-restore --configuration Release
+      
+    - name: Restore tools
+      run: dotnet tool restore
       
     - name: Run unit tests
       run: |
@@ -35,12 +49,9 @@ jobs:
           --results-directory ./TestResults/ \
           --logger "trx;LogFileName=test-results.trx"
       
-    - name: Install ReportGenerator
-      run: dotnet tool install -g dotnet-reportgenerator-globaltool
-      
     - name: Generate coverage report
       run: |
-        reportgenerator \
+        ~/.dotnet/tools/reportgenerator \
           -reports:"./TestResults/**/coverage.cobertura.xml" \
           -targetdir:"./coveragereport" \
           -reporttypes:"Html;Badges;TextSummary;JsonSummary"
@@ -70,17 +81,15 @@ jobs:
       if: always()
       with:
         name: coverage-report
-        path: |
-          ./coveragereport/**/*
-          
+        path: ./coveragereport/**/*
+        
     - name: Upload test results
       uses: actions/upload-artifact@v4
       if: always()
       with:
         name: test-results
-        path: |
-          ./TestResults/**/*
-          
+        path: ./TestResults/**/*
+        
     - name: Check coverage threshold
       run: |
         COVERAGE=$(grep -o 'Line coverage: [0-9]*\.*[0-9]*%' ./coveragereport/Summary.txt | grep -o '[0-9]*\.*[0-9]*')
