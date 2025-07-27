@@ -96,13 +96,13 @@ public class CategoryServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.GetByIdAsync(categoryId));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(404);
     }
 
     #endregion
-    
+
     #region GetAllAsync Tests
 
     [Fact]
@@ -149,12 +149,13 @@ public class CategoryServiceTests
         result.Should().NotBeNull();
         result.Should().HaveCount(2);
         result.TotalCount.Should().Be(2);
-        _cacheServiceMock.Verify(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()), Times.Once);
+        _cacheServiceMock.Verify(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()),
+            Times.Once);
     }
 
     #endregion
 
-     #region CreateAsync Tests
+    #region CreateAsync Tests
 
     [Fact]
     public async Task CreateAsync_ShouldCreateCategory_WhenValidData()
@@ -230,13 +231,13 @@ public class CategoryServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.CreateAsync(dto));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(409);
     }
 
     #endregion
-    
+
     #region UpdateAsync Tests
 
     [Fact]
@@ -313,14 +314,14 @@ public class CategoryServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.UpdateAsync(categoryId, dto));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(403);
     }
 
     #endregion
 
-       #region DeleteAsync Tests
+    #region DeleteAsync Tests
 
     [Fact]
     public async Task DeleteAsync_ShouldDeleteCategory_WhenValidAndNoChildren()
@@ -404,7 +405,7 @@ public class CategoryServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.DeleteAsync(categoryId));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(409);
     }
@@ -444,5 +445,4 @@ public class CategoryServiceTests
     }
 
     #endregion
-    
 }
