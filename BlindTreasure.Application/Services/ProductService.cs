@@ -44,7 +44,7 @@ public class ProductService : IProductService
     /// <summary>
     ///     API dùng chung cho mọi role: lấy chi tiết sản phẩm theo Id (không ràng buộc seller).
     /// </summary>
-    public async Task<ProducDetailDto> GetByIdAsync(Guid id)
+    public async Task<ProducDetailDto?> GetByIdAsync(Guid id)
     {
         var cacheKey = $"product:{id}";
         var cached = await _cacheService.GetAsync<Product>(cacheKey);
@@ -117,7 +117,7 @@ public class ProductService : IProductService
         return result;
     }
 
-    public async Task<ProducDetailDto> CreateAsync(ProductCreateDto dto)
+    public async Task<ProducDetailDto?> CreateAsync(ProductCreateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.GetByIdAsync(dto.SellerId);
@@ -187,7 +187,7 @@ public class ProductService : IProductService
         return await GetByIdAsync(product.Id);
     }
 
-    public async Task<ProducDetailDto> UpdateAsync(Guid id, ProductUpdateDto dto)
+    public async Task<ProducDetailDto?> UpdateAsync(Guid id, ProductUpdateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
         var product = await _unitOfWork.Products.GetByIdAsync(id);

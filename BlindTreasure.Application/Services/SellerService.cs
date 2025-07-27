@@ -312,7 +312,7 @@ public class SellerService : ISellerService
         return _mapper.Map<Product, ProducDetailDto>(product);
     }
 
-    public async Task<ProducDetailDto> CreateProductAsync(ProductSellerCreateDto dto)
+    public async Task<ProducDetailDto?> CreateProductAsync(ProductSellerCreateDto dto)
     {
         var userId = _claimsService.CurrentUserId; // chỗ này là lấy user id của seller là người đang login
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId); // seller id ở day86
@@ -330,7 +330,7 @@ public class SellerService : ISellerService
         return result;
     }
 
-    public async Task<ProducDetailDto> UpdateProductAsync(Guid productId, ProductUpdateDto dto)
+    public async Task<ProducDetailDto?> UpdateProductAsync(Guid productId, ProductUpdateDto dto)
     {
         var userId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
