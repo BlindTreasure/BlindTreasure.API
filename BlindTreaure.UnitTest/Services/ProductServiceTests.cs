@@ -1,0 +1,527 @@
+using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Services;
+using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.ProductDTOs;
+using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
+using BlindTreasure.Infrastructure.Interfaces;
+using FluentAssertions;
+using Microsoft.AspNetCore.Http;
+using MockQueryable.Moq;
+using Moq;
+
+namespace BlindTreaure.UnitTest.Services;
+
+public class ProductServiceTests
+{
+    private readonly ProductService _productService;
+    private readonly Mock<IBlobService> _blobServiceMock;
+    private readonly Mock<ICacheService> _cacheServiceMock;
+    private readonly Mock<ICategoryService> _categoryServiceMock;
+    private readonly Mock<IClaimsService> _claimsServiceMock;
+    private readonly Guid _currentUserId = Guid.NewGuid();
+    private readonly Mock<ILoggerService> _loggerServiceMock;
+    private readonly Mock<IMapperService> _mapperServiceMock;
+    private readonly Mock<IGenericRepository<Product>> _productRepoMock;
+    private readonly Mock<IGenericRepository<Seller>> _sellerRepoMock;
+    private readonly Mock<IGenericRepository<Category>> _categoryRepoMock;
+    private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+
+    public ProductServiceTests()
+    {
+        _unitOfWorkMock = new Mock<IUnitOfWork>();
+        _loggerServiceMock = new Mock<ILoggerService>();
+        _cacheServiceMock = new Mock<ICacheService>();
+        _claimsServiceMock = new Mock<IClaimsService>();
+        _mapperServiceMock = new Mock<IMapperService>();
+        _blobServiceMock = new Mock<IBlobService>();
+        _categoryServiceMock = new Mock<ICategoryService>();
+
+        _productRepoMock = new Mock<IGenericRepository<Product>>();
+        _sellerRepoMock = new Mock<IGenericRepository<Seller>>();
+        _categoryRepoMock = new Mock<IGenericRepository<Category>>();
+
+        _unitOfWorkMock.Setup(x => x.Products).Returns(_productRepoMock.Object);
+        _unitOfWorkMock.Setup(x => x.Sellers).Returns(_sellerRepoMock.Object);
+        _unitOfWorkMock.Setup(x => x.Categories).Returns(_categoryRepoMock.Object);
+
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(_currentUserId);
+
+        _productService = new ProductService(
+            _unitOfWorkMock.Object,
+            _loggerServiceMock.Object,
+            _cacheServiceMock.Object,
+            _claimsServiceMock.Object,
+            _mapperServiceMock.Object,
+            _blobServiceMock.Object,
+            _categoryServiceMock.Object
+        );
+    }
+
+    #region GetByIdAsync Tests
+
+    [Fact]
+    public async Task GetByIdAsync_ShouldReturnFromCache_WhenCacheExists()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var cachedProduct = new Product
+        {
+            Id = productId,
+            Name = "Cached Product",
+            Description = "Description",
+            Price = 100,
+            Stock = 10,
+            IsDeleted = false,
+            Seller = new Seller { CompanyName = "Test Company" }
+        };
+
+        _cacheServiceMock.Setup(x => x.GetAsync<Product>(It.IsAny<string>()))
+            .ReturnsAsync(cachedProduct);
+
+        _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
+            .Returns(new ProducDetailDto { Id = productId, Name = "Cached Product" });
+
+        // Act
+        var result = await _productService.GetByIdAsync(productId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(productId);
+        result.Name.Should().Be("Cached Product");
+        _productRepoMock.Verify(x => x.GetQueryable(), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ShouldThrowNotFound_WhenProductIsDeleted()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var deletedProduct = new Product
+        {
+            Id = productId,
+            IsDeleted = true
+        };
+
+        _cacheServiceMock.Setup(x => x.GetAsync<Product>(It.IsAny<string>()))
+            .ReturnsAsync(deletedProduct);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => _productService.GetByIdAsync(productId));
+
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(404);
+    }
+
+    #endregion
+
+    #region GetAllAsync Tests
+
+    [Fact]
+    public async Task GetAllAsync_ShouldReturnPaginatedProducts_WhenDataExists()
+    {
+        // Arrange
+        var products = new List<Product>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Product 1",
+                Price = 100,
+                Stock = 10,
+                ProductType = ProductSaleType.DirectSale,
+                IsDeleted = false,
+                Seller = new Seller { CompanyName = "Company 1" }
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Product 2",
+                Price = 200,
+                Stock = 20,
+                ProductType = ProductSaleType.DirectSale,
+                IsDeleted = false,
+                Seller = new Seller { CompanyName = "Company 2" }
+            }
+        };
+
+        var mockQueryable = products.AsQueryable().BuildMock();
+        _productRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        _cacheServiceMock.Setup(x => x.GetAsync<Pagination<ProducDetailDto>>(It.IsAny<string>()))
+            .ReturnsAsync((Pagination<ProducDetailDto>)null!);
+
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
+            .Returns((Product p) => new ProducDetailDto { Id = p.Id, Name = p.Name });
+
+        var param = new ProductQueryParameter
+        {
+            PageIndex = 1,
+            PageSize = 10
+        };
+
+        // Act
+        var result = await _productService.GetAllAsync(param);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalCount.Should().Be(2);
+        _cacheServiceMock.Verify(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()),
+            Times.Once);
+    }
+
+    #endregion
+    
+    #region CreateAsync Tests
+
+    [Fact]
+    public async Task CreateAsync_ShouldCreateProduct_WhenValidData()
+    {
+        // Arrange
+        var sellerId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var dto = new ProductCreateDto
+        {
+            Name = "New Product",
+            Description = "Description",
+            Price = 100,
+            Stock = 10,
+            CategoryId = categoryId,
+            SellerId = sellerId,
+            ProductType = ProductSaleType.DirectSale
+        };
+
+        var seller = new Seller
+        {
+            Id = sellerId,
+            IsVerified = true,
+            Status = SellerStatus.Approved,
+            CompanyName = "Test Company"
+        };
+
+        var category = new Category
+        {
+            Id = categoryId,
+            Name = "Test Category",
+            IsDeleted = false
+        };
+
+        _sellerRepoMock.Setup(x => x.GetByIdAsync(sellerId))
+            .ReturnsAsync(seller);
+
+        var categories = new List<Category> { category };
+        var mockCategoryQueryable = categories.AsQueryable().BuildMock();
+        _categoryRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockCategoryQueryable);
+
+        // Setup AddAsync to return a product with proper ID
+        _productRepoMock.Setup(x => x.AddAsync(It.IsAny<Product>()))
+            .ReturnsAsync((Product p) => {
+                p.Id = productId;
+                return p;
+            });
+
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+
+        // Create the product that will be returned by GetByIdAsync
+        var createdProduct = new Product
+        {
+            Id = productId,
+            Name = dto.Name,
+            Description = dto.Description,
+            Price = dto.Price,
+            Stock = dto.Stock,
+            SellerId = sellerId,
+            Seller = seller,
+            IsDeleted = false,
+            ProductType = dto.ProductType
+        };
+
+        // Setup cache mock to first return null (cache miss) then the created product
+        _cacheServiceMock.Setup(x => x.GetAsync<Product>(It.IsAny<string>()))
+            .ReturnsAsync((Product)null!);
+
+        // Setup product repository to return the created product
+        var products = new List<Product> { createdProduct };
+        var mockProductQueryable = products.AsQueryable().BuildMock();
+        _productRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockProductQueryable);
+
+        _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
+            .Returns(new ProducDetailDto { Id = productId, Name = dto.Name });
+
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<Product>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveByPatternAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _productService.CreateAsync(dto);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Name.Should().Be(dto.Name);
+        _productRepoMock.Verify(x => x.AddAsync(It.IsAny<Product>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldThrowForbidden_WhenSellerNotVerified()
+    {
+        // Arrange
+        var sellerId = Guid.NewGuid();
+        var dto = new ProductCreateDto
+        {
+            Name = "New Product",
+            Description = "Description",
+            Price = 100,
+            Stock = 10,
+            CategoryId = Guid.NewGuid(),
+            SellerId = sellerId
+        };
+
+        var seller = new Seller
+        {
+            Id = sellerId,
+            IsVerified = false,
+            Status = SellerStatus.WaitingReview
+        };
+
+        _sellerRepoMock.Setup(x => x.GetByIdAsync(sellerId))
+            .ReturnsAsync(seller);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => _productService.CreateAsync(dto));
+        
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(403);
+    }
+
+    #endregion
+    
+    #region UpdateAsync Tests
+
+    [Fact]
+    public async Task UpdateAsync_ShouldUpdateProduct_WhenValidData()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var dto = new ProductUpdateDto
+        {
+            Name = "Updated Product",
+            Description = "Updated Description",
+            Price = 150,
+            Stock = 20
+        };
+
+        var existingProduct = new Product
+        {
+            Id = productId,
+            Name = "Original Product",
+            Description = "Original Description",
+            Price = 100,
+            Stock = 10,
+            Status = ProductStatus.Active,
+            IsDeleted = false,
+            SellerId = Guid.NewGuid(),
+            Seller = new Seller { Id = Guid.NewGuid(), CompanyName = "Test Seller", IsVerified = true, Status = SellerStatus.Approved }
+        };
+
+        _productRepoMock.Setup(x => x.GetByIdAsync(productId))
+            .ReturnsAsync(existingProduct);
+
+        _productRepoMock.Setup(x => x.Update(It.IsAny<Product>()))
+            .ReturnsAsync(true);
+
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+
+        // Mock GetByIdAsync call at the end
+        _cacheServiceMock.Setup(x => x.GetAsync<Product>(It.IsAny<string>()))
+            .ReturnsAsync((Product)null!);
+
+        var products = new List<Product> { existingProduct };
+        var mockQueryable = products.AsQueryable().BuildMock();
+        _productRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
+            .Returns(new ProducDetailDto { Id = productId, Name = dto.Name });
+
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<Product>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveByPatternAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _productService.UpdateAsync(productId, dto);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(productId);
+        result.Name.Should().Be(dto.Name);
+        _productRepoMock.Verify(x => x.Update(It.IsAny<Product>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ShouldThrowNotFound_WhenProductNotExists()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var dto = new ProductUpdateDto { Name = "Updated" };
+
+        _productRepoMock.Setup(x => x.GetByIdAsync(productId))
+            .ReturnsAsync((Product)null!);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => _productService.UpdateAsync(productId, dto));
+        
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(404);
+    }
+
+    #endregion
+    
+    #region DeleteAsync Tests
+
+    [Fact]
+    public async Task DeleteAsync_ShouldSoftDeleteProduct_WhenProductExists()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var product = new Product
+        {
+            Id = productId,
+            Name = "Product to Delete",
+            Status = ProductStatus.Active,
+            IsDeleted = false,
+            SellerId = Guid.NewGuid(),
+            Seller = new Seller { CompanyName = "Test Company" }
+        };
+
+        _productRepoMock.Setup(x => x.GetByIdAsync(productId))
+            .ReturnsAsync(product);
+
+        _productRepoMock.Setup(x => x.Update(It.IsAny<Product>()))
+            .ReturnsAsync(true);
+
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+
+        _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
+            .Returns(new ProducDetailDto { Id = productId, Name = product.Name });
+
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveByPatternAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _productService.DeleteAsync(productId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Id.Should().Be(productId);
+        _productRepoMock.Verify(x => x.Update(It.Is<Product>(p => p.IsDeleted && p.Status == ProductStatus.InActive)), Times.Once);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+    }
+
+    #endregion
+    
+    #region UploadProductImageAsync Tests
+
+    [Fact]
+    public async Task UploadProductImageAsync_ShouldUploadImage_WhenValidFile()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var product = new Product
+        {
+            Id = productId,
+            Name = "Test Product",
+            IsDeleted = false,
+            ImageUrls = new List<string>()
+        };
+
+        var mockFile = CreateMockFormFile();
+        var imageUrl = "https://example.com/image.jpg";
+
+        _productRepoMock.Setup(x => x.GetByIdAsync(productId))
+            .ReturnsAsync(product);
+
+        _blobServiceMock.Setup(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<Stream>()))
+            .Returns(Task.CompletedTask);
+
+        _blobServiceMock.Setup(x => x.GetPreviewUrlAsync(It.IsAny<string>()))
+            .ReturnsAsync(imageUrl);
+
+        _productRepoMock.Setup(x => x.Update(It.IsAny<Product>()))
+            .ReturnsAsync(true);
+
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<Product>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _productService.UploadProductImageAsync(productId, mockFile);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Should().Be(imageUrl);
+        _blobServiceMock.Verify(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<Stream>()), Times.Once);
+        _productRepoMock.Verify(x => x.Update(It.Is<Product>(p => p.ImageUrls.Contains(imageUrl))), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadProductImageAsync_ShouldThrowBadRequest_WhenFileIsEmpty()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var emptyFile = new FormFile(new MemoryStream(), 0, 0, "Data", "empty.jpg");
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => _productService.UploadProductImageAsync(productId, emptyFile));
+        
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(400);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private static IFormFile CreateMockFormFile()
+    {
+        var content = "Hello World from a Fake File"u8.ToArray();
+        var stream = new MemoryStream(content);
+        var file = new FormFile(stream, 0, stream.Length, "Data", "dummy.jpg")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "image/jpeg"
+        };
+        return file;
+    }
+
+    #endregion
+}
