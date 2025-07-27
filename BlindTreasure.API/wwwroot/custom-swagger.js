@@ -61,18 +61,44 @@
         mainContainer.prepend(searchDiv);
     }
 
-    // Populate checkboxes with unique data-tag values
-    const tags = document.getElementsByClassName("opblock-tag-section");
-    const uniqueTags = new Set();
-    for (let i = 0; i < tags.length; i++) {
-        const tag = tags[i].querySelector('[data-tag]').getAttribute('data-tag');
-        uniqueTags.add(tag);
+    // Debounce helper
+    function debounce(fn, delay) {
+        let timer = null;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
     }
+
+    // Cache tags and operations
+    const tags = Array.from(document.getElementsByClassName("opblock-tag-section"));
+    const tagMap = new Map(); // tagName => { section, operations[] }
+    tags.forEach(tagSection => {
+        const tag = tagSection.querySelector('[data-tag]').getAttribute('data-tag').toLowerCase();
+        const operations = Array.from(tagSection.querySelectorAll('.opblock'));
+        tagMap.set(tag, { section: tagSection, operations });
+    });
+    const uniqueTags = Array.from(tagMap.keys());
+
     // Add "All" option
     const allCheckboxDiv = document.createElement("div");
     allCheckboxDiv.innerHTML = `
-    <label style="display: flex; align-items: center; font-weight: 500; font-size: 18px; padding: 10px 18px; border-radius: 8px; cursor: pointer; user-select: none; transition: background 0.2s;">
-      <input type="checkbox" value="__all__" checked style="margin-right: 12px; width: 22px; height: 22px; cursor: pointer;">All
+    <label style="
+      display: flex; align-items: center; font-weight: 700; font-size: 19px;
+      padding: 10px 18px; border-radius: 8px; cursor: pointer; user-select: none;
+      transition: background 0.2s, border 0.2s, opacity 0.2s;
+      background: #f8fafc;
+      border: 2px solid #e5e7eb;
+      margin-bottom: 4px;
+      box-sizing: border-box;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    "
+      onmouseover="this.style.background='#e5eaf1'; this.style.borderColor='#3b82f6'; this.style.opacity='0.7';"
+      onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#e5e7eb'; this.style.opacity='1';"
+    >
+      <input type="checkbox" value="__all__" checked style="margin-right: 12px; width: 22px; height: 22px; cursor: pointer;">
+      All
     </label>
   `;
     checkboxContainer.appendChild(allCheckboxDiv);
@@ -80,7 +106,20 @@
     uniqueTags.forEach(tag => {
         const checkboxDiv = document.createElement("div");
         checkboxDiv.innerHTML = `
-      <label style="display: flex; align-items: center; font-size: 18px; font-weight: 500; padding: 10px 18px; border-radius: 8px; cursor: pointer; user-select: none; transition: background 0.2s;">
+      <label style="
+        display: flex; align-items: center; font-size: 19px; font-weight: 700;
+        padding: 10px 18px; border-radius: 8px; cursor: pointer; user-select: none;
+        transition: background 0.2s, border 0.2s, opacity 0.2s;
+        background: #f8fafc;
+        border: 2px solid #e5e7eb;
+        margin-bottom: 4px;
+        box-sizing: border-box;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      "
+        onmouseover="this.style.background='#e5eaf1'; this.style.borderColor='#3b82f6'; this.style.opacity='0.7';"
+        onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#e5e7eb'; this.style.opacity='1';"
+      >
         <input type="checkbox" value="${tag}" style="margin-right: 12px; width: 22px; height: 22px; cursor: pointer;">
         ${tag}
       </label>
@@ -122,15 +161,22 @@
         filterContent();
     });
 
-    // Filtering logic
+    // Filtering logic (optimized)
     function filterContent() {
-        const filter = input.value.toLowerCase();
+        const filter = input.value.trim().toLowerCase();
         const checkedTags = getCheckedTags();
-        for (let i = 0; i < tags.length; i++) {
-            const tagSection = tags[i];
-            const tag = tagSection.querySelector('[data-tag]').getAttribute('data-tag').toLowerCase();
-            const operations = tagSection.querySelectorAll('.opblock');
-            let tagMatches = (checkedTags.length === 0 || checkedTags.includes(tag));
+        const showAll = checkedTags.length === 0 && filter === "";
+        // Nếu không filter gì và chọn All, reset toàn bộ hiển thị
+        if (showAll) {
+            tagMap.forEach(({ section, operations }) => {
+                section.style.display = "";
+                operations.forEach(op => op.style.display = "");
+            });
+            return;
+        }
+        // Chỉ thao tác với tag liên quan
+        tagMap.forEach(({ section, operations }, tag) => {
+            const tagMatches = (checkedTags.length === 0 || checkedTags.includes(tag));
             let anyOperationVisible = false;
             operations.forEach(operation => {
                 const path = operation.querySelector('[data-path]').getAttribute('data-path').toLowerCase();
@@ -140,18 +186,25 @@
                 const method = methodElem ? methodElem.textContent.toLowerCase() : "";
                 const pathMatches = path.includes(filter) || summary.includes(filter) || method.includes(filter);
                 if (tagMatches && pathMatches) {
-                    operation.style.display = "";
+                    if (operation.style.display === "none") operation.style.display = "";
                     anyOperationVisible = true;
                 } else {
-                    operation.style.display = "none";
+                    if (operation.style.display !== "none") operation.style.display = "none";
                 }
             });
-            tagSection.style.display = anyOperationVisible ? "" : "none";
-        }
+            // Luôn show section nếu tag được chọn
+            if (tagMatches) {
+                if (section.style.display === "none") section.style.display = "";
+            } else {
+                if (section.style.display !== "none") section.style.display = "none";
+            }
+        });
     }
 
     // Event listeners
-    input.addEventListener("input", filterContent);
+    input.addEventListener("input", debounce(filterContent, 300));
+    // Checkbox event vẫn gọi trực tiếp (ít tần suất)
+    checkboxContainer.addEventListener("change", filterContent);
     // Initial filter
     filterContent();
 };
