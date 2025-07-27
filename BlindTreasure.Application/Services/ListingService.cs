@@ -48,7 +48,7 @@ public class ListingService : IListingService
     public async Task<Pagination<ListingDetailDto>> GetAllListingsAsync(ListingQueryParameter param)
     {
         _logger.Info(
-            $"[GetAllListingsAsync] Page: {param.PageIndex}, Size: {param.PageSize}, Status: {param.Status}, IsFree: {param.IsFree}");
+            $"[GetAllListingsAsync] Page: {param.PageIndex}, Size: {param.PageSize}, Status: {param.Status}, IsFree: {param.IsFree}, IsOwnerListings: {param.IsOwnerListings}, UserId: {param.UserId}");
 
         var query = _unitOfWork.Listings.GetQueryable()
             .Include(l => l.InventoryItem)
@@ -57,11 +57,8 @@ public class ListingService : IListingService
             .Where(l => !l.IsDeleted)
             .AsNoTracking();
 
-        if (param.Status.HasValue)
-            query = query.Where(l => l.Status == param.Status.Value);
-
-        if (param.IsFree.HasValue)
-            query = query.Where(l => l.IsFree == param.IsFree.Value);
+        // Áp dụng các filter
+        query = ApplyFilters(query, param);
 
         var count = await query.CountAsync();
 
@@ -188,6 +185,53 @@ public class ListingService : IListingService
 
     #region Private Methods
 
+    private IQueryable<Listing> ApplyFilters(IQueryable<Listing> query, ListingQueryParameter param)
+    {
+        // Filter theo status
+        if (param.Status.HasValue)
+            query = query.Where(l => l.Status == param.Status.Value);
+
+        // Filter theo IsFree
+        if (param.IsFree.HasValue)
+            query = query.Where(l => l.IsFree == param.IsFree.Value);
+
+        // Filter theo owner (listings của chính user hiện tại)
+        if (param.IsOwnerListings.HasValue && param.IsOwnerListings.Value)
+        {
+            var currentUserId = _claimsService.CurrentUserId;
+            query = query.Where(l => l.InventoryItem.UserId == currentUserId);
+
+            _logger.Info($"[ApplyFilters] Filtering by owner: {currentUserId}");
+        }
+
+        // Filter theo userId cụ thể
+        if (param.UserId.HasValue)
+        {
+            query = query.Where(l => l.InventoryItem.UserId == param.UserId.Value);
+
+            _logger.Info($"[ApplyFilters] Filtering by userId: {param.UserId.Value}");
+        }
+
+        // Filter theo tên sản phẩm (search)
+        if (!string.IsNullOrWhiteSpace(param.SearchByName))
+        {
+            var searchTerm = param.SearchByName.Trim().ToLower();
+            query = query.Where(l => l.InventoryItem.Product.Name.ToLower().Contains(searchTerm));
+
+            _logger.Info($"[ApplyFilters] Filtering by product name containing: {param.SearchByName}");
+        }
+
+        // Filter theo CategoryId
+        if (param.CategoryId.HasValue)
+        {
+            query = query.Where(l => l.InventoryItem.Product.CategoryId == param.CategoryId.Value);
+
+            _logger.Info($"[ApplyFilters] Filtering by categoryId: {param.CategoryId.Value}");
+        }
+
+        return query;
+    }
+
     private ListingDetailDto MapListingToDto(Listing listing)
     {
         var dto = _mapper.Map<Listing, ListingDetailDto>(listing);
@@ -195,7 +239,7 @@ public class ListingService : IListingService
         dto.ProductName = listing.InventoryItem?.Product?.Name ?? "Unknown";
         dto.ProductImage = listing.InventoryItem?.Product?.ImageUrls?.FirstOrDefault() ?? "";
         dto.Description = listing.Description;
-
+        dto.AvatarUrl = listing.InventoryItem?.User?.AvatarUrl;
         // Thêm các thông tin khác nếu cần
         if (listing.InventoryItem?.User != null)
             dto.OwnerName = listing.InventoryItem.User.FullName ?? listing.InventoryItem.User.FullName;
