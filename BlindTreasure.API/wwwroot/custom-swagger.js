@@ -76,7 +76,7 @@
     tags.forEach(tagSection => {
         const tag = tagSection.querySelector('[data-tag]').getAttribute('data-tag').toLowerCase();
         const operations = Array.from(tagSection.querySelectorAll('.opblock'));
-        tagMap.set(tag, { section: tagSection, operations });
+        tagMap.set(tag, {section: tagSection, operations});
     });
     const uniqueTags = Array.from(tagMap.keys());
 
@@ -168,14 +168,14 @@
         const showAll = checkedTags.length === 0 && filter === "";
         // Nếu không filter gì và chọn All, reset toàn bộ hiển thị
         if (showAll) {
-            tagMap.forEach(({ section, operations }) => {
+            tagMap.forEach(({section, operations}) => {
                 section.style.display = "";
                 operations.forEach(op => op.style.display = "");
             });
             return;
         }
         // Chỉ thao tác với tag liên quan
-        tagMap.forEach(({ section, operations }, tag) => {
+        tagMap.forEach(({section, operations}, tag) => {
             const tagMatches = (checkedTags.length === 0 || checkedTags.includes(tag));
             let anyOperationVisible = false;
             operations.forEach(operation => {
