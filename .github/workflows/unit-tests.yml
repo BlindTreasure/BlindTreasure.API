@@ -18,6 +18,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        cache: true
+        cache-dependency-path: '**/*.csproj'
+
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
@@ -26,21 +33,13 @@ jobs:
         restore-keys: |
           nuget-${{ runner.os }}-
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
-        cache: true
-        cache-dependency-path: '**/*.csproj'
-
 
         
     # ================== BUILD VÀ CHẠY TEST ==================
-    - name: Restore dependencies
-      run: dotnet restore BlindTreasure.API.sln
-      
-    - name: Build
-      run: dotnet build BlindTreasure.API.sln --no-restore --configuration Release
+    - name: Restore dependencies and build
+      run: |
+        dotnet restore BlindTreasure.API.sln
+        dotnet build BlindTreasure.API.sln --no-restore --configuration Release
       
     - name: Restore tools
       run: dotnet tool restore
@@ -48,13 +47,15 @@ jobs:
     - name: Run unit tests
       run: |
         # Chạy unit tests và tạo file coverage + test results
-        dotnet test BlindTreasure.API.sln \
+        dotnet test \
           --no-build \
           --configuration Release \
-          --verbosity normal \
-          --collect:"XPlat Code Coverage" \           # Tạo file coverage
+          --verbosity minimal \
+          --collect:"XPlat Code Coverage" \
           --results-directory ./TestResults/ \
-          --logger "trx;LogFileName=test-results.trx"  # Tạo file test results
+          --logger "trx;LogFileName=test-results.trx" \
+          --blame-hang-timeout 2m \
+          --blame-crash-timeout 2m
       
     - name: Generate coverage report
       run: |
@@ -62,7 +63,7 @@ jobs:
         dotnet tool run reportgenerator \
           -reports:"./TestResults/**/coverage.cobertura.xml" \
           -targetdir:"./coveragereport" \
-          -reporttypes:"Html;Badges;TextSummary;JsonSummary;MarkdownSummaryGithub;Xml;Cobertura"
+          -reporttypes:"TextSummary;JsonSummary;MarkdownSummaryGithub"
       
 
       
@@ -165,3 +166,13 @@ jobs:
         name: coverage-report
         path: ./coveragereport/**/*                    # 📋 Upload tất cả file coverage
         retention-days: 30
+        
+    # ================== TRIGGER EXCEL REPORT GENERATION ==================
+    - name: Trigger Excel Report Generation
+      if: success()  # Chỉ trigger khi tests thành công
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ secrets.REPO_DISPATCH_TOKEN }}
+        repository: ${{ github.repository }}
+        event-type: generate-excel-report
+        client-payload: '{"workflow_run_id": "${{ github.run_id }}"}'
