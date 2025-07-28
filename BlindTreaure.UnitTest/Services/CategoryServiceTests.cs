@@ -1,3 +1,5 @@
+
+
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services;
@@ -11,6 +13,7 @@ using BlindTreasure.Infrastructure.Interfaces;
 using FluentAssertions;
 using MockQueryable.Moq;
 using Moq;
+using Resend;
 
 namespace BlindTreaure.UnitTest.Services;
 
@@ -25,7 +28,9 @@ public class CategoryServiceTests
     private readonly Mock<ILoggerService> _loggerServiceMock;
     private readonly Mock<IMapperService> _mapperServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+
     private readonly Mock<IUserService> _userServiceMock;
+
 //trigger
     public CategoryServiceTests()
     {
@@ -445,4 +450,31 @@ public class CategoryServiceTests
     }
 
     #endregion
+
+    [Fact]
+    public async Task GetByIdAsync_ShouldReturnCategoryDto_WhenCategoryExists()
+    {
+        var categoryId = Guid.NewGuid();
+        var category = new Category { Id = categoryId, Name = "Test", Description = "Desc", Children = new List<Category>() };
+        var mockSet = new List<Category> { category }.AsQueryable().BuildMockDbSet();
+        _unitOfWorkMock.Setup(x => x.Categories.GetQueryable()).Returns(mockSet.Object);
+        _cacheServiceMock.Setup(x => x.GetAsync<Category>($"category:{categoryId}")).ReturnsAsync((Category)null!);
+        var result = await _categoryService.GetByIdAsync(categoryId);
+        result.Should().NotBeNull();
+        result.Id.Should().Be(categoryId);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldThrowBadRequest_WhenNameIsEmpty()
+    {
+        var dto = new CategoryCreateDto { Name = "" };
+        _claimsServiceMock.Setup(x => x.CurrentUserId).Returns(Guid.NewGuid());
+        _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(It.IsAny<Guid>()))
+            .ReturnsAsync(new UserDto { RoleName = RoleType.Admin });
+        await Assert.ThrowsAsync<Exception>(() => _categoryService.CreateAsync(dto));
+    }
+
+
+
+   
 }
