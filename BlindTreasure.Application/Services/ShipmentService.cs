@@ -37,7 +37,7 @@ public class ShipmentService : IShipmentService
     // Lấy shipment theo Id (và kiểm tra quyền user)
     public async Task<ShipmentDto?> GetByIdAsync(Guid shipmentId)
     {
-        var shipment = await _unitOfWork.Shipments.GetQueryable().Include(s => s.InventoryItems)
+        var shipment = await _unitOfWork.Shipments.GetQueryable()
             .Include(x => x.InventoryItems)
             .Include(s => s.OrderDetail)
             .ThenInclude(od => od.Order)
@@ -82,31 +82,12 @@ public class ShipmentService : IShipmentService
 
         return shipments.Select(ShipmentDtoMapper.ToShipmentDto).ToList();
     }
+
+    #region private methods
+
+    
+
+    #endregion
 }
 
-public class ShipmentCreateDto
-{
-    public Guid OrderDetailId { get; set; }
-    public string? OrderCode { get; set; }
-    public int? TotalFee { get; set; }
-    public int? MainServiceFee { get; set; }
-    public string Provider { get; set; }
-    public string TrackingNumber { get; set; }
-    public DateTime ShippedAt { get; set; }
-    public DateTime EstimatedDelivery { get; set; }
-    public DateTime? DeliveredAt { get; set; }
-    public string Status { get; set; }
-}
 
-public class ShipmentUpdateDto
-{
-    public string? OrderCode { get; set; }
-    public int? TotalFee { get; set; }
-    public int? MainServiceFee { get; set; }
-    public string? Provider { get; set; }
-    public string? TrackingNumber { get; set; }
-    public DateTime? ShippedAt { get; set; }
-    public DateTime? EstimatedDelivery { get; set; }
-    public DateTime? DeliveredAt { get; set; }
-    public string? Status { get; set; }
-}
