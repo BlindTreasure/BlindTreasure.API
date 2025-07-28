@@ -18,13 +18,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
-        cache: true
-        cache-dependency-path: '**/*.csproj'
-
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
@@ -33,13 +26,30 @@ jobs:
         restore-keys: |
           nuget-${{ runner.os }}-
 
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        cache: true
+        cache-dependency-path: '**/*.csproj'
 
+    # ================== SETUP PYTHON CHO EXCEL ==================
+    - name: Setup Python for Excel generation
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install Python dependencies
+      run: |
+        # Cài đặt thư viện Python cần thiết để tạo file Excel
+        pip install pandas openpyxl xlsxwriter lxml beautifulsoup4
         
     # ================== BUILD VÀ CHẠY TEST ==================
-    - name: Restore dependencies and build
-      run: |
-        dotnet restore BlindTreasure.API.sln
-        dotnet build BlindTreasure.API.sln --no-restore --configuration Release
+    - name: Restore dependencies
+      run: dotnet restore BlindTreasure.API.sln
+      
+    - name: Build
+      run: dotnet build BlindTreasure.API.sln --no-restore --configuration Release
       
     - name: Restore tools
       run: dotnet tool restore
@@ -47,15 +57,13 @@ jobs:
     - name: Run unit tests
       run: |
         # Chạy unit tests và tạo file coverage + test results
-        dotnet test \
+        dotnet test BlindTreasure.API.sln \
           --no-build \
           --configuration Release \
-          --verbosity minimal \
-          --collect:"XPlat Code Coverage" \
+          --verbosity normal \
+          --collect:"XPlat Code Coverage" \           # Tạo file coverage
           --results-directory ./TestResults/ \
-          --logger "trx;LogFileName=test-results.trx" \
-          --blame-hang-timeout 2m \
-          --blame-crash-timeout 2m
+          --logger "trx;LogFileName=test-results.trx"  # Tạo file test results
       
     - name: Generate coverage report
       run: |
@@ -63,9 +71,292 @@ jobs:
         dotnet tool run reportgenerator \
           -reports:"./TestResults/**/coverage.cobertura.xml" \
           -targetdir:"./coveragereport" \
-          -reporttypes:"TextSummary;JsonSummary;MarkdownSummaryGithub"
+          -reporttypes:"Html;Badges;TextSummary;JsonSummary;MarkdownSummaryGithub;Xml;Cobertura"
       
-
+    # ================== TẠO FILE EXCEL - PHẦN QUAN TRỌNG NHẤT ==================
+    - name: Create Excel coverage report
+      run: |
+        # Tạo file Python script inline để generate Excel report
+        cat > generate_excel_report.py << 'EOF'
+        import pandas as pd
+        import json
+        import xml.etree.ElementTree as ET
+        from datetime import datetime
+        import os
+        import glob
+        from bs4 import BeautifulSoup
+        
+        def parse_cobertura_xml():
+            """Parse file XML coverage để lấy dữ liệu chi tiết"""
+            xml_files = glob.glob('./TestResults/**/coverage.cobertura.xml', recursive=True)
+            if not xml_files:
+                return None
+                
+            tree = ET.parse(xml_files[0])
+            root = tree.getroot()
+            
+            # Lấy thông tin tổng quan về coverage
+            line_rate = float(root.get('line-rate', 0)) * 100
+            branch_rate = float(root.get('branch-rate', 0)) * 100
+            
+            # Lấy chi tiết coverage theo từng class/file
+            classes_data = []
+            packages = root.findall('.//package')
+            
+            for package in packages:
+                package_name = package.get('name', 'Unknown')
+                classes = package.findall('.//class')
+                
+                for cls in classes:
+                    class_name = cls.get('name', 'Unknown')
+                    filename = cls.get('filename', 'Unknown')
+                    class_line_rate = float(cls.get('line-rate', 0)) * 100
+                    class_branch_rate = float(cls.get('branch-rate', 0)) * 100
+                    
+                    # Đếm số dòng được cover và chưa cover
+                    lines = cls.findall('.//line')
+                    total_lines = len(lines)
+                    covered_lines = len([l for l in lines if l.get('hits', '0') != '0'])
+                    
+                    classes_data.append({
+                        'Package': package_name,
+                        'Class': class_name,
+                        'File': filename,
+                        'Line Coverage (%)': round(class_line_rate, 2),
+                        'Branch Coverage (%)': round(class_branch_rate, 2),
+                        'Total Lines': total_lines,
+                        'Covered Lines': covered_lines,
+                        'Uncovered Lines': total_lines - covered_lines
+                    })
+            
+            return {
+                'summary': {
+                    'line_coverage': round(line_rate, 2),
+                    'branch_coverage': round(branch_rate, 2)
+                },
+                'classes': classes_data
+            }
+        
+        def parse_test_results():
+            """Parse file TRX để lấy kết quả test chi tiết"""
+            trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
+            test_data = []
+            
+            if trx_files:
+                try:
+                    with open(trx_files[0], 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        soup = BeautifulSoup(content, 'xml')
+                        
+                    # Parse từng test result
+                    test_results = soup.find_all('UnitTestResult')
+                    for result in test_results:
+                        test_name = result.get('testName', 'Unknown')
+                        outcome = result.get('outcome', 'Unknown')
+                        duration = result.get('duration', '00:00:00')
+                        
+                        # Lấy error message nếu test fail
+                        error_info = result.find('ErrorInfo')
+                        error_message = ""
+                        if error_info:
+                            message_elem = error_info.find('Message')
+                            if message_elem:
+                                error_message = message_elem.get_text()
+                        
+                        test_data.append({
+                            'Test Name': test_name,
+                            'Result': outcome,
+                            'Duration': duration,
+                            'Error Message': error_message
+                        })
+                except Exception as e:
+                    print(f"Error parsing TRX file: {e}")
+            
+            return test_data
+        
+        def create_excel_report():
+            """🔥 HÀM CHÍNH TẠO FILE EXCEL 🔥"""
+            
+            # Parse dữ liệu từ các file output
+            coverage_data = parse_cobertura_xml()
+            test_data = parse_test_results()
+            
+            # Tạo tên file Excel với timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            excel_file = f'./coveragereport/Coverage_Report_{timestamp}.xlsx'
+            
+            # 📊 TẠO FILE EXCEL VỚI NHIỀU SHEET
+            with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
+                workbook = writer.book
+                
+                # 🎨 ĐỊNH NGHĨA CÁC FORMAT CHO EXCEL
+                header_format = workbook.add_format({
+                    'bold': True,
+                    'text_wrap': True,
+                    'valign': 'top',
+                    'fg_color': '#4472C4',      # Màu nền xanh
+                    'font_color': 'white',       # Chữ màu trắng
+                    'border': 1
+                })
+                
+                cell_format = workbook.add_format({
+                    'text_wrap': True,
+                    'valign': 'top',
+                    'border': 1
+                })
+                
+                percent_format = workbook.add_format({
+                    'num_format': '0.00%',
+                    'text_wrap': True,
+                    'valign': 'top',
+                    'border': 1
+                })
+                
+                # 📋 SHEET 1: SUMMARY - Tổng quan
+                summary_data = []
+                if coverage_data:
+                    summary_data = [
+                        ['Metric', 'Value', 'Status'],
+                        ['Line Coverage', f"{coverage_data['summary']['line_coverage']}%", 
+                         '✅ Pass' if coverage_data['summary']['line_coverage'] >= 70 else '❌ Fail'],
+                        ['Branch Coverage', f"{coverage_data['summary']['branch_coverage']}%", ''],
+                        ['Test Run Date', datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ''],
+                        ['Total Test Classes', len(coverage_data['classes']) if coverage_data['classes'] else 0, ''],
+                        ['Minimum Threshold', '70%', ''],
+                    ]
+                else:
+                    summary_data = [
+                        ['Metric', 'Value', 'Status'],
+                        ['Line Coverage', 'N/A', 'No data available'],
+                    ]
+                
+                df_summary = pd.DataFrame(summary_data[1:], columns=summary_data[0])
+                df_summary.to_excel(writer, sheet_name='Summary', index=False)
+                
+                # Format sheet Summary
+                worksheet_summary = writer.sheets['Summary']
+                worksheet_summary.set_column('A:A', 20)
+                worksheet_summary.set_column('B:B', 15)
+                worksheet_summary.set_column('C:C', 15)
+                
+                # Áp dụng format cho từng cell
+                for row_num in range(len(df_summary) + 1):
+                    for col_num in range(len(df_summary.columns)):
+                        if row_num == 0:
+                            worksheet_summary.write(row_num, col_num, df_summary.columns[col_num], header_format)
+                        else:
+                            worksheet_summary.write(row_num, col_num, df_summary.iloc[row_num-1, col_num], cell_format)
+                
+                # 📊 SHEET 2: COVERAGE DETAILS - Chi tiết coverage theo class
+                if coverage_data and coverage_data['classes']:
+                    df_classes = pd.DataFrame(coverage_data['classes'])
+                    df_classes.to_excel(writer, sheet_name='Coverage Details', index=False)
+                    
+                    worksheet_details = writer.sheets['Coverage Details']
+                    # Set độ rộng cột
+                    worksheet_details.set_column('A:A', 25)  # Package
+                    worksheet_details.set_column('B:B', 30)  # Class
+                    worksheet_details.set_column('C:C', 40)  # File
+                    worksheet_details.set_column('D:D', 18)  # Line Coverage
+                    worksheet_details.set_column('E:E', 18)  # Branch Coverage
+                    worksheet_details.set_column('F:F', 12)  # Total Lines
+                    worksheet_details.set_column('G:G', 15)  # Covered Lines
+                    worksheet_details.set_column('H:H', 15)  # Uncovered Lines
+                    
+                    # Áp dụng format
+                    for row_num in range(len(df_classes) + 1):
+                        for col_num in range(len(df_classes.columns)):
+                            if row_num == 0:
+                                worksheet_details.write(row_num, col_num, df_classes.columns[col_num], header_format)
+                            else:
+                                worksheet_details.write(row_num, col_num, df_classes.iloc[row_num-1, col_num], cell_format)
+                
+                # 🧪 SHEET 3: TEST RESULTS - Kết quả test chi tiết
+                if test_data:
+                    df_tests = pd.DataFrame(test_data)
+                    df_tests.to_excel(writer, sheet_name='Test Results', index=False)
+                    
+                    worksheet_tests = writer.sheets['Test Results']
+                    worksheet_tests.set_column('A:A', 50)  # Test Name
+                    worksheet_tests.set_column('B:B', 12)  # Result
+                    worksheet_tests.set_column('C:C', 12)  # Duration
+                    worksheet_tests.set_column('D:D', 60)  # Error Message
+                    
+                    # Highlight test failed với màu đỏ
+                    for row_num in range(len(df_tests) + 1):
+                        for col_num in range(len(df_tests.columns)):
+                            if row_num == 0:
+                                worksheet_tests.write(row_num, col_num, df_tests.columns[col_num], header_format)
+                            else:
+                                cell_value = df_tests.iloc[row_num-1, col_num]
+                                # Highlight failed tests với background màu đỏ nhạt
+                                if col_num == 1 and cell_value == 'Failed':
+                                    fail_format = workbook.add_format({
+                                        'text_wrap': True,
+                                        'valign': 'top',
+                                        'border': 1,
+                                        'bg_color': '#FFE6E6'  # Màu đỏ nhạt
+                                    })
+                                    worksheet_tests.write(row_num, col_num, cell_value, fail_format)
+                                else:
+                                    worksheet_tests.write(row_num, col_num, cell_value, cell_format)
+                
+                # 📈 SHEET 4: COVERAGE TRENDS - Xu hướng coverage (để mở rộng sau)
+                trends_data = [
+                    ['Date', 'Line Coverage (%)', 'Branch Coverage (%)', 'Total Tests'],
+                    [datetime.now().strftime("%Y-%m-%d"), 
+                     coverage_data['summary']['line_coverage'] if coverage_data else 0,
+                     coverage_data['summary']['branch_coverage'] if coverage_data else 0,
+                     len(test_data) if test_data else 0]
+                ]
+                
+                df_trends = pd.DataFrame(trends_data[1:], columns=trends_data[0])
+                df_trends.to_excel(writer, sheet_name='Coverage Trends', index=False)
+                
+                worksheet_trends = writer.sheets['Coverage Trends']
+                worksheet_trends.set_column('A:A', 15)
+                worksheet_trends.set_column('B:B', 18)
+                worksheet_trends.set_column('C:C', 18)
+                worksheet_trends.set_column('D:D', 15)
+                
+                # Áp dụng format cho trends
+                for row_num in range(len(df_trends) + 1):
+                    for col_num in range(len(df_trends.columns)):
+                        if row_num == 0:
+                            worksheet_trends.write(row_num, col_num, df_trends.columns[col_num], header_format)
+                        else:
+                            worksheet_trends.write(row_num, col_num, df_trends.iloc[row_num-1, col_num], cell_format)
+            
+            print(f"✅ Excel report generated: {excel_file}")
+            return excel_file
+        
+        # Tạo CSV đơn giản để hiển thị trên GitHub
+        def create_csv_summary():
+            if os.path.exists('./coveragereport/Summary.json'):
+                try:
+                    with open('./coveragereport/Summary.json', 'r') as f:
+                        summary = json.load(f)
+                    
+                    # Tạo file CSV summary
+                    summary_csv = pd.DataFrame([
+                        ['Line Coverage', summary.get('summary', {}).get('linecoverage', 'N/A')],
+                        ['Branch Coverage', summary.get('summary', {}).get('branchcoverage', 'N/A')],
+                        ['Generated', datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+                    ], columns=['Metric', 'Value'])
+                    
+                    summary_csv.to_csv('./coveragereport/coverage_summary.csv', index=False)
+                    print("✅ CSV summary created")
+                except Exception as e:
+                    print(f"❌ Error creating CSV: {e}")
+        
+        # 🚀 CHẠY CÁC HÀM CHÍNH
+        if __name__ == "__main__":
+            excel_file = create_excel_report()  # 📊 TẠO FILE EXCEL
+            create_csv_summary()                # 📋 TẠO FILE CSV
+        EOF
+        
+        # 🐍 CHẠY PYTHON SCRIPT ĐỂ TẠO EXCEL
+        python generate_excel_report.py
       
     # ================== XỬ LÝ VÀ HIỂN THỊ KẾT QUẢ ==================
     - name: Extract and check coverage
@@ -122,12 +413,23 @@ jobs:
         echo "**Coverage:** $COVERAGE%" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
+        # Hiển thị bảng CSV nếu có
+        if [ -f "./coveragereport/coverage_summary.csv" ]; then
+          echo "### 📋 Quick Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          tail -n +2 ./coveragereport/coverage_summary.csv | sed 's/,/ | /g' | sed 's/^/| /' | sed 's/$/ |/' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
         # Hiển thị chi tiết trong code block
         echo '```' >> $GITHUB_STEP_SUMMARY
         cat ./coveragereport/Summary.txt 2>/dev/null || echo "Summary not available" >> $GITHUB_STEP_SUMMARY
         echo '```' >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "📊 **Excel Report**: Will be generated by separate workflow after test completion" >> $GITHUB_STEP_SUMMARY
+        echo "📊 **Excel Report Available**: Download the detailed Excel report from artifacts below" >> $GITHUB_STEP_SUMMARY
+        echo "📋 [Download HTML report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
       
     # ================== COMMENT TRÊN PULL REQUEST ==================
     - name: Comment coverage on PR
@@ -144,19 +446,28 @@ jobs:
           **Threshold:** 70%  
           **Status:** ${{ env.COVERAGE >= 70 && '✅ Passed' || '⚠️ Below threshold' }}
           
+          ### 📋 Quick Summary
+          $(if [ -f "./coveragereport/coverage_summary.csv" ]; then
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            tail -n +2 ./coveragereport/coverage_summary.csv | sed 's/,/ | /g' | sed 's/^/| /' | sed 's/$/ |/'
+          else
+            echo "Summary not available"
+          fi)
+          
           ```
           $(cat ./coveragereport/Summary.txt 2>/dev/null || echo "Summary not available")
           ```
           
-          📊 **Excel Report**: Will be generated by separate workflow after test completion
+          📊 **Excel Report Available**: Download detailed Excel report with multiple sheets from [artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
       
-    # ================== UPLOAD ARTIFACTS CHO WORKFLOW KHÁC ==================
-    - name: Upload test results
+    # ================== UPLOAD CÁC FILE ARTIFACTS ==================
+    - name: Upload Excel coverage reports
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-results
-        path: ./TestResults/**/*                       # 🧪 Upload file test results
+        name: excel-coverage-report
+        path: ./coveragereport/Coverage_Report_*.xlsx  # 📊 Upload file Excel
         retention-days: 30
         
     - name: Upload coverage reports  
@@ -167,12 +478,10 @@ jobs:
         path: ./coveragereport/**/*                    # 📋 Upload tất cả file coverage
         retention-days: 30
         
-    # ================== TRIGGER EXCEL REPORT GENERATION ==================
-    - name: Trigger Excel Report Generation
-      if: success()  # Chỉ trigger khi tests thành công
-      uses: peter-evans/repository-dispatch@v2
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
       with:
-        token: ${{ secrets.REPO_DISPATCH_TOKEN }}
-        repository: ${{ github.repository }}
-        event-type: generate-excel-report
-        client-payload: '{"workflow_run_id": "${{ github.run_id }}"}'
+        name: test-results
+        path: ./TestResults/**/*                       # 🧪 Upload file test results
+        retention-days: 30
