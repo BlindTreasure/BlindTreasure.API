@@ -17,7 +17,7 @@ public static class OrderDtoMapper
                 Id = order.Id,
                 Status = order.Status,
                 TotalAmount = order.TotalAmount,
-                FinalAmount = order.TotalAmount - (order.DiscountAmount ?? 0),
+                FinalAmount = order.TotalAmount,
                 PlacedAt = order.PlacedAt,
                 CompletedAt = order.CompletedAt,
                 ShippingAddress = order.ShippingAddress != null
@@ -25,11 +25,7 @@ public static class OrderDtoMapper
                     : null,
                 Details = order.OrderDetails?.Select(ToOrderDetailDto).ToList() ?? new List<OrderDetailDto>(),
                 Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
-                PromotionId = order.PromotionId,
-                DiscountAmount = order.DiscountAmount,
-                PromotionNote = order.PromotionNote
-                                ?? order.Promotion?.Description
-                                ?? string.Empty
+
             };
         }
         catch (Exception ex)
