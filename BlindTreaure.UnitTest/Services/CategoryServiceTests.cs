@@ -26,7 +26,7 @@ public class CategoryServiceTests
     private readonly Mock<IMapperService> _mapperServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IUserService> _userServiceMock;
-
+//trigger
     public CategoryServiceTests()
     {
         _unitOfWorkMock = new Mock<IUnitOfWork>();
