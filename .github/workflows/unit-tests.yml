@@ -65,10 +65,51 @@ jobs:
         mkdir -p coveragereport
         cat > generate_excel_report.py << 'EOF'
         import pandas as pd
-        import glob
+        import json
+        import xml.etree.ElementTree as ET
         from datetime import datetime
-        from bs4 import BeautifulSoup
         import os
+        import glob
+        from bs4 import BeautifulSoup
+        
+        def parse_cobertura_xml():
+            xml_files = glob.glob('./TestResults/**/coverage.cobertura.xml', recursive=True)
+            if not xml_files:
+                return None
+            tree = ET.parse(xml_files[0])
+            root = tree.getroot()
+            line_rate = float(root.get('line-rate', 0)) * 100
+            branch_rate = float(root.get('branch-rate', 0)) * 100
+            classes_data = []
+            packages = root.findall('.//package')
+            for package in packages:
+                package_name = package.get('name', 'Unknown')
+                classes = package.findall('.//class')
+                for cls in classes:
+                    class_name = cls.get('name', 'Unknown')
+                    filename = cls.get('filename', 'Unknown')
+                    class_line_rate = float(cls.get('line-rate', 0)) * 100
+                    class_branch_rate = float(cls.get('branch-rate', 0)) * 100
+                    lines = cls.findall('.//line')
+                    total_lines = len(lines)
+                    covered_lines = len([l for l in lines if l.get('hits', '0') != '0'])
+                    classes_data.append({
+                        'Package': package_name,
+                        'Class': class_name,
+                        'File': filename,
+                        'Line Coverage (%)': round(class_line_rate, 2),
+                        'Branch Coverage (%)': round(class_branch_rate, 2),
+                        'Total Lines': total_lines,
+                        'Covered Lines': covered_lines,
+                        'Uncovered Lines': total_lines - covered_lines
+                    })
+            return {
+                'summary': {
+                    'line_coverage': round(line_rate, 2),
+                    'branch_coverage': round(branch_rate, 2)
+                },
+                'classes': classes_data
+            }
         
         def parse_test_results():
             trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
@@ -82,247 +123,130 @@ jobs:
                     for result in test_results:
                         test_name = result.get('testName', 'Unknown')
                         outcome = result.get('outcome', 'Unknown')
+                        duration = result.get('duration', '00:00:00')
+                        error_info = result.find('ErrorInfo')
+                        error_message = ""
+                        if error_info:
+                            message_elem = error_info.find('Message')
+                            if message_elem:
+                                error_message = message_elem.get_text()
                         test_data.append({
-                            'test_name': test_name,
-                            'outcome': outcome
+                            'Test Name': test_name,
+                            'Result': outcome,
+                            'Duration': duration,
+                            'Error Message': error_message
                         })
                 except Exception as e:
                     print(f"Error parsing TRX file: {e}")
             return test_data
         
-        def extract_functions(test_data):
-            # Extract function names from test names (this is an example, adjust as needed)
-            functions = []
-            seen = set()
-        
-            for test in test_data:
-                # Extract function name from test name - adjust this logic based on your naming convention
-                parts = test['test_name'].split('_')
-                if len(parts) > 1:
-                    func_name = parts[0]
-                else:
-                    func_name = test['test_name']
-        
-                # Capitalize first letter and add spaces between camelCase
-                import re
-                func_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', func_name)
-                func_name = func_name.capitalize()
-        
-                if func_name not in seen:
-                    seen.add(func_name)
-                    functions.append(func_name)
-        
-            # If no functions extracted or too few, use these defaults
-            if len(functions) < 8:
-                functions = [
-                    "Login", 
-                    "Create Course", 
-                    "Create Publish Class Request", 
-                    "Handle Publish Class Request",
-                    "Learner Register",
-                    "Take Attendance",
-                    "Create Payout Request",
-                    "Handle Payout Request"
-                ]
-        
-            return functions[:8]  # Limit to 8 functions as in the sample
-        
         def create_excel_report():
+            coverage_data = parse_cobertura_xml()
             test_data = parse_test_results()
-            functions = extract_functions(test_data)
-        
-            today = datetime.now().strftime("%m/%d/%Y")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            excel_file = f'./coveragereport/Test_Report_{timestamp}.xlsx'
-        
+            excel_file = f'./coveragereport/Coverage_Report_{timestamp}.xlsx'
             with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
                 workbook = writer.book
-        
-                # Define formats
-                title_format = workbook.add_format({
+                header_format = workbook.add_format({
                     'bold': True,
-                    'font_size': 16,
-                    'align': 'center',
-                    'valign': 'vcenter'
-                })
-        
-                header_format_blue = workbook.add_format({
-                    'bold': True,
+                    'text_wrap': True,
+                    'valign': 'top',
+                    'fg_color': '#4472C4',
                     'font_color': 'white',
-                    'bg_color': '#000080',  # Navy blue
-                    'align': 'center',
-                    'valign': 'vcenter',
                     'border': 1
                 })
-        
-                header_format_brown = workbook.add_format({
-                    'bold': True,
-                    'font_color': 'white',
-                    'bg_color': '#A52A2A',  # Brown
-                    'valign': 'vcenter',
-                    'border': 1
-                })
-        
                 cell_format = workbook.add_format({
+                    'text_wrap': True,
+                    'valign': 'top',
                     'border': 1
                 })
-        
-                cell_format_blue_bg = workbook.add_format({
-                    'bg_color': '#E6F0FF',  # Light blue
-                    'border': 1
-                })
-        
-                # TEST CASE LIST sheet
-                worksheet1 = workbook.add_worksheet('TEST CASE LIST')
-        
-                # Set column widths
-                worksheet1.set_column('A:A', 20)
-                worksheet1.set_column('B:B', 60)
-                worksheet1.set_column('C:E', 30)
-        
-                # Title
-                worksheet1.merge_range('A1:E1', 'TEST CASE LIST', title_format)
-        
-                # Project info section
-                worksheet1.write('A2', 'Project Name', header_format_brown)
-                worksheet1.write('B2', '#REF!', cell_format)
-        
-                worksheet1.write('A3', 'Project Code', header_format_brown)
-                worksheet1.write('B3', '#REF!', cell_format)
-        
-                worksheet1.write('A4', 'Test Environment Setup Description', header_format_brown)
-                worksheet1.merge_range('A4:A7', 'Test Environment Setup Description', header_format_brown)
-        
-                # Test environment details
-                env_text = "1. Server\n2. Database\n3. Web Browser\n4. Mobile"
-                worksheet1.write('B4', env_text, cell_format_blue_bg)
-                worksheet1.merge_range('B4:B7', env_text, cell_format_blue_bg)
-        
-                # Add empty row
-                worksheet1.write('A8', '', cell_format)
-                worksheet1.write('B8', '', cell_format)
-        
-                # Table headers
-                worksheet1.write('A9', 'No', header_format_blue)
-                worksheet1.write('B9', 'Function Name', header_format_blue)
-                worksheet1.write('C9', 'Sheet Name', header_format_blue)
-                worksheet1.write('D9', 'Description', header_format_blue)
-                worksheet1.write('E9', 'Pre-Condition', header_format_blue)
-        
-                # Table data
-                for i, func in enumerate(functions, 1):
-                    row = i + 9
-                    worksheet1.write(f'A{row}', i, cell_format)
-                    worksheet1.write(f'B{row}', func, cell_format)
-        
-                    # Sheet name (make it look like a hyperlink)
-                    sheet_name = func.replace(" ", "_")
-                    hyperlink_format = workbook.add_format({
-                        'font_color': 'blue',
-                        'underline': 1,
-                        'border': 1
-                    })
-                    worksheet1.write(f'C{row}', sheet_name, hyperlink_format)
-        
-                    # Empty Description and Pre-Condition cells
-                    worksheet1.write(f'D{row}', '', cell_format)
-                    worksheet1.write(f'E{row}', '', cell_format)
-        
-                # TEST STATISTICS sheet
-                worksheet2 = workbook.add_worksheet('TEST STATISTICS')
-        
-                # Set column widths
-                worksheet2.set_column('A:A', 15)
-                worksheet2.set_column('B:B', 30)
-                worksheet2.set_column('C:G', 15)
-        
-                # Title
-                worksheet2.merge_range('A1:G1', 'TEST STATISTICS', title_format)
-        
-                # Project info section
-                worksheet2.write('A2', 'Project Name', header_format_brown)
-                worksheet2.write('B2', '#REF!', cell_format)
-                worksheet2.write('C2', 'Creator', header_format_brown)
-                worksheet2.write('E2', 'HaoNTT', cell_format)
-        
-                worksheet2.write('A3', 'Project Code', header_format_brown)
-                worksheet2.write('B3', '#REF!', cell_format)
-                worksheet2.write('C3', 'Reviewer/Approver', header_format_brown)
-                worksheet2.write('E3', '', cell_format)
-        
-                worksheet2.write('A4', 'Document Code', header_format_brown)
-                worksheet2.write('B4', '#REF!', cell_format)
-                worksheet2.write('C4', 'Issue Date', header_format_brown)
-                worksheet2.write('E4', today, cell_format)
-        
-                worksheet2.write('A5', 'Notes', header_format_brown)
-                worksheet2.merge_range('B5:G5', '', cell_format)
-        
-                # Empty row
-                worksheet2.write('A6', '', cell_format)
-        
-                # Table headers
-                worksheet2.write('A7', 'No', header_format_blue)
-                worksheet2.write('B7', 'Module code', header_format_blue)
-                worksheet2.write('C7', 'Passed', header_format_blue)
-                worksheet2.write('D7', 'Failed', header_format_blue)
-                worksheet2.write('E7', 'Pending', header_format_blue)
-                worksheet2.write('F7', 'N/A', header_format_blue)
-                worksheet2.write('G7', 'Number of test cases', header_format_blue)
-        
-                # Table data (first 4 rows with #REF!)
-                for i in range(1, 5):
-                    row = i + 7
-                    worksheet2.write(f'A{row}', i, cell_format)
-                    worksheet2.write(f'B{row}', '#REF!', cell_format)
-                    worksheet2.write(f'C{row}', '#REF!', cell_format)
-                    worksheet2.write(f'D{row}', '#REF!', cell_format)
-                    worksheet2.write(f'E{row}', '#REF!', cell_format)
-                    worksheet2.write(f'F{row}', '#REF!', cell_format)
-                    worksheet2.write(f'G{row}', '#REF!', cell_format)
-        
-                # Remaining rows with function names
-                for i, func in enumerate(functions[4:], 5):
-                    row = i + 7
-                    worksheet2.write(f'A{row}', i, cell_format)
-                    worksheet2.write(f'B{row}', func, cell_format)
-                    worksheet2.write(f'C{row}', '#REF!', cell_format)
-                    worksheet2.write(f'D{row}', '#REF!', cell_format)
-                    worksheet2.write(f'E{row}', '#REF!', cell_format)
-                    worksheet2.write(f'F{row}', '#REF!', cell_format)
-                    worksheet2.write(f'G{row}', '#REF!', cell_format)
-        
-                # Sub total row
-                sub_total_row = 16
-                worksheet2.write(f'A{sub_total_row}', 'Sub total', header_format_blue)
-                worksheet2.write(f'B{sub_total_row}', '', header_format_blue)
-                worksheet2.write(f'C{sub_total_row}', '#REF!', header_format_blue)
-                worksheet2.write(f'D{sub_total_row}', '#REF!', header_format_blue)
-                worksheet2.write(f'E{sub_total_row}', '#REF!', header_format_blue)
-                worksheet2.write(f'F{sub_total_row}', '#REF!', header_format_blue)
-                worksheet2.write(f'G{sub_total_row}', '#REF!', header_format_blue)
-        
-                # Test coverage statistics
-                worksheet2.write('A18', 'Test coverage', workbook.add_format({'bold': True, 'font_color': '#A52A2A'}))
-                worksheet2.write('C18', '#REF!', workbook.add_format({'bold': True, 'font_color': 'blue'}))
-                worksheet2.write('D18', '%', workbook.add_format({'bold': True, 'font_color': 'blue'}))
-        
-                worksheet2.write('A19', 'Test successful coverage', workbook.add_format({'bold': True, 'font_color': '#A52A2A'}))
-                worksheet2.write('C19', '#REF!', workbook.add_format({'bold': True, 'font_color': 'blue'}))
-                worksheet2.write('D19', '%', workbook.add_format({'bold': True, 'font_color': 'blue'}))
-        
-            print(f"✅ Excel test report generated: {excel_file}")
+                summary_data = []
+                if coverage_data:
+                    summary_data = [
+                        ['Metric', 'Value', 'Status'],
+                        ['Line Coverage', f"{coverage_data['summary']['line_coverage']}%", 
+                         '✅ Pass' if coverage_data['summary']['line_coverage'] >= 70 else '❌ Fail'],
+                        ['Branch Coverage', f"{coverage_data['summary']['branch_coverage']}%", ''],
+                        ['Test Run Date', datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ''],
+                        ['Total Test Classes', len(coverage_data['classes']) if coverage_data['classes'] else 0, ''],
+                        ['Minimum Threshold', '70%', ''],
+                    ]
+                else:
+                    summary_data = [
+                        ['Metric', 'Value', 'Status'],
+                        ['Line Coverage', 'N/A', 'No data available'],
+                    ]
+                df_summary = pd.DataFrame(summary_data[1:], columns=summary_data[0])
+                df_summary.to_excel(writer, sheet_name='Summary', index=False)
+                worksheet_summary = writer.sheets['Summary']
+                worksheet_summary.set_column('A:A', 20)
+                worksheet_summary.set_column('B:B', 15)
+                worksheet_summary.set_column('C:C', 15)
+                for row_num in range(len(df_summary) + 1):
+                    for col_num in range(len(df_summary.columns)):
+                        if row_num == 0:
+                            worksheet_summary.write(row_num, col_num, df_summary.columns[col_num], header_format)
+                        else:
+                            worksheet_summary.write(row_num, col_num, df_summary.iloc[row_num-1, col_num], cell_format)
+                if coverage_data and coverage_data['classes']:
+                    df_classes = pd.DataFrame(coverage_data['classes'])
+                    df_classes.to_excel(writer, sheet_name='Coverage Details', index=False)
+                    worksheet_details = writer.sheets['Coverage Details']
+                    worksheet_details.set_column('A:A', 25)
+                    worksheet_details.set_column('B:B', 30)
+                    worksheet_details.set_column('C:C', 40)
+                    worksheet_details.set_column('D:D', 18)
+                    worksheet_details.set_column('E:E', 18)
+                    worksheet_details.set_column('F:F', 12)
+                    worksheet_details.set_column('G:G', 15)
+                    worksheet_details.set_column('H:H', 15)
+                    for row_num in range(len(df_classes) + 1):
+                        for col_num in range(len(df_classes.columns)):
+                            if row_num == 0:
+                                worksheet_details.write(row_num, col_num, df_classes.columns[col_num], header_format)
+                            else:
+                                worksheet_details.write(row_num, col_num, df_classes.iloc[row_num-1, col_num], cell_format)
+                if test_data:
+                    df_tests = pd.DataFrame(test_data)
+                    df_tests.to_excel(writer, sheet_name='Test Results', index=False)
+                    worksheet_tests = writer.sheets['Test Results']
+                    worksheet_tests.set_column('A:A', 50)
+                    worksheet_tests.set_column('B:B', 12)
+                    worksheet_tests.set_column('C:C', 12)
+                    worksheet_tests.set_column('D:D', 60)
+                    for row_num in range(len(df_tests) + 1):
+                        for col_num in range(len(df_tests.columns)):
+                            if row_num == 0:
+                                worksheet_tests.write(row_num, col_num, df_tests.columns[col_num], header_format)
+                            else:
+                                cell_value = df_tests.iloc[row_num-1, col_num]
+                                if col_num == 1 and cell_value == 'Failed':
+                                    fail_format = workbook.add_format({
+                                        'text_wrap': True,
+                                        'valign': 'top',
+                                        'border': 1,
+                                        'bg_color': '#FFE6E6'
+                                    })
+                                    worksheet_tests.write(row_num, col_num, cell_value, fail_format)
+                                else:
+                                    worksheet_tests.write(row_num, col_num, cell_value, cell_format)
+            print(f"✅ Excel report generated: {excel_file}")
             return excel_file
-        
         if __name__ == "__main__":
             excel_file = create_excel_report()
         EOF
         python generate_excel_report.py
 
-    - name: Upload Excel test reports
+    - name: Display coverage summary
+      run: |
+        echo "## 📊 Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📊 **Excel Report Available**: Download the detailed Excel report from artifacts below" >> $GITHUB_STEP_SUMMARY
+
+    - name: Upload Excel coverage reports
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-report
-        path: ./coveragereport/Test_Report_*.xlsx
+        name: excel-coverage-report
+        path: ./coveragereport/Coverage_Report_*.xlsx
         retention-days: 30
