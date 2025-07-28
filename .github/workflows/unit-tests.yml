@@ -62,6 +62,7 @@ jobs:
 
     - name: Create Excel coverage report
       run: |
+        mkdir -p coveragereport
         cat > generate_excel_report.py << 'EOF'
         import pandas as pd
         import json
