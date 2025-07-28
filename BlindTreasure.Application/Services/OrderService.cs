@@ -522,7 +522,7 @@ public class OrderService : IOrderService
             }
             else if (item.BlindBoxId.HasValue)
             {
-                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value, x => x.SellerId);
+                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value, x => x.Seller);
                 blindBox.TotalQuantity -= item.Quantity;
                 if (blindBox.TotalQuantity <= 0 && blindBox.Status == BlindBoxStatus.Approved)
                 {
