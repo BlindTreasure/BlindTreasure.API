@@ -178,7 +178,7 @@ public class ProductServiceTests
     }
 
     #endregion
-    
+
     #region CreateAsync Tests
 
     [Fact]
@@ -224,7 +224,8 @@ public class ProductServiceTests
 
         // Setup AddAsync to return a product with proper ID
         _productRepoMock.Setup(x => x.AddAsync(It.IsAny<Product>()))
-            .ReturnsAsync((Product p) => {
+            .ReturnsAsync((Product p) =>
+            {
                 p.Id = productId;
                 return p;
             });
@@ -305,13 +306,13 @@ public class ProductServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() => _productService.CreateAsync(dto));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(403);
     }
 
     #endregion
-    
+
     #region UpdateAsync Tests
 
     [Fact]
@@ -337,7 +338,8 @@ public class ProductServiceTests
             Status = ProductStatus.Active,
             IsDeleted = false,
             SellerId = Guid.NewGuid(),
-            Seller = new Seller { Id = Guid.NewGuid(), CompanyName = "Test Seller", IsVerified = true, Status = SellerStatus.Approved }
+            Seller = new Seller
+                { Id = Guid.NewGuid(), CompanyName = "Test Seller", IsVerified = true, Status = SellerStatus.Approved }
         };
 
         _productRepoMock.Setup(x => x.GetByIdAsync(productId))
@@ -393,13 +395,13 @@ public class ProductServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() => _productService.UpdateAsync(productId, dto));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(404);
     }
 
     #endregion
-    
+
     #region DeleteAsync Tests
 
     [Fact]
@@ -441,12 +443,13 @@ public class ProductServiceTests
         // Assert
         result.Should().NotBeNull();
         result.Id.Should().Be(productId);
-        _productRepoMock.Verify(x => x.Update(It.Is<Product>(p => p.IsDeleted && p.Status == ProductStatus.InActive)), Times.Once);
+        _productRepoMock.Verify(x => x.Update(It.Is<Product>(p => p.IsDeleted && p.Status == ProductStatus.InActive)),
+            Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
     }
 
     #endregion
-    
+
     #region UploadProductImageAsync Tests
 
     [Fact]
@@ -501,8 +504,9 @@ public class ProductServiceTests
         var emptyFile = new FormFile(new MemoryStream(), 0, 0, "Data", "empty.jpg");
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => _productService.UploadProductImageAsync(productId, emptyFile));
-        
+        var exception =
+            await Assert.ThrowsAsync<Exception>(() => _productService.UploadProductImageAsync(productId, emptyFile));
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(400);
     }
