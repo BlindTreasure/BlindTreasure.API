@@ -1,10 +1,8 @@
 name: Generate Excel Test Reports
 
 on:
-  workflow_run:
-    workflows: ["Unit Tests with Excel Report"]
-    types: [completed]
-    branches: [ main, develop ]
+  repository_dispatch:
+    types: [generate-excel-report]
 
 jobs:
   generate-excel-report:
@@ -13,6 +11,7 @@ jobs:
       contents: read
       actions: read
       pull-requests: write
+      id-token: write
     
     steps:
     # ================== SETUP MÔI TRƯỜNG ==================
@@ -24,24 +23,40 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
+        cache: 'pip'
+        
+    - name: Cache Python dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
         
     - name: Install Python dependencies
       run: |
         # Cài đặt thư viện Python cần thiết để tạo file Excel
-        pip install pandas openpyxl xlsxwriter lxml beautifulsoup4
+        pip install --no-cache-dir pandas openpyxl xlsxwriter lxml beautifulsoup4
         
     # ================== DOWNLOAD ARTIFACTS TỪ WORKFLOW CHÍNH ==================
-    - name: Download test artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: test-results
-        path: ./TestResults/
+    - name: Get workflow run ID and download artifacts
+      id: get-run
+      run: |
+        # Lấy workflow run ID từ client payload hoặc tìm workflow gần nhất
+        if [ -n "${{ github.event.client_payload.workflow_run_id }}" ]; then
+          RUN_ID="${{ github.event.client_payload.workflow_run_id }}"
+        else
+          # Fallback: tìm workflow gần nhất thành công
+          RUN_ID=$(gh api repos/${{ github.repository }}/actions/runs \
+            --jq '.workflow_runs[] | select(.name == "Unit Tests with Excel Report" and .conclusion == "success") | .id' \
+            | head -1)
+        fi
+        echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
         
-    - name: Download coverage artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: coverage-report
-        path: ./coveragereport/
+        # Download artifacts in parallel
+        gh run download $RUN_ID --name test-results --dir ./TestResults/ &
+        gh run download $RUN_ID --name coverage-report --dir ./coveragereport/ &
+        wait
         
     # ================== TẠO FILE EXCEL - PHẦN QUAN TRỌNG NHẤT ==================
     - name: Create Excel coverage report
@@ -69,24 +84,21 @@ jobs:
             line_rate = float(root.get('line-rate', 0)) * 100
             branch_rate = float(root.get('branch-rate', 0)) * 100
             
-            # Lấy chi tiết coverage theo từng class/file
+            # Lấy chi tiết coverage theo từng class/file - optimized
             classes_data = []
-            packages = root.findall('.//package')
-            
-            for package in packages:
+            for package in root.findall('.//package'):
                 package_name = package.get('name', 'Unknown')
-                classes = package.findall('.//class')
                 
-                for cls in classes:
+                for cls in package.findall('.//class'):
                     class_name = cls.get('name', 'Unknown')
                     filename = cls.get('filename', 'Unknown')
                     class_line_rate = float(cls.get('line-rate', 0)) * 100
                     class_branch_rate = float(cls.get('branch-rate', 0)) * 100
                     
-                    # Đếm số dòng được cover và chưa cover
+                    # Đếm số dòng được cover và chưa cover - optimized
                     lines = cls.findall('.//line')
                     total_lines = len(lines)
-                    covered_lines = len([l for l in lines if l.get('hits', '0') != '0'])
+                    covered_lines = sum(1 for l in lines if l.get('hits', '0') != '0')
                     
                     classes_data.append({
                         'Package': package_name,
@@ -118,16 +130,15 @@ jobs:
                         content = f.read()
                         soup = BeautifulSoup(content, 'xml')
                         
-                    # Parse từng test result
-                    test_results = soup.find_all('UnitTestResult')
-                    for result in test_results:
+                    # Parse từng test result - optimized
+                    for result in soup.find_all('UnitTestResult'):
                         test_name = result.get('testName', 'Unknown')
                         outcome = result.get('outcome', 'Unknown')
                         duration = result.get('duration', '00:00:00')
                         
-                        # Lấy error message nếu test fail
-                        error_info = result.find('ErrorInfo')
+                        # Lấy error message nếu test fail - optimized
                         error_message = ""
+                        error_info = result.find('ErrorInfo')
                         if error_info:
                             message_elem = error_info.find('Message')
                             if message_elem:
@@ -209,13 +220,12 @@ jobs:
                 worksheet_summary.set_column('B:B', 15)
                 worksheet_summary.set_column('C:C', 15)
                 
-                # Áp dụng format cho từng cell
-                for row_num in range(len(df_summary) + 1):
+                # Áp dụng format cho từng cell - optimized
+                for col_num, col_name in enumerate(df_summary.columns):
+                    worksheet_summary.write(0, col_num, col_name, header_format)
+                for row_num in range(len(df_summary)):
                     for col_num in range(len(df_summary.columns)):
-                        if row_num == 0:
-                            worksheet_summary.write(row_num, col_num, df_summary.columns[col_num], header_format)
-                        else:
-                            worksheet_summary.write(row_num, col_num, df_summary.iloc[row_num-1, col_num], cell_format)
+                        worksheet_summary.write(row_num + 1, col_num, df_summary.iloc[row_num, col_num], cell_format)
                 
                 # 📊 SHEET 2: COVERAGE DETAILS - Chi tiết coverage theo class
                 if coverage_data and coverage_data['classes']:
@@ -233,13 +243,12 @@ jobs:
                     worksheet_details.set_column('G:G', 15)  # Covered Lines
                     worksheet_details.set_column('H:H', 15)  # Uncovered Lines
                     
-                    # Áp dụng format
-                    for row_num in range(len(df_classes) + 1):
+                    # Áp dụng format - optimized
+                    for col_num, col_name in enumerate(df_classes.columns):
+                        worksheet_details.write(0, col_num, col_name, header_format)
+                    for row_num in range(len(df_classes)):
                         for col_num in range(len(df_classes.columns)):
-                            if row_num == 0:
-                                worksheet_details.write(row_num, col_num, df_classes.columns[col_num], header_format)
-                            else:
-                                worksheet_details.write(row_num, col_num, df_classes.iloc[row_num-1, col_num], cell_format)
+                            worksheet_details.write(row_num + 1, col_num, df_classes.iloc[row_num, col_num], cell_format)
                 
                 # 🧪 SHEET 3: TEST RESULTS - Kết quả test chi tiết
                 if test_data:
@@ -252,24 +261,24 @@ jobs:
                     worksheet_tests.set_column('C:C', 12)  # Duration
                     worksheet_tests.set_column('D:D', 60)  # Error Message
                     
-                    # Highlight test failed với màu đỏ
-                    for row_num in range(len(df_tests) + 1):
+                    # Highlight test failed với màu đỏ - optimized
+                    fail_format = workbook.add_format({
+                        'text_wrap': True,
+                        'valign': 'top',
+                        'border': 1,
+                        'bg_color': '#FFE6E6'  # Màu đỏ nhạt
+                    })
+                    
+                    for col_num, col_name in enumerate(df_tests.columns):
+                        worksheet_tests.write(0, col_num, col_name, header_format)
+                    for row_num in range(len(df_tests)):
                         for col_num in range(len(df_tests.columns)):
-                            if row_num == 0:
-                                worksheet_tests.write(row_num, col_num, df_tests.columns[col_num], header_format)
+                            cell_value = df_tests.iloc[row_num, col_num]
+                            # Highlight failed tests với background màu đỏ nhạt
+                            if col_num == 1 and cell_value == 'Failed':
+                                worksheet_tests.write(row_num + 1, col_num, cell_value, fail_format)
                             else:
-                                cell_value = df_tests.iloc[row_num-1, col_num]
-                                # Highlight failed tests với background màu đỏ nhạt
-                                if col_num == 1 and cell_value == 'Failed':
-                                    fail_format = workbook.add_format({
-                                        'text_wrap': True,
-                                        'valign': 'top',
-                                        'border': 1,
-                                        'bg_color': '#FFE6E6'  # Màu đỏ nhạt
-                                    })
-                                    worksheet_tests.write(row_num, col_num, cell_value, fail_format)
-                                else:
-                                    worksheet_tests.write(row_num, col_num, cell_value, cell_format)
+                                worksheet_tests.write(row_num + 1, col_num, cell_value, cell_format)
                 
                 # 📈 SHEET 4: COVERAGE TRENDS - Xu hướng coverage (để mở rộng sau)
                 trends_data = [
@@ -289,13 +298,12 @@ jobs:
                 worksheet_trends.set_column('C:C', 18)
                 worksheet_trends.set_column('D:D', 15)
                 
-                # Áp dụng format cho trends
-                for row_num in range(len(df_trends) + 1):
+                # Áp dụng format cho trends - optimized
+                for col_num, col_name in enumerate(df_trends.columns):
+                    worksheet_trends.write(0, col_num, col_name, header_format)
+                for row_num in range(len(df_trends)):
                     for col_num in range(len(df_trends.columns)):
-                        if row_num == 0:
-                            worksheet_trends.write(row_num, col_num, df_trends.columns[col_num], header_format)
-                        else:
-                            worksheet_trends.write(row_num, col_num, df_trends.iloc[row_num-1, col_num], cell_format)
+                        worksheet_trends.write(row_num + 1, col_num, df_trends.iloc[row_num, col_num], cell_format)
             
             print(f"✅ Excel report generated: {excel_file}")
             return excel_file
