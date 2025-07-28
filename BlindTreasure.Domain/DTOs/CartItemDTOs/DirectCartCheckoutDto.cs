@@ -17,6 +17,6 @@ public class DirectCartItemDto
     public decimal UnitPrice { get; set; }
 
     public decimal TotalPrice { get; set; }
-    //public Guid? PromotionId { get; set; } // voucher được apply theo seller nên phải tính trên item
+    public Guid? PromotionId { get; set; } // voucher được apply theo seller nên phải tính trên item
     // Có thể bổ sung thêm payment info, note, v.v.
 }

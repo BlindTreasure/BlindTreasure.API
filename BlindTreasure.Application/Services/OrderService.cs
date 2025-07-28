@@ -93,10 +93,11 @@ public class OrderService : IOrderService
                 BlindBoxName = i.BlindBoxName,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
-                TotalPrice = i.TotalPrice
+                TotalPrice = i.TotalPrice,
+
             }),
-            shippingAddressId,
-            dto.PromotionId
+            shippingAddressId
+ 
         );
         _loggerService.Success("Checkout from system cart completed.");
         return result;
@@ -146,10 +147,11 @@ public class OrderService : IOrderService
                 BlindBoxName = i.BlindBoxName,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
-                TotalPrice = i.TotalPrice
+                TotalPrice = i.TotalPrice,
+                PromotionId = i.PromotionId // Thêm PromotionId nếu có
             }),
-            shippingAddressId,
-            cartDto.PromotionId
+            shippingAddressId
+
         );
         _loggerService.Success("Checkout from client cart completed.");
         return result;
@@ -228,7 +230,6 @@ public class OrderService : IOrderService
         var userId = _claimsService.CurrentUserId;
         var query = _unitOfWork.Orders.GetQueryable()
             .Where(o => o.UserId == userId && !o.IsDeleted)
-            .Include(o => o.Promotion)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
@@ -385,8 +386,7 @@ public class OrderService : IOrderService
 
     private async Task<string> CheckoutCore(
         IEnumerable<CheckoutItem> items,
-        Guid? shippingAddressId,
-        Guid? promotionId = null)
+        Guid? shippingAddressId)
     {
         _loggerService.Info("Start core checkout logic.");
         var userId = _claimsService.CurrentUserId;
@@ -421,6 +421,15 @@ public class OrderService : IOrderService
                 throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
             }
         }
+
+        var productIds = itemList.Where(i => i.ProductId.HasValue)
+                              .Select(i => i.ProductId.Value)
+                              .Distinct()
+                              .ToList();
+        var products = await _unitOfWork.Products.GetQueryable()
+            .Where(p => productIds.Contains(p.Id))
+            .Include(p => p.Seller)
+            .ToListAsync();
 
         foreach (var item in itemList)
             if (item.ProductId.HasValue)
@@ -468,57 +477,16 @@ public class OrderService : IOrderService
                 }
             }
 
-        var totalPrice = itemList.Sum(i => i.TotalPrice);
-
-        decimal discountAmount = 0;
-        string? promotionNote = null;
-        Promotion? promotion = null;
-
-        if (promotionId.HasValue)
-        {
-            promotion = await _unitOfWork.Promotions.GetByIdAsync(promotionId.Value);
-            if (promotion == null)
-            {
-                _loggerService.Warn("Promotion not found.");
-                throw ErrorHelper.BadRequest("Voucher không tồn tại.");
-            }
-
-            if (promotion.Status != PromotionStatus.Approved)
-            {
-                _loggerService.Warn("Promotion not approved.");
-                throw ErrorHelper.BadRequest("Voucher chưa được duyệt.");
-            }
-
-            var now = DateTime.UtcNow;
-            if (now < promotion.StartDate || now > promotion.EndDate)
-            {
-                _loggerService.Warn("Promotion expired or not started.");
-                throw ErrorHelper.BadRequest("Voucher đã hết hạn hoặc chưa bắt đầu.");
-            }
-
-            if (promotion.DiscountType == DiscountType.Percentage)
-                discountAmount = Math.Round(totalPrice * (promotion.DiscountValue / 100m), 2);
-            else if (promotion.DiscountType == DiscountType.Fixed)
-                discountAmount = promotion.DiscountValue;
-
-            discountAmount = Math.Min(discountAmount, totalPrice);
-            promotionNote = $"Áp dụng voucher {promotion.Code}, giảm {discountAmount:N0}đ";
-        }
-
         var order = new Order
         {
             UserId = userId,
             Status = OrderStatus.PENDING.ToString(),
-            TotalAmount = totalPrice,
-            FinalAmount = totalPrice - discountAmount,
             PlacedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
             ShippingAddressId = shippingAddressId,
-            PromotionId = promotionId,
-            Promotion = promotion,
-            DiscountAmount = discountAmount > 0 ? discountAmount : null,
-            PromotionNote = promotionNote,
-            OrderDetails = new List<OrderDetail>()
+            OrderDetails = new List<OrderDetail>(),
+            OrderSellerPromotions = new List<OrderSellerPromotion>()
+
         };
 
         var orderDetails = new List<OrderDetail>();
@@ -536,6 +504,12 @@ public class OrderService : IOrderService
                 Status = OrderDetailStatus.PENDING,
                 CreatedAt = DateTime.UtcNow
             };
+
+            if( orderDetail.TotalPrice != (item.Quantity * item.UnitPrice))
+            {
+                _loggerService.Warn($"Total price mismatch for item {item.ProductName ?? item.BlindBoxName}.");
+                throw ErrorHelper.BadRequest("Tổng tiền không khớp với số lượng và đơn giá.");
+            }
             order.OrderDetails.Add(orderDetail);
             orderDetails.Add(orderDetail);
 
@@ -561,7 +535,50 @@ public class OrderService : IOrderService
             }
         }
 
-        await _unitOfWork.Orders.AddAsync(order);
+        var sellerPromos = itemList
+         .Where(i => i.PromotionId.HasValue)
+         .GroupBy(i => new { Seller = products.First(p => p.Id == i.ProductId).SellerId, Promo = i.PromotionId.Value })
+         .Select(g => new { g.Key.Seller, g.Key.Promo })
+         .ToList();
+
+        foreach (var sp in sellerPromos)
+        {
+            var promo = await _unitOfWork.Promotions.GetByIdAsync(sp.Promo);
+            if (promo == null || promo.Status != PromotionStatus.Approved)
+                throw ErrorHelper.BadRequest("Invalid promotion");
+
+            var subTotal = order.OrderDetails
+                .Where(od => od.SellerId == sp.Seller)
+                .Sum(od => od.TotalPrice);
+
+            decimal discount = promo.DiscountType == DiscountType.Percentage
+                ? Math.Round(subTotal * promo.DiscountValue / 100m, 2)
+                : promo.DiscountValue;
+            discount = Math.Min(discount, subTotal);
+
+            var osp = new OrderSellerPromotion
+            {
+                Order = order,
+                SellerId = sp.Seller,
+                Promotion = promo,
+                DiscountAmount = discount,
+                Note = $"Applied {promo.Code}, -{discount:N0}"
+            };
+            order.OrderSellerPromotions.Add(osp);
+
+            promo.UsageLimit = (promo.UsageLimit ?? 0) - 1;
+            await _unitOfWork.Promotions.Update(promo);
+        }
+
+        order.TotalAmount = order.OrderDetails.Sum(od => od.TotalPrice);
+        order.FinalAmount = order.TotalAmount - order.OrderSellerPromotions.Sum(osp => osp.DiscountAmount);
+        if (order.FinalAmount < 0)
+        {
+            _loggerService.Warn("Final amount cannot be negative, resetting to zero.");
+            throw ErrorHelper.BadRequest("Tổng tiền không thể âm, vui lòng kiểm tra lại code.");
+        }
+
+        order = await _unitOfWork.Orders.AddAsync(order);
         await _unitOfWork.SaveChangesAsync();
 
         if (shippingAddress != null)
@@ -595,7 +612,7 @@ public class OrderService : IOrderService
                         .PreviewOrderAsync(
                             ghnOrderRequest); // sửa thành chính thức sang preview vì đây là tạo yêu cầu thanh toán
 
-                order.FinalAmount += ghnCreateResponse?.TotalFee ?? 0;
+                order.TotalAmount += ghnCreateResponse?.TotalFee ?? 0;
                 _loggerService.Info(
                     $"Created GHN shipment for seller {seller.Id}, fee: {ghnCreateResponse?.TotalFee ?? 0}");
 
@@ -618,9 +635,10 @@ public class OrderService : IOrderService
                         Status = ShipmentStatus.WAITING_PAYMENT // chưa thanh toán, chờ xác nhận
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
-
+                    order.FinalAmount = order.TotalAmount - order.OrderSellerPromotions.Sum(osp => osp.DiscountAmount);
                     od.Status = OrderDetailStatus.SHIPPING_REQUESTED;
                     od.Shipments.Add(shipment);
+                    _loggerService.Info($"Shipment created for OrderDetail {od.Id} with GHN.");
 
                     await _unitOfWork.OrderDetails.Update(od);
                 }
@@ -719,5 +737,6 @@ public class OrderService : IOrderService
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
         public Guid? SellerId { get; set; } // Thêm SellerId nếu cần
+        public Guid? PromotionId { get; set; } // Thêm PromotionId nếu cần
     }
 }

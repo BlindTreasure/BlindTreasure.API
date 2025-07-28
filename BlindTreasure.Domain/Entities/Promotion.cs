@@ -14,7 +14,7 @@ public class Promotion : BaseEntity
     public DateTime EndDate { get; set; }
 
     public int? UsageLimit { get; set; }
-    public string? RejectReason { get; set; }
+    public string? RejectReason { get; set; } 
 
     public PromotionStatus Status { get; set; } // Enum: [PENDING, Approved, Rejected]
 
@@ -27,4 +27,7 @@ public class Promotion : BaseEntity
 
     //navigation property to Order
     public ICollection<Order> Orders { get; set; }
+    public ICollection<OrderSellerPromotion> OrderSellerPromotions { get; set; }
+
+
 }

@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Stripe;
 using Stripe.Checkout;
+using System.Text;
 
 namespace BlindTreasure.Application.Services;
 
@@ -62,7 +63,7 @@ public class StripeService : IStripeService
             .ThenInclude(od => od.BlindBox)
             .Include(o => o.OrderDetails)
             .ThenInclude(od => od.Shipments)
-            .Include(o => o.Promotion)
+            .Include(o => o.OrderSellerPromotions)
             .FirstOrDefaultAsync();
 
         if (order == null)
@@ -161,15 +162,13 @@ public class StripeService : IStripeService
         {
             Metadata = new Dictionary<string, string>
             {
-                { "orderId", orderId.ToString() },
-                { "userId", userId.ToString() },
-                { "isRenew", isRenew.ToString() },
-                { "promotion", promotionDesc },
-                { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
-                { "promotionCode", order.Promotion?.Code ?? "" },
-                { "totalAmount", order.TotalAmount.ToString() },
-                { "finalAmount", order.FinalAmount.ToString() },
-                { "IsShipment", totalShippingFee > 0 ? "true" : "false" }
+            { "orderId", orderId.ToString() },
+            { "userId", userId.ToString() },
+            { "isRenew", isRenew.ToString() },
+            { "promotion", promotionDesc },
+            { "totalAmount", order.TotalAmount.ToString() },
+            { "finalAmount", order.FinalAmount.ToString() },
+            { "IsShipment", totalShippingFee > 0 ? "true" : "false" }
             },
 
             CustomerEmail = user.Email,
@@ -185,18 +184,16 @@ public class StripeService : IStripeService
             {
                 Metadata = new Dictionary<string, string>
                 {
-                    { "orderId", orderId.ToString() },
-                    { "userId", userId.ToString() },
-                    { "createdAt", DateTime.UtcNow.ToString("o") },
-                    { "email", user.Email },
-                    { "orderStatus", order.Status },
-                    { "itemCount", order.OrderDetails.Count.ToString() },
-                    { "totalAmount", order.TotalAmount.ToString() },
-                    { "currency", "vnd" },
-                    { "isRenew", isRenew.ToString() },
-                    { "promotion", promotionDesc },
-                    { "discountAmount", order.DiscountAmount?.ToString() ?? "0" },
-                    { "promotionCode", order.Promotion?.Code ?? "" }
+                { "orderId", orderId.ToString() },
+                { "userId", userId.ToString() },
+                { "createdAt", DateTime.UtcNow.ToString("o") },
+                { "email", user.Email },
+                { "orderStatus", order.Status },
+                { "itemCount", order.OrderDetails.Count.ToString() },
+                { "totalAmount", order.TotalAmount.ToString() },
+                { "currency", "vnd" },
+                { "isRenew", isRenew.ToString() },
+                { "promotion", promotionDesc }
                 }
             }
         };
@@ -288,7 +285,7 @@ public class StripeService : IStripeService
             {
                 { "shipmentIds", string.Join(",", shipments.Select(s => s.Id)) },
                 { "userId", userId.ToString() },
-                { "IsShipment", true.ToString() }
+                { "IsShipmenRequest", true.ToString() }
             },
             CustomerEmail = user.Email,
             PaymentMethodTypes = new List<string> { "card" },
@@ -413,16 +410,22 @@ public class StripeService : IStripeService
 
     private string GetPromotionDescription(Order order)
     {
-        if (order.Promotion != null)
-            return
-                $"[Voucher: {order.Promotion.Code} - {order.Promotion.Description}]\n" +
-                $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
-                $"Giảm giá: {order.DiscountAmount?.ToString("N0") ?? "0"}đ\n" +
-                $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
-        if (!string.IsNullOrEmpty(order.PromotionNote))
-            return order.PromotionNote +
-                   $"\nTổng tiền gốc: {order.TotalAmount:N0}đ" +
-                   $"\nKhách cần thanh toán: {order.FinalAmount:N0}đ";
+        if (order.OrderSellerPromotions != null && order.OrderSellerPromotions.Any())
+        {
+            var descBuilder = new StringBuilder();
+            foreach (var op in order.OrderSellerPromotions)
+            {
+                if (op.Promotion != null)
+                {
+                    descBuilder.AppendLine(
+                        $"[Voucher: {op.Promotion.Code} - {op.Promotion.Description}]");
+                }
+            }
+            descBuilder.AppendLine($"Tổng tiền gốc: {order.TotalAmount:N0}đ");
+            descBuilder.AppendLine($"Khách cần thanh toán: {order.FinalAmount:N0}đ");
+            return descBuilder.ToString();
+        }
+
         return
             $"Tổng tiền gốc: {order.TotalAmount:N0}đ\n" +
             $"Khách cần thanh toán: {order.FinalAmount:N0}đ";
