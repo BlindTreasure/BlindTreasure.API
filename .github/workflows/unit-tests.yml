@@ -68,6 +68,7 @@ jobs:
         import glob
         from datetime import datetime
         from bs4 import BeautifulSoup
+        import os
         
         def parse_test_results():
             trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
@@ -81,131 +82,235 @@ jobs:
                     for result in test_results:
                         test_name = result.get('testName', 'Unknown')
                         outcome = result.get('outcome', 'Unknown')
-                        duration = result.get('duration', '00:00:00')
-                        error_info = result.find('ErrorInfo')
-                        error_message = ""
-                        if error_info:
-                            message_elem = error_info.find('Message')
-                            if message_elem:
-                                error_message = message_elem.get_text()
                         test_data.append({
-                            'Test ID': f"TC-{len(test_data) + 1:03d}",
-                            'Test Name': test_name,
-                            'Description': f"Verify {test_name.replace('_', ' ')}",
-                            'Status': 'Passed' if outcome == 'Passed' else 'Failed',
-                            'Duration (ms)': duration,
-                            'Error Message': error_message
+                            'test_name': test_name,
+                            'outcome': outcome
                         })
                 except Exception as e:
                     print(f"Error parsing TRX file: {e}")
             return test_data
         
-        def create_statistics(test_data):
-            if not test_data:
-                return pd.DataFrame()
-            
-            total_tests = len(test_data)
-            passed_tests = sum(1 for test in test_data if test['Status'] == 'Passed')
-            failed_tests = total_tests - passed_tests
-            pass_rate = (passed_tests / total_tests * 100) if total_tests > 0 else 0
-            
-            stats_data = [
-                {'Metric': 'Total Test Cases', 'Value': total_tests},
-                {'Metric': 'Passed', 'Value': passed_tests},
-                {'Metric': 'Failed', 'Value': failed_tests},
-                {'Metric': 'Pass Rate (%)', 'Value': f"{pass_rate:.2f}%"},
-                {'Metric': 'Test Run Date', 'Value': datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-            ]
-            
-            return pd.DataFrame(stats_data)
+        def extract_functions(test_data):
+            # Extract function names from test names (this is an example, adjust as needed)
+            functions = []
+            seen = set()
+        
+            for test in test_data:
+                # Extract function name from test name - adjust this logic based on your naming convention
+                parts = test['test_name'].split('_')
+                if len(parts) > 1:
+                    func_name = parts[0]
+                else:
+                    func_name = test['test_name']
+        
+                # Capitalize first letter and add spaces between camelCase
+                import re
+                func_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', func_name)
+                func_name = func_name.capitalize()
+        
+                if func_name not in seen:
+                    seen.add(func_name)
+                    functions.append(func_name)
+        
+            # If no functions extracted or too few, use these defaults
+            if len(functions) < 8:
+                functions = [
+                    "Login", 
+                    "Create Course", 
+                    "Create Publish Class Request", 
+                    "Handle Publish Class Request",
+                    "Learner Register",
+                    "Take Attendance",
+                    "Create Payout Request",
+                    "Handle Payout Request"
+                ]
+        
+            return functions[:8]  # Limit to 8 functions as in the sample
         
         def create_excel_report():
             test_data = parse_test_results()
-            stats_data = create_statistics(test_data)
-            
+            functions = extract_functions(test_data)
+        
+            today = datetime.now().strftime("%m/%d/%Y")
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             excel_file = f'./coveragereport/Test_Report_{timestamp}.xlsx'
-            
+        
             with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
                 workbook = writer.book
-                
+        
                 # Define formats
-                header_format = workbook.add_format({
+                title_format = workbook.add_format({
                     'bold': True,
-                    'text_wrap': True,
-                    'valign': 'top',
-                    'fg_color': '#4472C4',
+                    'font_size': 16,
+                    'align': 'center',
+                    'valign': 'vcenter'
+                })
+        
+                header_format_blue = workbook.add_format({
+                    'bold': True,
                     'font_color': 'white',
+                    'bg_color': '#000080',  # Navy blue
+                    'align': 'center',
+                    'valign': 'vcenter',
                     'border': 1
                 })
-                
+        
+                header_format_brown = workbook.add_format({
+                    'bold': True,
+                    'font_color': 'white',
+                    'bg_color': '#A52A2A',  # Brown
+                    'valign': 'vcenter',
+                    'border': 1
+                })
+        
                 cell_format = workbook.add_format({
-                    'text_wrap': True,
-                    'valign': 'top',
                     'border': 1
                 })
-                
-                pass_format = workbook.add_format({
-                    'text_wrap': True,
-                    'valign': 'top',
-                    'border': 1,
-                    'bg_color': '#E2EFDA'  # Light green for passed tests
+        
+                cell_format_blue_bg = workbook.add_format({
+                    'bg_color': '#E6F0FF',  # Light blue
+                    'border': 1
                 })
-                
-                fail_format = workbook.add_format({
-                    'text_wrap': True,
-                    'valign': 'top',
-                    'border': 1,
-                    'bg_color': '#FFE6E6'  # Light red for failed tests
-                })
-                
-                # Create Test Cases sheet
-                if test_data:
-                    df_tests = pd.DataFrame(test_data)
-                    df_tests.to_excel(writer, sheet_name='Test Cases', index=False)
-                    worksheet_tests = writer.sheets['Test Cases']
-                    
-                    # Set column widths
-                    worksheet_tests.set_column('A:A', 10)  # Test ID
-                    worksheet_tests.set_column('B:B', 40)  # Test Name
-                    worksheet_tests.set_column('C:C', 50)  # Description
-                    worksheet_tests.set_column('D:D', 12)  # Status
-                    worksheet_tests.set_column('E:E', 15)  # Duration
-                    worksheet_tests.set_column('F:F', 50)  # Error Message
-                    
-                    # Apply formatting to cells
-                    for row_num in range(len(df_tests) + 1):
-                        for col_num in range(len(df_tests.columns)):
-                            if row_num == 0:
-                                worksheet_tests.write(row_num, col_num, df_tests.columns[col_num], header_format)
-                            else:
-                                cell_value = df_tests.iloc[row_num-1, col_num]
-                                # Apply different formatting based on test status
-                                if col_num == 3:  # Status column
-                                    if cell_value == 'Passed':
-                                        worksheet_tests.write(row_num, col_num, cell_value, pass_format)
-                                    else:
-                                        worksheet_tests.write(row_num, col_num, cell_value, fail_format)
-                                else:
-                                    worksheet_tests.write(row_num, col_num, cell_value, cell_format)
-                
-                # Create Test Statistics sheet
-                if not stats_data.empty:
-                    stats_data.to_excel(writer, sheet_name='Test Statistic', index=False)
-                    worksheet_stats = writer.sheets['Test Statistic']
-                    
-                    # Set column widths
-                    worksheet_stats.set_column('A:A', 25)  # Metric
-                    worksheet_stats.set_column('B:B', 25)  # Value
-                    
-                    # Apply formatting to cells
-                    for row_num in range(len(stats_data) + 1):
-                        for col_num in range(len(stats_data.columns)):
-                            if row_num == 0:
-                                worksheet_stats.write(row_num, col_num, stats_data.columns[col_num], header_format)
-                            else:
-                                worksheet_stats.write(row_num, col_num, stats_data.iloc[row_num-1, col_num], cell_format)
-                
+        
+                # TEST CASE LIST sheet
+                worksheet1 = workbook.add_worksheet('TEST CASE LIST')
+        
+                # Set column widths
+                worksheet1.set_column('A:A', 20)
+                worksheet1.set_column('B:B', 60)
+                worksheet1.set_column('C:E', 30)
+        
+                # Title
+                worksheet1.merge_range('A1:E1', 'TEST CASE LIST', title_format)
+        
+                # Project info section
+                worksheet1.write('A2', 'Project Name', header_format_brown)
+                worksheet1.write('B2', '#REF!', cell_format)
+        
+                worksheet1.write('A3', 'Project Code', header_format_brown)
+                worksheet1.write('B3', '#REF!', cell_format)
+        
+                worksheet1.write('A4', 'Test Environment Setup Description', header_format_brown)
+                worksheet1.merge_range('A4:A7', 'Test Environment Setup Description', header_format_brown)
+        
+                # Test environment details
+                env_text = "1. Server\n2. Database\n3. Web Browser\n4. Mobile"
+                worksheet1.write('B4', env_text, cell_format_blue_bg)
+                worksheet1.merge_range('B4:B7', env_text, cell_format_blue_bg)
+        
+                # Add empty row
+                worksheet1.write('A8', '', cell_format)
+                worksheet1.write('B8', '', cell_format)
+        
+                # Table headers
+                worksheet1.write('A9', 'No', header_format_blue)
+                worksheet1.write('B9', 'Function Name', header_format_blue)
+                worksheet1.write('C9', 'Sheet Name', header_format_blue)
+                worksheet1.write('D9', 'Description', header_format_blue)
+                worksheet1.write('E9', 'Pre-Condition', header_format_blue)
+        
+                # Table data
+                for i, func in enumerate(functions, 1):
+                    row = i + 9
+                    worksheet1.write(f'A{row}', i, cell_format)
+                    worksheet1.write(f'B{row}', func, cell_format)
+        
+                    # Sheet name (make it look like a hyperlink)
+                    sheet_name = func.replace(" ", "_")
+                    hyperlink_format = workbook.add_format({
+                        'font_color': 'blue',
+                        'underline': 1,
+                        'border': 1
+                    })
+                    worksheet1.write(f'C{row}', sheet_name, hyperlink_format)
+        
+                    # Empty Description and Pre-Condition cells
+                    worksheet1.write(f'D{row}', '', cell_format)
+                    worksheet1.write(f'E{row}', '', cell_format)
+        
+                # TEST STATISTICS sheet
+                worksheet2 = workbook.add_worksheet('TEST STATISTICS')
+        
+                # Set column widths
+                worksheet2.set_column('A:A', 15)
+                worksheet2.set_column('B:B', 30)
+                worksheet2.set_column('C:G', 15)
+        
+                # Title
+                worksheet2.merge_range('A1:G1', 'TEST STATISTICS', title_format)
+        
+                # Project info section
+                worksheet2.write('A2', 'Project Name', header_format_brown)
+                worksheet2.write('B2', '#REF!', cell_format)
+                worksheet2.write('C2', 'Creator', header_format_brown)
+                worksheet2.write('E2', 'HaoNTT', cell_format)
+        
+                worksheet2.write('A3', 'Project Code', header_format_brown)
+                worksheet2.write('B3', '#REF!', cell_format)
+                worksheet2.write('C3', 'Reviewer/Approver', header_format_brown)
+                worksheet2.write('E3', '', cell_format)
+        
+                worksheet2.write('A4', 'Document Code', header_format_brown)
+                worksheet2.write('B4', '#REF!', cell_format)
+                worksheet2.write('C4', 'Issue Date', header_format_brown)
+                worksheet2.write('E4', today, cell_format)
+        
+                worksheet2.write('A5', 'Notes', header_format_brown)
+                worksheet2.merge_range('B5:G5', '', cell_format)
+        
+                # Empty row
+                worksheet2.write('A6', '', cell_format)
+        
+                # Table headers
+                worksheet2.write('A7', 'No', header_format_blue)
+                worksheet2.write('B7', 'Module code', header_format_blue)
+                worksheet2.write('C7', 'Passed', header_format_blue)
+                worksheet2.write('D7', 'Failed', header_format_blue)
+                worksheet2.write('E7', 'Pending', header_format_blue)
+                worksheet2.write('F7', 'N/A', header_format_blue)
+                worksheet2.write('G7', 'Number of test cases', header_format_blue)
+        
+                # Table data (first 4 rows with #REF!)
+                for i in range(1, 5):
+                    row = i + 7
+                    worksheet2.write(f'A{row}', i, cell_format)
+                    worksheet2.write(f'B{row}', '#REF!', cell_format)
+                    worksheet2.write(f'C{row}', '#REF!', cell_format)
+                    worksheet2.write(f'D{row}', '#REF!', cell_format)
+                    worksheet2.write(f'E{row}', '#REF!', cell_format)
+                    worksheet2.write(f'F{row}', '#REF!', cell_format)
+                    worksheet2.write(f'G{row}', '#REF!', cell_format)
+        
+                # Remaining rows with function names
+                for i, func in enumerate(functions[4:], 5):
+                    row = i + 7
+                    worksheet2.write(f'A{row}', i, cell_format)
+                    worksheet2.write(f'B{row}', func, cell_format)
+                    worksheet2.write(f'C{row}', '#REF!', cell_format)
+                    worksheet2.write(f'D{row}', '#REF!', cell_format)
+                    worksheet2.write(f'E{row}', '#REF!', cell_format)
+                    worksheet2.write(f'F{row}', '#REF!', cell_format)
+                    worksheet2.write(f'G{row}', '#REF!', cell_format)
+        
+                # Sub total row
+                sub_total_row = 16
+                worksheet2.write(f'A{sub_total_row}', 'Sub total', header_format_blue)
+                worksheet2.write(f'B{sub_total_row}', '', header_format_blue)
+                worksheet2.write(f'C{sub_total_row}', '#REF!', header_format_blue)
+                worksheet2.write(f'D{sub_total_row}', '#REF!', header_format_blue)
+                worksheet2.write(f'E{sub_total_row}', '#REF!', header_format_blue)
+                worksheet2.write(f'F{sub_total_row}', '#REF!', header_format_blue)
+                worksheet2.write(f'G{sub_total_row}', '#REF!', header_format_blue)
+        
+                # Test coverage statistics
+                worksheet2.write('A18', 'Test coverage', workbook.add_format({'bold': True, 'font_color': '#A52A2A'}))
+                worksheet2.write('C18', '#REF!', workbook.add_format({'bold': True, 'font_color': 'blue'}))
+                worksheet2.write('D18', '%', workbook.add_format({'bold': True, 'font_color': 'blue'}))
+        
+                worksheet2.write('A19', 'Test successful coverage', workbook.add_format({'bold': True, 'font_color': '#A52A2A'}))
+                worksheet2.write('C19', '#REF!', workbook.add_format({'bold': True, 'font_color': 'blue'}))
+                worksheet2.write('D19', '%', workbook.add_format({'bold': True, 'font_color': 'blue'}))
+        
             print(f"✅ Excel test report generated: {excel_file}")
             return excel_file
         
@@ -220,18 +325,4 @@ jobs:
       with:
         name: test-report
         path: ./coveragereport/Test_Report_*.xlsx
-        retention-days: 30
-
-    - name: Display coverage summary
-      run: |
-        echo "## 📊 Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "📊 **Excel Report Available**: Download the detailed Excel report from artifacts below" >> $GITHUB_STEP_SUMMARY
-
-    - name: Upload Excel coverage reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: excel-coverage-report
-        path: ./coveragereport/Coverage_Report_*.xlsx
         retention-days: 30
