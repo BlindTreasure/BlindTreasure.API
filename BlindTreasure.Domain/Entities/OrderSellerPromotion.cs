@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace BlindTreasure.Domain.Entities;
 
-public class OrderSellerPromotion
+public class OrderSellerPromotion : BaseEntity
 {
     public Guid OrderId { get; set; }
     public Order Order { get; set; }

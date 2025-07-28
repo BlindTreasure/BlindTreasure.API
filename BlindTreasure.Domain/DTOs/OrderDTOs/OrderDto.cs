@@ -13,7 +13,5 @@ public class OrderDto
     public List<OrderDetailDto> Details { get; set; }
     public PaymentDto? Payment { get; set; } // Thêm dòng này
     public decimal FinalAmount { get; set; }
-    public Guid? PromotionId { get; set; }
-    public decimal? DiscountAmount { get; set; }
-    public string? PromotionNote { get; set; }
+
 }
