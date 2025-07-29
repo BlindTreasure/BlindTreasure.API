@@ -6,6 +6,7 @@ using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CategoryDtos;
 using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -241,6 +242,27 @@ public class CategoryServiceTests
         statusCode.Should().Be(409);
     }
 
+    [Fact]
+    public async Task CreateAsync_ShouldThrowForbidden_WhenUserNotAdmin()
+    {
+        // Arrange
+        var dto = new CategoryCreateDto { Name = "New Category" };
+        var user = new UserDto
+        {
+            FullName = "Regular User",
+            RoleName = RoleType.Customer
+        };
+
+        _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(_currentUserId))
+            .ReturnsAsync(user);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => _categoryService.CreateAsync(dto));
+        
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(403);
+    }
+
     #endregion
 
     #region UpdateAsync Tests
@@ -447,6 +469,240 @@ public class CategoryServiceTests
         result.Should().NotBeNull();
         result.Should().HaveCount(4); // parent + 2 children + 1 grandchild
         result.Should().Contain(new[] { parentId, childId1, childId2, grandChildId });
+    }
+
+    #endregion
+
+    #region GetCategoriesWithAllProductsAsync Tests
+
+    [Fact]
+    public async Task GetCategoriesWithAllProductsAsync_ShouldReturnCategoriesWithProducts()
+    {
+        // Arrange
+        var parentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        
+        var categories = new List<Category>
+        {
+            new Category
+            {
+                Id = parentId,
+                Name = "Parent Category",
+                ParentId = null,
+                IsDeleted = false,
+                Products = new List<Product>
+                {
+                    new Product { Id = Guid.NewGuid(), Name = "Product 1", IsDeleted = false }
+                },
+                Children = new List<Category>
+                {
+                    new Category
+                    {
+                        Id = childId,
+                        Name = "Child Category",
+                        ParentId = parentId,
+                        IsDeleted = false,
+                        Products = new List<Product>
+                        {
+                            new Product { Id = Guid.NewGuid(), Name = "Child Product", IsDeleted = false }
+                        }
+                    }
+                }
+            }
+        };
+
+        var mockQueryable = categories.AsQueryable().BuildMock();
+        _categoryRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
+            .Returns((Product p) => new ProducDetailDto { Id = p.Id, Name = p.Name });
+
+        // Act
+        var result = await _categoryService.GetCategoriesWithAllProductsAsync();
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Should().HaveCount(1);
+        result[0].ProductCount.Should().Be(2); // 1 parent product + 1 child product
+    }
+
+    [Fact]
+    public async Task GetCategoriesWithAllProductsAsync_ShouldReturnEmptyList_WhenNoCategories()
+    {
+        // Arrange
+        var mockQueryable = new List<Category>().AsQueryable().BuildMock();
+        _categoryRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        // Act
+        var result = await _categoryService.GetCategoriesWithAllProductsAsync();
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Should().BeEmpty();
+    }
+
+    #endregion
+
+    #region GetWithParentAsync Tests
+
+    [Fact]
+    public async Task GetWithParentAsync_ShouldReturnCategoryWithParent()
+    {
+        // Arrange
+        var parentId = Guid.NewGuid();
+        var childId = Guid.NewGuid();
+        
+        var categories = new List<Category>
+        {
+            new Category
+            {
+                Id = parentId,
+                Name = "Parent Category",
+                ParentId = null,
+                IsDeleted = false
+            },
+            new Category
+            {
+                Id = childId,
+                Name = "Child Category",
+                ParentId = parentId,
+                IsDeleted = false,
+                Parent = new Category
+                {
+                    Id = parentId,
+                    Name = "Parent Category",
+                    ParentId = null,
+                    IsDeleted = false
+                }
+            }
+        };
+
+        var mockQueryable = categories.AsQueryable().BuildMock();
+        _categoryRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        // Act
+        var result = await _categoryService.GetWithParentAsync(childId);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(childId);
+        result.Parent.Should().NotBeNull();
+        result.Parent!.Id.Should().Be(parentId);
+    }
+
+    [Fact]
+    public async Task GetWithParentAsync_ShouldReturnNull_WhenCategoryNotExists()
+    {
+        // Arrange
+        var categoryId = Guid.NewGuid();
+        var mockQueryable = new List<Category>().AsQueryable().BuildMock();
+        _categoryRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        // Act
+        var result = await _categoryService.GetWithParentAsync(categoryId);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    #endregion
+
+    #region UpdateAsync Additional Tests
+
+    [Fact]
+    public async Task UpdateAsync_ShouldThrowNotFound_WhenCategoryNotExists()
+    {
+        // Arrange
+        var categoryId = Guid.NewGuid();
+        var dto = new CategoryUpdateDto { Name = "Updated Name" };
+
+        var user = new UserDto
+        {
+            FullName = "Admin User",
+            RoleName = RoleType.Admin
+        };
+
+        _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(_currentUserId))
+            .ReturnsAsync(user);
+
+        var mockQueryable = new List<Category>().AsQueryable().BuildMock();
+        _categoryRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.UpdateAsync(categoryId, dto));
+        
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(404);
+    }
+
+    #endregion
+
+    #region DeleteAsync Additional Tests
+
+    [Fact]
+    public async Task DeleteAsync_ShouldThrowForbidden_WhenUserNotAdminOrStaff()
+    {
+        // Arrange
+        var categoryId = Guid.NewGuid();
+
+        var user = new UserDto
+        {
+            FullName = "Customer User",
+            RoleName = RoleType.Customer
+        };
+
+        _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(_currentUserId))
+            .ReturnsAsync(user);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.DeleteAsync(categoryId));
+        
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(403);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldThrowConflict_WhenCategoryHasChildren()
+    {
+        // Arrange
+        var categoryId = Guid.NewGuid();
+
+        var user = new UserDto
+        {
+            FullName = "Admin User",
+            RoleName = RoleType.Admin
+        };
+
+        var category = new Category
+        {
+            Id = categoryId,
+            Name = "Category with Children",
+            IsDeleted = false,
+            Products = new List<Product>(),
+            Children = new List<Category>
+            {
+                new Category { Id = Guid.NewGuid(), IsDeleted = false }
+            }
+        };
+
+        _userServiceMock.Setup(x => x.GetUserDetailsByIdAsync(_currentUserId))
+            .ReturnsAsync(user);
+
+        var categories = new List<Category> { category };
+        var mockQueryable = categories.AsQueryable().BuildMock();
+        _categoryRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.DeleteAsync(categoryId));
+        
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(409);
     }
 
     #endregion
