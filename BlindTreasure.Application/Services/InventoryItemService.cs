@@ -158,7 +158,7 @@ public class InventoryItemService : IInventoryItemService
             .Where(i => i.UserId == userId && !i.IsDeleted)
             .Include(i => i.Shipment)
             .Include(i => i.Product).ThenInclude(p => p.Category)
-            //.Include(i => i.OrderDetail)
+            .Include(i => i.OrderDetail)
             .AsNoTracking();
 
         // Filter theo tên sản phẩm
@@ -200,7 +200,7 @@ public class InventoryItemService : IInventoryItemService
                 .Take(param.PageSize)
                 .ToListAsync();
 
-        var dtos = items.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
+        var dtos = items.Select(InventoryItemMapper.ToInventoryItemDtoFullIncluded).ToList();
         return new Pagination<InventoryItemDto>(dtos, count, param.PageIndex, param.PageSize);
     }
 

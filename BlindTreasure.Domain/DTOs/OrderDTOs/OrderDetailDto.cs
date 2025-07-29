@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.DTOs.ShipmentDTOs;
+﻿using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 
@@ -19,5 +20,6 @@ public class OrderDetailDto
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public OrderDetailStatus Status { get; set; }
-    public ICollection<ShipmentDto> Shipments { get; set; } = new List<ShipmentDto>();
+    public ICollection<ShipmentDto>? Shipments { get; set; } = new List<ShipmentDto>();
+    public ICollection<InventoryItemDto>? InventoryItems { get; set; } = new List<InventoryItemDto>();
 }
