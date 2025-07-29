@@ -35,14 +35,16 @@ public class StripeService : IStripeService
     public async Task<string> GenerateExpressLoginLink()
     {
         var userId = _claimsService.CurrentUserId; // chỗ này là lấy user id của seller là người đang login
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(user => user.Id == userId) ??
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(user => user.UserId == userId) ??
                      throw ErrorHelper.Forbidden("Seller is not existing");
         // Create an instance of the LoginLinkService
         var loginLinkService = new AccountLoginLinkService();
 
         // Create the login link for the connected account
         // Optionally, you can provide additional options (like redirect URL) if needed.
-        var loginLink = await loginLinkService.CreateAsync(seller.Id.ToString());
+        if (string.IsNullOrEmpty(seller.StripeAccountId))
+            throw ErrorHelper.BadRequest("Seller chưa có Stripe account. Vui lòng tạo trước khi đăng nhập.");
+        var loginLink = await loginLinkService.CreateAsync(seller.StripeAccountId);
         return loginLink.Url;
     }
 
@@ -362,8 +364,19 @@ public class StripeService : IStripeService
                 {
                     Name = seller.CompanyName,
                     Mcc = "5945", // Toys, Hobby, and Game Shops
-                    ProductDescription = "Marketplace for collectibles",
-                    SupportEmail = seller.User?.Email
+                    ProductDescription = seller.CompanyProductDescription,
+                    SupportEmail = seller.User?.Email,
+                    SupportPhone = seller.CompanyPhone,
+                    SupportAddress = new AddressOptions
+                    {
+                        Line1 = seller.CompanyAddress,
+                        City = seller.CompanyProvinceName,
+                        State = seller.CompanyDistrictName,
+                        PostalCode = "700000", // Mã bưu điện tạm thời
+                        Country = "VN"
+                    },
+
+
                 },
                 TosAcceptance = new AccountTosAcceptanceOptions
                 {

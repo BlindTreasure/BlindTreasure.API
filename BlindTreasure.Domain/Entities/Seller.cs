@@ -15,6 +15,8 @@ public class Seller : BaseEntity
     public SellerStatus Status { get; set; }
     public string? StripeAccountId { get; set; }
 
+    public string? CompanyProductDescription { get; set; } = "Chuyên buôn bán vật phẩm gundam"; // FromName
+
     //địa chỉ lấy hàng của seller cho ghn 
     public string? ShopId { get; set; } = "197002"; // ShopId = 
     public string? CompanyName { get; set; } = "BlindTreasure-Collaboration"; // FromName

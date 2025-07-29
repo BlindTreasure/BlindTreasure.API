@@ -125,7 +125,7 @@ public class AuthService : IAuthService
         // Get user from cache or DBB
         var user = await GetUserByEmailAsync(loginDto.Email!, true);
         var seller = new Seller();
-        if (user.RoleName == RoleType.Seller)
+        if (user.RoleName.ToString() == RoleType.Seller.ToString())
         {
             seller = await GetSellerByUserIdAsync(user.Id);
             user.Seller = seller;
@@ -435,7 +435,11 @@ public class AuthService : IAuthService
             var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
             if (user != null)
                 await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
-            return user;
+            else
+            {
+                throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
+            }
+                return user;
         }
 
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
