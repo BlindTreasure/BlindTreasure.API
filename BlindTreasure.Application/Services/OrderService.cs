@@ -233,7 +233,7 @@ public class OrderService : IOrderService
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
-            .Include(o => o.ShippingAddress)
+        //    .Include(o => o.ShippingAddress)
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
             .AsNoTracking();
 
@@ -585,7 +585,7 @@ public class OrderService : IOrderService
         {
             var orderDetailIds = orderDetails.Select(od => od.Id).ToList();
             var orderDetailsWithProduct = await _unitOfWork.OrderDetails.GetQueryable()
-                .Where(od => orderDetailIds.Contains(od.Id))
+                .Where(od => orderDetailIds.Contains(od.Id)).AsNoTracking()
                 .Include(od => od.Product).ThenInclude(p => p.Category)
                 .Include(od => od.Product).ThenInclude(p => p.Seller)
                 .ToListAsync();
