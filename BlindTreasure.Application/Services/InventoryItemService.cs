@@ -158,7 +158,8 @@ public class InventoryItemService : IInventoryItemService
             .Where(i => i.UserId == userId && !i.IsDeleted)
             .Include(i => i.Shipment)
             .Include(i => i.Product).ThenInclude(p => p.Category)
-            .Include(i => i.OrderDetail).AsNoTracking();
+            //.Include(i => i.OrderDetail)
+            .AsNoTracking();
 
         // Filter theo tên sản phẩm
         if (!string.IsNullOrWhiteSpace(param.Search))
