@@ -1,8 +1,10 @@
-﻿using BlindTreasure.Domain.DTOs.OrderDTOs;
+﻿using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.PaymentDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.TransactionDTOs;
 using BlindTreasure.Domain.Entities;
+using Microsoft.IdentityModel.Tokens;
 
 namespace BlindTreasure.Application.Mappers;
 
@@ -52,6 +54,19 @@ public static class OrderDtoMapper
             Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>()
         };
     }
+
+    public static OrderDetailDto ToOrderDetailDtoFullIncluded(OrderDetail od)
+    {
+        var result = ToOrderDetailDto(od);
+
+        result.InventoryItems = od.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ?? new List<InventoryItemDto>();
+        if(result.Shipments.IsNullOrEmpty())
+        result.Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>();
+
+        return result;
+    }
+
+
 
     public static OrderAddressDto ToOrderAddressDto(Address address)
     {

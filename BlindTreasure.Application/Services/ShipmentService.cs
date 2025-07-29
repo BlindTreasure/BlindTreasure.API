@@ -59,8 +59,8 @@ public class ShipmentService : IShipmentService
     {
         var userId = _claimsService.CurrentUserId;
         var query = _unitOfWork.Shipments.GetQueryable()
-            .Include(s => s.OrderDetail)
-            .ThenInclude(od => od.Order)
+            .Include(s => s.OrderDetail).ThenInclude(od => od.Order)
+            .Include(s => s.InventoryItems)
             .Where(s => !s.IsDeleted && s.OrderDetail.Order.UserId == userId);
 
         if (orderId.HasValue)
@@ -70,17 +70,18 @@ public class ShipmentService : IShipmentService
             query = query.Where(s => s.OrderDetailId == orderDetailId.Value);
 
         var shipments = await query.ToListAsync();
-        return shipments.Select(ShipmentDtoMapper.ToShipmentDto).ToList();
+        return shipments.Select(ShipmentDtoMapper.ToShipmentDtoWithFullIncluded).ToList();
     }
 
     // Lấy shipment theo orderDetailId (không cần kiểm tra user)
     public async Task<List<ShipmentDto>> GetByOrderDetailIdAsync(Guid orderDetailId)
     {
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => s.OrderDetailId == orderDetailId && !s.IsDeleted)
+            .Where(s => s.OrderDetailId == orderDetailId && !s.IsDeleted).Include(s => s.OrderDetail)
+            .Include(s => s.InventoryItems)
             .ToListAsync();
 
-        return shipments.Select(ShipmentDtoMapper.ToShipmentDto).ToList();
+        return shipments.Select(ShipmentDtoMapper.ToShipmentDtoWithFullIncluded).ToList();
     }
 
     #region private methods
