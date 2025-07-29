@@ -85,9 +85,5 @@ public class ShipmentService : IShipmentService
 
     #region private methods
 
-    
-
     #endregion
 }
-
-

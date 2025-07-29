@@ -21,7 +21,7 @@ public static class InventoryItemMapper
             IsFromBlindBox = item.IsFromBlindBox,
             SourceCustomerBlindBoxId = item.SourceCustomerBlindBoxId,
             OrderDetailId = item.OrderDetailId,
-           // OrderDetail = item.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(item.OrderDetail) : null,
+            // OrderDetail = item.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(item.OrderDetail) : null,
             ShipmentId = item.ShipmentId,
             Shipment = item.Shipment != null ? ShipmentDtoMapper.ToShipmentDto(item.Shipment) : null
         };

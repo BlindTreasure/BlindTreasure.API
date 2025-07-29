@@ -42,12 +42,12 @@ public class TradingController : ControllerBase
     /// User B tạo yêu cầu giao dịch với User A cho một Listing.
     /// Nếu Listing miễn phí, User B không cần cung cấp item để trao đổi, nếu không, User B nhập item trong invent
     /// </summary>
-    [HttpPost("{listingId}/trade-requests")]
-    public async Task<IActionResult> CreateTradeRequest([FromBody] CreateTradeRequestDto dto)
+    [HttpPost("{id}/trade-requests")]
+    public async Task<IActionResult> CreateTradeRequest([FromForm] Guid id, CreateTradeRequestDto dto)
     {
         try
         {
-            var result = await _tradingService.CreateTradeRequestAsync(dto);
+            var result = await _tradingService.CreateTradeRequestAsync(id, dto);
             return Ok(ApiResult<TradeRequestDto>.Success(result, "200", "Tạo trade request thành công."));
         }
         catch (Exception ex)

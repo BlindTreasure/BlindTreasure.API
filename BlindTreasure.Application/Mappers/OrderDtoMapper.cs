@@ -24,8 +24,7 @@ public static class OrderDtoMapper
                     ? ToOrderAddressDto(order.ShippingAddress)
                     : null,
                 Details = order.OrderDetails?.Select(ToOrderDetailDto).ToList() ?? new List<OrderDetailDto>(),
-                Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
-
+                Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null
             };
         }
         catch (Exception ex)

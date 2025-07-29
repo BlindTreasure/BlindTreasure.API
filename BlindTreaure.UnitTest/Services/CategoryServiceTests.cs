@@ -1,5 +1,3 @@
-
-
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services;
@@ -258,7 +256,7 @@ public class CategoryServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAnyAsync<Exception>(() => _categoryService.CreateAsync(dto));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(403);
     }
@@ -481,10 +479,10 @@ public class CategoryServiceTests
         // Arrange
         var parentId = Guid.NewGuid();
         var childId = Guid.NewGuid();
-        
+
         var categories = new List<Category>
         {
-            new Category
+            new()
             {
                 Id = parentId,
                 Name = "Parent Category",
@@ -492,11 +490,11 @@ public class CategoryServiceTests
                 IsDeleted = false,
                 Products = new List<Product>
                 {
-                    new Product { Id = Guid.NewGuid(), Name = "Product 1", IsDeleted = false }
+                    new() { Id = Guid.NewGuid(), Name = "Product 1", IsDeleted = false }
                 },
                 Children = new List<Category>
                 {
-                    new Category
+                    new()
                     {
                         Id = childId,
                         Name = "Child Category",
@@ -504,7 +502,7 @@ public class CategoryServiceTests
                         IsDeleted = false,
                         Products = new List<Product>
                         {
-                            new Product { Id = Guid.NewGuid(), Name = "Child Product", IsDeleted = false }
+                            new() { Id = Guid.NewGuid(), Name = "Child Product", IsDeleted = false }
                         }
                     }
                 }
@@ -553,17 +551,17 @@ public class CategoryServiceTests
         // Arrange
         var parentId = Guid.NewGuid();
         var childId = Guid.NewGuid();
-        
+
         var categories = new List<Category>
         {
-            new Category
+            new()
             {
                 Id = parentId,
                 Name = "Parent Category",
                 ParentId = null,
                 IsDeleted = false
             },
-            new Category
+            new()
             {
                 Id = childId,
                 Name = "Child Category",
@@ -635,7 +633,7 @@ public class CategoryServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.UpdateAsync(categoryId, dto));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(404);
     }
@@ -661,7 +659,7 @@ public class CategoryServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.DeleteAsync(categoryId));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(403);
     }
@@ -686,7 +684,7 @@ public class CategoryServiceTests
             Products = new List<Product>(),
             Children = new List<Category>
             {
-                new Category { Id = Guid.NewGuid(), IsDeleted = false }
+                new() { Id = Guid.NewGuid(), IsDeleted = false }
             }
         };
 
@@ -700,7 +698,7 @@ public class CategoryServiceTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<Exception>(() => _categoryService.DeleteAsync(categoryId));
-        
+
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(409);
     }
@@ -711,7 +709,8 @@ public class CategoryServiceTests
     public async Task GetByIdAsync_ShouldReturnCategoryDto_WhenCategoryExists()
     {
         var categoryId = Guid.NewGuid();
-        var category = new Category { Id = categoryId, Name = "Test", Description = "Desc", Children = new List<Category>() };
+        var category = new Category
+            { Id = categoryId, Name = "Test", Description = "Desc", Children = new List<Category>() };
         var mockSet = new List<Category> { category }.AsQueryable().BuildMockDbSet();
         _unitOfWorkMock.Setup(x => x.Categories.GetQueryable()).Returns(mockSet.Object);
         _cacheServiceMock.Setup(x => x.GetAsync<Category>($"category:{categoryId}")).ReturnsAsync((Category)null!);
@@ -729,8 +728,4 @@ public class CategoryServiceTests
             .ReturnsAsync(new UserDto { RoleName = RoleType.Admin });
         await Assert.ThrowsAsync<Exception>(() => _categoryService.CreateAsync(dto));
     }
-
-
-
-   
 }

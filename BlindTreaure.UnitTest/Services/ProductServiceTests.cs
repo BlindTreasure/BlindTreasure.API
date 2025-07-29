@@ -236,12 +236,12 @@ public class ProductServiceTests
             .Returns(Task.CompletedTask);
 
         _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
-            .Returns((Product p) => new ProducDetailDto 
-            { 
-                Id = p.Id, 
-                Name = p.Name, 
+            .Returns((Product p) => new ProducDetailDto
+            {
+                Id = p.Id,
+                Name = p.Name,
                 Price = p.Price,
-                Brand = p.Seller?.CompanyName 
+                Brand = p.Seller?.CompanyName
             });
 
         var param = new ProductQueryParameter
@@ -262,13 +262,13 @@ public class ProductServiceTests
         result.TotalCount.Should().Be(2); // Only 2 products in the price range
         var items = result.ToList();
         items.Should().HaveCount(2);
-        
+
         // Check sorting (ascending by price)
         items[0].Name.Should().Be("Cheap Product");
         items[0].Price.Should().Be(100);
         items[1].Name.Should().Be("Medium Product");
         items[1].Price.Should().Be(300);
-        
+
         // The expensive product (500) and cheap product (50) should be filtered out
         items.Should().NotContain(i => i.Name == "Expensive Product" || i.Name == "Out of Range Product");
     }
@@ -677,7 +677,7 @@ public class ProductServiceTests
         result.Should().NotBeNull();
         _blobServiceMock.Verify(x => x.DeleteFileAsync(It.IsAny<string>()), Times.Once);
         _blobServiceMock.Verify(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<Stream>()), Times.Exactly(2));
-        
+
         // Verify that Update was called at least once, but don't verify the exact count of ImageUrls
         _productRepoMock.Verify(x => x.Update(It.IsAny<Product>()), Times.AtLeastOnce);
     }
@@ -693,7 +693,7 @@ public class ProductServiceTests
             .ReturnsAsync((Product)null!);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => 
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
             _productService.UpdateProductImagesAsync(productId, mockFiles));
 
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
@@ -754,9 +754,9 @@ public class ProductServiceTests
             .ReturnsAsync(new List<Guid> { childCategoryId });
 
         _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
-            .Returns((Product p) => new ProducDetailDto 
-            { 
-                Id = p.Id, 
+            .Returns((Product p) => new ProducDetailDto
+            {
+                Id = p.Id,
                 Name = p.Name,
                 Brand = p.Seller?.CompanyName
             });
@@ -811,7 +811,7 @@ public class ProductServiceTests
             .ReturnsAsync(seller);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => 
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
             _productService.CreateAsync(dto));
 
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);

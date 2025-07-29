@@ -30,7 +30,7 @@ public static class ShipmentDtoMapper
             ShippedAt = shipment.ShippedAt,
             EstimatedDelivery = shipment.EstimatedDelivery,
             DeliveredAt = shipment.DeliveredAt,
-            Status = shipment.Status,
+            Status = shipment.Status
             //InventoryItems = shipment.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ??
             //                 new List<InventoryItemDto>()
             //OrderDetail = shipment.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(shipment.OrderDetail) : null,

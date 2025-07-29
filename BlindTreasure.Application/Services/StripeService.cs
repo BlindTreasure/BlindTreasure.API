@@ -162,13 +162,13 @@ public class StripeService : IStripeService
         {
             Metadata = new Dictionary<string, string>
             {
-            { "orderId", orderId.ToString() },
-            { "userId", userId.ToString() },
-            { "isRenew", isRenew.ToString() },
-            { "promotion", promotionDesc },
-            { "totalAmount", order.TotalAmount.ToString() },
-            { "finalAmount", order.FinalAmount.ToString() },
-            { "IsShipment", totalShippingFee > 0 ? "true" : "false" }
+                { "orderId", orderId.ToString() },
+                { "userId", userId.ToString() },
+                { "isRenew", isRenew.ToString() },
+                { "promotion", promotionDesc },
+                { "totalAmount", order.TotalAmount.ToString() },
+                { "finalAmount", order.FinalAmount.ToString() },
+                { "IsShipment", totalShippingFee > 0 ? "true" : "false" }
             },
 
             CustomerEmail = user.Email,
@@ -184,16 +184,16 @@ public class StripeService : IStripeService
             {
                 Metadata = new Dictionary<string, string>
                 {
-                { "orderId", orderId.ToString() },
-                { "userId", userId.ToString() },
-                { "createdAt", DateTime.UtcNow.ToString("o") },
-                { "email", user.Email },
-                { "orderStatus", order.Status },
-                { "itemCount", order.OrderDetails.Count.ToString() },
-                { "totalAmount", order.TotalAmount.ToString() },
-                { "currency", "vnd" },
-                { "isRenew", isRenew.ToString() },
-                { "promotion", promotionDesc }
+                    { "orderId", orderId.ToString() },
+                    { "userId", userId.ToString() },
+                    { "createdAt", DateTime.UtcNow.ToString("o") },
+                    { "email", user.Email },
+                    { "orderStatus", order.Status },
+                    { "itemCount", order.OrderDetails.Count.ToString() },
+                    { "totalAmount", order.TotalAmount.ToString() },
+                    { "currency", "vnd" },
+                    { "isRenew", isRenew.ToString() },
+                    { "promotion", promotionDesc }
                 }
             }
         };
@@ -414,13 +414,10 @@ public class StripeService : IStripeService
         {
             var descBuilder = new StringBuilder();
             foreach (var op in order.OrderSellerPromotions)
-            {
                 if (op.Promotion != null)
-                {
                     descBuilder.AppendLine(
                         $"[Voucher: {op.Promotion.Code} - {op.Promotion.Description}]");
-                }
-            }
+
             descBuilder.AppendLine($"Tổng tiền gốc: {order.TotalAmount:N0}đ");
             descBuilder.AppendLine($"Khách cần thanh toán: {order.FinalAmount:N0}đ");
             return descBuilder.ToString();
