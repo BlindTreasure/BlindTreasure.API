@@ -356,6 +356,58 @@ jobs:
         run: |
           echo "## 📊 Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Extract coverage and test data from the XML file
+          if [ -d "./TestResults" ]; then
+            # Get line and branch coverage
+            COVERAGE_XML=$(find ./TestResults -name "coverage.cobertura.xml" -type f | head -1)
+            if [ -n "$COVERAGE_XML" ]; then
+              LINE_RATE=$(grep -o 'line-rate="[0-9.]*"' $COVERAGE_XML | head -1 | grep -o '[0-9.]*')
+              BRANCH_RATE=$(grep -o 'branch-rate="[0-9.]*"' $COVERAGE_XML | head -1 | grep -o '[0-9.]*')
+              
+              # Calculate percentages
+              LINE_PERCENT=$(awk "BEGIN {print $LINE_RATE * 100}")
+              BRANCH_PERCENT=$(awk "BEGIN {print $BRANCH_RATE * 100}")
+              
+              # Status indicators
+              if (( $(echo "$LINE_PERCENT >= 70" | bc -l) )); then
+                LINE_STATUS="✅"
+              else
+                LINE_STATUS="⚠️"
+              fi
+              
+              echo "### Coverage Metrics" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Metric | Coverage | Status |" >> $GITHUB_STEP_SUMMARY
+              echo "| ------ | -------- | ------ |" >> $GITHUB_STEP_SUMMARY
+              echo "| Line Coverage | $(printf "%.2f" $LINE_PERCENT)% | $LINE_STATUS |" >> $GITHUB_STEP_SUMMARY
+              echo "| Branch Coverage | $(printf "%.2f" $BRANCH_PERCENT)% | |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Get test results
+            TRX_FILE=$(find ./TestResults -name "test-results.trx" -type f | head -1)
+            if [ -n "$TRX_FILE" ]; then
+              TOTAL_TESTS=$(grep -c "<UnitTestResult" $TRX_FILE)
+              PASSED_TESTS=$(grep -c "outcome=\"Passed\"" $TRX_FILE)
+              FAILED_TESTS=$((TOTAL_TESTS - PASSED_TESTS))
+              PASS_RATE=$(awk "BEGIN {print ($PASSED_TESTS / $TOTAL_TESTS) * 100}")
+              
+              echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Metric | Value | Status |" >> $GITHUB_STEP_SUMMARY
+              echo "| ------ | ----- | ------ |" >> $GITHUB_STEP_SUMMARY
+              echo "| Total Tests | $TOTAL_TESTS | |" >> $GITHUB_STEP_SUMMARY
+              echo "| Passed Tests | $PASSED_TESTS | |" >> $GITHUB_STEP_SUMMARY
+              echo "| Failed Tests | $FAILED_TESTS | $([ "$FAILED_TESTS" -eq 0 ] && echo "✅" || echo "❌") |" >> $GITHUB_STEP_SUMMARY
+              echo "| Pass Rate | $(printf "%.2f" $PASS_RATE)% | |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ **No test data found**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
           echo "📊 **Excel Report Available**: Download the detailed Excel report from artifacts below" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Excel coverage reports
