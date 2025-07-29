@@ -585,7 +585,7 @@ public class OrderService : IOrderService
         {
             var orderDetailIds = orderDetails.Select(od => od.Id).ToList();
             var orderDetailsWithProduct = await _unitOfWork.OrderDetails.GetQueryable()
-                .Where(od => orderDetailIds.Contains(od.Id)).AsNoTracking()
+                .Where(od => orderDetailIds.Contains(od.Id))
                 .Include(od => od.Product).ThenInclude(p => p.Category)
                 .Include(od => od.Product).ThenInclude(p => p.Seller)
                 .ToListAsync();
