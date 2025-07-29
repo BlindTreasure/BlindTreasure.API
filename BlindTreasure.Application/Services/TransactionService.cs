@@ -48,6 +48,27 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
+    ///     Xử lý khi thanh toán Stripe shipment thành công (webhook).
+    /// </summary>
+    public async Task HandleSuccessfulShipmentPaymentAsync(IEnumerable<Guid> shipmentIds)
+    {
+        if (shipmentIds == null || !shipmentIds.Any())
+            throw ErrorHelper.BadRequest("Danh sách shipmentId rỗng.");
+
+        var shipments = await _unitOfWork.Shipments.GetQueryable()
+            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT)
+            .ToListAsync();
+
+        foreach (var shipment in shipments)
+        {
+            shipment.Status = ShipmentStatus.PROCESSING;
+            shipment.ShippedAt = DateTime.UtcNow;
+            await _unitOfWork.Shipments.Update(shipment);
+        }
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    /// <summary>
     ///     Xử lý khi thanh toán Stripe thành công (webhook).
     /// </summary>
     public async Task HandleSuccessfulPaymentAsync(string sessionId, string orderId)

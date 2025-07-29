@@ -10,4 +10,5 @@ public interface ITransactionService
     Task HandleFailedPaymentAsync(string sessionId);
     Task HandlePaymentIntentCreatedAsync(string paymentIntentId, string sessionId);
     Task HandleSuccessfulPaymentAsync(string sessionId, string orderId);
+    Task HandleSuccessfulShipmentPaymentAsync(IEnumerable<Guid> shipmentIds);
 }
