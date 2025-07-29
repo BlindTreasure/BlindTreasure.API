@@ -10,6 +10,7 @@ using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using System.Xml.Linq;
 
 namespace BlindTreasure.Application.Services;
 
@@ -56,16 +57,26 @@ public class TransactionService : ITransactionService
             throw ErrorHelper.BadRequest("Danh sách shipmentId rỗng.");
 
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT)
+            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT).Include(x => x.OrderDetail)
             .ToListAsync();
 
         foreach (var shipment in shipments)
         {
-            shipment.Status = ShipmentStatus.PROCESSING;
-            shipment.ShippedAt = DateTime.UtcNow;
-            await _unitOfWork.Shipments.Update(shipment);
+            if (shipment.OrderDetail != null)
+            {
+                // Cập nhật trạng thái OrderDetail
+                shipment.OrderDetail.Status = OrderDetailStatus.DELIVERING;
+                await _unitOfWork.OrderDetails.Update(shipment.OrderDetail);
+            }
+            else
+            {
+                _logger.Warn($"[HandleSuccessfulShipmentPaymentAsync] Không tìm thấy OrderDetail cho Shipment {shipment.Id}.");
+                shipment.Status = ShipmentStatus.PROCESSING;
+                shipment.ShippedAt = DateTime.UtcNow;
+                await _unitOfWork.Shipments.Update(shipment);
+            }
+            await _unitOfWork.SaveChangesAsync();
         }
-        await _unitOfWork.SaveChangesAsync();
     }
 
     /// <summary>
