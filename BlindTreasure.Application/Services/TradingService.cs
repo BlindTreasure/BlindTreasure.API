@@ -101,72 +101,92 @@ public class TradingService : ITradingService
     }
 
 
-    public async Task<TradeRequestDto> CreateTradeRequestAsync(CreateTradeRequestDto request)
+public async Task<TradeRequestDto> CreateTradeRequestAsync(CreateTradeRequestDto request)
+{
+    var userId = _claimsService.CurrentUserId;
+
+    var listing = await _unitOfWork.Listings.GetByIdAsync(request.ListingId, 
+        l => l.InventoryItem, 
+        l => l.InventoryItem.User);
+    
+    if (listing == null || listing.Status != ListingStatus.Active)
+        throw ErrorHelper.NotFound("Listing không tồn tại hoặc không còn hoạt động.");
+
+    // THÊM VALIDATION: Không cho phép tạo trade request cho listing của chính mình
+    if (listing.InventoryItem.UserId == userId)
     {
-        var userId = _claimsService.CurrentUserId;
-
-        var listing = await _unitOfWork.Listings.GetByIdAsync(request.ListingId, l => l.InventoryItem);
-        if (listing == null || listing.Status != ListingStatus.Active)
-            throw ErrorHelper.NotFound("Listing không tồn tại hoặc không còn hoạt động.");
-
-        // Kiểm tra xem listing item có đang trong thời gian giữ không
-        var now = DateTime.UtcNow;
-        var listingItem = listing.InventoryItem;
-        if (listingItem.Status == InventoryItemStatus.OnHold && listingItem.HoldUntil.HasValue &&
-            listingItem.HoldUntil.Value > now)
-        {
-            var remainingTime = listingItem.HoldUntil.Value - now;
-            _logger.Warn(
-                $"[CreateTradeRequestAsync] Listing item {listingItem.Id} đang trong thời gian giữ, còn {remainingTime.TotalDays:F1} ngày");
-            throw ErrorHelper.BadRequest(
-                $"Vật phẩm này đang trong thời gian chờ xử lý sau giao dịch. Vui lòng thử lại sau {remainingTime.TotalDays:F1} ngày.");
-        }
-
-        // Validate multiple offered items
-        await ValidateMultipleOfferedItems(request.OfferedInventoryIds, listing, userId);
-
-        var tradeRequest = new TradeRequest
-        {
-            ListingId = request.ListingId,
-            RequesterId = userId,
-            Status = TradeRequestStatus.PENDING,
-            RequestedAt = DateTime.UtcNow
-        };
-
-        await _unitOfWork.TradeRequests.AddAsync(tradeRequest);
-        await _unitOfWork.SaveChangesAsync();
-
-        // Tạo TradeRequestItems
-        if (request.OfferedInventoryIds.Any())
-        {
-            var tradeRequestItems = request.OfferedInventoryIds.Select(itemId => new TradeRequestItem
-            {
-                TradeRequestId = tradeRequest.Id,
-                InventoryItemId = itemId
-            }).ToList();
-
-            await _unitOfWork.TradeRequestItems.AddRangeAsync(tradeRequestItems);
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-        // Gửi notification cho chủ sở hữu listing
-        try
-        {
-            var listingOwner = await _unitOfWork.Users.GetByIdAsync(listing.InventoryItem.UserId);
-            var requester = await _unitOfWork.Users.GetByIdAsync(userId);
-
-            if (listingOwner != null && requester != null)
-                await SendTradeRequestNotificationIfNotSentAsync(listingOwner, requester.FullName);
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"[CreateTradeRequestAsync] Lỗi khi gửi notification: {ex.Message}");
-        }
-
-
-        return await GetTradeRequestByIdAsync(tradeRequest.Id);
+        _logger.Warn($"[CreateTradeRequestAsync] User {userId} cố gắng tạo trade request cho listing của chính mình {listing.Id}");
+        throw ErrorHelper.BadRequest("Bạn không thể tạo yêu cầu trao đổi với chính mình.");
     }
 
+    // Kiểm tra xem listing item có đang trong thời gian giữ không
+    var now = DateTime.UtcNow;
+    var listingItem = listing.InventoryItem;
+    if (listingItem.Status == InventoryItemStatus.OnHold && listingItem.HoldUntil.HasValue && 
+        listingItem.HoldUntil.Value > now)
+    {
+        var remainingTime = listingItem.HoldUntil.Value - now;
+        _logger.Warn($"[CreateTradeRequestAsync] Listing item {listingItem.Id} đang trong thời gian giữ, còn {remainingTime.TotalDays:F1} ngày");
+        throw ErrorHelper.BadRequest($"Vật phẩm này đang trong thời gian chờ xử lý sau giao dịch. Vui lòng thử lại sau {remainingTime.TotalDays:F1} ngày.");
+    }
+
+    // THÊM VALIDATION: Kiểm tra user đã tạo trade request cho listing này chưa
+    var existingTradeRequest = await _unitOfWork.TradeRequests.FirstOrDefaultAsync(
+        tr => tr.ListingId == request.ListingId && 
+              tr.RequesterId == userId && 
+              tr.Status == TradeRequestStatus.PENDING);
+
+    if (existingTradeRequest != null)
+    {
+        _logger.Warn($"[CreateTradeRequestAsync] User {userId} đã có trade request pending cho listing {listing.Id}");
+        throw ErrorHelper.BadRequest("Bạn đã tạo yêu cầu trao đổi cho listing này rồi. Vui lòng chờ phản hồi.");
+    }
+
+    // Validate multiple offered items
+    await ValidateMultipleOfferedItems(request.OfferedInventoryIds, listing, userId);
+
+    // Tiếp tục với logic tạo trade request như cũ...
+    var tradeRequest = new TradeRequest
+    {
+        ListingId = request.ListingId,
+        RequesterId = userId,
+        Status = TradeRequestStatus.PENDING,
+        RequestedAt = DateTime.UtcNow
+    };
+
+    await _unitOfWork.TradeRequests.AddAsync(tradeRequest);
+    await _unitOfWork.SaveChangesAsync();
+
+
+    // Tạo TradeRequestItems nếu có offered items
+    if (request.OfferedInventoryIds.Any())
+    {
+        var tradeRequestItems = request.OfferedInventoryIds.Select(itemId => new TradeRequestItem
+        {
+            TradeRequestId = tradeRequest.Id,
+            InventoryItemId = itemId
+        }).ToList();
+
+        await _unitOfWork.TradeRequestItems.AddRangeAsync(tradeRequestItems);
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    // Gửi notification...
+    try
+    {
+        var listingOwner = await _unitOfWork.Users.GetByIdAsync(listing.InventoryItem.UserId);
+        var requester = await _unitOfWork.Users.GetByIdAsync(userId);
+
+        if (listingOwner != null && requester != null)
+            await SendTradeRequestNotificationIfNotSentAsync(listingOwner, requester.FullName);
+    }
+    catch (Exception ex)
+    {
+        _logger.Error($"[CreateTradeRequestAsync] Lỗi khi gửi notification: {ex.Message}");
+    }
+
+    return await GetTradeRequestByIdAsync(tradeRequest.Id);
+}
     public async Task<TradeRequestDto> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted)
     {
         var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
