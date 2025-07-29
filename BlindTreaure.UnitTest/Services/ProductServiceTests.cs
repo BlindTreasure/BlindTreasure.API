@@ -177,6 +177,102 @@ public class ProductServiceTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task GetAllAsync_ShouldFilterByPriceRangeAndSortByPrice()
+    {
+        // Arrange
+        var products = new List<Product>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Expensive Product",
+                Price = 500,
+                Stock = 5,
+                ProductType = ProductSaleType.DirectSale,
+                IsDeleted = false,
+                Seller = new Seller { CompanyName = "Company 1" }
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Medium Product",
+                Price = 300,
+                Stock = 10,
+                ProductType = ProductSaleType.DirectSale,
+                IsDeleted = false,
+                Seller = new Seller { CompanyName = "Company 2" }
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Cheap Product",
+                Price = 100,
+                Stock = 20,
+                ProductType = ProductSaleType.DirectSale,
+                IsDeleted = false,
+                Seller = new Seller { CompanyName = "Company 3" }
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Out of Range Product",
+                Price = 50,
+                Stock = 15,
+                ProductType = ProductSaleType.DirectSale,
+                IsDeleted = false,
+                Seller = new Seller { CompanyName = "Company 4" }
+            }
+        };
+
+        var mockQueryable = products.AsQueryable().BuildMock();
+        _productRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        _cacheServiceMock.Setup(x => x.GetAsync<Pagination<ProducDetailDto>>(It.IsAny<string>()))
+            .ReturnsAsync((Pagination<ProducDetailDto>)null!);
+
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
+            .Returns((Product p) => new ProducDetailDto 
+            { 
+                Id = p.Id, 
+                Name = p.Name, 
+                Price = p.Price,
+                Brand = p.Seller?.CompanyName 
+            });
+
+        var param = new ProductQueryParameter
+        {
+            MinPrice = 100,
+            MaxPrice = 400,
+            SortBy = ProductSortField.Price,
+            Desc = false, // ascending order
+            PageIndex = 1,
+            PageSize = 10
+        };
+
+        // Act
+        var result = await _productService.GetAllAsync(param);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalCount.Should().Be(2); // Only 2 products in the price range
+        var items = result.ToList();
+        items.Should().HaveCount(2);
+        
+        // Check sorting (ascending by price)
+        items[0].Name.Should().Be("Cheap Product");
+        items[0].Price.Should().Be(100);
+        items[1].Name.Should().Be("Medium Product");
+        items[1].Price.Should().Be(300);
+        
+        // The expensive product (500) and cheap product (50) should be filtered out
+        items.Should().NotContain(i => i.Name == "Expensive Product" || i.Name == "Out of Range Product");
+    }
+
     #endregion
 
     #region CreateAsync Tests
@@ -247,7 +343,6 @@ public class ProductServiceTests
             ProductType = dto.ProductType
         };
 
-        // Setup cache mock to first return null (cache miss) then the created product
         _cacheServiceMock.Setup(x => x.GetAsync<Product>(It.IsAny<string>()))
             .ReturnsAsync((Product)null!);
 
@@ -509,6 +604,219 @@ public class ProductServiceTests
 
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(400);
+    }
+
+    #endregion
+
+    #region UpdateProductImagesAsync Tests
+
+    [Fact]
+    public async Task UpdateProductImagesAsync_ShouldUpdateImages_WhenValidFiles()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var oldImageUrl = "https://example.com/old-image.jpg?prefix=products%2Fold-image.jpg";
+        var product = new Product
+        {
+            Id = productId,
+            Name = "Test Product",
+            IsDeleted = false,
+            ImageUrls = new List<string> { oldImageUrl },
+            Seller = new Seller { CompanyName = "Test Seller" }
+        };
+
+        var mockFiles = new List<IFormFile>
+        {
+            CreateMockFormFile(),
+            CreateMockFormFile()
+        };
+
+        var newImageUrl = "https://example.com/new-image.jpg";
+
+        _productRepoMock.Setup(x => x.GetByIdAsync(productId))
+            .ReturnsAsync(product);
+
+        _blobServiceMock.Setup(x => x.DeleteFileAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        _blobServiceMock.Setup(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<Stream>()))
+            .Returns(Task.CompletedTask);
+
+        _blobServiceMock.Setup(x => x.GetPreviewUrlAsync(It.IsAny<string>()))
+            .ReturnsAsync(newImageUrl);
+
+        _productRepoMock.Setup(x => x.Update(It.IsAny<Product>()))
+            .ReturnsAsync(true);
+
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+
+        // Setup for GetByIdAsync call at the end
+        var products = new List<Product> { product };
+        var mockQueryable = products.AsQueryable().BuildMock();
+        _productRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
+            .Returns(new ProducDetailDto { Id = productId, Name = product.Name });
+
+        // Setup cache to return null to force DB query
+        _cacheServiceMock.Setup(x => x.GetAsync<Product>(It.IsAny<string>()))
+            .ReturnsAsync((Product)null!);
+
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        _cacheServiceMock.Setup(x => x.RemoveByPatternAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _productService.UpdateProductImagesAsync(productId, mockFiles);
+
+        // Assert
+        result.Should().NotBeNull();
+        _blobServiceMock.Verify(x => x.DeleteFileAsync(It.IsAny<string>()), Times.Once);
+        _blobServiceMock.Verify(x => x.UploadFileAsync(It.IsAny<string>(), It.IsAny<Stream>()), Times.Exactly(2));
+        
+        // Verify that Update was called at least once, but don't verify the exact count of ImageUrls
+        _productRepoMock.Verify(x => x.Update(It.IsAny<Product>()), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task UpdateProductImagesAsync_ShouldThrowNotFound_WhenProductNotExists()
+    {
+        // Arrange
+        var productId = Guid.NewGuid();
+        var mockFiles = new List<IFormFile> { CreateMockFormFile() };
+
+        _productRepoMock.Setup(x => x.GetByIdAsync(productId))
+            .ReturnsAsync((Product)null!);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => 
+            _productService.UpdateProductImagesAsync(productId, mockFiles));
+
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(404);
+    }
+
+    #endregion
+
+    #region ApplyProductFiltersAndSorts Tests
+
+    [Fact]
+    public async Task ApplyProductFiltersAndSorts_ShouldFilterBySearchAndCategory()
+    {
+        // Arrange
+        var categoryId = Guid.NewGuid();
+        var childCategoryId = Guid.NewGuid();
+        var products = new List<Product>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Test Product",
+                CategoryId = childCategoryId,
+                Price = 100,
+                Stock = 10,
+                Status = ProductStatus.Active,
+                ProductType = ProductSaleType.DirectSale,
+                IsDeleted = false,
+                Seller = new Seller { CompanyName = "Test Company" }
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "Another Product",
+                CategoryId = Guid.NewGuid(),
+                Price = 200,
+                Stock = 0,
+                Status = ProductStatus.Active,
+                ProductType = ProductSaleType.DirectSale,
+                IsDeleted = false,
+                Seller = new Seller { CompanyName = "Another Company" }
+            }
+        };
+
+        var mockQueryable = products.AsQueryable().BuildMock();
+        _productRepoMock.Setup(x => x.GetQueryable())
+            .Returns(mockQueryable);
+
+        var param = new ProductQueryParameter
+        {
+            Search = "test",
+            CategoryId = categoryId,
+            PageIndex = 1,
+            PageSize = 10
+        };
+
+        _categoryServiceMock.Setup(x => x.GetAllChildCategoryIdsAsync(categoryId))
+            .ReturnsAsync(new List<Guid> { childCategoryId });
+
+        _mapperServiceMock.Setup(x => x.Map<Product, ProducDetailDto>(It.IsAny<Product>()))
+            .Returns((Product p) => new ProducDetailDto 
+            { 
+                Id = p.Id, 
+                Name = p.Name,
+                Brand = p.Seller?.CompanyName
+            });
+
+        // Setup cache to return null to force DB query
+        _cacheServiceMock.Setup(x => x.GetAsync<Pagination<ProducDetailDto>>(It.IsAny<string>()))
+            .ReturnsAsync((Pagination<ProducDetailDto>)null!);
+
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _productService.GetAllAsync(param);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.TotalCount.Should().Be(1);
+        var items = result.ToList();
+        items.Should().HaveCount(1);
+        items.First().Name.Should().Be("Test Product");
+    }
+
+    #endregion
+
+    #region ValidateProductDto Tests
+
+    [Fact]
+    public async Task ValidateProductDto_ShouldThrowBadRequest_WhenInvalidData()
+    {
+        // Arrange
+        var sellerId = Guid.NewGuid();
+        var dto = new ProductCreateDto
+        {
+            Name = "",
+            Description = "Description",
+            Price = -100,
+            Stock = -1,
+            CategoryId = Guid.NewGuid(),
+            SellerId = sellerId
+        };
+
+        // Setup a valid seller to pass the seller validation
+        var seller = new Seller
+        {
+            Id = sellerId,
+            IsVerified = true,
+            Status = SellerStatus.Approved,
+            CompanyName = "Test Company"
+        };
+
+        _sellerRepoMock.Setup(x => x.GetByIdAsync(sellerId))
+            .ReturnsAsync(seller);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<Exception>(() => 
+            _productService.CreateAsync(dto));
+
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(400);
+        ExceptionUtils.ExtractMessage(exception).Should().Contain("Tên sản phẩm không được để trống");
     }
 
     #endregion
