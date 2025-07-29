@@ -184,11 +184,11 @@ public class TradingService : ITradingService
         return dtos.OrderByDescending(x => x.RequestedAt).ToList();
     }
 
-    public async Task<TradeRequestDto> CreateTradeRequestAsync(CreateTradeRequestDto request)
+    public async Task<TradeRequestDto> CreateTradeRequestAsync(Guid id, CreateTradeRequestDto request)
     {
         var userId = _claimsService.CurrentUserId;
 
-        var listing = await _unitOfWork.Listings.GetByIdAsync(request.ListingId,
+        var listing = await _unitOfWork.Listings.GetByIdAsync(id,
             l => l.InventoryItem,
             l => l.InventoryItem.User);
 
@@ -218,7 +218,7 @@ public class TradingService : ITradingService
 
         // THÊM VALIDATION: Kiểm tra user đã tạo trade request cho listing này chưa
         var existingTradeRequest = await _unitOfWork.TradeRequests.FirstOrDefaultAsync(tr =>
-            tr.ListingId == request.ListingId &&
+            tr.ListingId == id &&
             tr.RequesterId == userId &&
             tr.Status == TradeRequestStatus.PENDING);
 
@@ -235,7 +235,7 @@ public class TradingService : ITradingService
         // Tiếp tục với logic tạo trade request như cũ...
         var tradeRequest = new TradeRequest
         {
-            ListingId = request.ListingId,
+            ListingId = id,
             RequesterId = userId,
             Status = TradeRequestStatus.PENDING,
             RequestedAt = DateTime.UtcNow

@@ -57,7 +57,8 @@ public class TransactionService : ITransactionService
             throw ErrorHelper.BadRequest("Danh sách shipmentId rỗng.");
 
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT).Include(x => x.OrderDetail)
+            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT)
+            .Include(x => x.OrderDetail)
             .ToListAsync();
 
         foreach (var shipment in shipments)
@@ -70,11 +71,13 @@ public class TransactionService : ITransactionService
             }
             else
             {
-                _logger.Warn($"[HandleSuccessfulShipmentPaymentAsync] Không tìm thấy OrderDetail cho Shipment {shipment.Id}.");
+                _logger.Warn(
+                    $"[HandleSuccessfulShipmentPaymentAsync] Không tìm thấy OrderDetail cho Shipment {shipment.Id}.");
                 shipment.Status = ShipmentStatus.PROCESSING;
                 shipment.ShippedAt = DateTime.UtcNow;
                 await _unitOfWork.Shipments.Update(shipment);
             }
+
             await _unitOfWork.SaveChangesAsync();
         }
     }

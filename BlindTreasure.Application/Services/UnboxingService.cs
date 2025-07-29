@@ -244,7 +244,7 @@ public class UnboxingService : IUnboxingService
             SourceCustomerBlindBoxId = customerBox.Id,
             CreatedAt = now,
             CreatedBy = userId,
-            OrderDetailId = customerBox.OrderDetailId,
+            OrderDetailId = customerBox.OrderDetailId
         };
 
         customerBox.IsOpened = true;

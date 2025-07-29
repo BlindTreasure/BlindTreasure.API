@@ -99,8 +99,8 @@ public class SellerServiceTests
         };
 
         _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(
-            It.IsAny<Expression<Func<Seller, bool>>>(),
-            It.IsAny<Expression<Func<Seller, object>>>()))
+                It.IsAny<Expression<Func<Seller, bool>>>(),
+                It.IsAny<Expression<Func<Seller, object>>>()))
             .ReturnsAsync(seller);
 
         _sellerRepoMock.Setup(x => x.Update(It.IsAny<Seller>()))
@@ -136,13 +136,13 @@ public class SellerServiceTests
         };
 
         _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(
-            It.IsAny<Expression<Func<Seller, bool>>>(),
-            It.IsAny<Expression<Func<Seller, object>>>()))
+                It.IsAny<Expression<Func<Seller, bool>>>(),
+                It.IsAny<Expression<Func<Seller, object>>>()))
             .ReturnsAsync((Seller)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(
-            () => _sellerService.UpdateSellerInfoAsync(userId, updateDto));
+        var exception =
+            await Assert.ThrowsAsync<Exception>(() => _sellerService.UpdateSellerInfoAsync(userId, updateDto));
 
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(404);
@@ -250,8 +250,8 @@ public class SellerServiceTests
             .ReturnsAsync((Seller)null);
 
         _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(
-            It.IsAny<Expression<Func<Seller, bool>>>(),
-            It.IsAny<Expression<Func<Seller, object>>>()))
+                It.IsAny<Expression<Func<Seller, bool>>>(),
+                It.IsAny<Expression<Func<Seller, object>>>()))
             .ReturnsAsync(seller);
 
         // Act
@@ -266,7 +266,6 @@ public class SellerServiceTests
     #endregion
 
     #region GetAllSellersAsync Tests
-
 
     #endregion
 
@@ -291,8 +290,7 @@ public class SellerServiceTests
         var param = new ProductQueryParameter { PageIndex = 1, PageSize = 10 };
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(
-            () => _sellerService.GetAllProductsAsync(param, userId));
+        var exception = await Assert.ThrowsAsync<Exception>(() => _sellerService.GetAllProductsAsync(param, userId));
 
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(403);
@@ -332,7 +330,8 @@ public class SellerServiceTests
         _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
             .ReturnsAsync(seller);
 
-        _mapperServiceMock.Setup(x => x.Map<ProductSellerCreateDto, ProductCreateDto>(It.IsAny<ProductSellerCreateDto>()))
+        _mapperServiceMock.Setup(x =>
+                x.Map<ProductSellerCreateDto, ProductCreateDto>(It.IsAny<ProductSellerCreateDto>()))
             .Returns(productCreateDto);
 
         var expectedResult = new ProducDetailDto
@@ -342,10 +341,10 @@ public class SellerServiceTests
             Description = createDto.Description
         };
 
-        _productServiceMock.Setup(x => x.CreateAsync(It.Is<ProductCreateDto>(p => 
-            p.Name == createDto.Name && 
-            p.Description == createDto.Description && 
-            p.SellerId == sellerId)))
+        _productServiceMock.Setup(x => x.CreateAsync(It.Is<ProductCreateDto>(p =>
+                p.Name == createDto.Name &&
+                p.Description == createDto.Description &&
+                p.SellerId == sellerId)))
             .ReturnsAsync(expectedResult);
 
         // Act
@@ -355,9 +354,9 @@ public class SellerServiceTests
         result.Should().NotBeNull();
         result.Name.Should().Be(createDto.Name);
         result.Description.Should().Be(createDto.Description);
-        _productServiceMock.Verify(x => x.CreateAsync(It.Is<ProductCreateDto>(p => 
-            p.Name == createDto.Name && 
-            p.Description == createDto.Description && 
+        _productServiceMock.Verify(x => x.CreateAsync(It.Is<ProductCreateDto>(p =>
+            p.Name == createDto.Name &&
+            p.Description == createDto.Description &&
             p.SellerId == sellerId)), Times.Once);
     }
 
@@ -377,8 +376,7 @@ public class SellerServiceTests
             .ReturnsAsync((Seller)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(
-            () => _sellerService.CreateProductAsync(createDto));
+        var exception = await Assert.ThrowsAsync<Exception>(() => _sellerService.CreateProductAsync(createDto));
 
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
         statusCode.Should().Be(403);
@@ -569,8 +567,8 @@ public class SellerServiceTests
         file.Setup(f => f.OpenReadStream()).Returns(new MemoryStream());
 
         _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(
-            It.IsAny<Expression<Func<Seller, bool>>>(),
-            It.IsAny<Expression<Func<Seller, object>>>()))
+                It.IsAny<Expression<Func<Seller, bool>>>(),
+                It.IsAny<Expression<Func<Seller, object>>>()))
             .ReturnsAsync(seller);
 
         var newAvatarUrl = "https://storage.com/avatars/new-avatar.jpg";
@@ -669,4 +667,4 @@ public class TestAsyncEnumerator<T> : IAsyncEnumerator<T>
         _inner.Dispose();
         return new ValueTask();
     }
-} 
+}

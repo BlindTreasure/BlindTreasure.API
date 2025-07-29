@@ -929,7 +929,7 @@ public class BlindBoxServiceTests
                 It.IsAny<Expression<Func<BlindBox, bool>>>(),
                 It.IsAny<Expression<Func<BlindBox, object>>[]>()))
             .ReturnsAsync(blindBox);
-        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>() ))
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
             .ReturnsAsync(seller);
         _productRepoMock.Setup(x => x.GetAllAsync(
                 It.IsAny<Expression<Func<Product, bool>>>(),
@@ -947,7 +947,8 @@ public class BlindBoxServiceTests
             .Returns(new List<BlindBoxItem>().AsQueryable().BuildMock());
         _mapperServiceMock.Setup(x => x.Map<BlindBox, BlindBoxDetailDto>(It.IsAny<BlindBox>()))
             .Returns(new BlindBoxDetailDto { Id = blindBoxId, Name = "Test BlindBox" });
-        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
+        _cacheServiceMock
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
             .Returns(Task.CompletedTask);
         // Act
         var result = await _blindBoxService.ClearItemsFromBlindBoxAsync(blindBoxId);
@@ -1005,7 +1006,7 @@ public class BlindBoxServiceTests
                 It.IsAny<Expression<Func<BlindBox, bool>>>(),
                 It.IsAny<Expression<Func<BlindBox, object>>[]>()))
             .ReturnsAsync(blindBox);
-        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>() ))
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
             .ReturnsAsync(seller);
         _blindBoxRepoMock.Setup(x => x.SoftRemove(It.IsAny<BlindBox>()))
             .ReturnsAsync(true);
