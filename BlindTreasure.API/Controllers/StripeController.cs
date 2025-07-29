@@ -229,6 +229,7 @@ public class StripeController : ControllerBase
                                            ?? throw ErrorHelper.NotFound("Stripe session not found.");
                     _logger.Info("[Stripe][Webhook] Thanh toán thành công, Session ID: " + completedSession.Id);
                     await HandleSuccessfulPayment(completedSession);
+                    await HandleSuccessfulItemShipmentRequestPayment(completedSession);
                     await HandlePaymentIntentCreatedSession(completedSession);
                     break;
 
@@ -555,45 +556,45 @@ public class StripeController : ControllerBase
     {
         try
         {
-            var IsShipment = session.Metadata != null &&
-                             session.Metadata.TryGetValue("IsShipment", out var isShipmentStr)
+            var isShipment = session.Metadata != null &&
+                             session.Metadata.TryGetValue("IsShipmenRequest", out var isShipmentStr)
                 ? isShipmentStr
                 : null;
-            if (string.IsNullOrEmpty(IsShipment) || IsShipment != "true")
+            if (string.IsNullOrEmpty(isShipment) || isShipment != "True")
             {
                 _logger.Warn("[Stripe][Webhook] Not a shipment payment, skipping.");
                 return;
             }
 
-            var shipmentIds = session.Metadata != null &&
-                              session.Metadata.TryGetValue("shipmentIds", out var shipmentIdList)
+            var shipmentIdsStr = session.Metadata != null &&
+                                 session.Metadata.TryGetValue("shipmentIds", out var shipmentIdList)
                 ? shipmentIdList
                 : null;
 
-            // xử lý luồng yêu cầu thanh toán shipment thành công của các inventory item
+            if (string.IsNullOrEmpty(shipmentIdsStr))
+            {
+                _logger.Warn("[Stripe][Webhook] shipmentIds not found in metadata.");
+                return;
+            }
 
-            //if (string.IsNullOrEmpty(session.Id))
-            //    throw ErrorHelper.WithStatus(400, "Session Id is missing.");
+            var shipmentIds = shipmentIdsStr
+                .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                .Where(guid => guid != Guid.Empty)
+                .ToList();
 
-            //if (!string.IsNullOrEmpty(orderId))
-            //{
+            if (!shipmentIds.Any())
+            {
+                _logger.Warn("[Stripe][Webhook] No valid shipmentIds found.");
+                return;
+            }
 
-            //    await _transactionService.HandleSuccessfulPaymentAsync(session.Id, orderId);
-            //    _logger.Success(
-            //      $"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {session.Id}");
-            //}
-            //else
-            //{
-            //    _logger.Warn("[Stripe][Webhook] OrderId not found in Stripe session metadata.");
-            //}
-        }
-        catch (StripeException ex)
-        {
-            _logger.Error("[Stripe][Webhook] StripeException while handling payment: " + ex.Message);
+            await _transactionService.HandleSuccessfulShipmentPaymentAsync(shipmentIds);
+            _logger.Success($"[Stripe][Webhook] Đã cập nhật trạng thái PROCESSING cho các shipment: {shipmentIdsStr}");
         }
         catch (Exception ex)
         {
-            _logger.Error("[Stripe][Webhook] Unhandled exception while handling payment: " + ex.Message);
+            _logger.Error("[Stripe][Webhook] Unhandled exception while handling shipment payment: " + ex.Message);
         }
     }
 
