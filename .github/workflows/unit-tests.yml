@@ -208,32 +208,35 @@ jobs:
           
               return f"{base_name}Management"
           
-          def get_test_description_from_name(test_method):
+                    def get_test_description_from_name(test_method):
               """Tạo mô tả từ tên phương thức test (fallback)"""
               if '_' in test_method:
                   words = test_method.split('_')
-                  return ' '.join(words)
+                  return 'Test method: ' + ' '.join(words)
           
               words = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', test_method)
               if words:
-                  return ' '.join(words)
+                  return 'Test method: ' + ' '.join(words)
           
-              return test_method
+              return 'Test method: ' + test_method
           
           def get_enhanced_description(test_method, xml_docs):
               """Lấy mô tả từ XML documentation hoặc fallback về tên method"""
+              # Format documentation text to be a clean paragraph
+              def format_text(text):
+                  # Remove line breaks, extra spaces and normalize whitespace
+                  clean_text = ' '.join(text.replace('\n', ' ').replace('\r', ' ').split())
+                  # Limit text length for Excel cell
+                  if len(clean_text) > 300:
+                      clean_text = clean_text[:297] + "..."
+                  return clean_text
+              
               # Tìm trong XML documentation trước
               if test_method in xml_docs:
-                  doc_text = xml_docs[test_method]
-                  # Giới hạn độ dài để tránh Excel cell quá lớn
-                  if len(doc_text) > 300:
-                      doc_text = doc_text[:297] + "..."
-                  return f"📖 {doc_text}"
+                  doc_text = format_text(xml_docs[test_method])
+                  return doc_text
               
               # Try alternate name formats for better matching with test method names
-              # Check for variations in the method name format
-              alt_formats = []
-              
               # For methods like "GetByIdAsync_ShouldReturnEntity_WhenEntityExists"
               if "_Should" in test_method:
                   parts = test_method.split("_Should")
@@ -241,25 +244,20 @@ jobs:
                       # Try matching with the base method name
                       base_name = parts[0]
                       if base_name in xml_docs:
-                          doc_text = xml_docs[base_name]
-                          if len(doc_text) > 300:
-                              doc_text = doc_text[:297] + "..."
-                          return f"📖 {doc_text}"
+                          doc_text = format_text(xml_docs[base_name])
+                          return doc_text
               
-              # Look through all keys in xml_docs for potential match
+                                            # Look through all keys in xml_docs for potential match
               for doc_key in xml_docs.keys():
                   # Check if the test method is a substring of a documented method
                   # or if a documented method is a substring of the test method
                   if test_method in doc_key or doc_key in test_method:
-                      doc_text = xml_docs[doc_key]
-                      if len(doc_text) > 300:
-                          doc_text = doc_text[:297] + "..."
-                      print(f"Found match for {test_method} with {doc_key}")
-                      return f"📖 {doc_text}"
+                      doc_text = format_text(xml_docs[doc_key])
+                      return doc_text
           
               # Fallback về mô tả từ tên method
               fallback_desc = get_test_description_from_name(test_method)
-              return f"🔧 {fallback_desc}"
+              return format_text(fallback_desc)
           
           def parse_test_results():
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
@@ -295,10 +293,6 @@ jobs:
                           # Sử dụng enhanced description với XML documentation
                           description = get_enhanced_description(test_method, xml_docs)
           
-                          # Debug logs for XML documentation matching
-                          print(f"Processing test method: {test_method}")
-                          print(f"Description found: {description}")
-                          
                           # Tạo đối tượng test case với thông tin chi tiết
                           test_case = {
                               'ID': f"TC_{len(test_data_by_class.get(sheet_name, [])) + 1:03d}",
@@ -306,7 +300,7 @@ jobs:
                               'Description': description,  # Sử dụng enhanced description
                               'Expected Result': 'Pass',
                               'Actual Result': outcome,
-                              'Status': '✅ Pass' if outcome == 'Passed' else '❌ Fail',
+                              'Status': 'Pass' if outcome == 'Passed' else 'Fail',
                               'Duration': duration,
                               'Error Message': error_message if error_message else 'N/A'
                           }
@@ -362,28 +356,20 @@ jobs:
                       'bg_color': '#FFE6E6'
                   })
           
-                  # Định dạng đặc biệt cho Description với XML docs
-                  xml_doc_format = workbook.add_format({
+                                    # Standard format for descriptions
+                  description_format = workbook.add_format({
                       'text_wrap': True,
                       'valign': 'top',
-                      'border': 1,
-                      'bg_color': '#F0F8FF',  # Alice Blue cho XML docs
-                      'italic': True
-                  })
-          
-                  fallback_format = workbook.add_format({
-                      'text_wrap': True,
-                      'valign': 'top',
-                      'border': 1,
-                      'bg_color': '#FFF8DC'  # Cornsilk cho fallback descriptions
+                      'border': 1
                   })
           
                   # Tạo sheet Summary
                   summary_data = []
                   if coverage_data:
                       total_tests = sum(len(tests) for tests in test_data_by_class.values())
-                      passed_tests = sum(len([t for t in tests if t['Status'] == '✅ Pass']) for tests in test_data_by_class.values())
-                      xml_doc_tests = sum(len([t for t in tests if t['Description'].startswith('📖')]) for tests in test_data_by_class.values())
+                                              passed_tests = sum(len([t for t in tests if t['Status'] == 'Pass']) for tests in test_data_by_class.values())
+                                                # Count tests that have documentation (not using emojis anymore)
+                          xml_doc_tests = sum(len([t for t in tests if 'Description' in t and t['Description']]) for tests in test_data_by_class.values())
           
                       summary_data = [
                           ['Metric', 'Value', 'Status'],
@@ -393,7 +379,7 @@ jobs:
                           ['Total Tests', total_tests, ''],
                           ['Passed Tests', passed_tests, ''],
                           ['Failed Tests', total_tests - passed_tests, ''],
-                          ['Tests with XML Documentation', xml_doc_tests, f'{(xml_doc_tests/total_tests*100):.0f}%' if total_tests > 0 else '0%'],
+                          ['Tests with Documentation', xml_doc_tests, f'{(xml_doc_tests/total_tests*100):.0f}%' if total_tests > 0 else '0%'],
                           ['Test Pass Rate', f"{(passed_tests / total_tests * 100) if total_tests > 0 else 0:.2f}%", ''],
                           ['Test Run Date', datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ''],
                           ['Minimum Coverage Threshold', '70%', ''],
@@ -466,15 +452,12 @@ jobs:
           
                                   # Áp dụng định dạng khác nhau dựa trên nội dung
                                   if col_num == 5:  # Status column
-                                      if '✅ Pass' in str(cell_value):
+                                      if str(cell_value) == 'Pass':
                                           worksheet.write(row_num, col_num, cell_value, pass_format)
                                       else:
                                           worksheet.write(row_num, col_num, cell_value, fail_format)
                                   elif col_num == 2:  # Description column
-                                      if str(cell_value).startswith('📖'):  # XML documentation
-                                          worksheet.write(row_num, col_num, cell_value, xml_doc_format)
-                                      else:  # Fallback description
-                                          worksheet.write(row_num, col_num, cell_value, fallback_format)
+                                      worksheet.write(row_num, col_num, cell_value, description_format)
                                   else:
                                       worksheet.write(row_num, col_num, cell_value, cell_format)
           
@@ -488,7 +471,7 @@ jobs:
 
       - name: Display coverage summary
         run: |
-          echo "## 📊 Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Extract coverage and test data from the XML file
@@ -505,9 +488,9 @@ jobs:
           
               # Status indicators
               if (( $(echo "$LINE_PERCENT >= 70" | bc -l) )); then
-                LINE_STATUS="✅"
+                LINE_STATUS="PASS"
               else
-                LINE_STATUS="⚠️"
+                LINE_STATUS="FAIL"
               fi
           
               echo "### Coverage Metrics" >> $GITHUB_STEP_SUMMARY
@@ -533,7 +516,7 @@ jobs:
               echo "| ------ | ----- | ------ |" >> $GITHUB_STEP_SUMMARY
               echo "| Total Tests | $TOTAL_TESTS | |" >> $GITHUB_STEP_SUMMARY
               echo "| Passed Tests | $PASSED_TESTS | |" >> $GITHUB_STEP_SUMMARY
-              echo "| Failed Tests | $FAILED_TESTS | $([ "$FAILED_TESTS" -eq 0 ] && echo "✅" || echo "❌") |" >> $GITHUB_STEP_SUMMARY
+                                    echo "| Failed Tests | $FAILED_TESTS | $([ "$FAILED_TESTS" -eq 0 ] && echo "PASS" || echo "FAIL") |" >> $GITHUB_STEP_SUMMARY
               echo "| Pass Rate | $(printf "%.2f" $PASS_RATE)% | |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
@@ -551,7 +534,7 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
           
-          echo "📊 **Enhanced Excel Report Available**: Download the detailed Excel report with XML documentation from artifacts below" >> $GITHUB_STEP_SUMMARY
+          echo "**Excel Report Available**: Download the detailed Excel report with documentation from artifacts below" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Excel coverage reports
         uses: actions/upload-artifact@v4
