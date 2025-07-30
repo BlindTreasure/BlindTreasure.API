@@ -41,6 +41,14 @@ public class SellerVerificationServiceTests
 
     #region VerifySellerAsync Tests
 
+    /// <summary>
+    /// Checks if a seller's verification request is successfully approved when instructed to do so.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An administrator reviews a seller's profile and approves their verification request.
+    /// Expected: The seller's account is marked as verified and approved, and they receive a notification and an email confirming the approval. The system's temporary data (cache) for this seller is also cleared.
+    /// Coverage: The full process of approving a seller, including updating their status, sending communications, and managing cached data.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldApproveSeller_WhenIsApprovedIsTrue()
     {
@@ -133,6 +141,14 @@ public class SellerVerificationServiceTests
             Times.Once);
     }
 
+    /// <summary>
+    /// Checks if a seller's verification request is correctly rejected when instructed to do so.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An administrator reviews a seller's profile and decides to reject their verification request, providing a reason.
+    /// Expected: The seller's account is marked as rejected, and they receive a notification and an email explaining the rejection and the reason. The system's temporary data (cache) for this seller is also cleared.
+    /// Coverage: The full process of rejecting a seller, including updating their status, communicating the rejection, and managing cached data.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldRejectSeller_WhenIsApprovedIsFalse()
     {
@@ -229,6 +245,14 @@ public class SellerVerificationServiceTests
             Times.Once);
     }
 
+    /// <summary>
+    /// Checks if a 'Not Found' error occurs when trying to verify a seller that doesn't exist.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An attempt is made to approve or reject a seller's profile using an ID that doesn't belong to any existing seller.
+    /// Expected: The system responds with a 'Not Found' error, indicating that the seller's profile could not be located.
+    /// Coverage: Error handling when trying to verify a non-existent seller, ensuring robust system responses.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldThrowNotFound_WhenSellerNotExists()
     {
@@ -251,6 +275,14 @@ public class SellerVerificationServiceTests
         exception.Message.Should().Contain("Không tìm thấy hồ sơ seller");
     }
 
+    /// <summary>
+    /// Checks if an internal error occurs when a seller's profile is found but the associated user information is missing.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: The system finds a seller's profile for verification, but the user account linked to it is unexpectedly missing or null.
+    /// Expected: An internal error is thrown, indicating a data inconsistency or critical system issue, as every seller should have a linked user account.
+    /// Coverage: Handling critical data integrity issues where seller profiles are not properly linked to user accounts.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldThrowInternal_WhenUserIsNull()
     {
@@ -288,6 +320,14 @@ public class SellerVerificationServiceTests
 
     #region Additional Test Cases
 
+    /// <summary>
+    /// Checks if the correct email is sent with accurate information when a seller's profile is approved.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller's verification request is approved, and the system needs to send them an approval email.
+    /// Expected: An email is sent to the seller's registered email address, containing their name and a confirmation of approval.
+    /// Coverage: The accuracy and content of automated emails sent upon seller approval.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldSendEmailWithCorrectData_WhenApproved()
     {
@@ -354,6 +394,14 @@ public class SellerVerificationServiceTests
         capturedEmailRequest.UserName.Should().Be("Email Test Seller");
     }
 
+    /// <summary>
+    /// Checks if the correct email is sent with accurate information and the rejection reason when a seller's profile is rejected.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller's verification request is rejected, and the system needs to send them a rejection email with the specific reason.
+    /// Expected: An email is sent to the seller's registered email address, containing their name and the detailed reason for rejection.
+    /// Coverage: The accuracy and content of automated emails sent upon seller rejection, including the communication of the rejection reason.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldSendEmailWithCorrectData_WhenRejected()
     {
@@ -428,6 +476,14 @@ public class SellerVerificationServiceTests
         capturedRejectReason.Should().Be(rejectReason);
     }
 
+    /// <summary>
+    /// Checks if the relevant cache entries are cleared when a seller's profile is approved.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller's verification request is approved, and their old cached information needs to be removed to ensure fresh data is loaded next time.
+    /// Expected: The cache entries specifically related to the seller's ID and user ID are removed from the system's temporary storage.
+    /// Coverage: Cache invalidation upon seller approval to prevent serving outdated seller information.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldClearCache_WhenApproved()
     {
@@ -498,6 +554,14 @@ public class SellerVerificationServiceTests
         removedCacheKeys.Should().Contain($"seller:user:{userId}");
     }
 
+    /// <summary>
+    /// Checks if the seller's status and verification flag are correctly updated upon approval.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller's verification request is approved.
+    /// Expected: The seller's status is set to 'Approved', their `IsVerified` flag is set to `true`, and any previous rejection reason is cleared.
+    /// Coverage: Proper status and flag updates in the database when a seller is approved.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldSetCorrectStatus_WhenApproved()
     {
@@ -565,6 +629,14 @@ public class SellerVerificationServiceTests
         capturedSellerUpdate.RejectReason.Should().BeNull();
     }
 
+    /// <summary>
+    /// Checks if the notification sent to a seller upon approval has the correct content.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller's verification request is approved, triggering an automated notification.
+    /// Expected: A system notification is pushed to the seller with a title confirming approval and a message indicating successful verification.
+    /// Coverage: The accuracy and relevance of the notification content for approved sellers.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldSetCorrectNotificationContent_WhenApproved()
     {
@@ -630,6 +702,14 @@ public class SellerVerificationServiceTests
         capturedNotification.Message.Should().Contain("đã được duyệt thành công");
     }
 
+    /// <summary>
+    /// Checks if the notification sent to a seller upon rejection has the correct content, including the reason.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller's verification request is rejected, triggering an automated notification with the rejection reason.
+    /// Expected: A system notification is pushed to the seller with a title indicating rejection and a message that clearly states the reason for denial.
+    /// Coverage: The accuracy and completeness of the notification content for rejected sellers, ensuring the reason for rejection is communicated.
+    /// </remarks>
     [Fact]
     public async Task VerifySellerAsync_ShouldSetCorrectNotificationContent_WhenRejected()
     {
