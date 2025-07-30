@@ -47,8 +47,10 @@ jobs:
           dotnet build BlindTreasure.API.sln \
             --no-restore \
             --configuration Release \
-            /p:GenerateDocumentationFile=true \
-            /p:DocumentationFile=bin/Release/net8.0/$(MSBuildProjectName).xml
+            /p:GenerateDocumentationFile=true
+          
+          # List generated XML files to verify they exist
+          find . -name "*.xml" -path "*/bin/*" | sort
 
       - name: Restore tools
         run: dotnet tool restore
@@ -78,7 +80,12 @@ jobs:
           
           def extract_xml_documentation():
               """Trích xuất XML documentation từ các file .xml được generate"""
-              xml_files = glob.glob('./**/bin/**/*.xml', recursive=True)
+              # Direct path to test project XML documentation
+              test_project_xml = glob.glob('./BlindTreaure.UnitTest/bin/Release/net8.0/BlindTreaure.UnitTest.xml')
+              # Fallback to general search if specific file not found
+              xml_files = test_project_xml if test_project_xml else glob.glob('./**/bin/**/*.xml', recursive=True)
+              
+              print(f"🔍 Starting search for XML documentation files in bin directories")
               docs = {}
           
               print(f"🔍 Tìm thấy {len(xml_files)} file XML documentation")
@@ -115,7 +122,18 @@ jobs:
                                   method_parts = name.split('.')
                                   if len(method_parts) > 0:
                                       method_name = method_parts[-1].split('(')[0]  # Bỏ parameters
+                                      
+                                      # Store both original method name and without "_Should" pattern
                                       docs[method_name] = doc_text
+                                      
+                                      # Handle special case for test methods with common patterns
+                                      if "_Should" in method_name:
+                                          test_parts = method_name.split('_Should')
+                                          if len(test_parts) == 2:
+                                              simple_name = test_parts[0]
+                                              suffix = test_parts[1]
+                                              docs[f"{simple_name}_Should{suffix}"] = doc_text
+                                      
                                       print(f"📝 Tìm thấy documentation cho method: {method_name}")
           
                       print(f"✅ Đã xử lý xong file: {xml_file}")
@@ -129,6 +147,7 @@ jobs:
           
           def parse_cobertura_xml():
               xml_files = glob.glob('./TestResults/**/coverage.cobertura.xml', recursive=True)
+              print(f"🔍 Found {len(xml_files)} coverage.cobertura.xml files")
               if not xml_files:
                   return None
               tree = ET.parse(xml_files[0])
@@ -210,6 +229,33 @@ jobs:
                   if len(doc_text) > 300:
                       doc_text = doc_text[:297] + "..."
                   return f"📖 {doc_text}"
+              
+              # Try alternate name formats for better matching with test method names
+              # Check for variations in the method name format
+              alt_formats = []
+              
+              # For methods like "GetByIdAsync_ShouldReturnEntity_WhenEntityExists"
+              if "_Should" in test_method:
+                  parts = test_method.split("_Should")
+                  if len(parts) >= 2:
+                      # Try matching with the base method name
+                      base_name = parts[0]
+                      if base_name in xml_docs:
+                          doc_text = xml_docs[base_name]
+                          if len(doc_text) > 300:
+                              doc_text = doc_text[:297] + "..."
+                          return f"📖 {doc_text}"
+              
+              # Look through all keys in xml_docs for potential match
+              for doc_key in xml_docs.keys():
+                  # Check if the test method is a substring of a documented method
+                  # or if a documented method is a substring of the test method
+                  if test_method in doc_key or doc_key in test_method:
+                      doc_text = xml_docs[doc_key]
+                      if len(doc_text) > 300:
+                          doc_text = doc_text[:297] + "..."
+                      print(f"Found match for {test_method} with {doc_key}")
+                      return f"📖 {doc_text}"
           
               # Fallback về mô tả từ tên method
               fallback_desc = get_test_description_from_name(test_method)
@@ -249,6 +295,10 @@ jobs:
                           # Sử dụng enhanced description với XML documentation
                           description = get_enhanced_description(test_method, xml_docs)
           
+                          # Debug logs for XML documentation matching
+                          print(f"Processing test method: {test_method}")
+                          print(f"Description found: {description}")
+                          
                           # Tạo đối tượng test case với thông tin chi tiết
                           test_case = {
                               'ID': f"TC_{len(test_data_by_class.get(sheet_name, [])) + 1:03d}",
