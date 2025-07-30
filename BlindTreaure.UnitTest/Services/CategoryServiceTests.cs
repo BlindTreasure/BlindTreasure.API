@@ -85,6 +85,14 @@ public class CategoryServiceTests
         _categoryRepoMock.Verify(x => x.GetQueryable(), Times.Never);
     }
 
+    /// <summary>
+    /// Tests if a `NotFound` exception is thrown when `GetByIdAsync` is called for a non-existent category.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to retrieve a category by an ID that does not exist in the database or cache.
+    /// Expected: An `Exception` with a 404 (Not Found) status code is thrown.
+    /// Coverage: Error handling for retrieving non-existent categories.
+    /// </remarks>
     [Fact]
     public async Task GetByIdAsync_ShouldThrowNotFound_WhenCategoryNotExists()
     {
@@ -109,6 +117,14 @@ public class CategoryServiceTests
 
     #region GetAllAsync Tests
 
+    /// <summary>
+    /// Tests if `GetAllAsync` returns a paginated list of categories when data exists.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to retrieve all categories with pagination parameters.
+    /// Expected: A `PaginationResponse<Category>` containing the categories is returned, and the result is cached.
+    /// Coverage: Pagination functionality and caching of category lists.
+    /// </remarks>
     [Fact]
     public async Task GetAllAsync_ShouldReturnPaginatedCategories_WhenDataExists()
     {
@@ -161,6 +177,14 @@ public class CategoryServiceTests
 
     #region CreateAsync Tests
 
+    /// <summary>
+    /// Tests if a new category can be created successfully with valid input data.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An admin user provides valid information to create a new category.
+    /// Expected: A `CategoryDto` representing the newly created category is returned, the category is added to the database, and relevant caches are invalidated.
+    /// Coverage: Category creation, role-based access control, and cache management.
+    /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldCreateCategory_WhenValidData()
     {
@@ -206,6 +230,14 @@ public class CategoryServiceTests
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
     }
 
+    /// <summary>
+    /// Tests if a `Conflict` exception is thrown when attempting to create a category with an existing name.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An admin user attempts to create a category with a name that is already in use by another category.
+    /// Expected: An `Exception` with a 409 (Conflict) status code is thrown.
+    /// Coverage: Category name uniqueness validation.
+    /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldThrowConflict_WhenCategoryNameExists()
     {
@@ -240,6 +272,14 @@ public class CategoryServiceTests
         statusCode.Should().Be(409);
     }
 
+    /// <summary>
+    /// Tests if a `Forbidden` exception is thrown when a non-admin user attempts to create a category.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user without administrator privileges attempts to create a new category.
+    /// Expected: An `Exception` with a 403 (Forbidden) status code is thrown.
+    /// Coverage: Role-based access control for category creation.
+    /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldThrowForbidden_WhenUserNotAdmin()
     {
@@ -265,6 +305,14 @@ public class CategoryServiceTests
 
     #region UpdateAsync Tests
 
+    /// <summary>
+    /// Checks if a category can be updated successfully when given valid information.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An administrator changes the details of an existing category with correct information.
+    /// Expected: The category is updated in the system, and its new details are returned.
+    /// Coverage: How categories are updated, ensuring only authorized users can do it, and making sure the system's saved information is fresh.
+    /// </remarks>
     [Fact]
     public async Task UpdateAsync_ShouldUpdateCategory_WhenValidData()
     {
@@ -321,6 +369,14 @@ public class CategoryServiceTests
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
     }
 
+    /// <summary>
+    /// Checks if an error occurs when a user without permission tries to update a category.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user who is not an administrator tries to change a category.
+    /// Expected: The system stops the action with a 'Forbidden' error (status code 403), showing that the user doesn't have the right permissions.
+    /// Coverage: Making sure only authorized users can update categories.
+    /// </remarks>
     [Fact]
     public async Task UpdateAsync_ShouldThrowForbidden_WhenUserNotAuthorized()
     {
@@ -348,6 +404,14 @@ public class CategoryServiceTests
 
     #region DeleteAsync Tests
 
+    /// <summary>
+    /// Checks if a category can be successfully deleted when it has no subcategories or products.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An administrator deletes a category that doesn't have any products or smaller categories linked to it.
+    /// Expected: The category is marked as deleted in the system, and its details are returned.
+    /// Coverage: How categories are deleted, making sure only authorized users can do it, and ensuring categories are empty before deletion.
+    /// </remarks>
     [Fact]
     public async Task DeleteAsync_ShouldDeleteCategory_WhenValidAndNoChildren()
     {
@@ -399,6 +463,14 @@ public class CategoryServiceTests
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
     }
 
+    /// <summary>
+    /// Checks if an error occurs when trying to delete a category that still has products linked to it.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An administrator tries to delete a category that has products associated with it.
+    /// Expected: The system stops the action with a 'Conflict' error (status code 409), indicating that the category cannot be deleted while products are linked.
+    /// Coverage: Preventing deletion of categories that are still in use.
+    /// </remarks>
     [Fact]
     public async Task DeleteAsync_ShouldThrowConflict_WhenCategoryHasProducts()
     {
@@ -439,6 +511,14 @@ public class CategoryServiceTests
 
     #region GetAllChildCategoryIdsAsync Tests
 
+    /// <summary>
+    /// Checks if the system correctly finds all subcategory IDs, including grand-children and beyond, for a given parent category.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to get all IDs of categories that fall under a specific parent category, regardless of how many levels deep they are.
+    /// Expected: A list containing the ID of the parent category and all its subcategory IDs is returned.
+    /// Coverage: The ability to trace all related subcategories within the system's hierarchy.
+    /// </remarks>
     [Fact]
     public async Task GetAllChildCategoryIdsAsync_ShouldReturnAllDescendantIds()
     {
@@ -473,6 +553,14 @@ public class CategoryServiceTests
 
     #region GetCategoriesWithAllProductsAsync Tests
 
+    /// <summary>
+    /// Checks if categories are returned along with all products, including those in subcategories.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to retrieve categories and all their associated products, covering products directly in the category and those in its subcategories.
+    /// Expected: A list of categories, with each category showing the total count of all products under it.
+    /// Coverage: Retrieving category data with a comprehensive count of all related products.
+    /// </remarks>
     [Fact]
     public async Task GetCategoriesWithAllProductsAsync_ShouldReturnCategoriesWithProducts()
     {
@@ -525,6 +613,14 @@ public class CategoryServiceTests
         result[0].ProductCount.Should().Be(2); // 1 parent product + 1 child product
     }
 
+    /// <summary>
+    /// Checks if an empty list is returned when there are no categories to retrieve.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to get all categories, but no categories exist in the system.
+    /// Expected: An empty list is returned, indicating no categories were found.
+    /// Coverage: Handling cases where no categories are present in the database.
+    /// </remarks>
     [Fact]
     public async Task GetCategoriesWithAllProductsAsync_ShouldReturnEmptyList_WhenNoCategories()
     {
@@ -545,6 +641,14 @@ public class CategoryServiceTests
 
     #region GetWithParentAsync Tests
 
+    /// <summary>
+    /// Checks if a category is returned along with its direct parent category.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to retrieve a specific category, and it has a parent category.
+    /// Expected: The category is returned, and its `Parent` property is correctly populated with the parent category's details.
+    /// Coverage: Retrieving category information including its immediate parent in the hierarchy.
+    /// </remarks>
     [Fact]
     public async Task GetWithParentAsync_ShouldReturnCategoryWithParent()
     {
@@ -591,6 +695,14 @@ public class CategoryServiceTests
         result.Parent!.Id.Should().Be(parentId);
     }
 
+    /// <summary>
+    /// Checks if `null` is returned when trying to get a category that doesn't exist.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to find a category by an ID that isn't in the system.
+    /// Expected: Nothing is returned (a `null` value), meaning no category was found.
+    /// Coverage: How the system handles requests for categories that don't exist.
+    /// </remarks>
     [Fact]
     public async Task GetWithParentAsync_ShouldReturnNull_WhenCategoryNotExists()
     {
@@ -611,6 +723,14 @@ public class CategoryServiceTests
 
     #region UpdateAsync Additional Tests
 
+    /// <summary>
+    /// Checks if an error occurs when trying to update a category that doesn't exist.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An administrator attempts to update a category using an ID that does not match any existing category.
+    /// Expected: The system stops the action with a 'Not Found' error (status code 404), indicating the category doesn't exist.
+    /// Coverage: Error handling when trying to update a non-existent category.
+    /// </remarks>
     [Fact]
     public async Task UpdateAsync_ShouldThrowNotFound_WhenCategoryNotExists()
     {
@@ -642,6 +762,14 @@ public class CategoryServiceTests
 
     #region DeleteAsync Additional Tests
 
+    /// <summary>
+    /// Checks if an error occurs when a user without administrative or staff privileges tries to delete a category.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A regular user (neither admin nor staff) attempts to delete a category.
+    /// Expected: The system stops the action with a 'Forbidden' error (status code 403), showing that the user doesn't have the right permissions.
+    /// Coverage: Ensuring only authorized personnel can delete categories.
+    /// </remarks>
     [Fact]
     public async Task DeleteAsync_ShouldThrowForbidden_WhenUserNotAdminOrStaff()
     {
@@ -664,6 +792,14 @@ public class CategoryServiceTests
         statusCode.Should().Be(403);
     }
 
+    /// <summary>
+    /// Checks if an error occurs when trying to delete a category that still has subcategories.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An administrator tries to delete a category that has other categories listed under it.
+    /// Expected: The system stops the action with a 'Conflict' error (status code 409), indicating that the category cannot be deleted while it has subcategories.
+    /// Coverage: Preventing deletion of categories that are still organizing other categories.
+    /// </remarks>
     [Fact]
     public async Task DeleteAsync_ShouldThrowConflict_WhenCategoryHasChildren()
     {
@@ -705,6 +841,14 @@ public class CategoryServiceTests
 
     #endregion
 
+    /// <summary>
+    /// Checks if a category is correctly returned when it exists in the system.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to find a category by its ID, and that category exists.
+    /// Expected: The category's details are returned.
+    /// Coverage: Successfully retrieving category information when the category is present.
+    /// </remarks>
     [Fact]
     public async Task GetByIdAsync_ShouldReturnCategoryDto_WhenCategoryExists()
     {
@@ -719,6 +863,14 @@ public class CategoryServiceTests
         result.Id.Should().Be(categoryId);
     }
 
+    /// <summary>
+    /// Checks if an error occurs when trying to create a category with an empty name.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: An administrator attempts to create a new category but leaves the name field blank.
+    /// Expected: The system prevents the creation with an error, as a category name cannot be empty.
+    /// Coverage: Input validation for category names.
+    /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldThrowBadRequest_WhenNameIsEmpty()
     {
