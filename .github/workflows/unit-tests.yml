@@ -104,27 +104,39 @@ jobs:
                               summary = member.find('summary')
                               remarks = member.find('remarks')
           
-                              doc_text = ""
+                              doc_info = {
+                                  "summary": "",
+                                  "scenario": "",
+                                  "expected": "",
+                                  "coverage": ""
+                              }
           
                               # Lấy summary
                               if summary is not None and summary.text:
-                                  doc_text += summary.text.strip()
+                                  doc_info["summary"] = summary.text.strip()
           
-                              # Thêm remarks nếu có
+                              # Lấy chi tiết từ remarks
                               if remarks is not None and remarks.text:
-                                  if doc_text:
-                                      doc_text += " | "
-                                  doc_text += remarks.text.strip()
+                                  remarks_text = remarks.text.strip()
+                                  # Parse the remarks section
+                                  lines = remarks_text.split('\n')
+                                  for line in lines:
+                                      line = line.strip()
+                                      if line.startswith("Scenario:"):
+                                          doc_info["scenario"] = line.replace("Scenario:", "").strip()
+                                      elif line.startswith("Expected:"):
+                                          doc_info["expected"] = line.replace("Expected:", "").strip()
+                                      elif line.startswith("Coverage:"):
+                                          doc_info["coverage"] = line.replace("Coverage:", "").strip()
           
-                              if doc_text:
+                              if doc_info["summary"] or doc_info["scenario"] or doc_info["expected"]:
                                   # Extract method name từ full name
-                                  # Ví dụ: "M:BlindTreaure.UnitTest.Infrastructure.GenericRepositoryTests.AddAsync_ShouldAddEntityWithTimestamps"
                                   method_parts = name.split('.')
                                   if len(method_parts) > 0:
                                       method_name = method_parts[-1].split('(')[0]  # Bỏ parameters
                                       
                                       # Store both original method name and without "_Should" pattern
-                                      docs[method_name] = doc_text
+                                      docs[method_name] = doc_info
                                       
                                       # Handle special case for test methods with common patterns
                                       if "_Should" in method_name:
@@ -132,7 +144,7 @@ jobs:
                                           if len(test_parts) == 2:
                                               simple_name = test_parts[0]
                                               suffix = test_parts[1]
-                                              docs[f"{simple_name}_Should{suffix}"] = doc_text
+                                              docs[f"{simple_name}_Should{suffix}"] = doc_info
                                       
                                       print(f"📝 Tìm thấy documentation cho method: {method_name}")
           
@@ -225,16 +237,28 @@ jobs:
               # Format documentation text to be a clean paragraph
               def format_text(text):
                   # Remove line breaks, extra spaces and normalize whitespace
+                  if text is None:
+                      return ""
                   clean_text = ' '.join(text.replace('\n', ' ').replace('\r', ' ').split())
                   # Limit text length for Excel cell
                   if len(clean_text) > 300:
                       clean_text = clean_text[:297] + "..."
                   return clean_text
               
+              # Default empty result
+              result = {
+                  "description": "",
+                  "procedure": "",
+                  "expected": ""
+              }
+              
               # Tìm trong XML documentation trước
               if test_method in xml_docs:
-                  doc_text = format_text(xml_docs[test_method])
-                  return doc_text
+                  doc_info = xml_docs[test_method]
+                  result["description"] = format_text(doc_info.get("summary", ""))
+                  result["procedure"] = format_text(doc_info.get("scenario", ""))
+                  result["expected"] = format_text(doc_info.get("expected", ""))
+                  return result
               
               # Try alternate name formats for better matching with test method names
               # For methods like "GetByIdAsync_ShouldReturnEntity_WhenEntityExists"
@@ -244,20 +268,39 @@ jobs:
                       # Try matching with the base method name
                       base_name = parts[0]
                       if base_name in xml_docs:
-                          doc_text = format_text(xml_docs[base_name])
-                          return doc_text
+                          doc_info = xml_docs[base_name]
+                          result["description"] = format_text(doc_info.get("summary", ""))
+                          result["procedure"] = format_text(doc_info.get("scenario", ""))
+                          result["expected"] = format_text(doc_info.get("expected", ""))
+                          return result
               
               # Look through all keys in xml_docs for potential match
               for doc_key in xml_docs.keys():
                   # Check if the test method is a substring of a documented method
                   # or if a documented method is a substring of the test method
                   if test_method in doc_key or doc_key in test_method:
-                      doc_text = format_text(xml_docs[doc_key])
-                      return doc_text
+                      doc_info = xml_docs[doc_key]
+                      result["description"] = format_text(doc_info.get("summary", ""))
+                      result["procedure"] = format_text(doc_info.get("scenario", ""))
+                      result["expected"] = format_text(doc_info.get("expected", ""))
+                      return result
           
               # Fallback về mô tả từ tên method
               fallback_desc = get_test_description_from_name(test_method)
-              return format_text(fallback_desc)
+              result["description"] = format_text(fallback_desc)
+              # Extract expected results from method name if possible
+              if "_Should" in test_method and "_When" in test_method:
+                  parts = test_method.split("_Should")
+                  if len(parts) > 1:
+                      expected_part = parts[1].split("_When")[0]
+                      result["expected"] = format_text(f"Should {expected_part}")
+                      
+                  when_parts = test_method.split("_When")
+                  if len(when_parts) > 1:
+                      procedure_part = when_parts[1]
+                      result["procedure"] = format_text(f"When {procedure_part}")
+              
+              return result
           
           def parse_test_results():
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
@@ -291,14 +334,15 @@ jobs:
                           sheet_name = convert_to_management_name(test_class)
           
                           # Sử dụng enhanced description với XML documentation
-                          description = get_enhanced_description(test_method, xml_docs)
+                          description_data = get_enhanced_description(test_method, xml_docs)
           
                           # Tạo đối tượng test case với thông tin chi tiết
                           test_case = {
                               'ID': f"TC_{len(test_data_by_class.get(sheet_name, [])) + 1:03d}",
                               'Test Method': test_method,
-                              'Description': description,  # Sử dụng enhanced description
-                              'Expected Result': 'Pass',
+                              'Test Case Description': description_data["description"],
+                              'Test Case Procedure': description_data["procedure"],
+                              'Expected Results': description_data["expected"] or "Test should pass successfully",
                               'Actual Result': outcome,
                               'Status': 'Pass' if outcome == 'Passed' else 'Fail',
                               'Duration': duration,
@@ -435,13 +479,14 @@ jobs:
           
                       worksheet = writer.sheets[sheet_name]
                       worksheet.set_column('A:A', 10)  # ID
-                      worksheet.set_column('B:B', 35)  # Test Method
-                      worksheet.set_column('C:C', 60)  # Description (tăng độ rộng cho XML docs)
-                      worksheet.set_column('D:D', 20)  # Expected Result
-                      worksheet.set_column('E:E', 20)  # Actual Result
-                      worksheet.set_column('F:F', 15)  # Status
-                      worksheet.set_column('G:G', 15)  # Duration
-                      worksheet.set_column('H:H', 50)  # Error Message
+                      worksheet.set_column('B:B', 30)  # Test Method
+                      worksheet.set_column('C:C', 40)  # Test Case Description
+                      worksheet.set_column('D:D', 40)  # Test Case Procedure
+                      worksheet.set_column('E:E', 40)  # Expected Results
+                      worksheet.set_column('F:F', 15)  # Actual Result
+                      worksheet.set_column('G:G', 15)  # Status
+                      worksheet.set_column('H:H', 15)  # Duration
+                      worksheet.set_column('I:I', 40)  # Error Message
           
                       for row_num in range(len(df_tests) + 1):
                           for col_num in range(len(df_tests.columns)):
