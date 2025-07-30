@@ -208,7 +208,7 @@ jobs:
           
               return f"{base_name}Management"
           
-                    def get_test_description_from_name(test_method):
+          def get_test_description_from_name(test_method):
               """Tạo mô tả từ tên phương thức test (fallback)"""
               if '_' in test_method:
                   words = test_method.split('_')
@@ -247,7 +247,7 @@ jobs:
                           doc_text = format_text(xml_docs[base_name])
                           return doc_text
               
-                                            # Look through all keys in xml_docs for potential match
+              # Look through all keys in xml_docs for potential match
               for doc_key in xml_docs.keys():
                   # Check if the test method is a substring of a documented method
                   # or if a documented method is a substring of the test method
@@ -356,7 +356,7 @@ jobs:
                       'bg_color': '#FFE6E6'
                   })
           
-                                    # Standard format for descriptions
+                  # Standard format for descriptions
                   description_format = workbook.add_format({
                       'text_wrap': True,
                       'valign': 'top',
@@ -367,14 +367,14 @@ jobs:
                   summary_data = []
                   if coverage_data:
                       total_tests = sum(len(tests) for tests in test_data_by_class.values())
-                                              passed_tests = sum(len([t for t in tests if t['Status'] == 'Pass']) for tests in test_data_by_class.values())
-                                                # Count tests that have documentation (not using emojis anymore)
-                          xml_doc_tests = sum(len([t for t in tests if 'Description' in t and t['Description']]) for tests in test_data_by_class.values())
+                      passed_tests = sum(len([t for t in tests if t['Status'] == 'Pass']) for tests in test_data_by_class.values())
+                      # Count tests that have documentation (not using emojis anymore)
+                      xml_doc_tests = sum(len([t for t in tests if 'Description' in t and t['Description']]) for tests in test_data_by_class.values())
           
                       summary_data = [
                           ['Metric', 'Value', 'Status'],
                           ['Line Coverage', f"{coverage_data['summary']['line_coverage']}%", 
-                           '✅ Pass' if coverage_data['summary']['line_coverage'] >= 70 else '❌ Fail'],
+                           'Pass' if coverage_data['summary']['line_coverage'] >= 70 else 'Fail'],
                           ['Branch Coverage', f"{coverage_data['summary']['branch_coverage']}%", ''],
                           ['Total Tests', total_tests, ''],
                           ['Passed Tests', passed_tests, ''],
