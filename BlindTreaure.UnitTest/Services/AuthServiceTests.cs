@@ -54,6 +54,14 @@ public class AuthServiceTests
         );
     }
 
+    /// <summary>
+    /// Tests if a user can be successfully registered when their email does not already exist.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A new user attempts to register with an email address that is not already in the system.
+    /// Expected: The user is successfully registered, added to the database, an OTP verification email is sent, and an OTP verification record is created.
+    /// Coverage: User registration, email uniqueness check, OTP generation and email sending.
+    /// </remarks>
     [Fact]
     public async Task RegisterUserAsync_ShouldRegisterUser_WhenEmailNotExists()
     {
@@ -89,6 +97,14 @@ public class AuthServiceTests
         _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
     }
 
+    /// <summary>
+    /// Tests if a user can successfully log in and receive access/refresh tokens with valid credentials.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user provides correct email and password for an active, verified account.
+    /// Expected: A `LoginResponseDto` containing non-null and non-empty access and refresh tokens is returned, and the user's cache is updated.
+    /// Coverage: User authentication, password hashing verification, token generation, and cache updates.
+    /// </remarks>
     [Fact]
     public async Task LoginAsync_ShouldReturnTokens_WhenCredentialsAreValid()
     {
@@ -131,6 +147,14 @@ public class AuthServiceTests
         result.RefreshToken.Should().NotBeNullOrEmpty();
     }
 
+    /// <summary>
+    /// Tests if a user's refresh token is cleared and cache is removed upon logout.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user requests to log out.
+    /// Expected: The user's refresh token in the database is null, and the user's data is removed from the cache.
+    /// Coverage: User logout, refresh token invalidation, and cache management.
+    /// </remarks>
     [Fact]
     public async Task LogoutAsync_ShouldClearRefreshToken_AndCache()
     {
@@ -165,6 +189,14 @@ public class AuthServiceTests
         _cacheServiceMock.Verify(x => x.RemoveAsync($"user:{user.Email}"), Times.Once);
     }
 
+    /// <summary>
+    /// Tests if new access and refresh tokens are returned when a valid refresh token is provided.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user requests to refresh their tokens using a valid and unexpired refresh token.
+    /// Expected: New access and refresh tokens are generated and returned.
+    /// Coverage: Token refreshing mechanism, refresh token validation.
+    /// </remarks>
     [Fact]
     public async Task RefreshTokenAsync_ShouldReturnNewTokens_WhenRefreshTokenIsValid()
     {
@@ -200,6 +232,14 @@ public class AuthServiceTests
         result.RefreshToken.Should().NotBeNullOrEmpty();
     }
 
+    /// <summary>
+    /// Tests if a user's email is verified and their account is activated when a valid OTP is provided.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user provides a correct OTP for email verification.
+    /// Expected: The user's `IsEmailVerified` status is set to `true`, `Status` is set to `Active`, and a registration success email is sent.
+    /// Coverage: OTP verification, user status update, and email confirmation.
+    /// </remarks>
     [Fact]
     public async Task VerifyEmailOtpAsync_ShouldActivateUser_WhenOtpIsValid()
     {
@@ -240,6 +280,14 @@ public class AuthServiceTests
         _emailServiceMock.Verify(x => x.SendRegistrationSuccessEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
     }
 
+    /// <summary>
+    /// Tests if a user's password is successfully updated when a valid OTP is provided for password reset.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user requests to reset their password and provides a correct OTP.
+    /// Expected: The user's password is updated with the new password, and a password change confirmation email is sent.
+    /// Coverage: Password reset functionality, OTP validation for password reset, and email notification.
+    /// </remarks>
     [Fact]
     public async Task ResetPasswordAsync_ShouldUpdatePassword_WhenOtpIsValid()
     {
@@ -281,6 +329,14 @@ public class AuthServiceTests
         _emailServiceMock.Verify(x => x.SendPasswordChangeEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
     }
 
+    /// <summary>
+    /// Tests if a new OTP is sent for registration when the OTP type is 'Register'.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user requests to resend an OTP for registration purposes.
+    /// Expected: A new OTP is generated and sent via email, and a new OTP verification record is added.
+    /// Coverage: OTP resend functionality for registration.
+    /// </remarks>
     [Fact]
     public async Task ResendOtpAsync_ShouldCallResendRegisterOtp_WhenTypeIsRegister()
     {
@@ -313,6 +369,14 @@ public class AuthServiceTests
         _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
     }
 
+    /// <summary>
+    /// Tests if a seller can be successfully registered when their email does not already exist.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A new seller attempts to register with an email address that is not already in the system.
+    /// Expected: The seller is successfully registered, both user and seller records are added to the database, an OTP verification email is sent, and an OTP verification record is created.
+    /// Coverage: Seller registration, email uniqueness check, OTP generation and email sending for sellers.
+    /// </remarks>
     [Fact]
     public async Task RegisterSellerAsync_ShouldRegisterSeller_WhenEmailNotExists()
     {
@@ -353,6 +417,14 @@ public class AuthServiceTests
         _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
     }
 
+    /// <summary>
+    /// Tests if an OTP is sent for a forgot password request when the user is valid.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A valid user requests an OTP to reset their password, and the maximum attempt limit has not been exceeded.
+    /// Expected: A new OTP is generated and sent via email, and the OTP attempt count in cache is updated.
+    /// Coverage: Forgot password OTP generation and sending, and attempt tracking.
+    /// </remarks>
     [Fact]
     public async Task SendForgotPasswordOtpRequestAsync_ShouldSendOtp_WhenUserValid()
     {
@@ -390,6 +462,14 @@ public class AuthServiceTests
         _cacheServiceMock.Verify(x => x.SetAsync($"forgot-otp-count:{email}", 1, It.IsAny<TimeSpan>()), Times.Once);
     }
 
+    /// <summary>
+    /// Tests if a `BadRequest` exception is thrown when a user exceeds the maximum attempts for sending a forgot password OTP.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user requests to resend a forgot password OTP after already exceeding the maximum allowed attempts.
+    /// Expected: An `Exception` with a 400 (Bad Request) status code is thrown, and no new OTP is generated or email sent.
+    /// Coverage: Rate limiting for OTP requests and error handling for exceeding attempts.
+    /// </remarks>
     [Fact]
     public async Task SendForgotPasswordOtpRequestAsync_ShouldThrowBadRequest_WhenExceedMaxAttempts()
     {
@@ -421,6 +501,14 @@ public class AuthServiceTests
         _emailServiceMock.Verify(x => x.SendForgotPasswordOtpEmailAsync(It.IsAny<EmailRequestDto>()), Times.Never);
     }
 
+    /// <summary>
+    /// Tests if a welcome notification is sent to a user upon their first successful login.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user logs in for the first time.
+    /// Expected: A welcome notification is pushed to the user, and a flag is set in cache to prevent sending duplicate welcome notifications.
+    /// Coverage: First-time login experience, notification system integration, and cache management for notification state.
+    /// </remarks>
     [Fact]
     public async Task LoginAsync_ShouldSendWelcomeNotification_OnFirstLogin()
     {
@@ -480,6 +568,14 @@ public class AuthServiceTests
             Times.Once);
     }
 
+    /// <summary>
+    /// Tests if seller-specific information is included in the login response when the logged-in user is a seller.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user with the `Seller` role logs in.
+    /// Expected: The `LoginResponseDto` contains the `SellerId` and `RoleName` is correctly identified as `Seller`.
+    /// Coverage: Role-based login handling and inclusion of associated entity information.
+    /// </remarks>
     [Fact]
     public async Task LoginAsync_ShouldIncludeSellerInfo_WhenUserIsSeller()
     {
@@ -535,6 +631,14 @@ public class AuthServiceTests
         result.User.RoleName.Should().Be(RoleType.Seller);
     }
 
+    /// <summary>
+    /// Tests if a seller verification email is sent when a seller user's email is verified with OTP.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller user provides a correct OTP to verify their email.
+    /// Expected: A seller-specific email verification success email is sent, and the user's status and email verification status are updated.
+    /// Coverage: Seller-specific email verification flow and differentiation from customer verification.
+    /// </remarks>
     [Fact]
     public async Task VerifyEmailOtpAsync_ShouldSendSellerVerificationEmail_WhenUserIsSeller()
     {
@@ -579,6 +683,14 @@ public class AuthServiceTests
         user.IsEmailVerified.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Tests if a `Conflict` exception is thrown when a customer attempts to register with an email that already exists.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A new customer attempts to register with an email address that is already associated with an existing user.
+    /// Expected: An `Exception` with a 409 (Conflict) status code is thrown, and no new user or OTP record is created.
+    /// Coverage: Email uniqueness validation during customer registration and error handling for conflicts.
+    /// </remarks>
     [Fact]
     public async Task RegisterCustomerAsync_ShouldThrowConflict_WhenEmailAlreadyExists()
     {
@@ -615,6 +727,14 @@ public class AuthServiceTests
         _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Never);
     }
 
+    /// <summary>
+    /// Tests if a `Forbidden` exception is thrown when an inactive user attempts to log in.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user with `Pending` or other inactive status attempts to log in.
+    /// Expected: An `Exception` with a 403 (Forbidden) status code is thrown, and no user data or notifications are updated.
+    /// Coverage: User status validation during login and access control.
+    /// </remarks>
     [Fact]
     public async Task LoginAsync_ShouldThrowForbidden_WhenUserNotActive()
     {

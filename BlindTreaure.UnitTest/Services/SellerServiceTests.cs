@@ -66,8 +66,16 @@ public class SellerServiceTests
         );
     }
 
-    #region UpdateSellerInfoAsync Tests
+    #region MyRegion
 
+    /// <summary>
+    /// Checks if a seller's information can be updated successfully when valid details are provided.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller updates their profile with new, correct information about themselves and their company.
+    /// Expected: The seller's personal and company details are updated in the system, and their status might change to 'Waiting Review'.
+    /// Coverage: Updating seller profiles, including personal details and company information, and triggering status changes.
+    /// </remarks>
     [Fact]
     public async Task UpdateSellerInfoAsync_ShouldUpdateSellerInfo_WhenValidData()
     {
@@ -123,6 +131,14 @@ public class SellerServiceTests
         seller.Status.Should().Be(SellerStatus.WaitingReview);
     }
 
+    /// <summary>
+    /// Checks if a 'Not Found' error occurs when trying to update a seller's information if the seller doesn't exist.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to update a seller's profile using a user ID that is not linked to any existing seller account.
+    /// Expected: The system responds with a 'Not Found' error (status code 404), indicating that no seller profile could be found for the update.
+    /// Coverage: Error handling when attempting to modify a non-existent seller's profile.
+    /// </remarks>
     [Fact]
     public async Task UpdateSellerInfoAsync_ShouldThrowNotFound_WhenSellerNotExists()
     {
@@ -152,6 +168,14 @@ public class SellerServiceTests
 
     #region UploadSellerDocumentAsync Tests
 
+    /// <summary>
+    /// Checks if a seller's verification document is successfully uploaded when a valid file is provided.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller uploads a valid document (e.g., a PDF) for verification purposes.
+    /// Expected: The document is successfully uploaded to storage, its URL is saved with the seller's profile, and the URL is returned.
+    /// Coverage: Document upload functionality for seller verification, including saving the document's location.
+    /// </remarks>
     [Fact]
     public async Task UploadSellerDocumentAsync_ShouldUploadDocument_WhenValidFile()
     {
@@ -190,6 +214,14 @@ public class SellerServiceTests
 
     #region GetSellerProfileByIdAsync Tests
 
+    /// <summary>
+    /// Checks if a seller's profile is correctly returned when requested by seller ID.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to retrieve a seller's profile using their seller ID.
+    /// Expected: The seller's detailed profile, including associated user information, is returned.
+    /// Coverage: Retrieving seller profiles by their specific seller ID.
+    /// </remarks>
     [Fact]
     public async Task GetSellerProfileByIdAsync_ShouldReturnProfile_WhenSellerExists()
     {
@@ -227,6 +259,14 @@ public class SellerServiceTests
 
     #region GetSellerProfileByUserIdAsync Tests
 
+    /// <summary>
+    /// Checks if a seller's profile is correctly returned when requested by user ID.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to retrieve a seller's profile using the user ID linked to their seller account.
+    /// Expected: The seller's detailed profile, including associated user information, is returned.
+    /// Coverage: Retrieving seller profiles by their linked user ID.
+    /// </remarks>
     [Fact]
     public async Task GetSellerProfileByUserIdAsync_ShouldReturnProfile_WhenSellerExists()
     {
@@ -271,6 +311,14 @@ public class SellerServiceTests
 
     #region GetAllProductsAsync Tests
 
+    /// <summary>
+    /// Checks if a 'Forbidden' error occurs when an unverified seller tries to view all their products.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller attempts to get a list of all their products, but their account is not yet verified.
+    /// Expected: The system responds with a 'Forbidden' error (status code 403), indicating that only verified sellers can access their product listings.
+    /// Coverage: Ensuring that product listing access is restricted to verified sellers.
+    /// </remarks>
     [Fact]
     public async Task GetAllProductsAsync_ShouldThrowForbidden_WhenSellerNotVerified()
     {
@@ -300,6 +348,14 @@ public class SellerServiceTests
 
     #region CreateProductAsync Tests
 
+    /// <summary>
+    /// Checks if a product can be created successfully when the seller is valid and verified.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A verified seller attempts to create a new product by providing all necessary details.
+    /// Expected: The product is successfully created and its details are returned, confirming that the seller is authorized to add products.
+    /// Coverage: Product creation by a verified seller and the proper authorization checks.
+    /// </remarks>
     [Fact]
     public async Task CreateProductAsync_ShouldCreateProduct_WhenSellerIsValid()
     {
@@ -360,6 +416,14 @@ public class SellerServiceTests
             p.SellerId == sellerId)), Times.Once);
     }
 
+    /// <summary>
+    /// Checks if a 'Forbidden' error occurs when an un-registered seller tries to create a product.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A user who has not registered as a seller tries to create a product.
+    /// Expected: The system responds with a 'Forbidden' error (status code 403), indicating that only registered sellers can create products.
+    /// Coverage: Preventing product creation by unauthorized users who are not registered sellers.
+    /// </remarks>
     [Fact]
     public async Task CreateProductAsync_ShouldThrowForbidden_WhenSellerNotRegistered()
     {
@@ -387,6 +451,14 @@ public class SellerServiceTests
 
     #region UpdateProductAsync Tests
 
+    /// <summary>
+    /// Checks if a product is updated successfully when the seller who owns it makes changes.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller attempts to update a product that they have listed.
+    /// Expected: The product is updated with the new details, confirming that sellers can modify their own products.
+    /// Coverage: Updating products, ensuring that sellers can only modify products they own.
+    /// </remarks>
     [Fact]
     public async Task UpdateProductAsync_ShouldUpdateProduct_WhenSellerOwnsProduct()
     {
@@ -441,6 +513,14 @@ public class SellerServiceTests
 
     #region DeleteProductAsync Tests
 
+    /// <summary>
+    /// Checks if a product is successfully deleted when the seller who owns it initiates the deletion.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller attempts to delete a product that they have listed.
+    /// Expected: The product is successfully marked as deleted, confirming that sellers can remove their own products.
+    /// Coverage: Deleting products, ensuring that sellers can only delete products they own.
+    /// </remarks>
     [Fact]
     public async Task DeleteProductAsync_ShouldDeleteProduct_WhenSellerOwnsProduct()
     {
@@ -490,6 +570,14 @@ public class SellerServiceTests
 
     #region UpdateSellerProductImagesAsync Tests
 
+    /// <summary>
+    /// Checks if a seller can successfully update images for a product they own.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller provides new image files to update the pictures of a product they have listed.
+    /// Expected: The product's images are updated, and the new product details with updated image URLs are returned.
+    /// Coverage: Updating product images, ensuring that sellers can only modify images for their own products.
+    /// </remarks>
     [Fact]
     public async Task UpdateSellerProductImagesAsync_ShouldUpdateImages_WhenSellerOwnsProduct()
     {
@@ -543,6 +631,14 @@ public class SellerServiceTests
 
     #region UpdateSellerAvatarAsync Tests
 
+    /// <summary>
+    /// Checks if a seller's avatar is successfully updated when a valid image file is provided.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller uploads a new image file to change their profile picture.
+    /// Expected: The avatar image is successfully uploaded to storage, its URL is updated in the seller's user profile, and the new avatar URL is returned.
+    /// Coverage: Updating seller avatar images and ensuring the new image is correctly linked to their profile.
+    /// </remarks>
     [Fact]
     public async Task UpdateSellerAvatarAsync_ShouldUpdateAvatar_WhenValidFile()
     {

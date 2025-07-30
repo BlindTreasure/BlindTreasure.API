@@ -35,6 +35,14 @@ public class GenericRepositoryTests
 
     #region AddAsync Tests
 
+    /// <summary>
+    /// Tests that AddAsync properly sets timestamps and user tracking properties
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Adding a new entity to the database
+    /// Expected: Entity is added with correct timestamps and creator ID
+    /// Coverage: AddAsync method implementation
+    /// </remarks>
     [Fact]
     public async Task AddAsync_ShouldAddEntityWithTimestamps()
     {
@@ -68,6 +76,14 @@ public class GenericRepositoryTests
 
     #region GetByIdAsync Tests
 
+    /// <summary>
+    /// Tests retrieving an entity by ID when the entity exists
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Retrieving an existing entity by its ID
+    /// Expected: The correct entity is returned with all properties
+    /// Coverage: GetByIdAsync method implementation
+    /// </remarks>
     [Fact]
     public async Task GetByIdAsync_ShouldReturnEntity_WhenEntityExists()
     {
@@ -91,6 +107,14 @@ public class GenericRepositoryTests
         result.FullName.Should().Be("Test User");
     }
 
+    /// <summary>
+    /// Tests retrieving an entity by ID when the entity doesn't exist
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Attempting to retrieve a non-existent entity by ID
+    /// Expected: Null is returned
+    /// Coverage: GetByIdAsync method null handling
+    /// </remarks>
     [Fact]
     public async Task GetByIdAsync_ShouldReturnNull_WhenEntityNotExists()
     {
@@ -105,6 +129,14 @@ public class GenericRepositoryTests
 
     #region SoftRemove Tests
 
+    /// <summary>
+    /// Tests the soft delete functionality for an entity
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Soft deleting an existing entity
+    /// Expected: Entity is marked as deleted with timestamp and user tracking info
+    /// Coverage: SoftRemove method implementation
+    /// </remarks>
     [Fact]
     public async Task SoftRemove_ShouldMarkEntityAsDeleted()
     {
@@ -142,6 +174,14 @@ public class GenericRepositoryTests
 
     #region Update Tests
 
+    /// <summary>
+    /// Tests updating an entity with proper timestamp and user tracking
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Updating an existing entity's properties
+    /// Expected: Entity is updated with correct timestamp and user tracking info
+    /// Coverage: Update method implementation
+    /// </remarks>
     [Fact]
     public async Task Update_ShouldUpdateEntityWithTimestamp()
     {
@@ -181,6 +221,14 @@ public class GenericRepositoryTests
 
     #region FirstOrDefaultAsync Tests
 
+    /// <summary>
+    /// Tests finding the first entity that matches a predicate
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Finding an entity using a predicate that matches at least one item
+    /// Expected: The first matching entity is returned
+    /// Coverage: FirstOrDefaultAsync method implementation
+    /// </remarks>
     [Fact]
     public async Task FirstOrDefaultAsync_ShouldReturnEntity_WhenPredicateMatches()
     {
@@ -208,6 +256,14 @@ public class GenericRepositoryTests
 
     #region AddRangeAsync Tests
 
+    /// <summary>
+    /// Tests adding multiple entities in a single operation
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Adding a collection of entities to the database
+    /// Expected: All entities are added successfully
+    /// Coverage: AddRangeAsync method implementation
+    /// </remarks>
     [Fact]
     public async Task AddRangeAsync_ShouldAddMultipleEntities()
     {
@@ -251,6 +307,14 @@ public class GenericRepositoryTests
 
     #region GetAllAsync Tests
 
+    /// <summary>
+    /// Tests retrieving all entities when no filter is applied
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Fetching all entities without any filtering
+    /// Expected: All entities are returned
+    /// Coverage: GetAllAsync method with null predicate
+    /// </remarks>
     [Fact]
     public async Task GetAllAsync_ShouldReturnAllEntities_WhenPredicateIsNull()
     {
@@ -284,6 +348,14 @@ public class GenericRepositoryTests
         result.Should().Contain(u => u.Email == "userB@example.com");
     }
 
+    /// <summary>
+    /// Tests retrieving entities with a filtering predicate
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Fetching entities using a filter condition
+    /// Expected: Only entities matching the predicate are returned
+    /// Coverage: GetAllAsync method with predicate filtering
+    /// </remarks>
     [Fact]
     public async Task GetAllAsync_ShouldReturnFilteredEntities_WhenPredicateIsProvided()
     {
@@ -320,6 +392,14 @@ public class GenericRepositoryTests
 
     #region SoftRemoveRange Tests
 
+    /// <summary>
+    /// Tests soft deleting multiple entities in a single operation
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Soft deleting a collection of entities
+    /// Expected: All entities are marked as deleted with proper tracking info
+    /// Coverage: SoftRemoveRange method implementation
+    /// </remarks>
     [Fact]
     public async Task SoftRemoveRange_ShouldMarkMultipleEntitiesAsDeleted()
     {
@@ -368,6 +448,14 @@ public class GenericRepositoryTests
 
     #region SoftRemoveRangeById Tests
 
+    /// <summary>
+    /// Tests soft deleting entities by providing a list of IDs
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Soft deleting multiple entities by their IDs
+    /// Expected: All entities with matching IDs are marked as deleted
+    /// Coverage: SoftRemoveRangeById method implementation
+    /// </remarks>
     [Fact]
     public async Task SoftRemoveRangeById_ShouldMarkEntitiesAsDeleted_WhenIdsExist()
     {
@@ -417,6 +505,14 @@ public class GenericRepositoryTests
 
     #region UpdateRange Tests
 
+    /// <summary>
+    /// Tests updating multiple entities in a single operation
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Updating a collection of entities
+    /// Expected: All entities are updated with proper tracking information
+    /// Coverage: UpdateRange method implementation
+    /// </remarks>
     [Fact]
     public async Task UpdateRange_ShouldUpdateMultipleEntities()
     {
@@ -470,6 +566,14 @@ public class GenericRepositoryTests
 
     #region GetQueryable Tests
 
+    /// <summary>
+    /// Tests retrieving a queryable collection of entities
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Getting an IQueryable object for custom querying
+    /// Expected: A valid IQueryable instance is returned
+    /// Coverage: GetQueryable method implementation
+    /// </remarks>
     [Fact]
     public void GetQueryable_ShouldReturnQueryable()
     {
@@ -485,6 +589,14 @@ public class GenericRepositoryTests
 
     #region CountAsync Tests
 
+    /// <summary>
+    /// Tests counting entities that match a given criteria
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Counting entities with specific filtering conditions
+    /// Expected: The correct count of matching entities is returned
+    /// Coverage: CountAsync method implementation
+    /// </remarks>
     [Fact]
     public async Task CountAsync_ShouldReturnCorrectCount()
     {
@@ -529,6 +641,14 @@ public class GenericRepositoryTests
 
     #region HardRemove Tests
 
+    /// <summary>
+    /// Tests permanently removing entities that match a predicate
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Permanently deleting entities matching specific criteria
+    /// Expected: All matching entities are completely removed from the database
+    /// Coverage: HardRemove method implementation
+    /// </remarks>
     [Fact]
     public async Task HardRemove_ShouldPermanentlyRemoveEntities()
     {
@@ -567,6 +687,14 @@ public class GenericRepositoryTests
 
     #region HardRemoveRange Tests
 
+    /// <summary>
+    /// Tests permanently removing multiple entities in a single operation
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Permanently deleting a collection of entities
+    /// Expected: All provided entities are completely removed from the database
+    /// Coverage: HardRemoveRange method implementation
+    /// </remarks>
     [Fact]
     public async Task HardRemoveRange_ShouldPermanentlyRemoveMultipleEntities()
     {
@@ -605,6 +733,14 @@ public class GenericRepositoryTests
 
     #region GetByIdAsync With Includes Tests
 
+    /// <summary>
+    /// Tests retrieving an entity with its related entities using navigation properties
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Fetching an entity by ID with eager loading of related entities
+    /// Expected: The entity is returned with all related entities loaded
+    /// Coverage: GetByIdAsync method with includes parameter
+    /// </remarks>
     [Fact]
     public async Task GetByIdAsync_ShouldIncludeRelatedEntities_WhenIncludesProvided()
     {
@@ -652,6 +788,14 @@ public class GenericRepositoryTests
 
     #region FirstOrDefaultAsync With Includes Tests
 
+    /// <summary>
+    /// Tests finding an entity with its related entities using a predicate
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Finding an entity using a predicate with eager loading of related entities
+    /// Expected: The first matching entity is returned with all related entities loaded
+    /// Coverage: FirstOrDefaultAsync method with includes parameter
+    /// </remarks>
     [Fact]
     public async Task FirstOrDefaultAsync_ShouldIncludeRelatedEntities_WhenIncludesProvided()
     {
@@ -696,6 +840,14 @@ public class GenericRepositoryTests
 
     #region Edge Cases Tests
 
+    /// <summary>
+    /// Tests retrieving entities with a filter that matches no entities
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Fetching entities with a predicate that doesn't match any entities
+    /// Expected: An empty list is returned
+    /// Coverage: GetAllAsync edge case handling
+    /// </remarks>
     [Fact]
     public async Task GetAllAsync_ShouldReturnEmptyList_WhenNoEntitiesMatch()
     {
@@ -707,6 +859,14 @@ public class GenericRepositoryTests
         result.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// Tests hard remove operation when no entities match the predicate
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Attempting to permanently delete entities with a predicate that matches nothing
+    /// Expected: Method returns false indicating no entities were removed
+    /// Coverage: HardRemove method edge case handling
+    /// </remarks>
     [Fact]
     public async Task HardRemove_ShouldReturnFalse_WhenNoEntitiesMatch()
     {
