@@ -66,6 +66,8 @@ public class SellerServiceTests
         );
     }
 
+    #region MyRegion
+
     /// <summary>
     /// Checks if a seller's information can be updated successfully when valid details are provided.
     /// </summary>
