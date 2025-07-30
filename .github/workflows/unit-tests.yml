@@ -4,7 +4,6 @@ on:
   push:
     branches: [devphuctrann]
 
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -43,8 +42,13 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore BlindTreasure.API.sln
 
-      - name: Build
-        run: dotnet build BlindTreasure.API.sln --no-restore --configuration Release
+      - name: Build with documentation
+        run: |
+          dotnet build BlindTreasure.API.sln \
+            --no-restore \
+            --configuration Release \
+            /p:GenerateDocumentationFile=true \
+            /p:DocumentationFile=bin/Release/net8.0/$(MSBuildProjectName).xml
 
       - name: Restore tools
         run: dotnet tool restore
@@ -59,7 +63,7 @@ jobs:
             --results-directory ./TestResults/ \
             --logger "trx;LogFileName=test-results.trx"
 
-      - name: Create Excel coverage report
+      - name: Create Excel coverage report with XML Documentation
         run: |
           mkdir -p coveragereport
           cat > generate_excel_report.py << 'EOF'
@@ -71,6 +75,57 @@ jobs:
           import glob
           import re
           from bs4 import BeautifulSoup
+          
+          def extract_xml_documentation():
+              """Trích xuất XML documentation từ các file .xml được generate"""
+              xml_files = glob.glob('./**/bin/**/*.xml', recursive=True)
+              docs = {}
+          
+              print(f"🔍 Tìm thấy {len(xml_files)} file XML documentation")
+          
+              for xml_file in xml_files:
+                  try:
+                      print(f"📖 Đang đọc XML documentation từ: {xml_file}")
+                      tree = ET.parse(xml_file)
+                      root = tree.getroot()
+          
+                      for member in root.findall('.//member'):
+                          name = member.get('name', '')
+          
+                          # Chỉ lấy methods có chứa từ 'Test'
+                          if name.startswith('M:') and 'Test' in name:
+                              summary = member.find('summary')
+                              remarks = member.find('remarks')
+          
+                              doc_text = ""
+          
+                              # Lấy summary
+                              if summary is not None and summary.text:
+                                  doc_text += summary.text.strip()
+          
+                              # Thêm remarks nếu có
+                              if remarks is not None and remarks.text:
+                                  if doc_text:
+                                      doc_text += " | "
+                                  doc_text += remarks.text.strip()
+          
+                              if doc_text:
+                                  # Extract method name từ full name
+                                  # Ví dụ: "M:BlindTreaure.UnitTest.Infrastructure.GenericRepositoryTests.AddAsync_ShouldAddEntityWithTimestamps"
+                                  method_parts = name.split('.')
+                                  if len(method_parts) > 0:
+                                      method_name = method_parts[-1].split('(')[0]  # Bỏ parameters
+                                      docs[method_name] = doc_text
+                                      print(f"📝 Tìm thấy documentation cho method: {method_name}")
+          
+                      print(f"✅ Đã xử lý xong file: {xml_file}")
+          
+                  except Exception as e:
+                      print(f"⚠️ Lỗi khi đọc file XML {xml_file}: {e}")
+                      continue
+          
+              print(f"📚 Tổng cộng tìm thấy {len(docs)} method có documentation")
+              return docs
           
           def parse_cobertura_xml():
               xml_files = glob.glob('./TestResults/**/coverage.cobertura.xml', recursive=True)
@@ -112,51 +167,58 @@ jobs:
               }
           
           def extract_test_class_name(test_name):
-              # Trích xuất tên class từ tên test
-              # Ví dụ: "BlindTreasure.Test.AuthServiceTest.Login_Success" -> "AuthServiceTest"
+              """Trích xuất tên class từ tên test"""
               parts = test_name.split('.')
               if len(parts) >= 3:
-                  # Lấy phần tử kế cuối, thường là tên class test
                   class_name = parts[-2]
-                  # Chỉ lấy những class kết thúc bằng "Test" hoặc "Tests"
                   if class_name.endswith('Test') or class_name.endswith('Tests'):
                       return class_name
-              return 'OtherTests'  # Mặc định nếu không tìm thấy mẫu phù hợp
+              return 'OtherTests'
           
           def convert_to_management_name(test_class_name):
-              # Chuyển đổi tên class test thành tên sheet Management
-              # Ví dụ: "AuthServiceTest" -> "AuthManagement"
+              """Chuyển đổi tên class test thành tên sheet Management"""
               if test_class_name.endswith('Test'):
-                  base_name = test_class_name[:-4]  # Bỏ "Test" ở cuối
+                  base_name = test_class_name[:-4]
               elif test_class_name.endswith('Tests'):
-                  base_name = test_class_name[:-5]  # Bỏ "Tests" ở cuối
+                  base_name = test_class_name[:-5]
               else:
                   base_name = test_class_name
           
-              # Loại bỏ "Service" nếu có
               if base_name.endswith('Service'):
                   base_name = base_name[:-7]
           
               return f"{base_name}Management"
           
-          def get_test_description(test_method):
-              # Tạo mô tả từ tên phương thức test
-              # Ví dụ: "Login_WithValidCredentials_ReturnsSuccess" -> "Login With Valid Credentials Returns Success"
-              # Chia các từ bằng dấu gạch dưới
+          def get_test_description_from_name(test_method):
+              """Tạo mô tả từ tên phương thức test (fallback)"""
               if '_' in test_method:
                   words = test_method.split('_')
                   return ' '.join(words)
           
-              # Nếu không có gạch dưới, thử chia theo camel case
               words = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', test_method)
               if words:
                   return ' '.join(words)
           
-              return test_method  # Trả về nguyên tên nếu không thể phân tích
+              return test_method
+          
+          def get_enhanced_description(test_method, xml_docs):
+              """Lấy mô tả từ XML documentation hoặc fallback về tên method"""
+              # Tìm trong XML documentation trước
+              if test_method in xml_docs:
+                  doc_text = xml_docs[test_method]
+                  # Giới hạn độ dài để tránh Excel cell quá lớn
+                  if len(doc_text) > 300:
+                      doc_text = doc_text[:297] + "..."
+                  return f"📖 {doc_text}"
+          
+              # Fallback về mô tả từ tên method
+              fallback_desc = get_test_description_from_name(test_method)
+              return f"🔧 {fallback_desc}"
           
           def parse_test_results():
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
               test_data_by_class = {}
+              xml_docs = extract_xml_documentation()  # Lấy XML documentation
           
               if trx_files:
                   try:
@@ -184,33 +246,34 @@ jobs:
                           test_class = extract_test_class_name(test_name)
                           sheet_name = convert_to_management_name(test_class)
           
-                          # Tạo mô tả dựa trên tên phương thức test
-                          description = get_test_description(test_method)
+                          # Sử dụng enhanced description với XML documentation
+                          description = get_enhanced_description(test_method, xml_docs)
           
                           # Tạo đối tượng test case với thông tin chi tiết
                           test_case = {
                               'ID': f"TC_{len(test_data_by_class.get(sheet_name, [])) + 1:03d}",
                               'Test Method': test_method,
-                              'Description': description,
+                              'Description': description,  # Sử dụng enhanced description
                               'Expected Result': 'Pass',
                               'Actual Result': outcome,
                               'Status': '✅ Pass' if outcome == 'Passed' else '❌ Fail',
                               'Duration': duration,
-                              'Error Message': error_message
+                              'Error Message': error_message if error_message else 'N/A'
                           }
           
-                          # Thêm test case vào danh sách của class tương ứng
                           if sheet_name not in test_data_by_class:
                               test_data_by_class[sheet_name] = []
           
                           test_data_by_class[sheet_name].append(test_case)
           
                   except Exception as e:
-                      print(f"Error parsing TRX file: {e}")
+                      print(f"❌ Error parsing TRX file: {e}")
           
               return test_data_by_class
           
           def create_excel_report():
+              print("🚀 Bắt đầu tạo Excel report...")
+          
               coverage_data = parse_cobertura_xml()
               test_data_by_class = parse_test_results()
               timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -239,14 +302,30 @@ jobs:
                       'text_wrap': True,
                       'valign': 'top',
                       'border': 1,
-                      'bg_color': '#E2EFDA'  # Màu xanh nhạt cho Pass
+                      'bg_color': '#E2EFDA'
                   })
           
                   fail_format = workbook.add_format({
                       'text_wrap': True,
                       'valign': 'top',
                       'border': 1,
-                      'bg_color': '#FFE6E6'  # Màu đỏ nhạt cho Fail
+                      'bg_color': '#FFE6E6'
+                  })
+          
+                  # Định dạng đặc biệt cho Description với XML docs
+                  xml_doc_format = workbook.add_format({
+                      'text_wrap': True,
+                      'valign': 'top',
+                      'border': 1,
+                      'bg_color': '#F0F8FF',  # Alice Blue cho XML docs
+                      'italic': True
+                  })
+          
+                  fallback_format = workbook.add_format({
+                      'text_wrap': True,
+                      'valign': 'top',
+                      'border': 1,
+                      'bg_color': '#FFF8DC'  # Cornsilk cho fallback descriptions
                   })
           
                   # Tạo sheet Summary
@@ -254,6 +333,7 @@ jobs:
                   if coverage_data:
                       total_tests = sum(len(tests) for tests in test_data_by_class.values())
                       passed_tests = sum(len([t for t in tests if t['Status'] == '✅ Pass']) for tests in test_data_by_class.values())
+                      xml_doc_tests = sum(len([t for t in tests if t['Description'].startswith('📖')]) for tests in test_data_by_class.values())
           
                       summary_data = [
                           ['Metric', 'Value', 'Status'],
@@ -263,6 +343,7 @@ jobs:
                           ['Total Tests', total_tests, ''],
                           ['Passed Tests', passed_tests, ''],
                           ['Failed Tests', total_tests - passed_tests, ''],
+                          ['Tests with XML Documentation', xml_doc_tests, f'{(xml_doc_tests/total_tests*100):.0f}%' if total_tests > 0 else '0%'],
                           ['Test Pass Rate', f"{(passed_tests / total_tests * 100) if total_tests > 0 else 0:.2f}%", ''],
                           ['Test Run Date', datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ''],
                           ['Minimum Coverage Threshold', '70%', ''],
@@ -308,9 +389,8 @@ jobs:
                               else:
                                   worksheet_details.write(row_num, col_num, df_classes.iloc[row_num-1, col_num], cell_format)
           
-                  # Tạo các sheet cho từng class test (đã chuyển thành Management)
+                  # Tạo các sheet cho từng class test với enhanced formatting
                   for sheet_name, test_cases in test_data_by_class.items():
-                      # Giới hạn tên sheet theo quy tắc Excel (tối đa 31 ký tự)
                       if len(sheet_name) > 31:
                           sheet_name = sheet_name[:28] + "..."
           
@@ -320,7 +400,7 @@ jobs:
                       worksheet = writer.sheets[sheet_name]
                       worksheet.set_column('A:A', 10)  # ID
                       worksheet.set_column('B:B', 35)  # Test Method
-                      worksheet.set_column('C:C', 40)  # Description
+                      worksheet.set_column('C:C', 60)  # Description (tăng độ rộng cho XML docs)
                       worksheet.set_column('D:D', 20)  # Expected Result
                       worksheet.set_column('E:E', 20)  # Actual Result
                       worksheet.set_column('F:F', 15)  # Status
@@ -334,12 +414,17 @@ jobs:
                               else:
                                   cell_value = df_tests.iloc[row_num-1, col_num]
           
-                                  # Áp dụng định dạng khác nhau dựa trên kết quả test
+                                  # Áp dụng định dạng khác nhau dựa trên nội dung
                                   if col_num == 5:  # Status column
                                       if '✅ Pass' in str(cell_value):
                                           worksheet.write(row_num, col_num, cell_value, pass_format)
                                       else:
                                           worksheet.write(row_num, col_num, cell_value, fail_format)
+                                  elif col_num == 2:  # Description column
+                                      if str(cell_value).startswith('📖'):  # XML documentation
+                                          worksheet.write(row_num, col_num, cell_value, xml_doc_format)
+                                      else:  # Fallback description
+                                          worksheet.write(row_num, col_num, cell_value, fallback_format)
                                   else:
                                       worksheet.write(row_num, col_num, cell_value, cell_format)
           
@@ -363,18 +448,18 @@ jobs:
             if [ -n "$COVERAGE_XML" ]; then
               LINE_RATE=$(grep -o 'line-rate="[0-9.]*"' $COVERAGE_XML | head -1 | grep -o '[0-9.]*')
               BRANCH_RATE=$(grep -o 'branch-rate="[0-9.]*"' $COVERAGE_XML | head -1 | grep -o '[0-9.]*')
-              
+          
               # Calculate percentages
               LINE_PERCENT=$(awk "BEGIN {print $LINE_RATE * 100}")
               BRANCH_PERCENT=$(awk "BEGIN {print $BRANCH_RATE * 100}")
-              
+          
               # Status indicators
               if (( $(echo "$LINE_PERCENT >= 70" | bc -l) )); then
                 LINE_STATUS="✅"
               else
                 LINE_STATUS="⚠️"
               fi
-              
+          
               echo "### Coverage Metrics" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Metric | Coverage | Status |" >> $GITHUB_STEP_SUMMARY
@@ -383,7 +468,7 @@ jobs:
               echo "| Branch Coverage | $(printf "%.2f" $BRANCH_PERCENT)% | |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
-            
+          
             # Get test results
             TRX_FILE=$(find ./TestResults -name "test-results.trx" -type f | head -1)
             if [ -n "$TRX_FILE" ]; then
@@ -391,7 +476,7 @@ jobs:
               PASSED_TESTS=$(grep -c "outcome=\"Passed\"" $TRX_FILE)
               FAILED_TESTS=$((TOTAL_TESTS - PASSED_TESTS))
               PASS_RATE=$(awk "BEGIN {print ($PASSED_TESTS / $TOTAL_TESTS) * 100}")
-              
+          
               echo "### Test Results" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Metric | Value | Status |" >> $GITHUB_STEP_SUMMARY
@@ -402,17 +487,26 @@ jobs:
               echo "| Pass Rate | $(printf "%.2f" $PASS_RATE)% | |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
             fi
+          
+            # Count XML documentation coverage
+            XML_FILES=$(find . -name "*.xml" -path "*/bin/*" | wc -l)
+            echo "### Documentation Coverage" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
+            echo "| XML Documentation Files Found | $XML_FILES |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ **No test data found**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
           
-          echo "📊 **Excel Report Available**: Download the detailed Excel report from artifacts below" >> $GITHUB_STEP_SUMMARY
+          echo "📊 **Enhanced Excel Report Available**: Download the detailed Excel report with XML documentation from artifacts below" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Excel coverage reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: excel-coverage-report
+          name: excel-coverage-report-with-docs
           path: ./coveragereport/Coverage_Report_*.xlsx
           retention-days: 30
