@@ -2,9 +2,8 @@ name: Unit Tests with Excel Report
 
 on:
   push:
-    branches: [ main, devphuctrann ]
-  pull_request:
-    branches: [ main, devphuctrann ]
+    branches: [devphuctrann]
+
 
 jobs:
   test:
