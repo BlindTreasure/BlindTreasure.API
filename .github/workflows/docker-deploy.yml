@@ -17,20 +17,44 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}  # SSH password để đăng nhập
 
           script: |
-            cd /root/projects/blindtreasure  # Di chuyển đến thư mục chứa file docker-compose -f docker-compose.deploy.yml.yml trên VPS
-
-            echo "Pulling latest Docker image..."
-            docker compose pull  # Kéo image mới nhất từ Docker Hub
-
-            echo "Backing up previous image tag..."
-            docker image tag blindtreasureapi:latest blindtreasureapi:backup || true  # Gắn tag dự phòng để rollback nếu cần
-
-            echo "Restarting container..."
-            docker compose up -d  # Chạy hoặc restart container với image mới
-
-            echo "Removing dangling images to save space..."
-            docker image prune -f  # Xóa những image không dùng tới để tiết kiệm dung lượng ổ đĩa
-
-            echo "Checking health status..."
-            curl -f http://localhost:5000/health || echo "WARNING: Healthcheck failed"  
-            # Gọi thử endpoint của API xem có chạy không, nếu lỗi thì cảnh báo nhưng không dừng workflow
+              cd /root/projects/blindtreasure
+              
+              # Set longer timeouts
+              export COMPOSE_HTTP_TIMEOUT=300
+              export DOCKER_CLIENT_TIMEOUT=300
+              
+              echo "Pulling latest Docker image with retry logic..."
+              RETRY_COUNT=0
+              MAX_RETRIES=5
+              
+              while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                echo "Pull attempt $((RETRY_COUNT + 1))/$MAX_RETRIES..."
+                
+                if timeout 600 docker compose pull; then
+                  echo "Pull successful!"
+                  break
+                else
+                  RETRY_COUNT=$((RETRY_COUNT + 1))
+                  if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                    echo "Pull failed, cleaning up and retrying in 60 seconds..."
+                    docker system prune -f
+                    sleep 60
+                  else
+                    echo "All retry attempts failed. Exiting..."
+                    exit 1
+                  fi
+                fi
+              done
+              
+              # Rest of your deployment script...
+              echo "Backing up previous image tag..."
+              docker image tag blindtreasureapi:latest blindtreasureapi:backup || true
+              
+              echo "Restarting container..."
+              docker compose up -d
+              
+              echo "Removing dangling images to save space..."
+              docker image prune -f
+              
+              echo "Checking health status..."
+              curl -f http://localhost:5000/health || echo "WARNING: Healthcheck failed"  

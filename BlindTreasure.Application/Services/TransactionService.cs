@@ -70,11 +70,13 @@ public class TransactionService : ITransactionService
             }
             else
             {
-                _logger.Warn($"[HandleSuccessfulShipmentPaymentAsync] Không tìm thấy OrderDetail cho Shipment {shipment.Id}.");
+                _logger.Warn(
+                    $"[HandleSuccessfulShipmentPaymentAsync] Không tìm thấy OrderDetail cho Shipment {shipment.Id}.");
                 shipment.Status = ShipmentStatus.PROCESSING;
                 shipment.ShippedAt = DateTime.UtcNow;
                 await _unitOfWork.Shipments.Update(shipment);
             }
+
             await _unitOfWork.SaveChangesAsync();
         }
     }

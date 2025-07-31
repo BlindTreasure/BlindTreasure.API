@@ -56,14 +56,15 @@ public class UserServiceTests
     public async Task GetUserDetailsByIdAsync_ShouldReturnUserDto_WhenUserExists()
     {
         var userId = Guid.NewGuid();
-        var user = new User {
+        var user = new User
+        {
             Id = userId,
             RoleName = RoleType.Customer,
             IsDeleted = false,
             Email = "hehe@gmail.com",
             FullName = "Test User"
         };
-        _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>() ))
+        _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
             .ReturnsAsync(user);
         var result = await _userService.GetUserDetailsByIdAsync(userId);
         result.Should().NotBeNull();
@@ -74,7 +75,7 @@ public class UserServiceTests
     public async Task GetUserDetailsByIdAsync_ShouldThrowNotFound_WhenUserIsDeleted()
     {
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, IsDeleted = true, Email = "hehe@gmail.com", RoleName = RoleType.Customer};
+        var user = new User { Id = userId, IsDeleted = true, Email = "hehe@gmail.com", RoleName = RoleType.Customer };
         _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
             .ReturnsAsync(user);
 
@@ -89,7 +90,8 @@ public class UserServiceTests
     public async Task UpdateProfileAsync_ShouldUpdateProfile_WhenValidData()
     {
         var userId = Guid.NewGuid();
-        var user = new User {
+        var user = new User
+        {
             Id = userId,
             Email = "test@example.com",
             IsDeleted = false,
@@ -122,7 +124,8 @@ public class UserServiceTests
     public async Task UploadAvatarAsync_ShouldUploadAvatar_WhenValidFile()
     {
         var userId = Guid.NewGuid();
-        var user = new User {
+        var user = new User
+        {
             Id = userId,
             Email = "test@example.com",
             IsDeleted = false,
@@ -145,7 +148,8 @@ public class UserServiceTests
     public async Task UploadAvatarAsync_ShouldThrowBadRequest_WhenFileIsEmpty()
     {
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, Email = "test@example.com", IsDeleted = false, RoleName = RoleType.Customer };
+        var user = new User
+            { Id = userId, Email = "test@example.com", IsDeleted = false, RoleName = RoleType.Customer };
         var file = new FormFile(new MemoryStream(), 0, 0, "Data", "empty.jpg");
         _userRepoMock.Setup(x => x.GetByIdAsync(userId)).ReturnsAsync(user);
 
@@ -161,8 +165,16 @@ public class UserServiceTests
     {
         var users = new List<User>
         {
-            new() { Id = Guid.NewGuid(), FullName = "User 1", IsDeleted = false,Email = "hehe@gmail.com", RoleName = RoleType.Customer },
-            new() { Id = Guid.NewGuid(), FullName = "User 2", IsDeleted = false,Email = "hehe@gmail.com", RoleName = RoleType.Customer }
+            new()
+            {
+                Id = Guid.NewGuid(), FullName = "User 1", IsDeleted = false, Email = "hehe@gmail.com",
+                RoleName = RoleType.Customer
+            },
+            new()
+            {
+                Id = Guid.NewGuid(), FullName = "User 2", IsDeleted = false, Email = "hehe@gmail.com",
+                RoleName = RoleType.Customer
+            }
         };
         var mockQueryable = users.AsQueryable().BuildMock();
         _userRepoMock.Setup(x => x.GetQueryable()).Returns(mockQueryable);
@@ -207,7 +219,8 @@ public class UserServiceTests
     {
         var dto = new UserCreateDto
             { Email = "existing@example.com", Password = "Password123!", FullName = "Existing User" };
-        _cacheServiceMock.Setup(x => x.GetAsync<User>(It.IsAny<string>())).ReturnsAsync(new User { Email = dto.Email, RoleName = dto.RoleName });
+        _cacheServiceMock.Setup(x => x.GetAsync<User>(It.IsAny<string>()))
+            .ReturnsAsync(new User { Email = dto.Email, RoleName = dto.RoleName });
 
         await Assert.ThrowsAsync<Exception>(() => _userService.CreateUserAsync(dto));
     }
@@ -220,7 +233,8 @@ public class UserServiceTests
     public async Task UpdateUserStatusAsync_ShouldUpdateStatus_WhenUserExists()
     {
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, Email = "test@example.com", Status = UserStatus.Active, RoleName = RoleType.Customer };
+        var user = new User
+            { Id = userId, Email = "test@example.com", Status = UserStatus.Active, RoleName = RoleType.Customer };
         _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>())).ReturnsAsync(user);
         _userRepoMock.Setup(x => x.Update(It.IsAny<User>())).ReturnsAsync(true);
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync()).ReturnsAsync(1);
@@ -245,7 +259,8 @@ public class UserServiceTests
     public async Task UpdateUserStatusAsync_ShouldReactivateUser_WhenStatusIsActive()
     {
         var userId = Guid.NewGuid();
-        var user = new User {
+        var user = new User
+        {
             Id = userId,
             Email = "test@example.com",
             Status = UserStatus.Suspended,
@@ -271,7 +286,8 @@ public class UserServiceTests
     public async Task GetUserByEmail_ShouldReturnUser_WhenExists()
     {
         var email = "test@example.com";
-        var user = new User {
+        var user = new User
+        {
             Id = Guid.NewGuid(),
             Email = email,
             IsDeleted = false,
@@ -292,7 +308,8 @@ public class UserServiceTests
     public async Task GetUserById_ShouldReturnUser_WhenExists()
     {
         var userId = Guid.NewGuid();
-        var user = new User {
+        var user = new User
+        {
             Id = userId,
             Email = "test@example.com",
             RoleName = RoleType.Customer,

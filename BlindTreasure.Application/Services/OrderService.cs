@@ -93,11 +93,9 @@ public class OrderService : IOrderService
                 BlindBoxName = i.BlindBoxName,
                 Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice,
-                TotalPrice = i.TotalPrice,
-
+                TotalPrice = i.TotalPrice
             }),
             shippingAddressId
- 
         );
         _loggerService.Success("Checkout from system cart completed.");
         return result;
@@ -151,7 +149,6 @@ public class OrderService : IOrderService
                 PromotionId = i.PromotionId // Thêm PromotionId nếu có
             }),
             shippingAddressId
-
         );
         _loggerService.Success("Checkout from client cart completed.");
         return result;
@@ -233,7 +230,7 @@ public class OrderService : IOrderService
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
-        //    .Include(o => o.ShippingAddress)
+            //    .Include(o => o.ShippingAddress)
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
             .AsNoTracking();
 
@@ -423,9 +420,9 @@ public class OrderService : IOrderService
         }
 
         var productIds = itemList.Where(i => i.ProductId.HasValue)
-                              .Select(i => i.ProductId.Value)
-                              .Distinct()
-                              .ToList();
+            .Select(i => i.ProductId.Value)
+            .Distinct()
+            .ToList();
         var products = await _unitOfWork.Products.GetQueryable()
             .Where(p => productIds.Contains(p.Id))
             .Include(p => p.Seller)
@@ -486,7 +483,6 @@ public class OrderService : IOrderService
             ShippingAddressId = shippingAddressId,
             OrderDetails = new List<OrderDetail>(),
             OrderSellerPromotions = new List<OrderSellerPromotion>()
-
         };
 
         var orderDetails = new List<OrderDetail>();
@@ -505,11 +501,12 @@ public class OrderService : IOrderService
                 CreatedAt = DateTime.UtcNow
             };
 
-            if( orderDetail.TotalPrice != (item.Quantity * item.UnitPrice))
+            if (orderDetail.TotalPrice != item.Quantity * item.UnitPrice)
             {
                 _loggerService.Warn($"Total price mismatch for item {item.ProductName ?? item.BlindBoxName}.");
                 throw ErrorHelper.BadRequest("Tổng tiền không khớp với số lượng và đơn giá.");
             }
+
             order.OrderDetails.Add(orderDetail);
             orderDetails.Add(orderDetail);
 
@@ -536,10 +533,11 @@ public class OrderService : IOrderService
         }
 
         var sellerPromos = itemList
-         .Where(i => i.PromotionId.HasValue)
-         .GroupBy(i => new { Seller = products.First(p => p.Id == i.ProductId).SellerId, Promo = i.PromotionId.Value })
-         .Select(g => new { g.Key.Seller, g.Key.Promo })
-         .ToList();
+            .Where(i => i.PromotionId.HasValue)
+            .GroupBy(i => new
+                { Seller = products.First(p => p.Id == i.ProductId).SellerId, Promo = i.PromotionId.Value })
+            .Select(g => new { g.Key.Seller, g.Key.Promo })
+            .ToList();
 
         foreach (var sp in sellerPromos)
         {
@@ -551,7 +549,7 @@ public class OrderService : IOrderService
                 .Where(od => od.SellerId == sp.Seller)
                 .Sum(od => od.TotalPrice);
 
-            decimal discount = promo.DiscountType == DiscountType.Percentage
+            var discount = promo.DiscountType == DiscountType.Percentage
                 ? Math.Round(subTotal * promo.DiscountValue / 100m, 2)
                 : promo.DiscountValue;
             discount = Math.Min(discount, subTotal);

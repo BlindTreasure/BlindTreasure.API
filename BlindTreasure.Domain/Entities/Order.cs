@@ -23,6 +23,7 @@ public class Order : BaseEntity
 
     //promotion
     public ICollection<OrderSellerPromotion> OrderSellerPromotions { get; set; }
+
     // 1-n → OrderDetails
     public ICollection<OrderDetail> OrderDetails { get; set; }
 }

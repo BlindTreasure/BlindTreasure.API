@@ -138,6 +138,8 @@ public class CategoryService : ICategoryService
     {
         var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
+        if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
+            throw ErrorHelper.Forbidden(ErrorMessages.CategoryNoUpdatePermission);
         _logger.Info($"[CreateAsync] Admin/Staff creates category {dto.Name} by {user?.FullName}");
 
         if (string.IsNullOrWhiteSpace(dto.Name))

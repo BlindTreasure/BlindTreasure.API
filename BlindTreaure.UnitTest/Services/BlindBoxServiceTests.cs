@@ -96,6 +96,14 @@ public class BlindBoxServiceTests
 
     #region GetBlindBoxByIdAsync Tests
 
+    /// <summary>
+    /// Tests if `GetBlindBoxByIdAsync` returns data from cache when it exists.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request for a blind box by ID is made, and the data is found in the cache.
+    /// Expected: The cached `BlindBoxDetailDto` is returned, and the repository is not queried.
+    /// Coverage: Cache hit scenario for retrieving blind box details.
+    /// </remarks>
     [Fact]
     public async Task GetBlindBoxByIdAsync_ShouldReturnFromCache_WhenCacheExists()
     {
@@ -120,6 +128,14 @@ public class BlindBoxServiceTests
         _blindBoxRepoMock.Verify(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<BlindBox, bool>>>()), Times.Never);
     }
 
+    /// <summary>
+    /// Tests if `GetBlindBoxByIdAsync` retrieves data from the database and caches it when it's not in the cache.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request for a blind box by ID is made, and the data is not found in the cache.
+    /// Expected: The `BlindBoxDetailDto` is retrieved from the database, returned, and then stored in the cache.
+    /// Coverage: Cache miss scenario for retrieving blind box details, including database interaction and cache population.
+    /// </remarks>
     [Fact]
     public async Task GetBlindBoxByIdAsync_ShouldReturnFromDatabase_WhenCacheNotExists()
     {
@@ -204,6 +220,14 @@ public class BlindBoxServiceTests
 
     #region CreateBlindBoxAsync Tests
 
+    /// <summary>
+    /// Tests if a new blind box can be created successfully with valid input data.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller provides all necessary and valid information to create a new blind box.
+    /// Expected: A `BlindBoxDetailDto` representing the newly created blind box is returned, and the blind box is added to the database.
+    /// Coverage: Blind box creation, image upload, and database persistence.
+    /// </remarks>
     [Fact]
     public async Task CreateBlindBoxAsync_ShouldCreateBlindBox_WhenValidData()
     {
@@ -299,6 +323,14 @@ public class BlindBoxServiceTests
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
     }
 
+    /// <summary>
+    /// Tests if an exception is thrown when attempting to create a blind box with null data.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A `null` `CreateBlindBoxDto` is provided to the `CreateBlindBoxAsync` method.
+    /// Expected: An `Exception` is thrown, indicating invalid input.
+    /// Coverage: Null input validation for blind box creation.
+    /// </remarks>
     [Fact]
     public async Task CreateBlindBoxAsync_ShouldThrowException_WhenDataIsNull()
     {
@@ -329,6 +361,14 @@ public class BlindBoxServiceTests
 
     #region UpdateBlindBoxAsync Tests
 
+    /// <summary>
+    /// Tests if a blind box can be successfully updated with valid data.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller updates an existing blind box with valid information.
+    /// Expected: The blind box is updated in the database, and the updated `BlindBoxDetailDto` is returned.
+    /// Coverage: Blind box update functionality, including data persistence and cache invalidation/repopulation.
+    /// </remarks>
     [Fact]
     public async Task UpdateBlindBoxAsync_ShouldUpdateBlindBox_WhenValidData()
     {
@@ -417,6 +457,14 @@ public class BlindBoxServiceTests
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
     }
 
+    /// <summary>
+    /// Tests if a `NotFound` exception is thrown when attempting to update a blind box that does not exist.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A request is made to update a blind box with an ID that does not correspond to any existing blind box.
+    /// Expected: An `Exception` with a 404 (Not Found) status code is thrown.
+    /// Coverage: Error handling for updating non-existent blind boxes.
+    /// </remarks>
     [Fact]
     public async Task UpdateBlindBoxAsync_ShouldThrowNotFound_WhenBlindBoxNotExists()
     {
@@ -437,6 +485,14 @@ public class BlindBoxServiceTests
         Assert.Equal(404, exception.Data["StatusCode"]);
     }
 
+    /// <summary>
+    /// Tests if a `Forbidden` exception is thrown when a seller attempts to update a blind box they do not own.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller attempts to modify a blind box that is owned by a different seller.
+    /// Expected: An `Exception` with a 403 (Forbidden) status code is thrown.
+    /// Coverage: Authorization checks for blind box ownership during updates.
+    /// </remarks>
     [Fact]
     public async Task UpdateBlindBoxAsync_ShouldThrowForbidden_WhenSellerNotOwnsBlindBox()
     {
@@ -474,6 +530,14 @@ public class BlindBoxServiceTests
 
     #region AddItemsToBlindBoxAsync Tests
 
+    /// <summary>
+    /// Tests if items can be successfully added to a blind box with valid data.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller adds a valid set of items to an existing blind box, including required rarity types.
+    /// Expected: The items are successfully added to the blind box, and the blind box details are returned.
+    /// Coverage: Adding items to a blind box, item validation, and database updates.
+    /// </remarks>
     [Fact]
     public async Task AddItemsToBlindBoxAsync_ShouldAddItems_WhenValidData()
     {
@@ -615,6 +679,14 @@ public class BlindBoxServiceTests
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
     }
 
+    /// <summary>
+    /// Tests if a `BadRequest` exception is thrown when an invalid number of items is provided to a blind box.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller attempts to add items to a blind box with a count that does not meet the system's requirements (e.g., not 6 or 12 items).
+    /// Expected: An `Exception` with a 400 (Bad Request) status code is thrown, indicating the invalid item count.
+    /// Coverage: Validation of blind box item quantity.
+    /// </remarks>
     [Fact]
     public async Task AddItemsToBlindBoxAsync_ShouldThrowBadRequest_WhenInvalidItemCount()
     {
@@ -639,6 +711,14 @@ public class BlindBoxServiceTests
                         e.Message.Contains("6 hoặc 12 sản phẩm"));
     }
 
+    /// <summary>
+    /// Tests if a `BadRequest` exception is thrown when a blind box item collection does not contain at least one 'Secret' rarity item.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller attempts to add items to a blind box, but none of the items have the 'Secret' rarity.
+    /// Expected: An `Exception` with a 400 (Bad Request) status code is thrown, indicating the missing 'Secret' item.
+    /// Coverage: Validation of blind box item rarity distribution.
+    /// </remarks>
     [Fact]
     public async Task AddItemsToBlindBoxAsync_ShouldThrowBadRequest_WhenNoSecretItem()
     {
@@ -689,6 +769,14 @@ public class BlindBoxServiceTests
                         e.Message.Contains("ít nhất 1 item Secret"));
     }
 
+    /// <summary>
+    /// Tests if a `Forbidden` exception is thrown when a seller attempts to add items to a blind box they do not own.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller attempts to add items to a blind box that is owned by a different seller.
+    /// Expected: An `Exception` with a 403 (Forbidden) status code is thrown.
+    /// Coverage: Authorization checks for blind box ownership when adding items.
+    /// </remarks>
     [Fact]
     public async Task AddItemsToBlindBoxAsync_ShouldThrowForbidden_WhenSellerNotOwnsBlindBox()
     {
@@ -738,6 +826,14 @@ public class BlindBoxServiceTests
 
     #region SubmitBlindBoxAsync Tests
 
+    /// <summary>
+    /// Tests if a blind box can be successfully submitted when it contains valid items and sufficient product stock.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller submits a blind box that has items with corresponding products in stock.
+    /// Expected: The blind box status is updated, product stocks are reserved (reduced), and the updated blind box details are returned.
+    /// Coverage: Blind box submission, stock reservation, and status update.
+    /// </remarks>
     [Fact]
     public async Task SubmitBlindBoxAsync_ShouldSubmitBlindBox_WhenBlindBoxHasValidItems()
     {
@@ -825,6 +921,14 @@ public class BlindBoxServiceTests
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
     }
 
+    /// <summary>
+    /// Tests if a `BadRequest` exception is thrown when submitting a blind box with insufficient product stock for its items.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller attempts to submit a blind box, but one or more of its associated products have insufficient stock to cover the blind box's quantity.
+    /// Expected: An `Exception` with a 400 (Bad Request) status code is thrown, indicating the stock deficiency.
+    /// Coverage: Stock validation during blind box submission.
+    /// </remarks>
     [Fact]
     public async Task SubmitBlindBoxAsync_ShouldThrowBadRequest_WhenProductHasInsufficientStock()
     {
@@ -887,6 +991,14 @@ public class BlindBoxServiceTests
 
     #region ClearItemsFromBlindBoxAsync Tests
 
+    /// <summary>
+    /// Tests if items are successfully cleared from a blind box and product stock is restored when the seller owns the blind box.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller clears items from their blind box, and the associated product stocks need to be returned.
+    /// Expected: The blind box items are soft-deleted, product stocks are increased, and the updated blind box details are returned.
+    /// Coverage: Clearing blind box items, stock restoration, and soft deletion of items.
+    /// </remarks>
     [Fact]
     public async Task ClearItemsFromBlindBoxAsync_ShouldClearItemsAndRestoreStock_WhenSellerOwnsBlindBox()
     {
@@ -929,7 +1041,7 @@ public class BlindBoxServiceTests
                 It.IsAny<Expression<Func<BlindBox, bool>>>(),
                 It.IsAny<Expression<Func<BlindBox, object>>[]>()))
             .ReturnsAsync(blindBox);
-        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>() ))
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
             .ReturnsAsync(seller);
         _productRepoMock.Setup(x => x.GetAllAsync(
                 It.IsAny<Expression<Func<Product, bool>>>(),
@@ -947,7 +1059,8 @@ public class BlindBoxServiceTests
             .Returns(new List<BlindBoxItem>().AsQueryable().BuildMock());
         _mapperServiceMock.Setup(x => x.Map<BlindBox, BlindBoxDetailDto>(It.IsAny<BlindBox>()))
             .Returns(new BlindBoxDetailDto { Id = blindBoxId, Name = "Test BlindBox" });
-        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
+        _cacheServiceMock
+            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
             .Returns(Task.CompletedTask);
         // Act
         var result = await _blindBoxService.ClearItemsFromBlindBoxAsync(blindBoxId);
@@ -963,6 +1076,14 @@ public class BlindBoxServiceTests
 
     #region DeleteBlindBoxAsync Tests
 
+    /// <summary>
+    /// Tests if a blind box is soft-deleted and product stock is restored when the seller owns the blind box.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: A seller deletes their blind box, and the associated product stocks need to be returned.
+    /// Expected: The blind box is soft-deleted, product stocks are increased, and the updated blind box details are returned.
+    /// Coverage: Blind box soft deletion, stock restoration, and ownership verification.
+    /// </remarks>
     [Fact]
     public async Task DeleteBlindBoxAsync_ShouldSoftDeleteBlindBoxAndRestoreStock_WhenSellerOwnsBlindBox()
     {
@@ -1005,7 +1126,7 @@ public class BlindBoxServiceTests
                 It.IsAny<Expression<Func<BlindBox, bool>>>(),
                 It.IsAny<Expression<Func<BlindBox, object>>[]>()))
             .ReturnsAsync(blindBox);
-        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>() ))
+        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
             .ReturnsAsync(seller);
         _blindBoxRepoMock.Setup(x => x.SoftRemove(It.IsAny<BlindBox>()))
             .ReturnsAsync(true);

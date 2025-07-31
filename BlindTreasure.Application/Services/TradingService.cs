@@ -67,6 +67,55 @@ public class TradingService : ITradingService
         return dtos;
     }
 
+    public async Task<Pagination<TradeHistoryDto>> GetMyTradeHistoriesAsync(TradeHistoryQueryParameter param)
+    {
+        var userId = _claimsService.CurrentUserId;
+
+        _logger.Info(
+            $"[GetMyTradeHistoriesAsync] Lấy trade histories của user {userId}, Page: {param.PageIndex}, Size: {param.PageSize}");
+
+        var query = _unitOfWork.TradeHistories.GetQueryable()
+            .Include(th => th.Listing)
+            .ThenInclude(l => l.InventoryItem)
+            .ThenInclude(i => i.Product)
+            .Include(th => th.Requester)
+            .Include(th => th.OfferedInventory)
+            .ThenInclude(oi => oi!.Product)
+            .Where(th => !th.IsDeleted && th.RequesterId == userId) // Chỉ lấy của user hiện tại
+            .AsNoTracking();
+
+        // Apply filters (trừ RequesterId vì đã filter ở trên)
+        var filteredParam = new TradeHistoryQueryParameter
+        {
+            FinalStatus = param.FinalStatus,
+            ListingId = param.ListingId,
+            CompletedFromDate = param.CompletedFromDate,
+            CompletedToDate = param.CompletedToDate,
+            CreatedFromDate = param.CreatedFromDate,
+            CreatedToDate = param.CreatedToDate,
+            SortBy = param.SortBy,
+            Desc = param.Desc,
+            PageIndex = param.PageIndex,
+            PageSize = param.PageSize
+        };
+
+        query = ApplyTradeHistoryFilters(query, filteredParam);
+        query = ApplyTradeHistorySorting(query, filteredParam);
+
+        var count = await query.CountAsync();
+
+        var tradeHistories = await query
+            .Skip((param.PageIndex - 1) * param.PageSize)
+            .Take(param.PageSize)
+            .ToListAsync();
+
+        var tradeHistoryDtos = tradeHistories.Select(MapTradeHistoryToDto).ToList();
+
+        _logger.Success($"[GetMyTradeHistoriesAsync] Tìm thấy {count} trade histories của user {userId}");
+
+        return new Pagination<TradeHistoryDto>(tradeHistoryDtos, count, param.PageIndex, param.PageSize);
+    }
+
     public async Task<Pagination<TradeHistoryDto>> GetAllTradeHistoriesAsync(TradeHistoryQueryParameter param)
     {
         _logger.Info($"[GetAllTradeHistoriesAsync] Page: {param.PageIndex}, Size: {param.PageSize}, " +
@@ -100,14 +149,59 @@ public class TradingService : ITradingService
         return new Pagination<TradeHistoryDto>(tradeHistoryDtos, count, param.PageIndex, param.PageSize);
     }
 
-
-    public async Task<TradeRequestDto> CreateTradeRequestAsync(CreateTradeRequestDto request)
+    public async Task<List<TradeRequestDto>> GetMyTradeRequestsAsync()
     {
         var userId = _claimsService.CurrentUserId;
 
-        var listing = await _unitOfWork.Listings.GetByIdAsync(request.ListingId, l => l.InventoryItem);
+        _logger.Info($"[GetMyTradeRequestsAsync] Lấy danh sách trade requests của user {userId}");
+
+        var tradeRequests = await _unitOfWork.TradeRequests.GetAllAsync(
+            t => t.RequesterId == userId,
+            t => t.Listing!,
+            t => t.Listing!.InventoryItem,
+            t => t.Listing!.InventoryItem.Product!,
+            t => t.Requester!,
+            t => t.OfferedItems);
+
+        var dtos = new List<TradeRequestDto>();
+        foreach (var tradeRequest in tradeRequests)
+        {
+            // Load offered items cho mỗi trade request
+            var offeredInventoryItems = new List<InventoryItem>();
+            if (tradeRequest.OfferedItems.Any())
+            {
+                var itemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
+                offeredInventoryItems = await _unitOfWork.InventoryItems.GetAllAsync(
+                    i => itemIds.Contains(i.Id),
+                    i => i.Product);
+            }
+
+            var dto = MapTradeRequestToDto(tradeRequest, offeredInventoryItems);
+            dtos.Add(dto);
+        }
+
+        _logger.Success($"[GetMyTradeRequestsAsync] Tìm thấy {dtos.Count} trade requests của user {userId}");
+        return dtos.OrderByDescending(x => x.RequestedAt).ToList();
+    }
+
+    public async Task<TradeRequestDto> CreateTradeRequestAsync(Guid id, CreateTradeRequestDto request)
+    {
+        var userId = _claimsService.CurrentUserId;
+
+        var listing = await _unitOfWork.Listings.GetByIdAsync(id,
+            l => l.InventoryItem,
+            l => l.InventoryItem.User);
+
         if (listing == null || listing.Status != ListingStatus.Active)
             throw ErrorHelper.NotFound("Listing không tồn tại hoặc không còn hoạt động.");
+
+        // THÊM VALIDATION: Không cho phép tạo trade request cho listing của chính mình
+        if (listing.InventoryItem.UserId == userId)
+        {
+            _logger.Warn(
+                $"[CreateTradeRequestAsync] User {userId} cố gắng tạo trade request cho listing của chính mình {listing.Id}");
+            throw ErrorHelper.BadRequest("Bạn không thể tạo yêu cầu trao đổi với chính mình.");
+        }
 
         // Kiểm tra xem listing item có đang trong thời gian giữ không
         var now = DateTime.UtcNow;
@@ -122,12 +216,26 @@ public class TradingService : ITradingService
                 $"Vật phẩm này đang trong thời gian chờ xử lý sau giao dịch. Vui lòng thử lại sau {remainingTime.TotalDays:F1} ngày.");
         }
 
+        // THÊM VALIDATION: Kiểm tra user đã tạo trade request cho listing này chưa
+        var existingTradeRequest = await _unitOfWork.TradeRequests.FirstOrDefaultAsync(tr =>
+            tr.ListingId == id &&
+            tr.RequesterId == userId &&
+            tr.Status == TradeRequestStatus.PENDING);
+
+        if (existingTradeRequest != null)
+        {
+            _logger.Warn(
+                $"[CreateTradeRequestAsync] User {userId} đã có trade request pending cho listing {listing.Id}");
+            throw ErrorHelper.BadRequest("Bạn đã tạo yêu cầu trao đổi cho listing này rồi. Vui lòng chờ phản hồi.");
+        }
+
         // Validate multiple offered items
         await ValidateMultipleOfferedItems(request.OfferedInventoryIds, listing, userId);
 
+        // Tiếp tục với logic tạo trade request như cũ...
         var tradeRequest = new TradeRequest
         {
-            ListingId = request.ListingId,
+            ListingId = id,
             RequesterId = userId,
             Status = TradeRequestStatus.PENDING,
             RequestedAt = DateTime.UtcNow
@@ -136,7 +244,8 @@ public class TradingService : ITradingService
         await _unitOfWork.TradeRequests.AddAsync(tradeRequest);
         await _unitOfWork.SaveChangesAsync();
 
-        // Tạo TradeRequestItems
+
+        // Tạo TradeRequestItems nếu có offered items
         if (request.OfferedInventoryIds.Any())
         {
             var tradeRequestItems = request.OfferedInventoryIds.Select(itemId => new TradeRequestItem
@@ -149,7 +258,7 @@ public class TradingService : ITradingService
             await _unitOfWork.SaveChangesAsync();
         }
 
-        // Gửi notification cho chủ sở hữu listing
+        // Gửi notification...
         try
         {
             var listingOwner = await _unitOfWork.Users.GetByIdAsync(listing.InventoryItem.UserId);
@@ -162,7 +271,6 @@ public class TradingService : ITradingService
         {
             _logger.Error($"[CreateTradeRequestAsync] Lỗi khi gửi notification: {ex.Message}");
         }
-
 
         return await GetTradeRequestByIdAsync(tradeRequest.Id);
     }
@@ -380,6 +488,19 @@ public class TradingService : ITradingService
         _logger.Info(
             $"[ValidateMultipleOfferedItems] Bắt đầu validate {offeredInventoryIds.Count} offered items cho user {userId}");
 
+        // Kiểm tra duplicate items
+        var duplicateIds = offeredInventoryIds.GroupBy(x => x)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateIds.Any())
+        {
+            _logger.Warn(
+                $"[ValidateMultipleOfferedItems] Phát hiện duplicate items: {string.Join(", ", duplicateIds)}");
+            throw ErrorHelper.BadRequest("Không thể đề xuất cùng một item nhiều lần trong một giao dịch.");
+        }
+
         var offeredItems = new List<InventoryItem>();
 
         if (listing.IsFree)
@@ -403,7 +524,7 @@ public class TradingService : ITradingService
             offeredItems = await ValidateItemsOwnership(offeredInventoryIds, userId);
         }
 
-        // Kiểm tra xem có item nào đang trong thời gian giữ không
+        // Tiếp tục với logic kiểm tra OnHold như cũ...
         var now = DateTime.UtcNow;
         var heldItems = offeredItems.Where(i =>
             i.Status == InventoryItemStatus.OnHold &&
@@ -490,16 +611,21 @@ public class TradingService : ITradingService
     {
         _logger.Info($"[CreateTradeHistory] Tạo trade history cho trade request {tradeRequest.Id}");
 
+        // Lấy thông tin đầy đủ về offered items
+        var offeredItemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
+        var firstOfferedItem = offeredItemIds.FirstOrDefault();
+
         var tradeHistory = new TradeHistory
         {
             ListingId = tradeRequest.ListingId,
             RequesterId = tradeRequest.RequesterId,
-            OfferedInventoryId = tradeRequest.OfferedItems.FirstOrDefault()?.InventoryItemId, // Legacy support
+            OfferedInventoryId = firstOfferedItem, // Lấy item đầu tiên để backward compatibility
             FinalStatus = TradeRequestStatus.COMPLETED,
             CompletedAt = DateTime.UtcNow
         };
 
         await _unitOfWork.TradeHistories.AddAsync(tradeHistory);
+
         _logger.Success(
             $"[CreateTradeHistory] Đã tạo trade history {tradeHistory.Id} cho trade request {tradeRequest.Id}");
     }
