@@ -1,6 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
-using BlindTreasure.Application.Services.Commons;
+using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
@@ -8,9 +8,7 @@ using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using System.Xml.Linq;
 
 namespace BlindTreasure.Application.Services;
 
@@ -48,6 +46,8 @@ public class TransactionService : ITransactionService
         _ghnShippingService = ghnShippingService;
     }
 
+
+
     /// <summary>
     ///     Xử lý khi thanh toán Stripe shipment thành công (webhook).
     /// </summary>
@@ -57,7 +57,7 @@ public class TransactionService : ITransactionService
             throw ErrorHelper.BadRequest("Danh sách shipmentId rỗng.");
 
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT).Include(x => x.OrderDetail)
+            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT).Include(x => x.OrderDetail).ThenInclude(od => od.InventoryItems)
             .ToListAsync();
 
         foreach (var shipment in shipments)
@@ -65,7 +65,7 @@ public class TransactionService : ITransactionService
             if (shipment.OrderDetail != null)
             {
                 // Cập nhật trạng thái OrderDetail
-                shipment.OrderDetail.Status = OrderDetailStatus.DELIVERING;
+                OrderDtoMapper.UpdateOrderDetailStatusAndLogs(shipment.OrderDetail);
                 await _unitOfWork.OrderDetails.Update(shipment.OrderDetail);
             }
             else
@@ -136,7 +136,20 @@ public class TransactionService : ITransactionService
             await CreateGhnOrdersAndUpdateShipments(order, orderDetails);
 
             // 2. Tạo inventory cho sản phẩm vật lý
-            await CreateInventoryForOrderDetailsAsync(order);
+            await CreateInventoryForOrderDetailsAsync(order, orderDetails);
+
+            var orderDetailIds = order.OrderDetails.Where(od => od.ProductId.HasValue).Select(od => od.Id).ToList();
+            var orderDetailsWithInventory = await _unitOfWork.OrderDetails.GetQueryable()
+                .Where(od => orderDetailIds.Contains(od.Id))
+                .Include(od => od.InventoryItems)
+                .ToListAsync();
+
+            foreach (var od in orderDetailsWithInventory)
+            {
+                od.Status = OrderDetailItemStatus.DELIVERING;
+                OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
+                await _unitOfWork.OrderDetails.Update(od);
+            }
 
             // 3. Tạo customer inventory cho BlindBox
             await CreateCustomerBlindBoxForOrderDetails(order, orderDetails);
@@ -271,7 +284,7 @@ public class TransactionService : ITransactionService
     /// Mỗi InventoryItem đại diện cho một vật phẩm duy nhất, gắn với đúng OrderDetail và Shipment.
     /// </summary>
     private async Task CreateInventoryForOrderDetailsAsync(
-        Order order
+        Order order, List<OrderDetail> orderDetails
     )
     {
         // 1) Lấy và validate shippingAddress (1 lần)
@@ -290,13 +303,13 @@ public class TransactionService : ITransactionService
             }
         }
 
-        // Đảm bảo lấy đầy đủ các shipment cho từng order detail
-        var orderDetails = await _unitOfWork.OrderDetails
-            .GetQueryable()
-            .Where(od => od.OrderId == order.Id)
-            .Include(od => od.Shipments)
-            .Include(od => od.Seller)
-            .ToListAsync();
+        //// Đảm bảo lấy đầy đủ các shipment cho từng order detail
+        // orderDetails = await _unitOfWork.OrderDetails
+        //    .GetQueryable()
+        //    .Where(od => od.OrderId == order.Id)
+        //    .Include(od => od.Shipments)
+        //    .Include(od => od.Seller)
+        //    .ToListAsync();
 
         // 2) Build map: OrderDetailId → List<Shipment>
         var shipmentsByDetail = orderDetails
@@ -350,6 +363,8 @@ public class TransactionService : ITransactionService
                     $"for Product {od.ProductId} in Order {order.Id}.");
             }
         }
+
+
     }
 
     private async Task CreateCustomerBlindBoxForOrderDetails(Order order, List<OrderDetail> orderDetails)

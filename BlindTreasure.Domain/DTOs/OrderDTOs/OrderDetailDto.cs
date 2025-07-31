@@ -19,7 +19,7 @@ public class OrderDetailDto
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
-    public OrderDetailStatus Status { get; set; }
+    public OrderDetailItemStatus Status { get; set; }
     public ICollection<ShipmentDto>? Shipments { get; set; } = new List<ShipmentDto>();
     public ICollection<InventoryItemDto>? InventoryItems { get; set; } = new List<InventoryItemDto>();
 }

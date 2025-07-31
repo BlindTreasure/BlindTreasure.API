@@ -377,6 +377,24 @@ public class InventoryItemService : IInventoryItemService
         // Tạo duy nhất 1 link thanh toán cho toàn bộ phí ship
         var paymentUrl = await _stripeService.CreateShipmentCheckoutSessionAsync(shipments, userId, totalShippingFee);
 
+        var orderDetailIds = items
+    .Where(i => i.OrderDetailId.HasValue)
+    .Select(i => i.OrderDetailId.Value)
+    .Distinct()
+    .ToList();
+
+        foreach (var orderDetailId in orderDetailIds)
+        {
+            var orderDetail = await _unitOfWork.OrderDetails
+                .GetByIdAsync(orderDetailId, od => od.InventoryItems);
+            if (orderDetail != null)
+            {
+                OrderDtoMapper.UpdateOrderDetailStatusAndLogs(orderDetail);
+                await _unitOfWork.OrderDetails.Update(orderDetail);
+            }
+        }
+        await _unitOfWork.SaveChangesAsync();
+
         return new ShipmentItemResponseDTO
         {
             Shipments = shipmentDtos,
