@@ -289,7 +289,7 @@ public class OrderService : IOrderService
                 await _unitOfWork.BlindBoxes.Update(blindBox);
             }
 
-            od.Status = OrderDetailStatus.CANCELLED;
+            od.Status = OrderDetailItemStatus.CANCELLED;
         }
 
         await _unitOfWork.Orders.Update(order);
@@ -497,7 +497,7 @@ public class OrderService : IOrderService
                 Quantity = item.Quantity,
                 UnitPrice = item.UnitPrice,
                 TotalPrice = item.TotalPrice,
-                Status = OrderDetailStatus.PENDING,
+                Status = OrderDetailItemStatus.PENDING,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -634,7 +634,7 @@ public class OrderService : IOrderService
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
                     order.FinalAmount = order.TotalAmount - order.OrderSellerPromotions.Sum(osp => osp.DiscountAmount);
-                    od.Status = OrderDetailStatus.SHIPPING_REQUESTED;
+                    od.Status = OrderDetailItemStatus.SHIPPING_REQUESTED;
                     od.Shipments.Add(shipment);
                     _loggerService.Info($"Shipment created for OrderDetail {od.Id} with GHN.");
 

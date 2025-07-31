@@ -21,7 +21,8 @@ public class OrderDetail : BaseEntity
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
-    public OrderDetailStatus Status { get; set; } 
+    public OrderDetailItemStatus Status { get; set; }
+    public string? Logs { get; set; } = string.Empty;// Lưu trữ nhật ký trạng thái
 
 
     // Tách rõ SellerId ở đây

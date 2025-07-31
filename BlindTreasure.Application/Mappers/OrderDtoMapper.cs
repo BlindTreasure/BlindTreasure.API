@@ -4,12 +4,43 @@ using BlindTreasure.Domain.DTOs.PaymentDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.TransactionDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using Microsoft.IdentityModel.Tokens;
 
 namespace BlindTreasure.Application.Mappers;
 
 public static class OrderDtoMapper
 {
+    public static void UpdateOrderDetailStatusAndLogs(OrderDetail orderDetail)
+    {
+        var inventoryItems = orderDetail.InventoryItems?.ToList() ?? new List<InventoryItem>();
+        if (!inventoryItems.Any())
+            return;
+
+        int total = inventoryItems.Count;
+        int requested = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Shipment_requested);
+        int delivering = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Delivering);
+
+        // Trạng thái SHIPPING_REQUESTED
+        if (requested == total)
+            orderDetail.Status = OrderDetailItemStatus.SHIPPING_REQUESTED;
+        else if (requested > 0)
+            orderDetail.Status = OrderDetailItemStatus.PARTIALLY_SHIPPING_REQUESTED;
+
+        // Trạng thái DELIVERING
+        if (delivering == total)
+            orderDetail.Status = OrderDetailItemStatus.DELIVERING;
+        else if (delivering > 0)
+            orderDetail.Status = OrderDetailItemStatus.PARTIALLY_DELIVERING;
+
+        // Nếu chưa có inventory nào được request ship/delivering thì giữ nguyên (PENDING)
+
+        // Ghi logs
+        var logLines = inventoryItems
+            .Select(ii => $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] InventoryItem {ii.Id}: {ii.Status}")
+            .ToList();
+        orderDetail.Logs = string.Join("\n", logLines);
+    }
     public static OrderDto ToOrderDto(Order order)
     {
         try
@@ -40,6 +71,7 @@ public static class OrderDtoMapper
         return new OrderDetailDto
         {
             Id = od.Id,
+            Logs = od.Logs,
             ProductId = od.ProductId,
             ProductName = od.Product?.Name,
             ProductImages = od.Product?.ImageUrls,

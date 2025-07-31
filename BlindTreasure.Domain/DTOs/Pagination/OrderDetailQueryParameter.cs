@@ -12,7 +12,7 @@ public class OrderDetailQueryParameter : PaginationParameter
     /// <summary>
     /// Lọc theo trạng thái order detail
     /// </summary>
-    public OrderDetailStatus? Status { get; set; }
+    public OrderDetailItemStatus? Status { get; set; }
 
     /// <summary>
     /// Lọc theo OrderId

@@ -7,6 +7,7 @@ using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
+using BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
@@ -49,6 +50,59 @@ public class SellerService : ISellerService
         _notificationService = notificationService;
     }
 
+    public async Task<SellerSalesStatisticsDto> GetSalesStatisticsAsync(Guid? sellerId = null, DateTime? from = null, DateTime? to = null)
+    {
+        // Lấy sellerId hiện tại nếu không truyền vào
+        sellerId ??= (await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == _claimsService.CurrentUserId))?.Id
+            ?? throw ErrorHelper.Forbidden("Không tìm thấy seller.");
+
+        // Lấy các OrderDetail đã bán thành công của seller
+        var orderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable()
+            .Include(od => od.Order)
+            .Where(od => od.SellerId == sellerId
+                && od.Order.Status == OrderStatus.PAID.ToString()
+                && !od.Order.IsDeleted);
+
+        if (from.HasValue)
+            orderDetailsQuery = orderDetailsQuery.Where(od => od.Order.PlacedAt >= from.Value);
+        if (to.HasValue)
+            orderDetailsQuery = orderDetailsQuery.Where(od => od.Order.PlacedAt <= to.Value);
+
+        var orderDetails = await orderDetailsQuery.ToListAsync();
+
+        var totalOrders = orderDetails.Select(od => od.OrderId).Distinct().Count();
+        var totalProductsSold = orderDetails.Sum(od => od.Quantity);
+        var grossSales = orderDetails.Sum(od => od.TotalPrice);
+
+        // Tính tổng discount từ OrderSellerPromotion
+        var orderIds = orderDetails.Select(od => od.OrderId).Distinct().ToList();
+        var discounts = await _unitOfWork.OrderSellerPromotions.GetQueryable()
+            .Where(osp => osp.SellerId == sellerId && orderIds.Contains(osp.OrderId))
+            .SumAsync(osp => osp.DiscountAmount);
+
+        // Tính tổng refund từ Transaction
+        var paymentIds = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => orderIds.Contains(o.Id) && o.PaymentId != null)
+            .Select(o => o.PaymentId.Value)
+            .ToListAsync();
+
+        var totalRefunded = await _unitOfWork.Transactions.GetQueryable()
+            .Where(t => paymentIds.Contains(t.PaymentId) && t.Type == "Refund")
+            .SumAsync(t => (decimal?)t.RefundAmount ?? 0);
+
+        var netSales = grossSales - discounts - totalRefunded;
+
+        return new SellerSalesStatisticsDto
+        {
+            SellerId = sellerId.Value,
+            TotalOrders = totalOrders,
+            TotalProductsSold = totalProductsSold,
+            GrossSales = grossSales,
+            NetSales = netSales,
+            TotalRefunded = totalRefunded,
+            TotalDiscount = discounts
+        };
+    }
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
     {
         _loggerService.Info($"[UpdateSellerInfoAsync] Seller {userId} yêu cầu cập nhật thông tin.");

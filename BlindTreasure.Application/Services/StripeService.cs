@@ -78,8 +78,8 @@ public class StripeService : IStripeService
         }
         else
         {
-            if (order.Status != OrderStatus.EXPIRED.ToString() && order.Status != OrderStatus.COMPLETED.ToString())
-                throw ErrorHelper.BadRequest("Chỉ có thể gia hạn đơn hàng đã hoàn thành hoặc hết hạn.");
+            if (order.Status != OrderStatus.EXPIRED.ToString() && order.Status != OrderStatus.CANCELLED.ToString())
+                throw ErrorHelper.BadRequest("Chỉ có thể gia hạn đơn hàng đã hủy hoặc hết hạn.");
         }
 
         // 3. Lấy thông tin promotion từ order nếu có

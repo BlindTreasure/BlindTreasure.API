@@ -11,6 +11,7 @@ public class OrderDetailDto
     public Guid? ProductId { get; set; }
     public Guid? OrderId { get; set; }
 
+    public string? Logs {  get; set; }
     public string? ProductName { get; set; }
     public List<string>? ProductImages { get; set; }
     public Guid? BlindBoxId { get; set; }
@@ -19,7 +20,7 @@ public class OrderDetailDto
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
-    public OrderDetailStatus Status { get; set; }
+    public OrderDetailItemStatus Status { get; set; }
     public ICollection<ShipmentDto>? Shipments { get; set; } = new List<ShipmentDto>();
     public ICollection<InventoryItemDto>? InventoryItems { get; set; } = new List<InventoryItemDto>();
 }
