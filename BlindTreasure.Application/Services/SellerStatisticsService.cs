@@ -113,7 +113,7 @@ namespace BlindTreasure.Application.Services
                 .Where(od =>
                     od.SellerId == sellerId &&
                     od.Order.Status == OrderStatus.PAID.ToString() &&
-                    od.Status != OrderDetailStatus.CANCELLED &&
+                    od.Status != OrderDetailItemStatus.CANCELLED &&
                     od.Order.CompletedAt >= req.From &&
                     od.Order.CompletedAt < req.To);
 
