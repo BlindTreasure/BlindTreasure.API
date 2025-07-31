@@ -1,13 +1,54 @@
-﻿using BlindTreasure.Domain.DTOs.OrderDTOs;
+﻿using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.PaymentDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.TransactionDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
+using Microsoft.IdentityModel.Tokens;
 
 namespace BlindTreasure.Application.Mappers;
 
 public static class OrderDtoMapper
 {
+    public static void UpdateOrderDetailStatusAndLogs(OrderDetail orderDetail)
+    {
+        var inventoryItems = orderDetail.InventoryItems?.ToList() ?? new List<InventoryItem>();
+        if (!inventoryItems.Any())
+            return;
+
+        int total = inventoryItems.Count;
+        int requested = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Shipment_requested);
+        int delivering = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Delivering);
+
+        var oldStatus = orderDetail.Status;
+
+        // Trạng thái SHIPPING_REQUESTED
+        if (requested == total)
+            orderDetail.Status = OrderDetailItemStatus.SHIPPING_REQUESTED;
+        else if (requested > 0)
+            orderDetail.Status = OrderDetailItemStatus.PARTIALLY_SHIPPING_REQUESTED;
+
+        // Trạng thái DELIVERING
+        if (delivering == total)
+            orderDetail.Status = OrderDetailItemStatus.DELIVERING;
+        else if (delivering > 0)
+            orderDetail.Status = OrderDetailItemStatus.PARTIALLY_DELIVERING;
+
+        // Nếu chưa có inventory nào được request ship/delivering thì giữ nguyên (PENDING)
+
+        // Ghi log thay đổi trạng thái nếu có
+        if (orderDetail.Status != oldStatus)
+        {
+            orderDetail.Logs += $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Status changed: {oldStatus} → {orderDetail.Status}";
+        }
+
+        // Ghi log trạng thái inventory item hiện tại
+        var logLines = inventoryItems
+            .Select(ii => $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] InventoryItem {ii.Id}: {ii.Status}")
+            .ToList();
+        orderDetail.Logs += "\n" + string.Join("\n", logLines);
+    }
     public static OrderDto ToOrderDto(Order order)
     {
         try
@@ -38,6 +79,7 @@ public static class OrderDtoMapper
         return new OrderDetailDto
         {
             Id = od.Id,
+            Logs = od.Logs,
             ProductId = od.ProductId,
             ProductName = od.Product?.Name,
             ProductImages = od.Product?.ImageUrls,
@@ -51,6 +93,19 @@ public static class OrderDtoMapper
             Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>()
         };
     }
+
+    public static OrderDetailDto ToOrderDetailDtoFullIncluded(OrderDetail od)
+    {
+        var result = ToOrderDetailDto(od);
+
+        result.InventoryItems = od.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ?? new List<InventoryItemDto>();
+        if(result.Shipments.IsNullOrEmpty())
+        result.Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>();
+
+        return result;
+    }
+
+
 
     public static OrderAddressDto ToOrderAddressDto(Address address)
     {

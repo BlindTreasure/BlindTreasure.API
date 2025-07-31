@@ -23,7 +23,8 @@ public static class SellerMapper
             CompanyAddress = seller.CompanyAddress,
             CoaDocumentUrl = seller.CoaDocumentUrl,
             Status = seller.Status,
-            IsVerified = seller.IsVerified
+            IsVerified = seller.IsVerified,
+            StripeAccountId = seller.StripeAccountId
         };
     }
 
@@ -51,7 +52,8 @@ public static class SellerMapper
             CoaDocumentUrl = seller.CoaDocumentUrl,
             SellerStatus = seller.Status.ToString(),
             IsVerified = seller.IsVerified,
-            RejectReason = seller.RejectReason
+            RejectReason = seller.RejectReason,
+            StripeAccountId = seller.StripeAccountId
         };
     }
 }

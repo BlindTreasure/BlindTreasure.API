@@ -21,4 +21,7 @@ public class SellerProfileDto
     public string SellerStatus { get; set; }
     public bool IsVerified { get; set; }
     public string? RejectReason { get; set; }
+
+    public string? StripeAccountId { get; set; }
+
 }

@@ -21,4 +21,5 @@ public class SellerRegistrationDto
     [JsonIgnore] public string? TaxId { get; set; } = "";
 
     [JsonIgnore] public string? CompanyAddress { get; set; } = "";
+    [JsonIgnore] public string? CompanyProductDescription { get; set; } = "";
 }

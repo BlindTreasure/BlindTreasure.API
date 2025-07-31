@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
@@ -30,10 +31,22 @@ public static class ShipmentDtoMapper
             ShippedAt = shipment.ShippedAt,
             EstimatedDelivery = shipment.EstimatedDelivery,
             DeliveredAt = shipment.DeliveredAt,
-            Status = shipment.Status
-            //InventoryItems = shipment.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ??
-            //                 new List<InventoryItemDto>()
-            //OrderDetail = shipment.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(shipment.OrderDetail) : null,
+            Status = shipment.Status,
+
         };
+    }
+
+    public static ShipmentDto ToShipmentDtoWithFullIncluded(Shipment shipment)
+    {
+        if (shipment == null)
+            throw ErrorHelper.Internal("Dữ liệu shipment không hợp lệ.");
+
+        var result = ToShipmentDto(shipment);
+        result.InventoryItems = shipment.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ??
+                                new List<InventoryItemDto>();
+        result.OrderDetail = OrderDtoMapper.ToOrderDetailDto(shipment.OrderDetail);
+
+
+        return result;
     }
 }
