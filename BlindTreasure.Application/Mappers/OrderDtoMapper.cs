@@ -72,6 +72,7 @@ public static class OrderDtoMapper
         return new OrderDetailDto
         {
             Id = od.Id,
+            Logs = od.Logs,
             ProductId = od.ProductId,
             ProductName = od.Product?.Name,
             ProductImages = od.Product?.ImageUrls,
