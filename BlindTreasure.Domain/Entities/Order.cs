@@ -15,6 +15,7 @@ public class Order : BaseEntity
     public Guid? ShippingAddressId { get; set; }
     public Address ShippingAddress { get; set; }
 
+    public decimal? TotalShippingFee { get; set; } = 0; // Tổng phí vận chuyển của từ shipment của các items thuộc Order
     public string Status { get; set; }
     public decimal TotalAmount { get; set; }
     public decimal? FinalAmount { get; set; } = 0;

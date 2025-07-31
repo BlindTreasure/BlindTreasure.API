@@ -5,6 +5,7 @@ using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using static BlindTreasure.Application.Services.OrderService;
 
 namespace BlindTreasure.Application.Services;
@@ -39,28 +40,53 @@ public class CartItemService : ICartItemService
     public async Task<CartDto> GetCurrentUserCartAsync()
     {
         var userId = _claimsService.CurrentUserId;
-        var cartItems = await _unitOfWork.CartItems.GetAllAsync(
-            c => c.UserId == userId && !c.IsDeleted,
-            c => c.Product,
-            c => c.BlindBox
-        );
+        var cartItems = await _unitOfWork.CartItems.GetQueryable().Where(c => c.UserId == userId && !c.IsDeleted)
+            .Include(c => c.Product).ThenInclude(c => c.Seller).
+            Include(c => c.BlindBox).ThenInclude(c => c.Seller).ToListAsync();
 
-        var dtos = cartItems.Select(c => new CartItemDto
+        // Group by SellerId (ưu tiên Product, nếu là BlindBox thì lấy SellerId từ BlindBox)
+        var sellerGroups = cartItems
+            .GroupBy(c =>
+                c.Product?.SellerId
+                ?? c.BlindBox?.SellerId
+                ?? Guid.Empty // fallback nếu không có seller
+            )
+            .ToList();
+
+        var sellerItems = new List<CartSellerItemDto>();
+
+        foreach (var group in sellerGroups)
         {
-            Id = c.Id,
-            ProductId = c.ProductId,
-            ProductName = c.Product?.Name,
-            ProductImages = c.Product?.ImageUrls,
-            BlindBoxId = c.BlindBoxId,
-            BlindBoxName = c.BlindBox?.Name,
-            BlindBoxImage = c.BlindBox?.ImageUrl,
-            Quantity = c.Quantity,
-            UnitPrice = c.UnitPrice,
-            TotalPrice = c.TotalPrice,
-            CreatedAt = c.CreatedAt
-        }).ToList();
+            var firstItem = group.FirstOrDefault();
+            var sellerId = group.Key;
+            string sellerName = firstItem?.Product?.Seller?.CompanyName
+                ?? firstItem?.BlindBox?.Seller?.CompanyName
+                ?? "Unknown Seller";
 
-        return new CartDto { Items = dtos };
+            var items = group.Select(c => new CartItemDto
+            {
+                Id = c.Id,
+                ProductId = c.ProductId,
+                ProductName = c.Product?.Name,
+                ProductImages = c.Product?.ImageUrls,
+                BlindBoxId = c.BlindBoxId,
+                BlindBoxName = c.BlindBox?.Name,
+                BlindBoxImage = c.BlindBox?.ImageUrl,
+                Quantity = c.Quantity,
+                UnitPrice = c.UnitPrice,
+                TotalPrice = c.TotalPrice,
+                CreatedAt = c.CreatedAt
+            }).ToList();
+
+            sellerItems.Add(new CartSellerItemDto
+            {
+                SellerId = sellerId,
+                SellerName = sellerName,
+                Items = items
+            });
+        }
+
+        return new CartDto { SellerItems = sellerItems };
     }
 
     // Thêm sản phẩm hoặc blindbox vào cart

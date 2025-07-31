@@ -4,7 +4,7 @@ namespace BlindTreasure.Domain.DTOs.CartItemDTOs;
 
 public class DirectCartCheckoutDto : CreateCheckoutRequestDto
 {
-    public List<DirectCartItemDto> Items { get; set; } = new();
+    public List<CartSellerItemDto> SellerItems { get; set; } = new();
 }
 
 public class DirectCartItemDto

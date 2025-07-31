@@ -14,7 +14,7 @@ public class OrderDetail : BaseEntity
     //
     public Guid? BlindBoxId { get; set; } = null;
     public BlindBox BlindBox { get; set; } = null;
-    public int? TotalShippingFee { get; set; } = null; // Tổng phí vận chuyển
+    public int? TotalItemsShippingFee { get; set; } = null; // Tổng phí vận chuyển của từ shipment của các items thuộc OrderDetail
 
 
 
