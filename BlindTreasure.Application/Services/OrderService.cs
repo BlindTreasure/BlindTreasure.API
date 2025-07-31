@@ -500,6 +500,9 @@ public class OrderService : IOrderService
                 Status = OrderDetailItemStatus.PENDING,
                 CreatedAt = DateTime.UtcNow
             };
+            // Ghi log khởi tạo
+            orderDetail.Logs = $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Created: PENDING, Quantity: {item.Quantity}, UnitPrice: {item.UnitPrice}, TotalPrice: {item.TotalPrice}";
+
 
             if (orderDetail.TotalPrice != item.Quantity * item.UnitPrice)
             {
@@ -516,6 +519,7 @@ public class OrderService : IOrderService
                 product.Stock -= item.Quantity;
                 await _unitOfWork.Products.Update(product);
                 orderDetail.SellerId = product.SellerId;
+                orderDetail.Logs += $"\n This is Product {product.Name} stock updated: {product.Stock} remaining.";
             }
             else if (item.BlindBoxId.HasValue)
             {
@@ -529,7 +533,10 @@ public class OrderService : IOrderService
 
                 await _unitOfWork.BlindBoxes.Update(blindBox);
                 orderDetail.SellerId = blindBox.SellerId;
+                orderDetail.Logs += $"\n This is BlindBox {blindBox.Name} stock updated: {blindBox.TotalQuantity} remaining.";
             }
+
+            // Ghi log tạo mới
         }
 
         var sellerPromos = itemList
@@ -634,7 +641,8 @@ public class OrderService : IOrderService
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
                     order.FinalAmount = order.TotalAmount - order.OrderSellerPromotions.Sum(osp => osp.DiscountAmount);
-                    od.Status = OrderDetailItemStatus.SHIPPING_REQUESTED;
+                    od.Status = OrderDetailItemStatus.PENDING;
+                    od.Logs += $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Shipment created: {shipment.Id}, status: {shipment.Status}, fee: {shipment.TotalFee}";
                     od.Shipments.Add(shipment);
                     _loggerService.Info($"Shipment created for OrderDetail {od.Id} with GHN.");
 

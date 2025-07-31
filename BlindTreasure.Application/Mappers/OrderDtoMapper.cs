@@ -21,6 +21,8 @@ public static class OrderDtoMapper
         int requested = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Shipment_requested);
         int delivering = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Delivering);
 
+        var oldStatus = orderDetail.Status;
+
         // Trạng thái SHIPPING_REQUESTED
         if (requested == total)
             orderDetail.Status = OrderDetailItemStatus.SHIPPING_REQUESTED;
@@ -35,11 +37,17 @@ public static class OrderDtoMapper
 
         // Nếu chưa có inventory nào được request ship/delivering thì giữ nguyên (PENDING)
 
-        // Ghi logs
+        // Ghi log thay đổi trạng thái nếu có
+        if (orderDetail.Status != oldStatus)
+        {
+            orderDetail.Logs += $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Status changed: {oldStatus} → {orderDetail.Status}";
+        }
+
+        // Ghi log trạng thái inventory item hiện tại
         var logLines = inventoryItems
             .Select(ii => $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] InventoryItem {ii.Id}: {ii.Status}")
             .ToList();
-        orderDetail.Logs = string.Join("\n", logLines);
+        orderDetail.Logs += "\n" + string.Join("\n", logLines);
     }
     public static OrderDto ToOrderDto(Order order)
     {

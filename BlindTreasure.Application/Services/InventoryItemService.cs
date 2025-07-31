@@ -141,13 +141,13 @@ public class InventoryItemService : IInventoryItemService
             return InventoryItemMapper.ToInventoryItemDto(cached);
         }
 
-        var item = await _unitOfWork.InventoryItems.GetByIdAsync(id, i => i.Product, i => i.Shipment);
+        var item = await _unitOfWork.InventoryItems.GetByIdAsync(id, i => i.Product, i => i.Shipment, i => i.OrderDetail);
         if (item == null || item.IsDeleted)
             return null;
 
         await _cacheService.SetAsync(cacheKey, item, TimeSpan.FromMinutes(30));
         _loggerService.Info($"[GetByIdAsync] Inventory item {id} loaded from DB and cached.");
-        return InventoryItemMapper.ToInventoryItemDto(item);
+        return InventoryItemMapper.ToInventoryItemDtoFullIncluded(item);
     }
 
     public async Task<Pagination<InventoryItemDto>> GetMyInventoryAsync(InventoryItemQueryParameter param)
@@ -389,6 +389,7 @@ public class InventoryItemService : IInventoryItemService
                 .GetByIdAsync(orderDetailId, od => od.InventoryItems);
             if (orderDetail != null)
             {
+                orderDetail.Logs += $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Shipment requested by user {userId}.";
                 OrderDtoMapper.UpdateOrderDetailStatusAndLogs(orderDetail);
                 await _unitOfWork.OrderDetails.Update(orderDetail);
             }
