@@ -175,7 +175,7 @@ public class TransactionService : ITransactionService
     private void UpdatePaymentAndOrderStatus(Transaction transaction, Order order)
     {
         transaction.Status = TransactionStatus.Successful.ToString();
-        transaction.Payment.Status = PaymentStatus.Paid.ToString();
+        transaction.Payment.Status = PaymentStatus.Paid;
         transaction.Payment.PaidAt = DateTime.UtcNow;
         order.Status = OrderStatus.PAID.ToString();
         order.CompletedAt = DateTime.UtcNow;
@@ -411,7 +411,7 @@ public class TransactionService : ITransactionService
 
             transaction.Status = TransactionStatus.Failed.ToString();
             if (transaction.Payment != null)
-                transaction.Payment.Status = PaymentStatus.Failed.ToString();
+                transaction.Payment.Status = PaymentStatus.Failed;
             if (transaction.Payment?.Order != null)
                 transaction.Payment.Order.Status = OrderStatus.EXPIRED.ToString();
 
@@ -447,7 +447,7 @@ public class TransactionService : ITransactionService
             if (transaction == null)
                 throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
 
-            transaction.Payment.TransactionId = paymentIntentId;
+            transaction.Payment.PaymentIntentId = paymentIntentId;
             await _unitOfWork.Transactions.Update(transaction);
             await _unitOfWork.SaveChangesAsync();
             _logger.Info(

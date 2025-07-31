@@ -133,7 +133,7 @@ public static class OrderDtoMapper
             NetAmount = payment.NetAmount,
             Method = payment.Method,
             Status = payment.Status,
-            TransactionId = payment.TransactionId,
+            PaymentIntentId = payment.PaymentIntentId,
             PaidAt = payment.PaidAt,
             RefundedAmount = payment.RefundedAmount,
             Transactions = payment.Transactions?.Select(ToTransactionDto).ToList() ?? new List<TransactionDto>()
