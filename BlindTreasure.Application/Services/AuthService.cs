@@ -407,7 +407,6 @@ public class AuthService : IAuthService
     #endregion
 
     #region PRIVATE HELPER METHODS
-
     /// <summary>
     ///     Checks if a user exists in cache or DB.
     /// </summary>

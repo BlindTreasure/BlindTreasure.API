@@ -117,65 +117,53 @@ public class StripeController : ControllerBase
         }
     }
 
-    ///// <summary>
-    /////     TIẾN TEST BẰNG CÁI NÀY
-    ///// </summary>
-    //[Authorize]
-    //[HttpPost("preview-shipping")]
-    //public async Task<IActionResult> PreviewShippingFromCart()
-    //{
-    //    try
-    //    {
-    //        var cart = await _cartItemService.GetCurrentUserCartAsync();
-    //        // Map CartItemDto sang DirectCartItemDto
-    //        var directCartItems = cart.Items.Select(i => new DirectCartItemDto
-    //        {
-    //            ProductId = i.ProductId,
-    //            ProductName = i.ProductName,
-    //            BlindBoxId = i.BlindBoxId,
-    //            BlindBoxName = i.BlindBoxName,
-    //            Quantity = i.Quantity,
-    //            UnitPrice = i.UnitPrice,
-    //            TotalPrice = i.TotalPrice
-    //        }).ToList();
-
-    //        var result = await _orderService.PreviewShippingCheckoutAsync(directCartItems);
-    //        return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200",
-    //            "Preview shipment thành công."));
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-    //        var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-    //        return StatusCode(statusCode, errorResponse);
-    //    }
-    //}
-
-    ///// <summary>
-    /////     FRONT-END DÙNG API NÀY ĐỂ LẤY TRƯỚC THÔNG TIN GIAO HÀNG CỦA ITEM TRUYỀN VÀO
-    ///// </summary>
-    ///// <param name="cart">Thông tin cart từ FE (danh sách sản phẩm, số lượng, giá...)</param>
-    ///// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
-    //[Authorize]
-    //[HttpPost("preview-shipping-direct")]
-    //public async Task<IActionResult> PreviewShippingFromClientCart([FromBody] DirectCartCheckoutDto cart)
-    //{
-    //    try
-    //    {
-    //        var result = await _orderService.PreviewShippingCheckoutAsync(cart.Items);
-    //        return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200",
-    //            "Preview shipment thành công."));
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-    //        var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-    //        return StatusCode(statusCode, errorResponse);
-    //    }
-    //}
+    /// <summary>
+    ///     TIẾN TEST BẰNG CÁI NÀY
+    /// </summary>
+    [Authorize]
+    [HttpPost("preview-shipping")]
+    public async Task<IActionResult> PreviewShippingFromCart()
+    {
+        try
+        {
+            var cart = await _cartItemService.GetCurrentUserCartAsync();
+            var result = await _orderService.PreviewShippingCheckoutAsync(cart.SellerItems);
+            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200",
+                "Preview shipment thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 
     /// <summary>
-    ///     Stripe webhook callback: xử lý sự kiện thanh toán từ Stripe (checkout.session.completed, checkout.session.expired,
+    ///     FRONT-END DÙNG API NÀY ĐỂ LẤY TRƯỚC THÔNG TIN GIAO HÀNG CỦA ITEM TRUYỀN VÀO
+    /// </summary>
+    /// <param name="cart">Thông tin cart từ FE (danh sách sản phẩm, số lượng, giá...)</param>
+    /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
+    [Authorize]
+    [HttpPost("preview-shipping-direct")]
+    public async Task<IActionResult> PreviewShippingFromClientCart([FromBody] DirectCartCheckoutDto cart)
+    {
+        try
+        {
+            var result = await _orderService.PreviewShippingCheckoutAsync(cart.SellerItems);
+            return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200",
+                "Preview shipment thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    /// <summary>
+    ///     Stripe webhook callback: xử lý sự kiện thanh toán từ Stripe(checkout.session.completed, checkout.session.expired,
     ///     ...).
     /// </summary>
     [HttpPost("checkout-callback-handler")]
