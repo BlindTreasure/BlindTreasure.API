@@ -277,15 +277,10 @@ public class TradingService : ITradingService
             t => t.OfferedItems,
             t => t.Requester!);
 
-        if (tradeRequest == null)
-        {
-            throw ErrorHelper.NotFound("Trade request không tồn tại.");
-        }
+        if (tradeRequest == null) throw ErrorHelper.NotFound("Trade request không tồn tại.");
 
         if (tradeRequest.Status != TradeRequestStatus.ACCEPTED)
-        {
             throw ErrorHelper.BadRequest("Trade request chưa được chấp nhận.");
-        }
 
         var listingOwnerId = tradeRequest.Listing!.InventoryItem.UserId; // User A
 
@@ -318,13 +313,13 @@ public class TradingService : ITradingService
     public async Task ReleaseHeldItemsAsync()
     {
         var now = DateTime.UtcNow;
-        var itemsToRelease = await _unitOfWork.InventoryItems.GetAllAsync(i =>
-            i.Status == InventoryItemStatus.OnHold && i.HoldUntil.HasValue && i.HoldUntil.Value <= now);
+        var itemsToRelease = await _unitOfWork.InventoryItems.GetAllAsync(
+            i => i.Status == InventoryItemStatus.OnHold &&
+                 i.HoldUntil.HasValue &&
+                 i.HoldUntil.Value <= now,
+            i => i.Product); // Include Product để có thể lấy tên
 
-        if (!itemsToRelease.Any())
-        {
-            return;
-        }
+        if (!itemsToRelease.Any()) return;
 
         foreach (var item in itemsToRelease)
         {
@@ -334,6 +329,17 @@ public class TradingService : ITradingService
 
         await _unitOfWork.InventoryItems.UpdateRange(itemsToRelease);
         await _unitOfWork.SaveChangesAsync();
+
+        // Gửi notification cho từng item được release
+        foreach (var item in itemsToRelease)
+            try
+            {
+                await NotifyItemReleased(item);
+            }
+            catch (Exception ex)
+            {
+                // Không throw exception để không ảnh hưởng việc release các item khác
+            }
     }
 
     private async Task<TradeRequestDto> GetTradeRequestByIdAsync(Guid tradeRequestId)
@@ -345,10 +351,7 @@ public class TradingService : ITradingService
             t => t.Requester!,
             t => t.OfferedItems);
 
-        if (tradeRequest == null)
-        {
-            throw ErrorHelper.NotFound("Trade Request không tồn tại.");
-        }
+        if (tradeRequest == null) throw ErrorHelper.NotFound("Trade Request không tồn tại.");
 
         var offeredInventoryItems = new List<InventoryItem>();
         if (tradeRequest.OfferedItems.Any())
@@ -366,6 +369,26 @@ public class TradingService : ITradingService
     }
 
     #region Private Methods
+
+    #region notifications
+
+    private async Task NotifyItemReleased(InventoryItem item)
+    {
+        var cacheKey = $"noti:item_released:{item.UserId}:{item.Id}";
+        if (await _cacheService.ExistsAsync(cacheKey)) return;
+
+        await _notificationService.PushNotificationToUser(
+            item.UserId,
+            new NotificationDTO
+            {
+                Title = "Vật phẩm sẵn sàng trade!",
+                Message = $"'{item.Product?.Name}' đã có thể trao đổi lại.",
+                Type = NotificationType.System
+            }
+        );
+
+        await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
+    }
 
     private async Task SendTradeRequestNotificationIfNotSentAsync(User user, string? requesterName)
     {
@@ -445,6 +468,9 @@ public class TradingService : ITradingService
             await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
         }
     }
+
+    #endregion
+
 
     private async Task ValidateMultipleOfferedItems(List<Guid> offeredInventoryIds,
         Listing listing, Guid userId)
@@ -716,7 +742,7 @@ public class TradingService : ITradingService
             InventoryItemId = item.Id,
             ItemName = item.Product?.Name,
             ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
-            Tier = item.Tier ?? RarityName.Common, // Giá trị mặc định
+            Tier = item.Tier ?? RarityName.Common // Giá trị mặc định
         }).ToList();
 
         var dto = new TradeRequestDto

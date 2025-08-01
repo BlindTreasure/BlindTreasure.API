@@ -17,9 +17,9 @@ public static class OrderDtoMapper
         if (!inventoryItems.Any())
             return;
 
-        int total = inventoryItems.Count;
-        int requested = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Shipment_requested);
-        int delivering = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Delivering);
+        var total = inventoryItems.Count;
+        var requested = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Shipment_requested);
+        var delivering = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Delivering);
 
         var oldStatus = orderDetail.Status;
 
@@ -39,9 +39,8 @@ public static class OrderDtoMapper
 
         // Ghi log thay đổi trạng thái nếu có
         if (orderDetail.Status != oldStatus)
-        {
-            orderDetail.Logs += $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Status changed: {oldStatus} → {orderDetail.Status}";
-        }
+            orderDetail.Logs +=
+                $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Status changed: {oldStatus} → {orderDetail.Status}";
 
         // Ghi log trạng thái inventory item hiện tại
         var logLines = inventoryItems
@@ -49,6 +48,7 @@ public static class OrderDtoMapper
             .ToList();
         orderDetail.Logs += "\n" + string.Join("\n", logLines);
     }
+
     public static OrderDto ToOrderDto(Order order)
     {
         try
@@ -64,7 +64,8 @@ public static class OrderDtoMapper
                 ShippingAddress = order.ShippingAddress != null
                     ? ToOrderAddressDto(order.ShippingAddress)
                     : null,
-                Details = order.OrderDetails?.Select(ToOrderDetailDtoFullIncluded).ToList() ?? new List<OrderDetailDto>(),
+                Details = order.OrderDetails?.Select(ToOrderDetailDtoFullIncluded).ToList() ??
+                          new List<OrderDetailDto>(),
                 Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
                 TotalShippingFee = order.TotalShippingFee ?? 0
             };
@@ -90,7 +91,7 @@ public static class OrderDtoMapper
             Quantity = od.Quantity,
             UnitPrice = od.UnitPrice,
             TotalPrice = od.TotalPrice,
-            Status = od.Status,
+            Status = od.Status
             //Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>()
         };
     }
@@ -99,13 +100,14 @@ public static class OrderDtoMapper
     {
         var result = ToOrderDetailDto(od);
 
-        result.InventoryItems = od.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ?? new List<InventoryItemDto>();
-        if(result.Shipments.IsNullOrEmpty())
-        result.Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>();
+        result.InventoryItems = od.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ??
+                                new List<InventoryItemDto>();
+        if (result.Shipments.IsNullOrEmpty())
+            result.Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ??
+                               new List<ShipmentDto>();
 
         return result;
     }
-
 
 
     public static OrderAddressDto ToOrderAddressDto(Address address)

@@ -121,4 +121,44 @@ public class TradingController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
+
+    /// <summary>
+    /// Lấy danh sách yêu cầu trao đổi mà người dùng hiện tại đã tạo
+    /// </summary>
+    [HttpGet("my-trade-requests")]
+    public async Task<IActionResult> GetMyTradeRequests()
+    {
+        try
+        {
+            var result = await _tradingService.GetMyTradeRequestsAsync();
+            return Ok(ApiResult<List<TradeRequestDto>>.Success(result, "200",
+                "Lấy danh sách yêu cầu trao đổi của bạn thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<List<TradeRequestDto>>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    /// Lấy lịch sử giao dịch của người dùng hiện tại với phân trang và bộ lọc
+    /// </summary>
+    [HttpGet("my-histories")]
+    public async Task<IActionResult> GetMyTradeHistories([FromQuery] TradeHistoryQueryParameter param)
+    {
+        try
+        {
+            var result = await _tradingService.GetMyTradeHistoriesAsync(param);
+            return Ok(ApiResult<Pagination<TradeHistoryDto>>.Success(result, "200",
+                "Lấy lịch sử giao dịch của bạn thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<Pagination<TradeHistoryDto>>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
 }

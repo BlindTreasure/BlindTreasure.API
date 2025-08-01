@@ -958,7 +958,8 @@ public class SystemController : ControllerBase
                         {
                             Id = Guid.NewGuid(),
                             Name = "SMISKI Blowing Bubbles",
-                            Description = "Hãy cùng chìm đắm trong một thế giới mộng mơ với SMISKI Blowing Bubbles. Phiên bản này khắc họa hình ảnh SMISKI đang tập trung thổi những quả bong bóng xà phòng lấp lánh, mỗi quả bóng như chứa đựng một ước mơ nhỏ bé bay lên. Với vẻ mặt ngây thơ và hành động đáng yêu, SMISKI không chỉ là một vật trang trí mà còn là nguồn cảm hứng cho những khoảnh khắc thư giãn, mang lại cảm giác bình yên và một chút phép màu cho không gian sống của bạn. Đặt SMISKI ở góc làm việc hay đầu giường, và để những 'quả bóng mơ ước' này nhắc nhở bạn về niềm vui trong những điều giản dị.",
+                            Description =
+                                "Hãy cùng chìm đắm trong một thế giới mộng mơ với SMISKI Blowing Bubbles. Phiên bản này khắc họa hình ảnh SMISKI đang tập trung thổi những quả bong bóng xà phòng lấp lánh, mỗi quả bóng như chứa đựng một ước mơ nhỏ bé bay lên. Với vẻ mặt ngây thơ và hành động đáng yêu, SMISKI không chỉ là một vật trang trí mà còn là nguồn cảm hứng cho những khoảnh khắc thư giãn, mang lại cảm giác bình yên và một chút phép màu cho không gian sống của bạn. Đặt SMISKI ở góc làm việc hay đầu giường, và để những 'quả bóng mơ ước' này nhắc nhở bạn về niềm vui trong những điều giản dị.",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 299000,
@@ -978,7 +979,8 @@ public class SystemController : ControllerBase
                         {
                             Id = Guid.NewGuid(),
                             Name = "SMISKI Paper Airplane",
-                            Description = "Cùng SMISKI Paper Airplane nuôi dưỡng những giấc mơ bay cao, bay xa. Hình ảnh SMISKI cẩn thận cầm trên tay chiếc máy bay giấy, ánh mắt hướng về một chân trời vô định, thể hiện cho khát khao khám phá và chinh phục những vùng đất mới. Đây không chỉ là một món đồ chơi, mà là biểu tượng của lòng dũng cảm, của những hoài bão tuổi trẻ và niềm tin vào một tương lai rộng mở. Hãy để SMISKI Paper Airplane trên bàn làm việc của bạn như một lời nhắc nhở rằng không có giấc mơ nào là quá lớn và không có hành trình nào là không thể.",
+                            Description =
+                                "Cùng SMISKI Paper Airplane nuôi dưỡng những giấc mơ bay cao, bay xa. Hình ảnh SMISKI cẩn thận cầm trên tay chiếc máy bay giấy, ánh mắt hướng về một chân trời vô định, thể hiện cho khát khao khám phá và chinh phục những vùng đất mới. Đây không chỉ là một món đồ chơi, mà là biểu tượng của lòng dũng cảm, của những hoài bão tuổi trẻ và niềm tin vào một tương lai rộng mở. Hãy để SMISKI Paper Airplane trên bàn làm việc của bạn như một lời nhắc nhở rằng không có giấc mơ nào là quá lớn và không có hành trình nào là không thể.",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 255000,
@@ -998,7 +1000,8 @@ public class SystemController : ControllerBase
                         {
                             Id = Guid.NewGuid(),
                             Name = "SMISKI Sunbathing",
-                            Description = "Tận hưởng sự bình yên tuyệt đối cùng SMISKI Sunbathing. Trong một buổi chiều nắng đẹp, SMISKI nằm dài thư giãn, trên bụng là một chú mèo nhỏ đang say ngủ, tạo nên một bức tranh hoàn hảo về tình bạn và sự tin tưởng. Vẻ mặt mãn nguyện của SMISKI và sự yên bình của khung cảnh sẽ giúp bạn tạm gác lại những lo toan, bộn bề của cuộc sống. Sản phẩm này là một lời nhắn nhủ ngọt ngào, rằng hạnh phúc đôi khi chỉ đơn giản là được ở bên cạnh người mình yêu thương, cùng nhau tận hưởng những giây phút tĩnh lặng.",
+                            Description =
+                                "Tận hưởng sự bình yên tuyệt đối cùng SMISKI Sunbathing. Trong một buổi chiều nắng đẹp, SMISKI nằm dài thư giãn, trên bụng là một chú mèo nhỏ đang say ngủ, tạo nên một bức tranh hoàn hảo về tình bạn và sự tin tưởng. Vẻ mặt mãn nguyện của SMISKI và sự yên bình của khung cảnh sẽ giúp bạn tạm gác lại những lo toan, bộn bề của cuộc sống. Sản phẩm này là một lời nhắn nhủ ngọt ngào, rằng hạnh phúc đôi khi chỉ đơn giản là được ở bên cạnh người mình yêu thương, cùng nhau tận hưởng những giây phút tĩnh lặng.",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 319000,
@@ -1018,7 +1021,8 @@ public class SystemController : ControllerBase
                         {
                             Id = Guid.NewGuid(),
                             Name = "SMISKI Sing-Along",
-                            Description = "Lắng nghe giai điệu của tâm hồn cùng SMISKI Sing-Along. Với cây đàn guitar trên tay, SMISKI say sưa trong thế giới âm nhạc của riêng mình, mỗi nốt nhạc vang lên là một cảm xúc, một câu chuyện được kể. Bức tượng này không chỉ dành cho những người yêu âm nhạc, mà còn dành cho những ai tìm kiếm sự đồng điệu và niềm vui trong cô đơn. SMISKI Sing-Along sẽ là người bạn tâm giao thầm lặng, cùng bạn chia sẻ mọi khoảnh khắc, biến những góc nhỏ trong nhà bạn thành một sân khấu của cảm xúc và sự sáng tạo.",
+                            Description =
+                                "Lắng nghe giai điệu của tâm hồn cùng SMISKI Sing-Along. Với cây đàn guitar trên tay, SMISKI say sưa trong thế giới âm nhạc của riêng mình, mỗi nốt nhạc vang lên là một cảm xúc, một câu chuyện được kể. Bức tượng này không chỉ dành cho những người yêu âm nhạc, mà còn dành cho những ai tìm kiếm sự đồng điệu và niềm vui trong cô đơn. SMISKI Sing-Along sẽ là người bạn tâm giao thầm lặng, cùng bạn chia sẻ mọi khoảnh khắc, biến những góc nhỏ trong nhà bạn thành một sân khấu của cảm xúc và sự sáng tạo.",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 275000,
@@ -1038,7 +1042,8 @@ public class SystemController : ControllerBase
                         {
                             Id = Guid.NewGuid(),
                             Name = "SMISKI Skateboarding",
-                            Description = "Giải phóng năng lượng và cá tính của bạn cùng SMISKI Skateboarding. SMISKI xuất hiện với vẻ ngoài cực ngầu trên chiếc ván trượt, sẵn sàng cho những cú lướt điệu nghệ trên mọi địa hình. Đây là hình ảnh đại diện cho tuổi trẻ, sự năng động và tinh thần không ngại thử thách. Dù bạn là một skater hay chỉ đơn giản là người yêu thích sự tự do, SMISKI Skateboarding chắc chắn sẽ truyền cảm hứng để bạn sống hết mình, phá vỡ mọi giới hạn và tự tin thể hiện phong cách riêng.",
+                            Description =
+                                "Giải phóng năng lượng và cá tính của bạn cùng SMISKI Skateboarding. SMISKI xuất hiện với vẻ ngoài cực ngầu trên chiếc ván trượt, sẵn sàng cho những cú lướt điệu nghệ trên mọi địa hình. Đây là hình ảnh đại diện cho tuổi trẻ, sự năng động và tinh thần không ngại thử thách. Dù bạn là một skater hay chỉ đơn giản là người yêu thích sự tự do, SMISKI Skateboarding chắc chắn sẽ truyền cảm hứng để bạn sống hết mình, phá vỡ mọi giới hạn và tự tin thể hiện phong cách riêng.",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 319000,
@@ -1058,7 +1063,8 @@ public class SystemController : ControllerBase
                         {
                             Id = Guid.NewGuid(),
                             Name = "SMISKI Gardening",
-                            Description = "Khám phá niềm vui từ việc chăm sóc và nuôi dưỡng sự sống với SMISKI Gardening. Với bình tưới trên tay, SMISKI chăm chú tưới nước cho một mầm cây nhỏ, biểu tượng của sự khởi đầu và hy vọng. Điều thú vị và hài hước nhất là một mầm xanh cũng đang nhú lên từ chính đỉnh đầu của SMISKI, như một phần thưởng cho tình yêu thiên nhiên của nó. Sản phẩm này là món quà tuyệt vời cho những người yêu cây cối, mang lại thông điệp về sự kiên nhẫn và niềm hạnh phúc khi thấy công sức của mình đơm hoa kết trái.",
+                            Description =
+                                "Khám phá niềm vui từ việc chăm sóc và nuôi dưỡng sự sống với SMISKI Gardening. Với bình tưới trên tay, SMISKI chăm chú tưới nước cho một mầm cây nhỏ, biểu tượng của sự khởi đầu và hy vọng. Điều thú vị và hài hước nhất là một mầm xanh cũng đang nhú lên từ chính đỉnh đầu của SMISKI, như một phần thưởng cho tình yêu thiên nhiên của nó. Sản phẩm này là món quà tuyệt vời cho những người yêu cây cối, mang lại thông điệp về sự kiên nhẫn và niềm hạnh phúc khi thấy công sức của mình đơm hoa kết trái.",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 275000,
@@ -1367,9 +1373,10 @@ public class SystemController : ControllerBase
             _logger.Warn("[SmiskiBlindBoxes] Không tìm thấy category 'Smiski' để tạo blind box.");
             return;
         }
-    
+
         // Check if the blind box already exists
-        if (await _context.BlindBoxes.AnyAsync(b => b.Name == "SMISKI Series1")) {
+        if (await _context.BlindBoxes.AnyAsync(b => b.Name == "SMISKI Series1"))
+        {
             _logger.Info("[SmiskiBlindBoxes] Blind box 'SMISKI Series1' đã tồn tại. Bỏ qua seed.");
             return;
         }
@@ -1381,7 +1388,8 @@ public class SystemController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 Name = "SMISKI Series1 - Smiski Hugging Knees",
-                Description = "Luôn ẩn mình trong một góc nhỏ, SMISKI lặng lẽ ôm lấy đầu gối, đôi mắt mơ màng nhìn xa xăm, chìm đắm trong những suy tư miên man. Hình ảnh này gợi lên một cảm giác yên bình, một chút cô đơn nhưng đầy chất thơ, như một người bạn nhỏ đang cùng bạn chia sẻ những khoảnh khắc tĩnh lặng của tâm hồn.",
+                Description =
+                    "Luôn ẩn mình trong một góc nhỏ, SMISKI lặng lẽ ôm lấy đầu gối, đôi mắt mơ màng nhìn xa xăm, chìm đắm trong những suy tư miên man. Hình ảnh này gợi lên một cảm giác yên bình, một chút cô đơn nhưng đầy chất thơ, như một người bạn nhỏ đang cùng bạn chia sẻ những khoảnh khắc tĩnh lặng của tâm hồn.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
                 Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
@@ -1392,7 +1400,8 @@ public class SystemController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 Name = "SMISKI Series1 - Smiski Sitting",
-                Description = "Bạn sẽ thường bắt gặp SMISKI này ngồi một mình trong im lặng, ánh mắt tập trung nhìn xuống một vật gì đó vô định. Với tính cách có phần cảnh giác và hướng nội, nó yêu thích không gian riêng tư, nơi nó có thể chìm vào thế giới của riêng mình mà không bị làm phiền. Một hình ảnh đầy bí ẩn và cuốn hút, dành cho những ai trân trọng khoảnh khắc được ở một mình.",
+                Description =
+                    "Bạn sẽ thường bắt gặp SMISKI này ngồi một mình trong im lặng, ánh mắt tập trung nhìn xuống một vật gì đó vô định. Với tính cách có phần cảnh giác và hướng nội, nó yêu thích không gian riêng tư, nơi nó có thể chìm vào thế giới của riêng mình mà không bị làm phiền. Một hình ảnh đầy bí ẩn và cuốn hút, dành cho những ai trân trọng khoảnh khắc được ở một mình.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
                 Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
@@ -1403,7 +1412,8 @@ public class SystemController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 Name = "SMISKI Series1 - Smiski Looking Back",
-                Description = "Đây là một SMISKI nhút nhát và dễ giật mình. Mỗi khi bạn vô tình phát hiện ra, nó sẽ lập tức quay lại, đôi mắt mở to nhìn bạn đầy ngạc nhiên và có chút bối rối. Khoảnh khắc đáng yêu này sẽ khiến bạn bất giác mỉm cười, như vừa khám phá ra một bí mật nhỏ bé và ngộ nghĩnh trong căn phòng của mình.",
+                Description =
+                    "Đây là một SMISKI nhút nhát và dễ giật mình. Mỗi khi bạn vô tình phát hiện ra, nó sẽ lập tức quay lại, đôi mắt mở to nhìn bạn đầy ngạc nhiên và có chút bối rối. Khoảnh khắc đáng yêu này sẽ khiến bạn bất giác mỉm cười, như vừa khám phá ra một bí mật nhỏ bé và ngộ nghĩnh trong căn phòng của mình.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
                 Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
@@ -1414,7 +1424,8 @@ public class SystemController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 Name = "SMISKI Series1 - Smiski Lounging",
-                Description = "Gặp gỡ SMISKI lười biếng nhất hội! Nó chỉ thích nằm dài thư giãn ở bất cứ đâu, từ trên bàn làm việc cho đến kệ sách. Với nó, không có gì tuyệt vời hơn là được nghỉ ngơi và chẳng phải làm gì cả. Mọi hoạt động liên quan đến di chuyển hay vận động đều nằm ngoài từ điển của SMISKI này. Hãy để nó mang lại cho bạn một lời nhắc nhở nhẹ nhàng về việc tận hưởng những phút giây không làm gì.",
+                Description =
+                    "Gặp gỡ SMISKI lười biếng nhất hội! Nó chỉ thích nằm dài thư giãn ở bất cứ đâu, từ trên bàn làm việc cho đến kệ sách. Với nó, không có gì tuyệt vời hơn là được nghỉ ngơi và chẳng phải làm gì cả. Mọi hoạt động liên quan đến di chuyển hay vận động đều nằm ngoài từ điển của SMISKI này. Hãy để nó mang lại cho bạn một lời nhắc nhở nhẹ nhàng về việc tận hưởng những phút giây không làm gì.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
                 Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
@@ -1425,7 +1436,8 @@ public class SystemController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 Name = "SMISKI Series1 - Smiski Hiding",
-                Description = "Trốn tìm chính là biệt tài của SMISKI này. Nó là một bậc thầy trong việc tìm kiếm những nơi ẩn náu độc đáo, từ kẽ hở nhỏ nhất cho đến phía sau một chậu cây. Nó cảm thấy an toàn và thoải mái nhất khi được cuộn mình trong những không gian nhỏ hẹp. Sở hữu SMISKI này, bạn sẽ có một trò chơi trốn tìm nho nhỏ mỗi ngày trong chính căn phòng của mình.",
+                Description =
+                    "Trốn tìm chính là biệt tài của SMISKI này. Nó là một bậc thầy trong việc tìm kiếm những nơi ẩn náu độc đáo, từ kẽ hở nhỏ nhất cho đến phía sau một chậu cây. Nó cảm thấy an toàn và thoải mái nhất khi được cuộn mình trong những không gian nhỏ hẹp. Sở hữu SMISKI này, bạn sẽ có một trò chơi trốn tìm nho nhỏ mỗi ngày trong chính căn phòng của mình.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
                 Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
@@ -1436,7 +1448,8 @@ public class SystemController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 Name = "SMISKI Series1 - Smiski Peeking",
-                Description = "Luôn trong tư thế khom người, SMISKI này rụt rè hé nhìn mọi thứ từ một góc an toàn. Nó có vẻ tò mò về thế giới xung quanh nhưng lại cần rất nhiều can đảm để thực sự tiến lại gần. Một hình ảnh vừa ngộ nghĩnh vừa đáng yêu, thể hiện sự tò mò nhưng đầy e dè, như một đứa trẻ đang khám phá thế giới rộng lớn.",
+                Description =
+                    "Luôn trong tư thế khom người, SMISKI này rụt rè hé nhìn mọi thứ từ một góc an toàn. Nó có vẻ tò mò về thế giới xung quanh nhưng lại cần rất nhiều can đảm để thực sự tiến lại gần. Một hình ảnh vừa ngộ nghĩnh vừa đáng yêu, thể hiện sự tò mò nhưng đầy e dè, như một đứa trẻ đang khám phá thế giới rộng lớn.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
                 Price = 500000, Stock = 20, Status = ProductStatus.Active, CreatedAt = now,
@@ -1447,7 +1460,7 @@ public class SystemController : ControllerBase
 
         await _context.Products.AddRangeAsync(blindBoxProducts);
         await _context.SaveChangesAsync();
-    
+
         // Rarity cấu hình cho từng item (chuẩn theo enum RarityName)
         var rarityArr = new[]
         {
@@ -1458,9 +1471,9 @@ public class SystemController : ControllerBase
             new { Rarity = RarityName.Epic, Weight = 10, Quantity = 4 },
             new { Rarity = RarityName.Secret, Weight = 5, Quantity = 2 }
         };
-    
+
         var totalWeightQty = rarityArr.Sum(x => x.Quantity * x.Weight);
-    
+
         var blindBox = new BlindBox
         {
             Id = Guid.NewGuid(),
@@ -1477,7 +1490,7 @@ public class SystemController : ControllerBase
             ReleaseDate = now,
             CreatedAt = now
         };
-    
+
         var blindBoxItems = new List<BlindBoxItem>();
         var rarityConfigs = new List<RarityConfig>();
 
@@ -1516,7 +1529,7 @@ public class SystemController : ControllerBase
         await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
         await _context.RarityConfigs.AddRangeAsync(rarityConfigs);
         await _context.SaveChangesAsync();
-    
+
         // Sau khi SaveChanges xong BlindBox và BlindBoxItems:
         foreach (var item in blindBoxItems)
         {
