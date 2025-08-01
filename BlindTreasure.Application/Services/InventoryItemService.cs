@@ -265,6 +265,7 @@ public class InventoryItemService : IInventoryItemService
             .Where(i => request.InventoryItemIds.Contains(i.Id) && i.UserId == userId && !i.IsDeleted)
             .Include(i => i.Product).ThenInclude(p => p.Seller)
             .Include(i => i.Product).ThenInclude(p => p.Category)
+            .Include(i => i.OrderDetail)
             .ToListAsync();
 
         if (!items.Any())
@@ -306,7 +307,7 @@ public class InventoryItemService : IInventoryItemService
                     {
                         Name = p.Name,
                         Code = p.Id.ToString(),
-                        Quantity = g.Count(), // tổng số inventory item cùng product
+                        Quantity = g.Count(),
                         Price = Convert.ToInt32(p.Price),
                         Length = length,
                         Width = width,
@@ -369,6 +370,37 @@ public class InventoryItemService : IInventoryItemService
             shipment = await _unitOfWork.Shipments.AddAsync(shipment);
             await _unitOfWork.SaveChangesAsync();
 
+            // Gán shipmentId cho inventory item trong group
+            foreach (var item in group)
+            {
+                item.ShipmentId = shipment.Id;
+                item.Shipment = shipment;
+                await _unitOfWork.InventoryItems.Update(item);
+            }
+
+            // Gán shipment vào các order-detail liên quan (many-to-many)
+            var orderDetailIds = group
+                .Where(i => i.OrderDetailId.HasValue)
+                .Select(i => i.OrderDetailId.Value)
+                .Distinct()
+                .ToList();
+
+            foreach (var orderDetailId in orderDetailIds)
+            {
+                var orderDetail = await _unitOfWork.OrderDetails
+                    .GetByIdAsync(orderDetailId, od => od.Shipments);
+                if (orderDetail != null)
+                {
+                    if (orderDetail.Shipments == null)
+                        orderDetail.Shipments = new List<Shipment>();
+                    if (!orderDetail.Shipments.Any(s => s.Id == shipment.Id))
+                    {
+                        orderDetail.Shipments.Add(shipment);
+                        await _unitOfWork.OrderDetails.Update(orderDetail);
+                    }
+                }
+            }
+
             shipments.Add(shipment);
             shipmentDtos.Add(ShipmentDtoMapper.ToShipmentDto(shipment));
             totalShippingFee += shipment.TotalFee ?? 0;
@@ -377,13 +409,14 @@ public class InventoryItemService : IInventoryItemService
         // Tạo duy nhất 1 link thanh toán cho toàn bộ phí ship
         var paymentUrl = await _stripeService.CreateShipmentCheckoutSessionAsync(shipments, userId, totalShippingFee);
 
-        var orderDetailIds = items
-    .Where(i => i.OrderDetailId.HasValue)
-    .Select(i => i.OrderDetailId.Value)
-    .Distinct()
-    .ToList();
+        // Cập nhật trạng thái/log cho các order detail liên quan
+        var allOrderDetailIds = items
+            .Where(i => i.OrderDetailId.HasValue)
+            .Select(i => i.OrderDetailId.Value)
+            .Distinct()
+            .ToList();
 
-        foreach (var orderDetailId in orderDetailIds)
+        foreach (var orderDetailId in allOrderDetailIds)
         {
             var orderDetail = await _unitOfWork.OrderDetails
                 .GetByIdAsync(orderDetailId, od => od.InventoryItems);

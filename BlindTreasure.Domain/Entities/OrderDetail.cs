@@ -29,8 +29,8 @@ public class OrderDetail : BaseEntity
     public Guid SellerId { get; set; }
     public Seller Seller { get; set; }
 
-    // 1-n → Shipments
-    public ICollection<Shipment> Shipments { get; set; } = new List<Shipment>();
+    // Many → Shipments
+    public ICollection<Shipment>? Shipments { get; set; } = new List<Shipment>();
     public ICollection<InventoryItem> InventoryItems { get; set; } = new List<InventoryItem>();
     public ICollection<CustomerBlindBox>? CustomerBlindBoxes { get; set; } = new List<CustomerBlindBox>();
 }

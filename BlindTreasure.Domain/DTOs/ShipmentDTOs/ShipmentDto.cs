@@ -14,7 +14,7 @@ public class ShipmentDto
 {
     public Guid? Id { get; set; }
     public Guid? OrderDetailId { get; set; }
-    public OrderDetailDto? OrderDetail { get; set; } // Thông tin chi tiết đơn hàng liên quan đến shipment
+    public ICollection<OrderDetailDto>? OrderDetails { get; set; } // Thông tin chi tiết đơn hàng liên quan đến shipment
 
 
     //các field cho GHN 

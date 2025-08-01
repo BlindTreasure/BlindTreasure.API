@@ -205,31 +205,34 @@ public class TransactionService : ITransactionService
 
     private async Task CreateGhnOrdersAndUpdateShipments(Order order, List<OrderDetail> orderDetails)
     {
+        // Lấy tất cả shipment của các order detail liên quan, status WAITING_PAYMENT
+        var shipmentIds = orderDetails
+            .SelectMany(od => od.Shipments)
+            .Where(s => s.Status == ShipmentStatus.WAITING_PAYMENT)
+            .Select(s => s.Id)
+            .Distinct()
+            .ToList();
+
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => orderDetails.Select(od => od.Id).Contains(s.OrderDetailId.Value) &&
-                        s.Status == ShipmentStatus.WAITING_PAYMENT)
-            .Include(s => s.OrderDetail).ThenInclude(od => od.Product).ThenInclude(p => p.Seller)
+            .Where(s => shipmentIds.Contains(s.Id))
+            .Include(s => s.OrderDetails)
+                .ThenInclude(od => od.Product)
+                    .ThenInclude(p => p.Seller)
             .ToListAsync();
 
-        var sellerGroups = shipments
-            .Where(s => s.OrderDetail.Product != null)
-            .GroupBy(s => s.OrderDetail.Product.SellerId);
-
-        foreach (var group in sellerGroups)
+        foreach (var shipment in shipments)
         {
-            var seller = group.First().OrderDetail.Product.Seller;
+            // Lấy seller từ order detail đầu tiên (vì shipment theo seller)
+            var seller = shipment.OrderDetails.First().Product.Seller;
             var address = order.ShippingAddress;
-            var orderDetailsInGroup = group.Select(s => s.OrderDetail).ToList();
+            var orderDetailsInGroup = shipment.OrderDetails.ToList();
 
             var ghnOrderRequest = BuildGhnOrderRequestFromOrderDetails(orderDetailsInGroup, seller, address);
 
             var ghnCreateResponse = await _ghnShippingService.CreateOrderAsync(ghnOrderRequest);
 
-            foreach (var shipment in group)
-            {
-                UpdateShipmentWithGhnResponse(shipment, ghnCreateResponse);
-                await _unitOfWork.Shipments.Update(shipment);
-            }
+            UpdateShipmentWithGhnResponse(shipment, ghnCreateResponse);
+            await _unitOfWork.Shipments.Update(shipment);
         }
 
         await _unitOfWork.SaveChangesAsync();
@@ -329,36 +332,32 @@ public class TransactionService : ITransactionService
         //    .Include(od => od.Seller)
         //    .ToListAsync();
 
+
         // 2) Build map: OrderDetailId → List<Shipment>
         var shipmentsByDetail = orderDetails
             .Where(od => od.Shipments != null && od.Shipments.Any())
             .ToDictionary(
                 od => od.Id,
-                od => od.Shipments!
-                    .Select(s => new { s.Id, s.Status, SellerId = s.OrderDetail.SellerId })
-                    .ToList()
+                od => od.Shipments!.ToList()
             );
 
         // 3) Tạo từng InventoryItem
         var createdCount = 0;
         foreach (var od in orderDetails.Where(od => od.ProductId.HasValue))
         {
-            shipmentsByDetail.TryGetValue(od.Id, out var shipmentInfos);
-            _logger.Info($"[CreateInventory] OrderDetail {od.Id} có {shipmentInfos?.Count ?? 0} shipment.");
+            shipmentsByDetail.TryGetValue(od.Id, out var shipmentList);
+            _logger.Info($"[CreateInventory] OrderDetail {od.Id} có {shipmentList?.Count ?? 0} shipment.");
 
             for (var i = 0; i < od.Quantity; i++)
             {
                 Guid? shipmentId = null;
                 var status = InventoryItemStatus.Available;
 
-                if (shipmentInfos != null && shipmentInfos.Count > 0)
+                if (shipmentList != null && shipmentList.Count > 0)
                 {
-                    var selectedShipment = shipmentInfos.Count == 1
-                        ? shipmentInfos[0]
-                        : shipmentInfos.FirstOrDefault(si => si.SellerId == od.SellerId) ?? shipmentInfos[0];
-
+                    // Lấy shipment đầu tiên (vì mỗi order detail chỉ có 1 shipment trong 1 lần checkout)
+                    var selectedShipment = shipmentList[0];
                     shipmentId = selectedShipment.Id;
-                    // Gắn trạng thái dựa trên shipment thực tế
                     status = selectedShipment.Status == ShipmentStatus.PROCESSING
                         ? InventoryItemStatus.Delivering
                         : InventoryItemStatus.Available;
