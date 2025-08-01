@@ -8,7 +8,7 @@ namespace BlindTreasure.Application.Interfaces;
 public interface IListingService
 {
     Task<ListingDetailDto> CreateListingAsync(CreateListingRequestDto dto);
-    Task<ListingDetailDto> GetByIdAsync(Guid listingId);
+    Task<ListingDetailDto> GetListingByIdAsync(Guid listingId);
     Task<List<InventoryItemDto>> GetAvailableItemsForListingAsync();
     Task<Pagination<ListingDetailDto>> GetAllListingsAsync(ListingQueryParameter param);
     Task ReportListingAsync(Guid listingId, string reason);

@@ -4,7 +4,6 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain.DTOs.ChatDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -15,23 +14,27 @@ using Moq;
 
 namespace BlindTreaure.UnitTest.Services;
 
+/// <summary>
+/// 
+/// </summary>
 public class ChatMessageServiceTests
 {
     private readonly ChatMessageService _chatMessageService;
     private readonly Mock<ICacheService> _cacheServiceMock;
-    private readonly Mock<IClaimsService> _claimsServiceMock;
     private readonly Mock<IHubContext<ChatHub>> _hubContextMock;
-    private readonly Mock<ILoggerService> _loggerServiceMock;
     private readonly Mock<IGenericRepository<ChatMessage>> _chatMessageRepoMock;
     private readonly Mock<IGenericRepository<User>> _userRepoMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
 
+    /// <summary>
+    /// 
+    /// </summary>
     public ChatMessageServiceTests()
     {
         _cacheServiceMock = new Mock<ICacheService>();
-        _claimsServiceMock = new Mock<IClaimsService>();
+        var claimsServiceMock = new Mock<IClaimsService>();
         _hubContextMock = new Mock<IHubContext<ChatHub>>();
-        _loggerServiceMock = new Mock<ILoggerService>();
+        var loggerServiceMock = new Mock<ILoggerService>();
         _chatMessageRepoMock = new Mock<IGenericRepository<ChatMessage>>();
         _userRepoMock = new Mock<IGenericRepository<User>>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
@@ -47,8 +50,8 @@ public class ChatMessageServiceTests
 
         _chatMessageService = new ChatMessageService(
             _cacheServiceMock.Object,
-            _claimsServiceMock.Object,
-            _loggerServiceMock.Object,
+            claimsServiceMock.Object,
+            loggerServiceMock.Object,
             _unitOfWorkMock.Object,
             _hubContextMock.Object
         );

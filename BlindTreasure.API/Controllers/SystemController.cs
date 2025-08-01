@@ -307,6 +307,130 @@ public class SystemController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Seed vào bảng CartItem một product và một blind box ngẫu nhiên cho một user.
+    /// </summary>
+    /// <param name="userId">ID của user cần seed cart items. Nếu không truyền sẽ mặc định là user trangiaphuc362003181@gmail.com</param>
+    /// <returns>Thông tin các items đã được thêm vào giỏ hàng</returns>
+    [HttpPost("dev/seed-user-cart-items")]
+    public async Task<IActionResult> SeedUserCartItems([FromQuery] Guid? userId = null)
+    {
+        try
+        {
+            _logger.Info("[SeedUserCartItems] Bắt đầu seed cart items cho user.");
+            User? user;
+
+            if (userId.HasValue)
+            {
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserCartItems] Không tìm thấy user với Id: {userId}");
+                    return NotFound($"Không tìm thấy user với Id: {userId}");
+                }
+
+                _logger.Info($"[SeedUserCartItems] Bắt đầu seed cart items cho user Id: {userId}");
+            }
+            else
+            {
+                var email = "trangiaphuc362003181@gmail.com";
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserCartItems] Không tìm thấy user với email: {email}");
+                    return NotFound($"Không tìm thấy user với email: {email}");
+                }
+
+                _logger.Info($"[SeedUserCartItems] Bắt đầu seed cart items cho user: {email}");
+            }
+
+            // Remove existing cart items for the user to avoid duplicates
+            var existingCartItems = _context.CartItems.Where(ci => ci.UserId == user.Id);
+            if (await existingCartItems.AnyAsync())
+            {
+                _context.CartItems.RemoveRange(existingCartItems);
+                await _context.SaveChangesAsync();
+                _logger.Info($"[SeedUserCartItems] Đã xóa cart items cũ của user {user.Email}.");
+            }
+
+            // Lấy 1 product ngẫu nhiên
+            var randomProduct = await _context.Products
+                .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 &&
+                            p.ProductType == ProductSaleType.DirectSale && !p.IsDeleted)
+                .OrderBy(p => Guid.NewGuid())
+                .FirstOrDefaultAsync();
+
+            if (randomProduct == null)
+            {
+                _logger.Warn("[SeedUserCartItems] Không tìm thấy product nào hợp lệ để thêm vào giỏ hàng.");
+                return BadRequest("Không có sản phẩm nào hợp lệ để seed.");
+            }
+
+            _logger.Info($"[SeedUserCartItems] Đã chọn product: {randomProduct.Name}");
+
+            // Lấy 1 blind box ngẫu nhiên
+            var randomBlindBox = await _context.BlindBoxes
+                .Where(b => b.Status == BlindBoxStatus.Approved && b.TotalQuantity > 0 && !b.IsDeleted)
+                .OrderBy(b => Guid.NewGuid())
+                .FirstOrDefaultAsync();
+
+            if (randomBlindBox == null)
+            {
+                _logger.Warn("[SeedUserCartItems] Không tìm thấy blind box nào hợp lệ để thêm vào giỏ hàng.");
+                return BadRequest("Không có blind box nào hợp lệ để seed.");
+            }
+
+            _logger.Info($"[SeedUserCartItems] Đã chọn blind box: {randomBlindBox.Name}");
+
+            var cartItems = new List<CartItem>();
+
+            // Tạo cart item cho product
+            var productCartItem = new CartItem
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                ProductId = randomProduct.Id,
+                BlindBoxId = null,
+                Quantity = 1,
+                UnitPrice = randomProduct.Price,
+                TotalPrice = randomProduct.Price * 1,
+                AddedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+            cartItems.Add(productCartItem);
+
+            // Tạo cart item cho blind box
+            var blindBoxCartItem = new CartItem
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                ProductId = null,
+                BlindBoxId = randomBlindBox.Id,
+                Quantity = 1,
+                UnitPrice = randomBlindBox.Price,
+                TotalPrice = randomBlindBox.Price * 1,
+                AddedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+            cartItems.Add(blindBoxCartItem);
+
+            await _context.CartItems.AddRangeAsync(cartItems);
+            await _context.SaveChangesAsync();
+
+            _logger.Success($"[SeedUserCartItems] Seed thành công {cartItems.Count} items vào giỏ hàng của user {user.Email}.");
+
+            return Ok(ApiResult<object>.Success("200",
+                $"Đã seed {cartItems.Count} items vào giỏ hàng của user {user.Email}."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            _logger.Error($"[SeedUserCartItems] Exception: {ex.Message}");
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
     [HttpDelete("clear-caching")]
     public async Task<IActionResult> ClearCaching()
     {
