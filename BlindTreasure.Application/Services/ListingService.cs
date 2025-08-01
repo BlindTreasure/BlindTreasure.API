@@ -1,7 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.ListingDTOs;
 using BlindTreasure.Domain.Entities;
@@ -14,23 +13,36 @@ namespace BlindTreasure.Application.Services;
 
 public class ListingService : IListingService
 {
+    private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
     private readonly IUnitOfWork _unitOfWork;
 
-
     public ListingService(IClaimsService claimsService, ILoggerService logger,
-        IMapperService mapper, IUnitOfWork unitOfWork)
+        IMapperService mapper, IUnitOfWork unitOfWork, ICacheService cacheService)
     {
         _claimsService = claimsService;
         _logger = logger;
         _mapper = mapper;
         _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
     }
 
-    public async Task<ListingDetailDto> GetByIdAsync(Guid id)
+    public async Task<ListingDetailDto> GetListingByIdAsync(Guid id)
     {
+        var cacheKey = CacheKeyManager.GetListingDetailKey(id);
+
+        // Kiểm tra cache trước
+        var cachedListing = await _cacheService.GetAsync<ListingDetailDto>(cacheKey);
+        if (cachedListing != null)
+        {
+            _logger.Info($"[GetByIdAsync] Đã lấy listing từ cache: {id}");
+            return cachedListing;
+        }
+
+        _logger.Info($"[GetByIdAsync] Cache miss cho listing: {id}, đang truy vấn database");
+
         var listing = await _unitOfWork.Listings
             .GetQueryable()
             .Include(l => l.InventoryItem)
@@ -42,13 +54,21 @@ public class ListingService : IListingService
         if (listing == null)
             throw ErrorHelper.NotFound("Listing không tồn tại.");
 
-        return MapListingToDto(listing);
+        var result = MapListingToDto(listing);
+
+        // Lưu vào cache
+        await _cacheService.SetAsync(cacheKey, result, CacheKeyManager.LISTING_CACHE_DURATION);
+        _logger.Info($"[GetByIdAsync] Đã lưu listing {id} vào cache");
+
+        return result;
     }
 
     public async Task<Pagination<ListingDetailDto>> GetAllListingsAsync(ListingQueryParameter param)
     {
+        var currentUserId = _claimsService.CurrentUserId;
+
         _logger.Info(
-            $"[GetAllListingsAsync] Page: {param.PageIndex}, Size: {param.PageSize}, Status: {param.Status}, IsFree: {param.IsFree}, IsOwnerListings: {param.IsOwnerListings}, UserId: {param.UserId}");
+            $"[GetAllListingsAsync] Page: {param.PageIndex}, Size: {param.PageSize}, Status: {param.Status}, IsFree: {param.IsFree}, IsOwnerListings: {param.IsOwnerListings}, UserId: {param.UserId}, CurrentUserId: {currentUserId}");
 
         var query = _unitOfWork.Listings.GetQueryable()
             .Include(l => l.InventoryItem)
@@ -56,6 +76,13 @@ public class ListingService : IListingService
             .Include(l => l.InventoryItem.User)
             .Where(l => !l.IsDeleted)
             .AsNoTracking();
+
+        // Mặc định loại trừ listings của current user, trừ khi param.IsOwnerListings = true
+        if (!(param.IsOwnerListings.HasValue && param.IsOwnerListings.Value))
+        {
+            query = query.Where(l => l.InventoryItem.UserId != currentUserId);
+            _logger.Info($"[GetAllListingsAsync] Đã loại trừ listings của current user: {currentUserId}");
+        }
 
         // Áp dụng các filter
         query = ApplyFilters(query, param);
@@ -69,12 +96,26 @@ public class ListingService : IListingService
 
         var listingDtos = listings.Select(MapListingToDto).ToList();
 
+        _logger.Info($"[GetAllListingsAsync] Đã tìm thấy {count} listings phù hợp với filter");
+
         return new Pagination<ListingDetailDto>(listingDtos, count, param.PageIndex, param.PageSize);
     }
 
     public async Task<List<InventoryItemDto>> GetAvailableItemsForListingAsync()
     {
         var userId = _claimsService.CurrentUserId;
+        var cacheKey = CacheKeyManager.GetAvailableItemsKey(userId);
+
+        // Kiểm tra cache trước
+        var cachedItems = await _cacheService.GetAsync<List<InventoryItemDto>>(cacheKey);
+        if (cachedItems != null)
+        {
+            _logger.Info(
+                $"[GetAvailableItemsForListingAsync] Đã lấy vật phẩm có thể listing từ cache cho user: {userId}");
+            return cachedItems;
+        }
+
+        _logger.Info($"[GetAvailableItemsForListingAsync] Cache miss cho user: {userId}, đang truy vấn database");
 
         var items = await _unitOfWork.InventoryItems.GetAllAsync(
             x => x.UserId == userId &&
@@ -86,7 +127,7 @@ public class ListingService : IListingService
             i => i.Listings
         );
 
-        return items.Select(item =>
+        var result = items.Select(item =>
         {
             var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
             dto.Id = item.Id;
@@ -101,6 +142,13 @@ public class ListingService : IListingService
 
             return dto;
         }).ToList();
+
+        // Lưu vào cache
+        await _cacheService.SetAsync(cacheKey, result, CacheKeyManager.AVAILABLE_ITEMS_CACHE_DURATION);
+        _logger.Info(
+            $"[GetAvailableItemsForListingAsync] Đã lưu danh sách vật phẩm có thể listing vào cache cho user: {userId}");
+
+        return result;
     }
 
     public async Task<ListingDetailDto> CreateListingAsync(CreateListingRequestDto dto)
@@ -139,8 +187,12 @@ public class ListingService : IListingService
         await _unitOfWork.Listings.AddAsync(listing);
         await _unitOfWork.SaveChangesAsync();
 
+        // Xóa cache liên quan
+        await InvalidateListingRelatedCacheAsync(userId);
+        _logger.Info("[CreateListingAsync] Đã xóa cache liên quan sau khi tạo listing mới");
+
         // Sử dụng GetByIdAsync để đảm bảo dữ liệu đồng nhất
-        var createdListing = await GetByIdAsync(listing.Id);
+        var createdListing = await GetListingByIdAsync(listing.Id);
 
         return createdListing;
     }
@@ -162,7 +214,12 @@ public class ListingService : IListingService
         listing.Status = ListingStatus.Sold;
         await _unitOfWork.Listings.Update(listing);
         await _unitOfWork.SaveChangesAsync();
-        return await GetByIdAsync(listingId);
+
+        // Xóa cache liên quan đến listing này
+        await InvalidateListingCacheAsync(listingId, userId);
+        _logger.Info($"[CloseListingAsync] Đã xóa cache cho listing {listingId} sau khi đóng");
+
+        return await GetListingByIdAsync(listingId);
     }
 
     public async Task ReportListingAsync(Guid listingId, string reason)
@@ -183,7 +240,76 @@ public class ListingService : IListingService
         await _unitOfWork.SaveChangesAsync();
     }
 
+    #region Caching
+
+    private class CacheKeyManager
+    {
+        // Cache keys
+        public const string ALL_LISTINGS_CACHE_KEY = "listings:all:{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}";
+        public const string LISTING_DETAIL_CACHE_KEY = "listing:detail:{0}";
+        public const string AVAILABLE_ITEMS_CACHE_KEY = "listings:available-items:{0}";
+
+        // Cache durations
+        public static readonly TimeSpan LISTING_CACHE_DURATION = TimeSpan.FromMinutes(15);
+        public static readonly TimeSpan AVAILABLE_ITEMS_CACHE_DURATION = TimeSpan.FromMinutes(10);
+
+        // Generate specific cache keys
+        public static string GetListingDetailKey(Guid listingId)
+        {
+            return string.Format(LISTING_DETAIL_CACHE_KEY, listingId);
+        }
+
+        public static string GetAvailableItemsKey(Guid userId)
+        {
+            return string.Format(AVAILABLE_ITEMS_CACHE_KEY, userId);
+        }
+
+        public static string GetAllListingsKey(ListingQueryParameter param)
+        {
+            return string.Format(ALL_LISTINGS_CACHE_KEY,
+                param.PageIndex,
+                param.PageSize,
+                param.Status?.ToString() ?? "null",
+                param.IsFree?.ToString() ?? "null",
+                param.IsOwnerListings?.ToString() ?? "null",
+                param.UserId?.ToString() ?? "null",
+                param.SearchByName ?? "null",
+                param.CategoryId?.ToString() ?? "null");
+        }
+    }
+
+    #endregion
+
     #region Private Methods
+
+    /// <summary>
+    ///     Xóa cache cho một listing cụ thể và danh sách listing của người dùng
+    /// </summary>
+    private async Task InvalidateListingCacheAsync(Guid listingId, Guid userId)
+    {
+        // Xóa cache chi tiết của listing
+        var detailCacheKey = CacheKeyManager.GetListingDetailKey(listingId);
+        await _cacheService.RemoveAsync(detailCacheKey);
+        _logger.Info($"[InvalidateListingCacheAsync] Đã xóa cache chi tiết cho listing {listingId}");
+
+        // Xóa cache vật phẩm có thể listing của user
+        await InvalidateListingRelatedCacheAsync(userId);
+    }
+
+    /// <summary>
+    ///     Xóa tất cả cache liên quan đến listings và vật phẩm có thể listing
+    /// </summary>
+    private async Task InvalidateListingRelatedCacheAsync(Guid userId)
+    {
+        // Xóa cache danh sách listings
+        await _cacheService.RemoveByPatternAsync("listings:all:*");
+        _logger.Info("[InvalidateListingRelatedCacheAsync] Đã xóa cache danh sách listings");
+
+        // Xóa cache vật phẩm có thể listing của user
+        var availableItemsCacheKey = CacheKeyManager.GetAvailableItemsKey(userId);
+        await _cacheService.RemoveAsync(availableItemsCacheKey);
+        _logger.Info($"[InvalidateListingRelatedCacheAsync] Đã xóa cache vật phẩm có thể listing cho user {userId}");
+    }
 
     private IQueryable<Listing> ApplyFilters(IQueryable<Listing> query, ListingQueryParameter param)
     {

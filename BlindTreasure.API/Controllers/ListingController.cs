@@ -51,7 +51,7 @@ public class ListingController : ControllerBase
     {
         try
         {
-            var result = await _listingService.GetByIdAsync(listingId);
+            var result = await _listingService.GetListingByIdAsync(listingId);
             return Ok(ApiResult<object>.Success(result, "200",
                 "Lấy chi tiết listing thành công."));
         }

@@ -231,6 +231,7 @@ public class CartItemService : ICartItemService
 
     public async Task UpdateCartAfterCheckoutAsync(Guid userId, List<CheckoutItem> checkoutItems)
     {
+        var changesMade = false;
         foreach (var item in checkoutItems)
         {
             // Tìm cart item theo user, productId, blindBoxId
@@ -255,9 +256,13 @@ public class CartItemService : ICartItemService
                 }
 
                 await _unitOfWork.CartItems.Update(cartItem);
+                changesMade = true;
             }
         }
 
-        await _unitOfWork.SaveChangesAsync();
+        if (changesMade)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
     }
 }
