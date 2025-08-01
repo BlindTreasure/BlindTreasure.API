@@ -93,6 +93,10 @@ public class CartItemService : ICartItemService
     public async Task<CartDto> AddToCartAsync(AddCartItemDto dto)
     {
         var userId = _claimsService.CurrentUserId;
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null || user.IsDeleted)
+            throw ErrorHelper.Forbidden(ErrorMessages.AccountNotFound);
+
         if (dto.Quantity <= 0)
             throw ErrorHelper.BadRequest(ErrorMessages.CartItemQuantityMustBeGreaterThanZero);
 
