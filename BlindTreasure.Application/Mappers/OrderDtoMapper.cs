@@ -65,7 +65,8 @@ public static class OrderDtoMapper
                     ? ToOrderAddressDto(order.ShippingAddress)
                     : null,
                 Details = order.OrderDetails?.Select(ToOrderDetailDto).ToList() ?? new List<OrderDetailDto>(),
-                Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null
+                Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
+                TotalShippingFee = order.TotalShippingFee ?? 0
             };
         }
         catch (Exception ex)
@@ -90,7 +91,7 @@ public static class OrderDtoMapper
             UnitPrice = od.UnitPrice,
             TotalPrice = od.TotalPrice,
             Status = od.Status,
-            Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>()
+           // Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>()
         };
     }
 

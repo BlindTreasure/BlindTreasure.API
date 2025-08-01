@@ -22,7 +22,7 @@ public static class ShipmentDtoMapper
         return new ShipmentDto
         {
             Id = shipment.Id,
-            OrderDetailId = shipment.OrderDetailId,
+            //OrderDetail = shipment.,
             OrderCode = shipment.OrderCode,
             TotalFee = shipment.TotalFee,
             MainServiceFee = shipment.MainServiceFee,
@@ -44,8 +44,8 @@ public static class ShipmentDtoMapper
         var result = ToShipmentDto(shipment);
         result.InventoryItems = shipment.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ??
                                 new List<InventoryItemDto>();
-        result.OrderDetail = OrderDtoMapper.ToOrderDetailDto(shipment.OrderDetail);
-
+        result.OrderDetails = shipment.OrderDetails?.Select(OrderDtoMapper.ToOrderDetailDto).ToList() ??
+                                new List<OrderDetailDto>();
 
         return result;
     }

@@ -4,9 +4,8 @@ namespace BlindTreasure.Domain.Entities;
 
 public class Shipment : BaseEntity
 {
-    // FK → OrderDetail
-    public Guid? OrderDetailId { get; set; }
-    public OrderDetail? OrderDetail { get; set; }
+    // Many → OrderDetail
+    public ICollection<OrderDetail>? OrderDetails { get; set; } = new List<OrderDetail>();
 
     //các field cho GHN 
     public string? OrderCode { get; set; } // Mã đơn hàng của GHN    

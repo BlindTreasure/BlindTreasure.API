@@ -555,12 +555,12 @@ public class BlindTreasureDbContext : DbContext
             .WithMany(u => u.Addresses)
             .HasForeignKey(a => a.UserId);
 
-        // Shipment ↔ OrderDetail (n-1)
-        modelBuilder.Entity<Shipment>()
-            .HasOne(s => s.OrderDetail)
-            .WithMany(od => od.Shipments)
-            .HasForeignKey(s => s.OrderDetailId)
-            .OnDelete(DeleteBehavior.Cascade); // This will delete Shipments when OrderDetail is deleted
+        //// Shipment ↔ OrderDetail (n-1)
+        //modelBuilder.Entity<Shipment>()
+        //    .HasOne(s => s.OrderDetail)
+        //    .WithMany(od => od.Shipments)
+        //    .HasForeignKey(s => s.OrderDetailId)
+        //    .OnDelete(DeleteBehavior.Cascade); // This will delete Shipments when OrderDetail is deleted
 
         // Review ↔ User / Product / BlindBox (n-1), set null
         modelBuilder.Entity<Review>()
@@ -651,5 +651,10 @@ public class BlindTreasureDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(50);
         });
+
+        modelBuilder.Entity<OrderDetail>()
+    .HasMany(od => od.Shipments)
+    .WithMany(s => s.OrderDetails)
+    .UsingEntity(j => j.ToTable("OrderDetailShipments"));
     }
 }
