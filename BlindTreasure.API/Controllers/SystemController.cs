@@ -444,6 +444,8 @@ public class SystemController : ControllerBase
             await _cacheService.RemoveByPatternAsync("gemini:");
             await _cacheService.RemoveByPatternAsync("address:");
             await _cacheService.RemoveByPatternAsync("inventoryitem:");
+            await _cacheService.RemoveByPatternAsync("listings:");
+            await _cacheService.RemoveByPatternAsync("listing:");
             await _cacheService.RemoveByPatternAsync("Promotion:");
 
 
