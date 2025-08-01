@@ -56,29 +56,45 @@ public class TransactionService : ITransactionService
         if (shipmentIds == null || !shipmentIds.Any())
             throw ErrorHelper.BadRequest("Danh sách shipmentId rỗng.");
 
+        // 1. Lấy shipment và inventory item liên quan, đã include OrderDetail và InventoryItems
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT).Include(x => x.OrderDetail).ThenInclude(od => od.InventoryItems)
+            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT)
+            .Include(s => s.InventoryItems)
+                .ThenInclude(ii => ii.OrderDetail)
+                    .ThenInclude(od => od.InventoryItems)
             .ToListAsync();
 
+        // 2. Tập hợp các OrderDetail cần cập nhật
+        var orderDetailsToUpdate = new HashSet<OrderDetail>();
+
+        // 3. Cập nhật trạng thái InventoryItem và collect OrderDetail
         foreach (var shipment in shipments)
         {
-            if (shipment.OrderDetail != null)
+            foreach (var item in shipment.InventoryItems)
             {
-                // Cập nhật trạng thái OrderDetail
-                OrderDtoMapper.UpdateOrderDetailStatusAndLogs(shipment.OrderDetail);
-                await _unitOfWork.OrderDetails.Update(shipment.OrderDetail);
-            }
-            else
-            {
-                _logger.Warn(
-                    $"[HandleSuccessfulShipmentPaymentAsync] Không tìm thấy OrderDetail cho Shipment {shipment.Id}.");
-                shipment.Status = ShipmentStatus.PROCESSING;
-                shipment.ShippedAt = DateTime.UtcNow;
-                await _unitOfWork.Shipments.Update(shipment);
+                item.Status = InventoryItemStatus.Delivering;
+                item.ShipmentId = shipment.Id;
+                await _unitOfWork.InventoryItems.Update(item);
+
+                if (item.OrderDetail != null)
+                    orderDetailsToUpdate.Add(item.OrderDetail);
             }
 
-            await _unitOfWork.SaveChangesAsync();
+            shipment.Status = ShipmentStatus.PROCESSING;
+            shipment.ShippedAt = DateTime.UtcNow;
+            await _unitOfWork.Shipments.Update(shipment);
         }
+
+        // 4. Cập nhật trạng thái và log cho từng OrderDetail (dùng method static)
+        foreach (var orderDetail in orderDetailsToUpdate)
+        {
+            // Đảm bảo InventoryItems đã được include và trạng thái mới nhất
+            // Nếu cần, có thể reload lại từ DB, nhưng nếu đã include thì không cần
+            OrderDtoMapper.UpdateOrderDetailStatusAndLogs(orderDetail);
+            await _unitOfWork.OrderDetails.Update(orderDetail);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
     }
 
     /// <summary>
@@ -189,31 +205,34 @@ public class TransactionService : ITransactionService
 
     private async Task CreateGhnOrdersAndUpdateShipments(Order order, List<OrderDetail> orderDetails)
     {
+        // Lấy tất cả shipment của các order detail liên quan, status WAITING_PAYMENT
+        var shipmentIds = orderDetails
+            .SelectMany(od => od.Shipments)
+            .Where(s => s.Status == ShipmentStatus.WAITING_PAYMENT)
+            .Select(s => s.Id)
+            .Distinct()
+            .ToList();
+
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => orderDetails.Select(od => od.Id).Contains(s.OrderDetailId.Value) &&
-                        s.Status == ShipmentStatus.WAITING_PAYMENT)
-            .Include(s => s.OrderDetail).ThenInclude(od => od.Product).ThenInclude(p => p.Seller)
+            .Where(s => shipmentIds.Contains(s.Id))
+            .Include(s => s.OrderDetails)
+                .ThenInclude(od => od.Product)
+                    .ThenInclude(p => p.Seller)
             .ToListAsync();
 
-        var sellerGroups = shipments
-            .Where(s => s.OrderDetail.Product != null)
-            .GroupBy(s => s.OrderDetail.Product.SellerId);
-
-        foreach (var group in sellerGroups)
+        foreach (var shipment in shipments)
         {
-            var seller = group.First().OrderDetail.Product.Seller;
+            // Lấy seller từ order detail đầu tiên (vì shipment theo seller)
+            var seller = shipment.OrderDetails.First().Product.Seller;
             var address = order.ShippingAddress;
-            var orderDetailsInGroup = group.Select(s => s.OrderDetail).ToList();
+            var orderDetailsInGroup = shipment.OrderDetails.ToList();
 
             var ghnOrderRequest = BuildGhnOrderRequestFromOrderDetails(orderDetailsInGroup, seller, address);
 
             var ghnCreateResponse = await _ghnShippingService.CreateOrderAsync(ghnOrderRequest);
 
-            foreach (var shipment in group)
-            {
-                UpdateShipmentWithGhnResponse(shipment, ghnCreateResponse);
-                await _unitOfWork.Shipments.Update(shipment);
-            }
+            UpdateShipmentWithGhnResponse(shipment, ghnCreateResponse);
+            await _unitOfWork.Shipments.Update(shipment);
         }
 
         await _unitOfWork.SaveChangesAsync();
@@ -313,36 +332,32 @@ public class TransactionService : ITransactionService
         //    .Include(od => od.Seller)
         //    .ToListAsync();
 
+
         // 2) Build map: OrderDetailId → List<Shipment>
         var shipmentsByDetail = orderDetails
             .Where(od => od.Shipments != null && od.Shipments.Any())
             .ToDictionary(
                 od => od.Id,
-                od => od.Shipments!
-                    .Select(s => new { s.Id, s.Status, SellerId = s.OrderDetail.SellerId })
-                    .ToList()
+                od => od.Shipments!.ToList()
             );
 
         // 3) Tạo từng InventoryItem
         var createdCount = 0;
         foreach (var od in orderDetails.Where(od => od.ProductId.HasValue))
         {
-            shipmentsByDetail.TryGetValue(od.Id, out var shipmentInfos);
-            _logger.Info($"[CreateInventory] OrderDetail {od.Id} có {shipmentInfos?.Count ?? 0} shipment.");
+            shipmentsByDetail.TryGetValue(od.Id, out var shipmentList);
+            _logger.Info($"[CreateInventory] OrderDetail {od.Id} có {shipmentList?.Count ?? 0} shipment.");
 
             for (var i = 0; i < od.Quantity; i++)
             {
                 Guid? shipmentId = null;
                 var status = InventoryItemStatus.Available;
 
-                if (shipmentInfos != null && shipmentInfos.Count > 0)
+                if (shipmentList != null && shipmentList.Count > 0)
                 {
-                    var selectedShipment = shipmentInfos.Count == 1
-                        ? shipmentInfos[0]
-                        : shipmentInfos.FirstOrDefault(si => si.SellerId == od.SellerId) ?? shipmentInfos[0];
-
+                    // Lấy shipment đầu tiên (vì mỗi order detail chỉ có 1 shipment trong 1 lần checkout)
+                    var selectedShipment = shipmentList[0];
                     shipmentId = selectedShipment.Id;
-                    // Gắn trạng thái dựa trên shipment thực tế
                     status = selectedShipment.Status == ShipmentStatus.PROCESSING
                         ? InventoryItemStatus.Delivering
                         : InventoryItemStatus.Available;

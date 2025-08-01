@@ -184,7 +184,7 @@ public class OrderService : IOrderService
             ? await query.ToListAsync()
             : await query.Skip((param.PageIndex - 1) * param.PageSize).Take(param.PageSize).ToListAsync();
 
-        var dtos = orderDetails.Select(OrderDtoMapper.ToOrderDetailDto).ToList();
+        var dtos = orderDetails.Select(OrderDtoMapper.ToOrderDetailDtoFullIncluded).ToList();
         return new Pagination<OrderDetailDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
 
@@ -228,7 +228,7 @@ public class OrderService : IOrderService
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
-            //    .Include(o => o.ShippingAddress)
+                .Include(o => o.ShippingAddress)
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
             .AsNoTracking();
 
@@ -538,8 +538,6 @@ public class OrderService : IOrderService
                 // Tạo 1 shipment cho cả group
                 var shipment = new Shipment
                 {
-                    // Có thể chọn gắn với orderId hoặc để OrderDetailId = null, hoặc gắn với order detail đầu tiên
-                    OrderDetailId = null, // hoặc grp.First().Id nếu cần
                     Provider = "GHN",
                     OrderCode = ghnResp?.OrderCode ?? string.Empty,
                     TotalFee = (int?)(ghnResp?.TotalFee) ?? 0,
@@ -555,7 +553,7 @@ public class OrderService : IOrderService
                 foreach (var od in grp)
                 {
                     od.Status = OrderDetailItemStatus.PENDING;
-                    od.Shipments.Add(shipment);
+                    od.Shipments.Add(shipment); // Many-to-many
                     await _unitOfWork.OrderDetails.Update(od);
                 }
             }
