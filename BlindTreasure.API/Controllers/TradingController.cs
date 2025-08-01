@@ -73,7 +73,7 @@ public class TradingController : ControllerBase
         try
         {
             var result = await _tradingService.RespondTradeRequestAsync(tradeRequestId, isAccepted);
-            return Ok(ApiResult<object>.Success(new { result }, "200", "Cập nhật trade request thành công."));
+            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", "Cập nhật trade request thành công."));
         }
         catch (Exception ex)
         {
@@ -112,7 +112,7 @@ public class TradingController : ControllerBase
         try
         {
             var result = await _tradingService.LockDealAsync(tradeRequestId);
-            return Ok(ApiResult<object>.Success(new { result }, "200", "Giao dịch đã được khóa thành công."));
+            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", "Giao dịch đã được khóa thành công."));
         }
         catch (Exception ex)
         {
