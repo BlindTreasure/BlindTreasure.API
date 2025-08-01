@@ -11,6 +11,7 @@ using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Text.RegularExpressions;
 
 namespace BlindTreasure.Application.Services;
 
@@ -52,15 +53,15 @@ public class OrderService : IOrderService
     {
         _loggerService.Info("Start checkout from system cart.");
         var cart = await _cartItemService.GetCurrentUserCartAsync();
-        if (cart.Items == null || !cart.Items.Any())
+        if (cart.SellerItems == null || !cart.SellerItems.Any())
         {
             _loggerService.Warn("Cart is empty.");
             throw ErrorHelper.BadRequest(ErrorMessages.OrderCartEmpty);
         }
 
         // Lọc product vật lý
-        var hasProduct = cart.Items.Any(i => i.ProductId.HasValue);
-        var hasBlindBox = cart.Items.Any(i => i.BlindBoxId.HasValue);
+        var hasProduct = cart.SellerItems.Any(s => s.Items.Any(i => i.ProductId.HasValue));
+        var hasBlindBox = cart.SellerItems.Any(s => s.Items.Any(i => i.BlindBoxId.HasValue));
 
         Guid? shippingAddressId = null;
         if (dto.IsShip == true)
@@ -84,73 +85,70 @@ public class OrderService : IOrderService
             shippingAddressId = address.Id;
         }
 
-        var result = await CheckoutCore(
-            cart.Items.Select(i => new CheckoutItem
+        // Gộp lại thành list item
+        var groups = cart.SellerItems
+        .Select(s => new SellerCheckoutGroup
+        {
+            SellerId = s.SellerId,
+            PromotionId = s.PromotionId,
+            Items = s.Items.Select(i => new CheckoutItem
             {
+                SellerId = s.SellerId,
                 ProductId = i.ProductId,
-                ProductName = i.ProductName,
                 BlindBoxId = i.BlindBoxId,
-                BlindBoxName = i.BlindBoxName,
                 Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice,
-                TotalPrice = i.TotalPrice
-            }),
-            shippingAddressId
-        );
+                UnitPrice = i.UnitPrice
+            }).ToList()
+        })
+        .ToList();
+
         _loggerService.Success("Checkout from system cart completed.");
-        return result;
+
+        return await CheckoutCore(groups, shippingAddressId);
     }
 
     public async Task<string> CheckoutFromClientCartAsync(DirectCartCheckoutDto cartDto)
     {
-        _loggerService.Info("Start checkout from client cart.");
-        if (cartDto == null || cartDto.Items == null || !cartDto.Items.Any())
-        {
-            _loggerService.Warn("Client cart is invalid or empty.");
-            throw ErrorHelper.BadRequest(ErrorMessages.OrderClientCartInvalid);
-        }
+        _loggerService.Info("Start checkout from client cart (new format).");
 
-        // Lọc product vật lý
-        var hasProduct = cartDto.Items.Any(i => i.ProductId.HasValue);
-        var hasBlindBox = cartDto.Items.Any(i => i.BlindBoxId.HasValue);
+        if (cartDto == null || cartDto.SellerItems == null || !cartDto.SellerItems.Any())
+            throw ErrorHelper.BadRequest(ErrorMessages.OrderClientCartInvalid);
 
         Guid? shippingAddressId = null;
         if (cartDto.IsShip == true)
         {
+            var hasProduct = cartDto.SellerItems.Any(s => s.Items.Any(i => i.ProductId.HasValue));
             if (!hasProduct)
-            {
-                _loggerService.Warn("Cart only contains BlindBox, cannot ship.");
-                throw ErrorHelper.BadRequest("Không thể giao hàng: Giỏ hàng không có sản phẩm vật lý nào để ship.");
-            }
+                throw ErrorHelper.BadRequest("Không thể giao hàng: Không có sản phẩm vật lý nào.");
 
             var userId = _claimsService.CurrentUserId;
             var address = await _unitOfWork.Addresses.GetQueryable()
                 .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
                 .FirstOrDefaultAsync();
             if (address == null)
-            {
-                _loggerService.Warn("Default shipping address not found.");
                 throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
-            }
-
             shippingAddressId = address.Id;
         }
 
-        var result = await CheckoutCore(
-            cartDto.Items.Select(i => new CheckoutItem
+        // Gộp lại thành list item
+        // Build groups
+        var groups = cartDto.SellerItems
+            .Select(s => new SellerCheckoutGroup
             {
-                ProductId = i.ProductId,
-                ProductName = i.ProductName,
-                BlindBoxId = i.BlindBoxId,
-                BlindBoxName = i.BlindBoxName,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice,
-                TotalPrice = i.TotalPrice,
-                PromotionId = i.PromotionId // Thêm PromotionId nếu có
-            }),
-            shippingAddressId
-        );
-        _loggerService.Success("Checkout from client cart completed.");
+                SellerId = s.SellerId,
+                PromotionId = s.PromotionId,
+                Items = s.Items.Select(i => new CheckoutItem
+                {
+                    SellerId = s.SellerId,
+                    ProductId = i.ProductId,
+                    BlindBoxId = i.BlindBoxId,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice
+                }).ToList()
+            })
+            .ToList();
+
+        var result = await CheckoutCore(groups, shippingAddressId);
         return result;
     }
 
@@ -375,105 +373,64 @@ public class OrderService : IOrderService
             Width = ghnOrderItems.Max(i => i.Width),
             Height = ghnOrderItems.Max(i => i.Height),
             Weight = ghnOrderItems.Sum(i => i.Weight),
-            InsuranceValue = ghnOrderItems.Sum(i => i.Price * i.Quantity),
+            InsuranceValue = ghnOrderItems.Sum(i => i.Price * i.Quantity) <= 5000000 ? ghnOrderItems.Sum(i => i.Price * i.Quantity) : 5000000,
             ServiceTypeId = 2,
             Items = ghnOrderItems.ToArray()
         };
     }
 
     private async Task<string> CheckoutCore(
-        IEnumerable<CheckoutItem> items,
-        Guid? shippingAddressId)
+    List<SellerCheckoutGroup> groups,
+    Guid? shippingAddressId)
     {
         _loggerService.Info("Start core checkout logic.");
+
+        // 1. Validate user
         var userId = _claimsService.CurrentUserId;
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null || user.IsDeleted)
-        {
-            _loggerService.Warn("User not found or deleted.");
             throw ErrorHelper.Forbidden(ErrorMessages.AccountNotFound);
-        }
 
-        var itemList = items.ToList();
-        if (!itemList.Any())
-        {
-            _loggerService.Warn("Cart is empty or invalid.");
+        // 2. Validate cart
+        if (groups == null || !groups.Any(g => g.Items?.Any() == true))
             throw ErrorHelper.BadRequest(ErrorMessages.OrderCartEmptyOrInvalid);
-        }
 
-        // Nếu có yêu cầu ship nhưng không có product vật lý nào
-        if (shippingAddressId.HasValue && !itemList.Any(i => i.ProductId.HasValue))
-        {
-            _loggerService.Warn("Cart only contains BlindBox, cannot ship.");
-            throw ErrorHelper.BadRequest("Không thể giao hàng: Giỏ hàng không có sản phẩm vật lý nào để ship.");
-        }
+        // 3. Validate shipping requirement
+        var hasPhysical = groups.SelectMany(g => g.Items).Any(i => i.ProductId.HasValue);
+        if (shippingAddressId.HasValue && !hasPhysical)
+            throw ErrorHelper.BadRequest("Cannot ship: no physical products in cart.");
 
         Address? shippingAddress = null;
         if (shippingAddressId.HasValue)
         {
             shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(shippingAddressId.Value);
             if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != userId)
-            {
-                _loggerService.Warn("Shipping address invalid.");
                 throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
-            }
         }
 
-        var productIds = itemList.Where(i => i.ProductId.HasValue)
-            .Select(i => i.ProductId.Value)
-            .Distinct()
-            .ToList();
+        // 4. Preload products and blindboxes
+        var productIds = groups.SelectMany(g => g.Items)
+            .Where(i => i.ProductId.HasValue)
+            .Select(i => i.ProductId!.Value)
+            .Distinct();
+        var blindBoxIds = groups.SelectMany(g => g.Items)
+            .Where(i => i.BlindBoxId.HasValue)
+            .Select(i => i.BlindBoxId!.Value)
+            .Distinct();
+
         var products = await _unitOfWork.Products.GetQueryable()
-            .Where(p => productIds.Contains(p.Id))
+            .Where(p => productIds.Contains(p.Id) && !p.IsDeleted)
             .Include(p => p.Seller)
             .ToListAsync();
+        var blindBoxes = await _unitOfWork.BlindBoxes.GetQueryable()
+            .Where(b => blindBoxIds.Contains(b.Id) && !b.IsDeleted)
+            .Include(b => b.Seller)
+            .ToListAsync();
 
-        foreach (var item in itemList)
-            if (item.ProductId.HasValue)
-            {
-                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
-                if (product == null || product.IsDeleted)
-                {
-                    _loggerService.Warn($"Product {item.ProductId} not found or deleted.");
-                    throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderProductNotFound, item.ProductName));
-                }
+        var prodById = products.ToDictionary(p => p.Id);
+        var boxById = blindBoxes.ToDictionary(b => b.Id);
 
-                if (product.Stock < item.Quantity)
-                {
-                    _loggerService.Warn($"Product {item.ProductId} out of stock.");
-                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderProductOutOfStock, item.ProductName));
-                }
-
-                if (product.Status != ProductStatus.Active)
-                {
-                    _loggerService.Warn($"Product {item.ProductId} not for sale.");
-                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderProductNotForSale, item.ProductName));
-                }
-            }
-            else if (item.BlindBoxId.HasValue)
-            {
-                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value);
-                if (blindBox == null || blindBox.IsDeleted)
-                {
-                    _loggerService.Warn($"BlindBox {item.BlindBoxId} not found or deleted.");
-                    throw ErrorHelper.NotFound(string.Format(ErrorMessages.OrderBlindBoxNotFound, item.BlindBoxName));
-                }
-
-                if (blindBox.Status != BlindBoxStatus.Approved)
-                {
-                    _loggerService.Warn($"BlindBox {item.BlindBoxId} not approved.");
-                    throw ErrorHelper.BadRequest(string.Format(ErrorMessages.OrderBlindBoxNotApproved,
-                        item.BlindBoxName));
-                }
-
-                if (blindBox.TotalQuantity < item.Quantity)
-                {
-                    _loggerService.Warn($"BlindBox {item.BlindBoxId} out of stock.");
-                    throw ErrorHelper.BadRequest(
-                        string.Format(ErrorMessages.OrderBlindBoxOutOfStock, item.BlindBoxName));
-                }
-            }
-
+        // 5. Create order
         var order = new Order
         {
             UserId = userId,
@@ -485,181 +442,135 @@ public class OrderService : IOrderService
             OrderSellerPromotions = new List<OrderSellerPromotion>()
         };
 
-        var orderDetails = new List<OrderDetail>();
-        foreach (var item in itemList)
+        // 6. Build details and reserve stock
+        foreach (var group in groups)
         {
-            var orderDetail = new OrderDetail
+            foreach (var item in group.Items)
             {
-                Id = Guid.NewGuid(),
-                OrderId = order.Id,
-                ProductId = item.ProductId,
-                BlindBoxId = item.BlindBoxId,
-                Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
-                TotalPrice = item.TotalPrice,
-                Status = OrderDetailItemStatus.PENDING,
-                CreatedAt = DateTime.UtcNow
-            };
-            // Ghi log khởi tạo
-            orderDetail.Logs = $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Created: PENDING, Quantity: {item.Quantity}, UnitPrice: {item.UnitPrice}, TotalPrice: {item.TotalPrice}";
-
-
-            if (orderDetail.TotalPrice != item.Quantity * item.UnitPrice)
-            {
-                _loggerService.Warn($"Total price mismatch for item {item.ProductName ?? item.BlindBoxName}.");
-                throw ErrorHelper.BadRequest("Tổng tiền không khớp với số lượng và đơn giá.");
-            }
-
-            order.OrderDetails.Add(orderDetail);
-            orderDetails.Add(orderDetail);
-
-            if (item.ProductId.HasValue)
-            {
-                var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value, x => x.Seller);
-                product.Stock -= item.Quantity;
-                await _unitOfWork.Products.Update(product);
-                orderDetail.SellerId = product.SellerId;
-                orderDetail.Logs += $"\n This is Product {product.Name} stock updated: {product.Stock} remaining.";
-            }
-            else if (item.BlindBoxId.HasValue)
-            {
-                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(item.BlindBoxId.Value, x => x.Seller);
-                blindBox.TotalQuantity -= item.Quantity;
-                if (blindBox.TotalQuantity <= 0 && blindBox.Status == BlindBoxStatus.Approved)
+                decimal unitPrice;
+                string itemName;
+                if (item.ProductId.HasValue)
                 {
-                    blindBox.Status = BlindBoxStatus.Rejected;
-                    _loggerService.Info($"BlindBox {blindBox.Id} is now out of stock and set to Rejected.");
+                    var p = prodById[item.ProductId.Value];
+                    if (p.Status != ProductStatus.Active || p.Stock < item.Quantity)
+                        throw ErrorHelper.BadRequest($"Product {p.Name} invalid or out of stock.");
+                    unitPrice = p.Price;
+                    itemName = p.Name;
+                    p.Stock -= item.Quantity;
+                    await _unitOfWork.Products.Update(p);
+                }
+                else
+                {
+                    var b = boxById[item.BlindBoxId!.Value];
+                    if (b.Status != BlindBoxStatus.Approved || b.TotalQuantity < item.Quantity)
+                        throw ErrorHelper.BadRequest($"BlindBox {b.Name} invalid or out of stock.");
+                    unitPrice = b.Price;
+                    itemName = b.Name;
+                    b.TotalQuantity -= item.Quantity;
+                    await _unitOfWork.BlindBoxes.Update(b);
                 }
 
-                await _unitOfWork.BlindBoxes.Update(blindBox);
-                orderDetail.SellerId = blindBox.SellerId;
-                orderDetail.Logs += $"\n This is BlindBox {blindBox.Name} stock updated: {blindBox.TotalQuantity} remaining.";
+                var detail = new OrderDetail
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    ProductId = item.ProductId,
+                    BlindBoxId = item.BlindBoxId,
+                    Quantity = item.Quantity,
+                    UnitPrice = unitPrice,
+                    TotalPrice = unitPrice * item.Quantity,
+                    SellerId = group.SellerId,
+                    Status = OrderDetailItemStatus.PENDING,
+                    CreatedAt = DateTime.UtcNow,
+                    Logs = $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Created {itemName}, Qty={item.Quantity}"
+                };
+                order.OrderDetails.Add(detail);
             }
-
-            // Ghi log tạo mới
-        }
-
-        var sellerPromos = itemList
-            .Where(i => i.PromotionId.HasValue)
-            .GroupBy(i => new
-                { Seller = products.First(p => p.Id == i.ProductId).SellerId, Promo = i.PromotionId.Value })
-            .Select(g => new { g.Key.Seller, g.Key.Promo })
-            .ToList();
-
-        foreach (var sp in sellerPromos)
-        {
-            var promo = await _unitOfWork.Promotions.GetByIdAsync(sp.Promo);
-            if (promo == null || promo.Status != PromotionStatus.Approved)
-                throw ErrorHelper.BadRequest("Invalid promotion");
-
-            var subTotal = order.OrderDetails
-                .Where(od => od.SellerId == sp.Seller)
-                .Sum(od => od.TotalPrice);
-
-            var discount = promo.DiscountType == DiscountType.Percentage
-                ? Math.Round(subTotal * promo.DiscountValue / 100m, 2)
-                : promo.DiscountValue;
-            discount = Math.Min(discount, subTotal);
-
-            var osp = new OrderSellerPromotion
+            // 7. Apply promotion
+            if (group.PromotionId.HasValue)
             {
-                Order = order,
-                SellerId = sp.Seller,
-                Promotion = promo,
-                DiscountAmount = discount,
-                Note = $"Applied {promo.Code}, -{discount:N0}"
-            };
-            order.OrderSellerPromotions.Add(osp);
-
-            promo.UsageLimit = (promo.UsageLimit ?? 0) - 1;
-            await _unitOfWork.Promotions.Update(promo);
+                var promo = await _unitOfWork.Promotions.GetByIdAsync(group.PromotionId.Value);
+                if (promo == null || promo.Status != PromotionStatus.Approved)
+                    throw ErrorHelper.BadRequest("Invalid promotion");
+                var subTotal = order.OrderDetails.Where(d => d.SellerId == group.SellerId).Sum(d => d.TotalPrice);
+                var discount = promo.DiscountType == DiscountType.Percentage
+                    ? Math.Round(subTotal * promo.DiscountValue / 100m, 2)
+                    : promo.DiscountValue;
+                discount = Math.Min(discount, subTotal);
+                order.OrderSellerPromotions.Add(new OrderSellerPromotion
+                {
+                    Order = order,
+                    SellerId = group.SellerId,
+                    Promotion = promo,
+                    DiscountAmount = discount,
+                    Note = $"Applied {promo.Code}"
+                });
+                promo.UsageLimit = (promo.UsageLimit ?? 0) - 1;
+                await _unitOfWork.Promotions.Update(promo);
+            }
         }
 
-        order.TotalAmount = order.OrderDetails.Sum(od => od.TotalPrice);
-        order.FinalAmount = order.TotalAmount - order.OrderSellerPromotions.Sum(osp => osp.DiscountAmount);
+        // 8. Totals before shipment
+        order.TotalAmount = order.OrderDetails.Sum(d => d.TotalPrice);
+        order.FinalAmount = order.TotalAmount - order.OrderSellerPromotions.Sum(p => p.DiscountAmount);
         if (order.FinalAmount < 0)
-        {
-            _loggerService.Warn("Final amount cannot be negative, resetting to zero.");
-            throw ErrorHelper.BadRequest("Tổng tiền không thể âm, vui lòng kiểm tra lại code.");
-        }
+            throw ErrorHelper.BadRequest("Final amount cannot be negative.");
 
+        // 9. Save order and details
         order = await _unitOfWork.Orders.AddAsync(order);
         await _unitOfWork.SaveChangesAsync();
 
+        // 10. Shipments grouped by seller
         if (shippingAddress != null)
         {
-            var orderDetailIds = orderDetails.Select(od => od.Id).ToList();
-            var orderDetailsWithProduct = await _unitOfWork.OrderDetails.GetQueryable()
-                .Where(od => orderDetailIds.Contains(od.Id))
-                .Include(od => od.Product).ThenInclude(p => p.Category)
-                .Include(od => od.Product).ThenInclude(p => p.Seller)
-                .ToListAsync();
-
-            var sellerGroups = orderDetailsWithProduct
-                .Where(od => od.ProductId.HasValue && od.Product != null)
-                .GroupBy(od => od.Product.SellerId);
-
-            foreach (var group in sellerGroups)
+            order.TotalShippingFee = 0m;
+            var grouped = order.OrderDetails.Where(d => d.ProductId.HasValue).GroupBy(d => d.SellerId);
+            foreach (var grp in grouped)
             {
-                var seller = group.First().Product.Seller;
-                if (seller == null) continue;
+                var seller = grp.First().Product!.Seller;
+                var ghnResp = await _ghnShippingService.PreviewOrderAsync(
+                    BuildGhnOrderRequest(grp, seller, shippingAddress, od => od.Product!, od => od.Quantity));
+                var fee = ghnResp?.TotalFee ?? 0m;
+                order.TotalShippingFee += fee;
+                order.FinalAmount += fee;
+                _loggerService.Info($"GHN shipment for seller {seller.Id}, fee={fee}");
 
-                var ghnOrderRequest = BuildGhnOrderRequest(
-                    group,
-                    seller,
-                    shippingAddress,
-                    od => od.Product,
-                    od => od.Quantity
-                );
-
-                var ghnCreateResponse =
-                    await _ghnShippingService
-                        .PreviewOrderAsync(
-                            ghnOrderRequest); // sửa thành chính thức sang preview vì đây là tạo yêu cầu thanh toán
-
-                order.TotalAmount += ghnCreateResponse?.TotalFee ?? 0;
-                _loggerService.Info(
-                    $"Created GHN shipment for seller {seller.Id}, fee: {ghnCreateResponse?.TotalFee ?? 0}");
-
-                foreach (var od in group)
+                // Tạo 1 shipment cho cả group
+                var shipment = new Shipment
                 {
-                    var shipment = new Shipment
-                    {
-                        OrderDetailId = od.Id,
-                        Provider = "GHN",
-                        OrderCode = ghnCreateResponse?.OrderCode,
-                        TotalFee = ghnCreateResponse?.TotalFee != null
-                            ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value)
-                            : 0,
-                        MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0),
-                        TrackingNumber = ghnCreateResponse?.OrderCode ?? "",
-                        ShippedAt = DateTime.UtcNow,
-                        EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
-                            ? ghnCreateResponse.ExpectedDeliveryTime
-                            : DateTime.UtcNow.AddDays(3),
-                        Status = ShipmentStatus.WAITING_PAYMENT // chưa thanh toán, chờ xác nhận
-                    };
-                    await _unitOfWork.Shipments.AddAsync(shipment);
-                    order.FinalAmount = order.TotalAmount - order.OrderSellerPromotions.Sum(osp => osp.DiscountAmount);
-                    od.Status = OrderDetailItemStatus.PENDING;
-                    od.Logs += $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Shipment created: {shipment.Id}, status: {shipment.Status}, fee: {shipment.TotalFee}";
-                    od.Shipments.Add(shipment);
-                    _loggerService.Info($"Shipment created for OrderDetail {od.Id} with GHN.");
+                    // Có thể chọn gắn với orderId hoặc để OrderDetailId = null, hoặc gắn với order detail đầu tiên
+                    OrderDetailId = null, // hoặc grp.First().Id nếu cần
+                    Provider = "GHN",
+                    OrderCode = ghnResp?.OrderCode ?? string.Empty,
+                    TotalFee = (int?)(ghnResp?.TotalFee) ?? 0,
+                    MainServiceFee = (int?)(ghnResp?.Fee?.MainService) ?? 0,
+                    TrackingNumber = ghnResp?.OrderCode ?? string.Empty,
+                    ShippedAt = DateTime.UtcNow,
+                    EstimatedDelivery = ghnResp?.ExpectedDeliveryTime ?? DateTime.UtcNow.AddDays(3),
+                    Status = ShipmentStatus.WAITING_PAYMENT
+                };
+                await _unitOfWork.Shipments.AddAsync(shipment);
 
+                // Gắn shipment này vào tất cả các order detail vật lý của seller
+                foreach (var od in grp)
+                {
+                    od.Status = OrderDetailItemStatus.PENDING;
+                    od.Shipments.Add(shipment);
                     await _unitOfWork.OrderDetails.Update(od);
                 }
             }
-
+            await _unitOfWork.Orders.Update(order);
             await _unitOfWork.SaveChangesAsync();
         }
 
-        await _cartItemService.UpdateCartAfterCheckoutAsync(userId, itemList);
-        _loggerService.Info("Cart updated after checkout.");
+        // 11. Cleanup and return
         await _cacheService.RemoveByPatternAsync($"order:user:{userId}:*");
-        _loggerService.Info("Order cache cleared after checkout.");
-        _loggerService.Success($"Order checkout success for user {userId}.");
-        return await _stripeService.CreateCheckoutSession(order.Id);
+        _loggerService.Success($"Checkout success for user {userId}.");
+        var sessionUrl = await _stripeService.CreateCheckoutSession(order.Id);
+        await _cartItemService.UpdateCartAfterCheckoutAsync(userId, groups.SelectMany(g => g.Items).ToList());
+        return sessionUrl;
     }
+
 
     public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(List<DirectCartItemDto> items,
         bool? IsPreview = false)
@@ -735,14 +646,18 @@ public class OrderService : IOrderService
 
     public struct CheckoutItem
     {
+        public Guid SellerId { get; set; }
         public Guid? ProductId { get; set; }
-        public string? ProductName { get; set; }
         public Guid? BlindBoxId { get; set; }
-        public string? BlindBoxName { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
-        public decimal TotalPrice { get; set; }
-        public Guid? SellerId { get; set; } // Thêm SellerId nếu cần
-        public Guid? PromotionId { get; set; } // Thêm PromotionId nếu cần
+        public decimal TotalPrice => UnitPrice * Quantity;
+    }
+
+    public class SellerCheckoutGroup
+    {
+        public Guid SellerId { get; set; }
+        public Guid? PromotionId { get; set; }
+        public List<CheckoutItem> Items { get; set; } = new();
     }
 }
