@@ -39,10 +39,10 @@ public class SystemController : ControllerBase
 
             // Seed data
             await SeedRolesAndUsers();
-
             await SeedCategories();
             await SeedProducts();
             await SeedBlindBoxes();
+            await SmiskiBlindBoxes();
             await SeedPromotions();
             await SeedPromotionParticipants();
             return Ok(ApiResult<object>.Success(new
@@ -693,6 +693,13 @@ public class SystemController : ControllerBase
                 Description = "Mẫu đồ chơi sưu tầm dòng Baby Three.",
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
+            },
+            new()
+            {
+                Name = "Smiski",
+                Description = "Mẫu đồ chơi sưu tầm dòng Smiski.",
+                ParentId = collectibleToys.Id,
+                CreatedAt = now
             }
         };
 
@@ -944,8 +951,130 @@ public class SystemController : ControllerBase
                     });
                     break;
 
-                default:
-                    _logger.Warn($"Chưa có dữ liệu mẫu cho category {category.Name}, bỏ qua tạo sản phẩm.");
+                case "Smiski":
+                    products.AddRange(new[]
+                    {
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "SMISKI Blowing Bubbles",
+                            Description = "Hãy cùng chìm đắm trong một thế giới mộng mơ với SMISKI Blowing Bubbles. Phiên bản này khắc họa hình ảnh SMISKI đang tập trung thổi những quả bong bóng xà phòng lấp lánh, mỗi quả bóng như chứa đựng một ước mơ nhỏ bé bay lên. Với vẻ mặt ngây thơ và hành động đáng yêu, SMISKI không chỉ là một vật trang trí mà còn là nguồn cảm hứng cho những khoảnh khắc thư giãn, mang lại cảm giác bình yên và một chút phép màu cho không gian sống của bạn. Đặt SMISKI ở góc làm việc hay đầu giường, và để những 'quả bóng mơ ước' này nhắc nhở bạn về niềm vui trong những điều giản dị.",
+                            CategoryId = category.Id,
+                            SellerId = seller.Id,
+                            Price = 299000,
+                            Stock = 40,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/e/wp-content/uploads/2025/02/img_product_sunday01.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.DirectSale,
+                            Height = 9
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "SMISKI Paper Airplane",
+                            Description = "Cùng SMISKI Paper Airplane nuôi dưỡng những giấc mơ bay cao, bay xa. Hình ảnh SMISKI cẩn thận cầm trên tay chiếc máy bay giấy, ánh mắt hướng về một chân trời vô định, thể hiện cho khát khao khám phá và chinh phục những vùng đất mới. Đây không chỉ là một món đồ chơi, mà là biểu tượng của lòng dũng cảm, của những hoài bão tuổi trẻ và niềm tin vào một tương lai rộng mở. Hãy để SMISKI Paper Airplane trên bàn làm việc của bạn như một lời nhắc nhở rằng không có giấc mơ nào là quá lớn và không có hành trình nào là không thể.",
+                            CategoryId = category.Id,
+                            SellerId = seller.Id,
+                            Price = 255000,
+                            Stock = 25,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/e/wp-content/uploads/2025/02/img_product_sunday02.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "Fabric",
+                            ProductType = ProductSaleType.DirectSale,
+                            Height = 15
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "SMISKI Sunbathing",
+                            Description = "Tận hưởng sự bình yên tuyệt đối cùng SMISKI Sunbathing. Trong một buổi chiều nắng đẹp, SMISKI nằm dài thư giãn, trên bụng là một chú mèo nhỏ đang say ngủ, tạo nên một bức tranh hoàn hảo về tình bạn và sự tin tưởng. Vẻ mặt mãn nguyện của SMISKI và sự yên bình của khung cảnh sẽ giúp bạn tạm gác lại những lo toan, bộn bề của cuộc sống. Sản phẩm này là một lời nhắn nhủ ngọt ngào, rằng hạnh phúc đôi khi chỉ đơn giản là được ở bên cạnh người mình yêu thương, cùng nhau tận hưởng những giây phút tĩnh lặng.",
+                            CategoryId = category.Id,
+                            SellerId = seller.Id,
+                            Price = 319000,
+                            Stock = 10,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/e/wp-content/uploads/2025/02/img_product_sunday03.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.DirectSale,
+                            Height = 11
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "SMISKI Sing-Along",
+                            Description = "Lắng nghe giai điệu của tâm hồn cùng SMISKI Sing-Along. Với cây đàn guitar trên tay, SMISKI say sưa trong thế giới âm nhạc của riêng mình, mỗi nốt nhạc vang lên là một cảm xúc, một câu chuyện được kể. Bức tượng này không chỉ dành cho những người yêu âm nhạc, mà còn dành cho những ai tìm kiếm sự đồng điệu và niềm vui trong cô đơn. SMISKI Sing-Along sẽ là người bạn tâm giao thầm lặng, cùng bạn chia sẻ mọi khoảnh khắc, biến những góc nhỏ trong nhà bạn thành một sân khấu của cảm xúc và sự sáng tạo.",
+                            CategoryId = category.Id,
+                            SellerId = seller.Id,
+                            Price = 275000,
+                            Stock = 70,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/e/wp-content/uploads/2025/02/img_product_sunday04.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.DirectSale,
+                            Height = 30
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "SMISKI Skateboarding",
+                            Description = "Giải phóng năng lượng và cá tính của bạn cùng SMISKI Skateboarding. SMISKI xuất hiện với vẻ ngoài cực ngầu trên chiếc ván trượt, sẵn sàng cho những cú lướt điệu nghệ trên mọi địa hình. Đây là hình ảnh đại diện cho tuổi trẻ, sự năng động và tinh thần không ngại thử thách. Dù bạn là một skater hay chỉ đơn giản là người yêu thích sự tự do, SMISKI Skateboarding chắc chắn sẽ truyền cảm hứng để bạn sống hết mình, phá vỡ mọi giới hạn và tự tin thể hiện phong cách riêng.",
+                            CategoryId = category.Id,
+                            SellerId = seller.Id,
+                            Price = 319000,
+                            Stock = 10,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/e/wp-content/uploads/2025/02/img_product_sunday05.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.DirectSale,
+                            Height = 11
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "SMISKI Gardening",
+                            Description = "Khám phá niềm vui từ việc chăm sóc và nuôi dưỡng sự sống với SMISKI Gardening. Với bình tưới trên tay, SMISKI chăm chú tưới nước cho một mầm cây nhỏ, biểu tượng của sự khởi đầu và hy vọng. Điều thú vị và hài hước nhất là một mầm xanh cũng đang nhú lên từ chính đỉnh đầu của SMISKI, như một phần thưởng cho tình yêu thiên nhiên của nó. Sản phẩm này là món quà tuyệt vời cho những người yêu cây cối, mang lại thông điệp về sự kiên nhẫn và niềm hạnh phúc khi thấy công sức của mình đơm hoa kết trái.",
+                            CategoryId = category.Id,
+                            SellerId = seller.Id,
+                            Price = 275000,
+                            Stock = 70,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/e/wp-content/uploads/2025/02/img_product_sunday06.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.DirectSale,
+                            Height = 30
+                        }
+                    });
                     break;
             }
 
@@ -1210,6 +1339,204 @@ public class SystemController : ControllerBase
 
             _logger.Success($"[SeedBlindBoxes] Đã seed blind box cho category {category.Name} thành công.");
         }
+    }
+
+    private async Task SmiskiBlindBoxes()
+    {
+        var now = DateTime.UtcNow;
+        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
+        if (sellerUser == null)
+        {
+            _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo blind box.");
+            return;
+        }
+
+        var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == sellerUser.Id);
+        if (seller == null)
+        {
+            _logger.Error("User này chưa có Seller tương ứng.");
+            return;
+        }
+
+        // Lấy category Smiski
+        var smiskiCategory = await _context.Categories
+            .FirstOrDefaultAsync(c => c.Name == "Smiski" && !c.IsDeleted);
+
+        if (smiskiCategory == null)
+        {
+            _logger.Warn("[SmiskiBlindBoxes] Không tìm thấy category 'Smiski' để tạo blind box.");
+            return;
+        }
+    
+        // Check if the blind box already exists
+        if (await _context.BlindBoxes.AnyAsync(b => b.Name == "SMISKI Series1")) {
+            _logger.Info("[SmiskiBlindBoxes] Blind box 'SMISKI Series1' đã tồn tại. Bỏ qua seed.");
+            return;
+        }
+
+        // Tạo mới 6 sản phẩm cho blind box, ProductSaleType là BlindBoxOnly
+        var blindBoxProducts = new List<Product>
+        {
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "SMISKI Series1 - Smiski Hugging Knees",
+                Description = "Luôn ẩn mình trong một góc nhỏ, SMISKI lặng lẽ ôm lấy đầu gối, đôi mắt mơ màng nhìn xa xăm, chìm đắm trong những suy tư miên man. Hình ảnh này gợi lên một cảm giác yên bình, một chút cô đơn nhưng đầy chất thơ, như một người bạn nhỏ đang cùng bạn chia sẻ những khoảnh khắc tĩnh lặng của tâm hồn.",
+                CategoryId = smiskiCategory.Id,
+                SellerId = seller.Id,
+                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_01.png" },
+                Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "SMISKI Series1 - Smiski Sitting",
+                Description = "Bạn sẽ thường bắt gặp SMISKI này ngồi một mình trong im lặng, ánh mắt tập trung nhìn xuống một vật gì đó vô định. Với tính cách có phần cảnh giác và hướng nội, nó yêu thích không gian riêng tư, nơi nó có thể chìm vào thế giới của riêng mình mà không bị làm phiền. Một hình ảnh đầy bí ẩn và cuốn hút, dành cho những ai trân trọng khoảnh khắc được ở một mình.",
+                CategoryId = smiskiCategory.Id,
+                SellerId = seller.Id,
+                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_02.png" },
+                Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "SMISKI Series1 - Smiski Looking Back",
+                Description = "Đây là một SMISKI nhút nhát và dễ giật mình. Mỗi khi bạn vô tình phát hiện ra, nó sẽ lập tức quay lại, đôi mắt mở to nhìn bạn đầy ngạc nhiên và có chút bối rối. Khoảnh khắc đáng yêu này sẽ khiến bạn bất giác mỉm cười, như vừa khám phá ra một bí mật nhỏ bé và ngộ nghĩnh trong căn phòng của mình.",
+                CategoryId = smiskiCategory.Id,
+                SellerId = seller.Id,
+                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_03.png" },
+                Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "SMISKI Series1 - Smiski Lounging",
+                Description = "Gặp gỡ SMISKI lười biếng nhất hội! Nó chỉ thích nằm dài thư giãn ở bất cứ đâu, từ trên bàn làm việc cho đến kệ sách. Với nó, không có gì tuyệt vời hơn là được nghỉ ngơi và chẳng phải làm gì cả. Mọi hoạt động liên quan đến di chuyển hay vận động đều nằm ngoài từ điển của SMISKI này. Hãy để nó mang lại cho bạn một lời nhắc nhở nhẹ nhàng về việc tận hưởng những phút giây không làm gì.",
+                CategoryId = smiskiCategory.Id,
+                SellerId = seller.Id,
+                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_04.png" },
+                Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "SMISKI Series1 - Smiski Hiding",
+                Description = "Trốn tìm chính là biệt tài của SMISKI này. Nó là một bậc thầy trong việc tìm kiếm những nơi ẩn náu độc đáo, từ kẽ hở nhỏ nhất cho đến phía sau một chậu cây. Nó cảm thấy an toàn và thoải mái nhất khi được cuộn mình trong những không gian nhỏ hẹp. Sở hữu SMISKI này, bạn sẽ có một trò chơi trốn tìm nho nhỏ mỗi ngày trong chính căn phòng của mình.",
+                CategoryId = smiskiCategory.Id,
+                SellerId = seller.Id,
+                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_05.png" },
+                Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Name = "SMISKI Series1 - Smiski Peeking",
+                Description = "Luôn trong tư thế khom người, SMISKI này rụt rè hé nhìn mọi thứ từ một góc an toàn. Nó có vẻ tò mò về thế giới xung quanh nhưng lại cần rất nhiều can đảm để thực sự tiến lại gần. Một hình ảnh vừa ngộ nghĩnh vừa đáng yêu, thể hiện sự tò mò nhưng đầy e dè, như một đứa trẻ đang khám phá thế giới rộng lớn.",
+                CategoryId = smiskiCategory.Id,
+                SellerId = seller.Id,
+                Price = 500000, Stock = 20, Status = ProductStatus.Active, CreatedAt = now,
+                ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_06.png" },
+                Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
+            }
+        };
+
+        await _context.Products.AddRangeAsync(blindBoxProducts);
+        await _context.SaveChangesAsync();
+    
+        // Rarity cấu hình cho từng item (chuẩn theo enum RarityName)
+        var rarityArr = new[]
+        {
+            new { Rarity = RarityName.Common, Weight = 40, Quantity = 10 },
+            new { Rarity = RarityName.Rare, Weight = 25, Quantity = 8 },
+            new { Rarity = RarityName.Rare, Weight = 10, Quantity = 8 },
+            new { Rarity = RarityName.Epic, Weight = 10, Quantity = 5 },
+            new { Rarity = RarityName.Epic, Weight = 10, Quantity = 4 },
+            new { Rarity = RarityName.Secret, Weight = 5, Quantity = 2 }
+        };
+    
+        var totalWeightQty = rarityArr.Sum(x => x.Quantity * x.Weight);
+    
+        var blindBox = new BlindBox
+        {
+            Id = Guid.NewGuid(),
+            SellerId = seller.Id,
+            CategoryId = smiskiCategory.Id,
+            Name = "SMISKI Series1",
+            Description = "Blind box SMISKI Series1, a collection of small creatures that love hiding in corners.",
+            Price = 350000,
+            TotalQuantity = 30,
+            HasSecretItem = true,
+            SecretProbability = 5,
+            Status = BlindBoxStatus.Approved,
+            ImageUrl = "https://smiski.com/wp-content/uploads/2016/03/series1_img.png",
+            ReleaseDate = now,
+            CreatedAt = now
+        };
+    
+        var blindBoxItems = new List<BlindBoxItem>();
+        var rarityConfigs = new List<RarityConfig>();
+
+        for (var i = 0; i < 6; i++)
+        {
+            var r = rarityArr[i];
+            var product = blindBoxProducts[i];
+
+            var dropRate = Math.Round((decimal)(r.Quantity * r.Weight) / totalWeightQty * 100m, 2);
+            var itemId = Guid.NewGuid();
+
+            blindBoxItems.Add(new BlindBoxItem
+            {
+                Id = itemId,
+                BlindBoxId = blindBox.Id,
+                ProductId = product.Id,
+                Quantity = r.Quantity,
+                DropRate = dropRate,
+                IsSecret = r.Rarity == RarityName.Secret,
+                IsActive = true,
+                CreatedAt = now
+            });
+
+            rarityConfigs.Add(new RarityConfig
+            {
+                Id = Guid.NewGuid(),
+                BlindBoxItemId = itemId,
+                Name = r.Rarity,
+                Weight = r.Weight,
+                IsSecret = r.Rarity == RarityName.Secret,
+                CreatedAt = now
+            });
+        }
+
+        await _context.BlindBoxes.AddAsync(blindBox);
+        await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
+        await _context.RarityConfigs.AddRangeAsync(rarityConfigs);
+        await _context.SaveChangesAsync();
+    
+        // Sau khi SaveChanges xong BlindBox và BlindBoxItems:
+        foreach (var item in blindBoxItems)
+        {
+            var probCfg = new ProbabilityConfig
+            {
+                Id = Guid.NewGuid(),
+                BlindBoxItemId = item.Id,
+                Probability = item.DropRate,
+                EffectiveFrom = now,
+                EffectiveTo = now.AddYears(1), // đảm bảo NOW nằm trong range này
+                ApprovedBy = sellerUser.Id, // hoặc Id của user staff test (nếu có)
+                ApprovedAt = now,
+                CreatedAt = now
+            };
+            await _context.ProbabilityConfigs.AddAsync(probCfg);
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.Success("[SmiskiBlindBoxes] Đã seed blind box cho SMISKI Series1 thành công.");
     }
 
     private async Task SeedCounterStrikeCases()
