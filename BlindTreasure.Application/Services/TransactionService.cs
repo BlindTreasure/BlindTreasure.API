@@ -56,29 +56,45 @@ public class TransactionService : ITransactionService
         if (shipmentIds == null || !shipmentIds.Any())
             throw ErrorHelper.BadRequest("Danh sách shipmentId rỗng.");
 
+        // 1. Lấy shipment và inventory item liên quan, đã include OrderDetail và InventoryItems
         var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT).Include(x => x.OrderDetail).ThenInclude(od => od.InventoryItems)
+            .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT)
+            .Include(s => s.InventoryItems)
+                .ThenInclude(ii => ii.OrderDetail)
+                    .ThenInclude(od => od.InventoryItems)
             .ToListAsync();
 
+        // 2. Tập hợp các OrderDetail cần cập nhật
+        var orderDetailsToUpdate = new HashSet<OrderDetail>();
+
+        // 3. Cập nhật trạng thái InventoryItem và collect OrderDetail
         foreach (var shipment in shipments)
         {
-            if (shipment.OrderDetail != null)
+            foreach (var item in shipment.InventoryItems)
             {
-                // Cập nhật trạng thái OrderDetail
-                OrderDtoMapper.UpdateOrderDetailStatusAndLogs(shipment.OrderDetail);
-                await _unitOfWork.OrderDetails.Update(shipment.OrderDetail);
-            }
-            else
-            {
-                _logger.Warn(
-                    $"[HandleSuccessfulShipmentPaymentAsync] Không tìm thấy OrderDetail cho Shipment {shipment.Id}.");
-                shipment.Status = ShipmentStatus.PROCESSING;
-                shipment.ShippedAt = DateTime.UtcNow;
-                await _unitOfWork.Shipments.Update(shipment);
+                item.Status = InventoryItemStatus.Delivering;
+                item.ShipmentId = shipment.Id;
+                await _unitOfWork.InventoryItems.Update(item);
+
+                if (item.OrderDetail != null)
+                    orderDetailsToUpdate.Add(item.OrderDetail);
             }
 
-            await _unitOfWork.SaveChangesAsync();
+            shipment.Status = ShipmentStatus.PROCESSING;
+            shipment.ShippedAt = DateTime.UtcNow;
+            await _unitOfWork.Shipments.Update(shipment);
         }
+
+        // 4. Cập nhật trạng thái và log cho từng OrderDetail (dùng method static)
+        foreach (var orderDetail in orderDetailsToUpdate)
+        {
+            // Đảm bảo InventoryItems đã được include và trạng thái mới nhất
+            // Nếu cần, có thể reload lại từ DB, nhưng nếu đã include thì không cần
+            OrderDtoMapper.UpdateOrderDetailStatusAndLogs(orderDetail);
+            await _unitOfWork.OrderDetails.Update(orderDetail);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
     }
 
     /// <summary>
