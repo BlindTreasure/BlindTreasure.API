@@ -277,15 +277,10 @@ public class TradingService : ITradingService
             t => t.OfferedItems,
             t => t.Requester!);
 
-        if (tradeRequest == null)
-        {
-            throw ErrorHelper.NotFound("Trade request không tồn tại.");
-        }
+        if (tradeRequest == null) throw ErrorHelper.NotFound("Trade request không tồn tại.");
 
         if (tradeRequest.Status != TradeRequestStatus.ACCEPTED)
-        {
             throw ErrorHelper.BadRequest("Trade request chưa được chấp nhận.");
-        }
 
         var listingOwnerId = tradeRequest.Listing!.InventoryItem.UserId; // User A
 
@@ -324,10 +319,7 @@ public class TradingService : ITradingService
                  i.HoldUntil.Value <= now,
             i => i.Product); // Include Product để có thể lấy tên
 
-        if (!itemsToRelease.Any())
-        {
-            return;
-        }
+        if (!itemsToRelease.Any()) return;
 
         foreach (var item in itemsToRelease)
         {
@@ -340,7 +332,6 @@ public class TradingService : ITradingService
 
         // Gửi notification cho từng item được release
         foreach (var item in itemsToRelease)
-        {
             try
             {
                 await NotifyItemReleased(item);
@@ -349,7 +340,6 @@ public class TradingService : ITradingService
             {
                 // Không throw exception để không ảnh hưởng việc release các item khác
             }
-        }
     }
 
     private async Task<TradeRequestDto> GetTradeRequestByIdAsync(Guid tradeRequestId)
@@ -361,10 +351,7 @@ public class TradingService : ITradingService
             t => t.Requester!,
             t => t.OfferedItems);
 
-        if (tradeRequest == null)
-        {
-            throw ErrorHelper.NotFound("Trade Request không tồn tại.");
-        }
+        if (tradeRequest == null) throw ErrorHelper.NotFound("Trade Request không tồn tại.");
 
         var offeredInventoryItems = new List<InventoryItem>();
         if (tradeRequest.OfferedItems.Any())
@@ -755,7 +742,7 @@ public class TradingService : ITradingService
             InventoryItemId = item.Id,
             ItemName = item.Product?.Name,
             ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
-            Tier = item.Tier ?? RarityName.Common, // Giá trị mặc định
+            Tier = item.Tier ?? RarityName.Common // Giá trị mặc định
         }).ToList();
 
         var dto = new TradeRequestDto
