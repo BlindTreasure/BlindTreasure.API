@@ -73,7 +73,7 @@ public class ChatMessageServiceTests
         // Arrange
         var userId = Guid.NewGuid();
         var content = "Hello from AI";
-        var user = new User { Id = userId, IsDeleted = false, Email = "hehe@gmail.com", RoleName = RoleType.Customer};
+        var user = new User { Id = userId, IsDeleted = false, Email = "hehe@gmail.com", RoleName = RoleType.Customer };
 
         _userRepoMock.Setup(x => x.GetByIdAsync(userId)).ReturnsAsync(user);
 
@@ -81,10 +81,9 @@ public class ChatMessageServiceTests
         await _chatMessageService.SaveAiMessageAsync(userId, content);
 
         // Assert
-        _chatMessageRepoMock.Verify(x => x.AddAsync(It.Is<ChatMessage>(
-            m => m.ReceiverId == userId &&
-                 m.SenderType == ChatParticipantType.AI &&
-                 m.Content == content
+        _chatMessageRepoMock.Verify(x => x.AddAsync(It.Is<ChatMessage>(m => m.ReceiverId == userId &&
+                                                                            m.SenderType == ChatParticipantType.AI &&
+                                                                            m.Content == content
         )), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
     }
@@ -123,7 +122,10 @@ public class ChatMessageServiceTests
     {
         // Arrange
         var userId = Guid.NewGuid();
-        var user = new User { Id = userId, IsDeleted = true, Email = "hehe@gmail.com", RoleName = RoleType.Customer}; // User is deleted
+        var user = new User
+        {
+            Id = userId, IsDeleted = true, Email = "hehe@gmail.com", RoleName = RoleType.Customer
+        }; // User is deleted
         _userRepoMock.Setup(x => x.GetByIdAsync(userId)).ReturnsAsync(user);
 
         // Act & Assert
@@ -156,13 +158,13 @@ public class ChatMessageServiceTests
         await _chatMessageService.SaveMessageAsync(senderId, receiverId, content);
 
         // Assert
-        _chatMessageRepoMock.Verify(x => x.AddAsync(It.Is<ChatMessage>(
-            m => m.SenderId == senderId &&
-                 m.ReceiverId == receiverId &&
-                 m.MessageType == ChatMessageType.UserToUser
+        _chatMessageRepoMock.Verify(x => x.AddAsync(It.Is<ChatMessage>(m => m.SenderId == senderId &&
+                                                                            m.ReceiverId == receiverId &&
+                                                                            m.MessageType == ChatMessageType.UserToUser
         )), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
-        _cacheServiceMock.Verify(x => x.SetAsync(It.IsAny<string>(), It.IsAny<ChatMessage>(), It.IsAny<TimeSpan>()), Times.Once);
+        _cacheServiceMock.Verify(x => x.SetAsync(It.IsAny<string>(), It.IsAny<ChatMessage>(), It.IsAny<TimeSpan>()),
+            Times.Once);
     }
 
     /// <summary>
@@ -184,11 +186,10 @@ public class ChatMessageServiceTests
         await _chatMessageService.SaveMessageAsync(senderId, Guid.Empty, content);
 
         // Assert
-        _chatMessageRepoMock.Verify(x => x.AddAsync(It.Is<ChatMessage>(
-            m => m.SenderId == senderId &&
-                 m.ReceiverId == null &&
-                 m.ReceiverType == ChatParticipantType.AI &&
-                 m.MessageType == ChatMessageType.UserToAi
+        _chatMessageRepoMock.Verify(x => x.AddAsync(It.Is<ChatMessage>(m => m.SenderId == senderId &&
+                                                                            m.ReceiverId == null &&
+                                                                            m.ReceiverType == ChatParticipantType.AI &&
+                                                                            m.MessageType == ChatMessageType.UserToAi
         )), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
     }
@@ -295,9 +296,21 @@ public class ChatMessageServiceTests
         var targetId = Guid.NewGuid();
         var messages = new List<ChatMessage>
         {
-            new() { SenderId = currentUserId, ReceiverId = targetId, Content = "Msg1", SentAt = DateTime.UtcNow.AddMinutes(-5) },
-            new() { SenderId = targetId, ReceiverId = currentUserId, Content = "Msg2", SentAt = DateTime.UtcNow.AddMinutes(-4) },
-            new() { SenderId = currentUserId, ReceiverId = targetId, Content = "Msg3", SentAt = DateTime.UtcNow.AddMinutes(-3) }
+            new()
+            {
+                SenderId = currentUserId, ReceiverId = targetId, Content = "Msg1",
+                SentAt = DateTime.UtcNow.AddMinutes(-5)
+            },
+            new()
+            {
+                SenderId = targetId, ReceiverId = currentUserId, Content = "Msg2",
+                SentAt = DateTime.UtcNow.AddMinutes(-4)
+            },
+            new()
+            {
+                SenderId = currentUserId, ReceiverId = targetId, Content = "Msg3",
+                SentAt = DateTime.UtcNow.AddMinutes(-3)
+            }
         }.AsQueryable().BuildMock();
         _chatMessageRepoMock.Setup(x => x.GetQueryable()).Returns(messages);
 
@@ -326,8 +339,16 @@ public class ChatMessageServiceTests
         var targetId = Guid.NewGuid();
         var messages = new List<ChatMessage>
         {
-            new() { SenderId = currentUserId, ReceiverId = targetId, Content = "Older", SentAt = DateTime.UtcNow.AddMinutes(-2) },
-            new() { SenderId = targetId, ReceiverId = currentUserId, Content = "Newer", SentAt = DateTime.UtcNow.AddMinutes(-1) }
+            new()
+            {
+                SenderId = currentUserId, ReceiverId = targetId, Content = "Older",
+                SentAt = DateTime.UtcNow.AddMinutes(-2)
+            },
+            new()
+            {
+                SenderId = targetId, ReceiverId = currentUserId, Content = "Newer",
+                SentAt = DateTime.UtcNow.AddMinutes(-1)
+            }
         }.AsQueryable().BuildMock();
         _chatMessageRepoMock.Setup(x => x.GetQueryable()).Returns(messages);
 
@@ -356,7 +377,11 @@ public class ChatMessageServiceTests
         var currentUserId = Guid.NewGuid();
         var messages = new List<ChatMessage>
         {
-            new() { SenderType = ChatParticipantType.AI, ReceiverId = currentUserId, Content = "Hello From AI", SentAt = DateTime.UtcNow }
+            new()
+            {
+                SenderType = ChatParticipantType.AI, ReceiverId = currentUserId, Content = "Hello From AI",
+                SentAt = DateTime.UtcNow
+            }
         }.AsQueryable().BuildMock();
         _chatMessageRepoMock.Setup(x => x.GetQueryable()).Returns(messages);
 
@@ -387,7 +412,11 @@ public class ChatMessageServiceTests
         {
             // Note: The Sender navigation property is null, which mimics EF Core's behavior
             // when .Include() is not used.
-            new() { SenderId = targetId, ReceiverId = currentUserId, Content = "Test", SenderType = ChatParticipantType.User, Sender = null }
+            new()
+            {
+                SenderId = targetId, ReceiverId = currentUserId, Content = "Test",
+                SenderType = ChatParticipantType.User, Sender = null
+            }
         }.AsQueryable().BuildMock();
         _chatMessageRepoMock.Setup(x => x.GetQueryable()).Returns(messages);
 
@@ -429,8 +458,7 @@ public class ChatMessageServiceTests
         await _chatMessageService.MarkMessagesAsReadAsync(fromUserId, toUserId);
 
         // Assert
-        _chatMessageRepoMock.Verify(x => x.UpdateRange(It.Is<List<ChatMessage>>(
-            list => list.All(m => m.IsRead)
+        _chatMessageRepoMock.Verify(x => x.UpdateRange(It.Is<List<ChatMessage>>(list => list.All(m => m.IsRead)
         )), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
         _hubContextMock.Verify(x => x.Clients.User(fromUserId.ToString()).SendCoreAsync(
@@ -485,7 +513,7 @@ public class ChatMessageServiceTests
             new() { Id = Guid.NewGuid(), SenderId = fromUserId, ReceiverId = toUserId, IsRead = false, ReadAt = null }
         }.AsQueryable().BuildMock();
         _chatMessageRepoMock.Setup(x => x.GetQueryable()).Returns(unreadMessages);
-        
+
         List<ChatMessage> updatedMessages = null;
         _chatMessageRepoMock.Setup(r => r.UpdateRange(It.IsAny<List<ChatMessage>>()))
             .Callback<List<ChatMessage>>(list => updatedMessages = list);

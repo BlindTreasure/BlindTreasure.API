@@ -417,7 +417,8 @@ public class SystemController : ControllerBase
             await _context.CartItems.AddRangeAsync(cartItems);
             await _context.SaveChangesAsync();
 
-            _logger.Success($"[SeedUserCartItems] Seed thành công {cartItems.Count} items vào giỏ hàng của user {user.Email}.");
+            _logger.Success(
+                $"[SeedUserCartItems] Seed thành công {cartItems.Count} items vào giỏ hàng của user {user.Email}.");
 
             return Ok(ApiResult<object>.Success("200",
                 $"Đã seed {cartItems.Count} items vào giỏ hàng của user {user.Email}."));
@@ -444,6 +445,8 @@ public class SystemController : ControllerBase
             await _cacheService.RemoveByPatternAsync("gemini:");
             await _cacheService.RemoveByPatternAsync("address:");
             await _cacheService.RemoveByPatternAsync("inventoryitem:");
+            await _cacheService.RemoveByPatternAsync("listings:");
+            await _cacheService.RemoveByPatternAsync("listing:");
             await _cacheService.RemoveByPatternAsync("Promotion:");
 
 

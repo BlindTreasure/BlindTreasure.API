@@ -87,20 +87,20 @@ public class OrderService : IOrderService
 
         // Gộp lại thành list item
         var groups = cart.SellerItems
-        .Select(s => new SellerCheckoutGroup
-        {
-            SellerId = s.SellerId,
-            PromotionId = s.PromotionId,
-            Items = s.Items.Select(i => new CheckoutItem
+            .Select(s => new SellerCheckoutGroup
             {
                 SellerId = s.SellerId,
-                ProductId = i.ProductId,
-                BlindBoxId = i.BlindBoxId,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice
-            }).ToList()
-        })
-        .ToList();
+                PromotionId = s.PromotionId,
+                Items = s.Items.Select(i => new CheckoutItem
+                {
+                    SellerId = s.SellerId,
+                    ProductId = i.ProductId,
+                    BlindBoxId = i.BlindBoxId,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice
+                }).ToList()
+            })
+            .ToList();
 
         _loggerService.Success("Checkout from system cart completed.");
 
@@ -228,7 +228,7 @@ public class OrderService : IOrderService
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
-                .Include(o => o.ShippingAddress)
+            .Include(o => o.ShippingAddress)
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
             .AsNoTracking();
 
@@ -373,15 +373,17 @@ public class OrderService : IOrderService
             Width = ghnOrderItems.Max(i => i.Width),
             Height = ghnOrderItems.Max(i => i.Height),
             Weight = ghnOrderItems.Sum(i => i.Weight),
-            InsuranceValue = ghnOrderItems.Sum(i => i.Price * i.Quantity) <= 5000000 ? ghnOrderItems.Sum(i => i.Price * i.Quantity) : 5000000,
+            InsuranceValue = ghnOrderItems.Sum(i => i.Price * i.Quantity) <= 5000000
+                ? ghnOrderItems.Sum(i => i.Price * i.Quantity)
+                : 5000000,
             ServiceTypeId = 2,
             Items = ghnOrderItems.ToArray()
         };
     }
 
     private async Task<string> CheckoutCore(
-    List<SellerCheckoutGroup> groups,
-    Guid? shippingAddressId)
+        List<SellerCheckoutGroup> groups,
+        Guid? shippingAddressId)
     {
         _loggerService.Info("Start core checkout logic.");
 
@@ -486,6 +488,7 @@ public class OrderService : IOrderService
                 };
                 order.OrderDetails.Add(detail);
             }
+
             // 7. Apply promotion
             if (group.PromotionId.HasValue)
             {
@@ -540,8 +543,8 @@ public class OrderService : IOrderService
                 {
                     Provider = "GHN",
                     OrderCode = ghnResp?.OrderCode ?? string.Empty,
-                    TotalFee = (int?)(ghnResp?.TotalFee) ?? 0,
-                    MainServiceFee = (int?)(ghnResp?.Fee?.MainService) ?? 0,
+                    TotalFee = (int?)ghnResp?.TotalFee ?? 0,
+                    MainServiceFee = (int?)ghnResp?.Fee?.MainService ?? 0,
                     TrackingNumber = ghnResp?.OrderCode ?? string.Empty,
                     ShippedAt = DateTime.UtcNow,
                     EstimatedDelivery = ghnResp?.ExpectedDeliveryTime ?? DateTime.UtcNow.AddDays(3),
@@ -557,6 +560,7 @@ public class OrderService : IOrderService
                     await _unitOfWork.OrderDetails.Update(od);
                 }
             }
+
             await _unitOfWork.Orders.Update(order);
             await _unitOfWork.SaveChangesAsync();
         }
@@ -643,66 +647,66 @@ public class OrderService : IOrderService
     }
 
     public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(
-    List<CartSellerItemDto> sellerItems, bool? isPreview = false)
-{
-    _loggerService.Info("Preview shipping checkout (by seller items) started.");
-    var userId = _claimsService.CurrentUserId;
-    if (sellerItems == null || !sellerItems.Any())
-        throw ErrorHelper.BadRequest("Cart trống.");
-
-    var address = await _unitOfWork.Addresses.GetQueryable()
-        .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
-        .FirstOrDefaultAsync();
-    if (address == null)
-        throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
-
-    var result = new List<ShipmentCheckoutResponseDTO>();
-
-    foreach (var sellerGroup in sellerItems)
+        List<CartSellerItemDto> sellerItems, bool? isPreview = false)
     {
-        var productItems = sellerGroup.Items.Where(i => i.ProductId.HasValue).ToList();
-        if (!productItems.Any())
-            continue;
+        _loggerService.Info("Preview shipping checkout (by seller items) started.");
+        var userId = _claimsService.CurrentUserId;
+        if (sellerItems == null || !sellerItems.Any())
+            throw ErrorHelper.BadRequest("Cart trống.");
 
-        var productIds = productItems.Select(i => i.ProductId.Value).ToList();
-        var products = await _unitOfWork.Products.GetQueryable()
-            .Where(p => productIds.Contains(p.Id))
-            .Include(p => p.Category)
-            .Include(p => p.Seller)
-            .ToListAsync();
+        var address = await _unitOfWork.Addresses.GetQueryable()
+            .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
+            .FirstOrDefaultAsync();
+        if (address == null)
+            throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
 
-        var seller = products.FirstOrDefault()?.Seller;
-        if (seller == null)
-            continue;
+        var result = new List<ShipmentCheckoutResponseDTO>();
 
-        var itemsWithProduct = productItems.Select(item => new
+        foreach (var sellerGroup in sellerItems)
         {
-            Product = products.First(p => p.Id == item.ProductId),
-            Quantity = item.Quantity
-        });
+            var productItems = sellerGroup.Items.Where(i => i.ProductId.HasValue).ToList();
+            if (!productItems.Any())
+                continue;
 
-        var ghnOrderRequest = BuildGhnOrderRequest(
-            itemsWithProduct,
-            seller,
-            address,
-            x => x.Product,
-            x => x.Quantity
-        );
+            var productIds = productItems.Select(i => i.ProductId.Value).ToList();
+            var products = await _unitOfWork.Products.GetQueryable()
+                .Where(p => productIds.Contains(p.Id))
+                .Include(p => p.Category)
+                .Include(p => p.Seller)
+                .ToListAsync();
 
-        var ghnPreviewResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest);
+            var seller = products.FirstOrDefault()?.Seller;
+            if (seller == null)
+                continue;
 
-        result.Add(new ShipmentCheckoutResponseDTO
-        {
-            SellerId = seller.Id,
-            SellerCompanyName = seller.CompanyName,
-            Shipment = null,
-            GhnPreviewResponse = ghnPreviewResponse
-        });
+            var itemsWithProduct = productItems.Select(item => new
+            {
+                Product = products.First(p => p.Id == item.ProductId),
+                Quantity = item.Quantity
+            });
+
+            var ghnOrderRequest = BuildGhnOrderRequest(
+                itemsWithProduct,
+                seller,
+                address,
+                x => x.Product,
+                x => x.Quantity
+            );
+
+            var ghnPreviewResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest);
+
+            result.Add(new ShipmentCheckoutResponseDTO
+            {
+                SellerId = seller.Id,
+                SellerCompanyName = seller.CompanyName,
+                Shipment = null,
+                GhnPreviewResponse = ghnPreviewResponse
+            });
+        }
+
+        _loggerService.Info("Preview shipping checkout (by seller items) completed.");
+        return result;
     }
-
-    _loggerService.Info("Preview shipping checkout (by seller items) completed.");
-    return result;
-}
 
     public struct CheckoutItem
     {

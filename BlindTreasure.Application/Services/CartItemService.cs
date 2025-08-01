@@ -41,15 +41,15 @@ public class CartItemService : ICartItemService
     {
         var userId = _claimsService.CurrentUserId;
         var cartItems = await _unitOfWork.CartItems.GetQueryable().Where(c => c.UserId == userId && !c.IsDeleted)
-            .Include(c => c.Product).ThenInclude(c => c.Seller).
-            Include(c => c.BlindBox).ThenInclude(c => c.Seller).ToListAsync();
+            .Include(c => c.Product).ThenInclude(c => c.Seller).Include(c => c.BlindBox).ThenInclude(c => c.Seller)
+            .ToListAsync();
 
         // Group by SellerId (ưu tiên Product, nếu là BlindBox thì lấy SellerId từ BlindBox)
         var sellerGroups = cartItems
             .GroupBy(c =>
-                c.Product?.SellerId
-                ?? c.BlindBox?.SellerId
-                ?? Guid.Empty // fallback nếu không có seller
+                    c.Product?.SellerId
+                    ?? c.BlindBox?.SellerId
+                    ?? Guid.Empty // fallback nếu không có seller
             )
             .ToList();
 
@@ -59,9 +59,9 @@ public class CartItemService : ICartItemService
         {
             var firstItem = group.FirstOrDefault();
             var sellerId = group.Key;
-            string sellerName = firstItem?.Product?.Seller?.CompanyName
-                ?? firstItem?.BlindBox?.Seller?.CompanyName
-                ?? "Unknown Seller";
+            var sellerName = firstItem?.Product?.Seller?.CompanyName
+                             ?? firstItem?.BlindBox?.Seller?.CompanyName
+                             ?? "Unknown Seller";
 
             var items = group.Select(c => new CartItemDto
             {
@@ -264,9 +264,6 @@ public class CartItemService : ICartItemService
             }
         }
 
-        if (changesMade)
-        {
-            await _unitOfWork.SaveChangesAsync();
-        }
+        if (changesMade) await _unitOfWork.SaveChangesAsync();
     }
 }

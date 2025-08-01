@@ -50,18 +50,19 @@ public class SellerService : ISellerService
         _notificationService = notificationService;
     }
 
-    public async Task<SellerSalesStatisticsDto> GetSalesStatisticsAsync(Guid? sellerId = null, DateTime? from = null, DateTime? to = null)
+    public async Task<SellerSalesStatisticsDto> GetSalesStatisticsAsync(Guid? sellerId = null, DateTime? from = null,
+        DateTime? to = null)
     {
         // Lấy sellerId hiện tại nếu không truyền vào
         sellerId ??= (await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == _claimsService.CurrentUserId))?.Id
-            ?? throw ErrorHelper.Forbidden("Không tìm thấy seller.");
+                     ?? throw ErrorHelper.Forbidden("Không tìm thấy seller.");
 
         // Lấy các OrderDetail đã bán thành công của seller
         var orderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable()
             .Include(od => od.Order)
             .Where(od => od.SellerId == sellerId
-                && od.Order.Status == OrderStatus.PAID.ToString()
-                && !od.Order.IsDeleted);
+                         && od.Order.Status == OrderStatus.PAID.ToString()
+                         && !od.Order.IsDeleted);
 
         if (from.HasValue)
             orderDetailsQuery = orderDetailsQuery.Where(od => od.Order.PlacedAt >= from.Value);
@@ -103,6 +104,7 @@ public class SellerService : ISellerService
             TotalDiscount = discounts
         };
     }
+
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
     {
         _loggerService.Info($"[UpdateSellerInfoAsync] Seller {userId} yêu cầu cập nhật thông tin.");
