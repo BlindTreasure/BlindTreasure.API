@@ -168,6 +168,7 @@ public class InventoryItemService : IInventoryItemService
             query = query.Where(i => i.Product.Name.ToLower().Contains(keyword));
         }
 
+
         // Filter theo category
         if (param.CategoryId.HasValue)
         {
@@ -184,10 +185,10 @@ public class InventoryItemService : IInventoryItemService
             query = query.Where(i => i.Status == param.Status.Value);
 
         // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
-        if (param.Desc)
-            query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
-        else
-            query = query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
+        query = param.Desc
+        ? query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt)
+        : query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
+
 
         var count = await query.CountAsync();
 

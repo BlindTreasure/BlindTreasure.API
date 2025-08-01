@@ -20,6 +20,7 @@ public static class OrderDtoMapper
         int total = inventoryItems.Count;
         int requested = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Shipment_requested);
         int delivering = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Delivering);
+        int available = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Available);
 
         var oldStatus = orderDetail.Status;
 
@@ -35,7 +36,11 @@ public static class OrderDtoMapper
         else if (delivering > 0)
             orderDetail.Status = OrderDetailItemStatus.PARTIALLY_DELIVERING;
 
-        // Nếu chưa có inventory nào được request ship/delivering thì giữ nguyên (PENDING)
+        // Nếu tất cả đều Available (chưa yêu cầu ship, đã về kho)
+        if (available == total)
+            orderDetail.Status = OrderDetailItemStatus.IN_INVENTORY;
+
+        // Nếu chưa có inventory nào được request ship/delivering/available thì giữ nguyên (PENDING)
 
         // Ghi log thay đổi trạng thái nếu có
         if (orderDetail.Status != oldStatus)

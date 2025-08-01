@@ -11,6 +11,7 @@ public enum OrderStatus
 public enum OrderDetailItemStatus
 {
     PENDING, // Chưa có yêu cầu ship
+    IN_INVENTORY, // ĐANG Ở TRONG TÚI ĐỒ CỦA KHÁCH, CHƯA YÊU CẦU SHIP
     SHIPPING_REQUESTED, // Đã request ship toàn bộ inventory item của order-detail
     PARTIALLY_SHIPPING_REQUESTED, // Đã request ship một phần inventory item của order-detail
     DELIVERING, // Đang giao hết inventory item của order-detail
