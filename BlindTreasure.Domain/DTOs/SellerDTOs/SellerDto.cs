@@ -18,5 +18,4 @@ public class SellerDto
     public SellerStatus Status { get; set; }
     public bool IsVerified { get; set; }
     public string? StripeAccountId { get; set; }
-
 }

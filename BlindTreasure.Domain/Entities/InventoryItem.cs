@@ -18,6 +18,7 @@ public class InventoryItem : BaseEntity
     public CustomerBlindBox? SourceCustomerBlindBox { get; set; }
     public Guid? AddressId { get; set; } // FK → Address, optional
     public Address? Address { get; set; }
+    public RarityName? Tier { get; set; }
 
     // FK → OrderDetail
     public Guid? OrderDetailId { get; set; }

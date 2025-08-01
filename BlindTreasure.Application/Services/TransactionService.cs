@@ -47,7 +47,6 @@ public class TransactionService : ITransactionService
     }
 
 
-
     /// <summary>
     ///     Xử lý khi thanh toán Stripe shipment thành công (webhook).
     /// </summary>
@@ -60,8 +59,8 @@ public class TransactionService : ITransactionService
         var shipments = await _unitOfWork.Shipments.GetQueryable()
             .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT)
             .Include(s => s.InventoryItems)
-                .ThenInclude(ii => ii.OrderDetail)
-                    .ThenInclude(od => od.InventoryItems)
+            .ThenInclude(ii => ii.OrderDetail)
+            .ThenInclude(od => od.InventoryItems)
             .ToListAsync();
 
         // 2. Tập hợp các OrderDetail cần cập nhật
@@ -224,8 +223,8 @@ public class TransactionService : ITransactionService
         var shipments = await _unitOfWork.Shipments.GetQueryable()
             .Where(s => shipmentIds.Contains(s.Id))
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.Product)
-                    .ThenInclude(p => p.Seller)
+            .ThenInclude(od => od.Product)
+            .ThenInclude(p => p.Seller)
             .ToListAsync();
 
         foreach (var shipment in shipments)
@@ -399,8 +398,6 @@ public class TransactionService : ITransactionService
 
             }
         }
-
-
     }
 
     private async Task CreateCustomerBlindBoxForOrderDetails(Order order, List<OrderDetail> orderDetails)

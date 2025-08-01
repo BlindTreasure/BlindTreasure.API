@@ -112,9 +112,17 @@ public class AddressServiceTests
         var userId = _currentUserId;
         var addresses = new List<Address>
         {
-            new() { Id = Guid.NewGuid(), UserId = userId, IsDefault = false, CreatedAt = DateTime.UtcNow.AddDays(-10), UpdatedAt = null },
+            new()
+            {
+                Id = Guid.NewGuid(), UserId = userId, IsDefault = false, CreatedAt = DateTime.UtcNow.AddDays(-10),
+                UpdatedAt = null
+            },
             new() { Id = Guid.NewGuid(), UserId = userId, IsDefault = true, CreatedAt = DateTime.UtcNow.AddDays(-20) },
-            new() { Id = Guid.NewGuid(), UserId = userId, IsDefault = false, CreatedAt = DateTime.UtcNow.AddDays(-5), UpdatedAt = DateTime.UtcNow.AddDays(-1) }
+            new()
+            {
+                Id = Guid.NewGuid(), UserId = userId, IsDefault = false, CreatedAt = DateTime.UtcNow.AddDays(-5),
+                UpdatedAt = DateTime.UtcNow.AddDays(-1)
+            }
         };
         _addressRepoMock.Setup(x => x.GetAllAsync(It.IsAny<Expression<Func<Address, bool>>>()))
             .ReturnsAsync(addresses);
@@ -184,7 +192,8 @@ public class AddressServiceTests
         // Assert
         result.Should().NotBeNull();
         result.FullName.Should().Be("DB Name");
-        _cacheServiceMock.Verify(x => x.SetAsync($"address:{addressId}", dbAddress, TimeSpan.FromHours(1)), Times.Once); // Verify it was cached
+        _cacheServiceMock.Verify(x => x.SetAsync($"address:{addressId}", dbAddress, TimeSpan.FromHours(1)),
+            Times.Once); // Verify it was cached
     }
 
     /// <summary>
@@ -226,7 +235,8 @@ public class AddressServiceTests
     public async Task CreateAsync_ShouldCreateAddressAndSetAsDefault_WhenItIsTheFirstAddress()
     {
         // Arrange
-        var createDto = new CreateAddressDto { FullName = "First Address", IsDefault = false }; // IsDefault is ignored for first address
+        var createDto = new CreateAddressDto
+            { FullName = "First Address", IsDefault = false }; // IsDefault is ignored for first address
         _addressRepoMock.Setup(x => x.GetAllAsync(It.IsAny<Expression<Func<Address, bool>>>()))
             .ReturnsAsync(new List<Address>()); // No existing addresses
 
@@ -298,7 +308,7 @@ public class AddressServiceTests
         _addressRepoMock.Setup(x => x.AddAsync(It.IsAny<Address>()))
             .Callback<Address>(a => capturedAddress = a)
             .ReturnsAsync((Address a) => a);
-            
+
         // Act
         await _addressService.CreateAsync(createDto);
 
@@ -308,7 +318,7 @@ public class AddressServiceTests
         oldDefault.IsDefault.Should().BeTrue(); // The old default should not have changed
         _addressRepoMock.Verify(x => x.Update(It.IsAny<Address>()), Times.Never); // No other address should be updated
     }
-    
+
     #endregion
 
     #region UpdateAsync Tests
@@ -361,7 +371,7 @@ public class AddressServiceTests
         var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.UpdateAsync(addressId, updateDto));
         ExceptionUtils.ExtractStatusCode(exception).Should().Be(404);
     }
-    
+
     /// <summary>
     /// Checks if a 'Not Found' error occurs when a user tries to update an address that doesn't belong to them.
     /// </summary>
@@ -413,7 +423,7 @@ public class AddressServiceTests
         _addressRepoMock.Verify(x => x.SoftRemove(It.Is<Address>(a => a.Id == addressId)), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
     }
-    
+
     /// <summary>
     /// Checks if a 'Not Found' error occurs when a user tries to delete an address that doesn't belong to them.
     /// </summary>
@@ -513,7 +523,7 @@ public class AddressServiceTests
         var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.SetDefaultAsync(addressId));
         ExceptionUtils.ExtractStatusCode(exception).Should().Be(404);
     }
-    
+
     /// <summary>
     /// Checks that the system handles a request to set an already-default address as default without making unnecessary changes.
     /// </summary>
@@ -536,11 +546,12 @@ public class AddressServiceTests
 
         // Act
         await _addressService.SetDefaultAsync(addressId);
-        
+
         // Assert
         // Verify that no other addresses were updated because none needed to be
         _addressRepoMock.Verify(x => x.Update(It.Is<Address>(a => a.Id != addressId)), Times.Never);
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce); // SaveChanges is still called to update the target address
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(),
+            Times.AtLeastOnce); // SaveChanges is still called to update the target address
     }
 
     #endregion
@@ -564,7 +575,7 @@ public class AddressServiceTests
         var addresses = new List<Address>
         {
             defaultAddress,
-            new Address { Id = Guid.NewGuid(), UserId = userId, IsDefault = false }
+            new() { Id = Guid.NewGuid(), UserId = userId, IsDefault = false }
         }.AsQueryable().BuildMock();
 
         _addressRepoMock.Setup(x => x.GetQueryable()).Returns(addresses);
@@ -593,7 +604,7 @@ public class AddressServiceTests
         var userId = Guid.NewGuid();
         var addresses = new List<Address>
         {
-            new Address { Id = Guid.NewGuid(), UserId = userId, IsDefault = false }
+            new() { Id = Guid.NewGuid(), UserId = userId, IsDefault = false }
         }.AsQueryable().BuildMock();
 
         _addressRepoMock.Setup(x => x.GetQueryable()).Returns(addresses);
@@ -604,5 +615,6 @@ public class AddressServiceTests
         // Assert
         result.Should().BeNull();
     }
+
     #endregion
 }

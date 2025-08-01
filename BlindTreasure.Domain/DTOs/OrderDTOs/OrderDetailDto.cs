@@ -11,7 +11,7 @@ public class OrderDetailDto
     public Guid? ProductId { get; set; }
     public Guid? OrderId { get; set; }
 
-    public string? Logs {  get; set; }
+    public string? Logs { get; set; }
     public string? ProductName { get; set; }
     public List<string>? ProductImages { get; set; }
     public Guid? BlindBoxId { get; set; }

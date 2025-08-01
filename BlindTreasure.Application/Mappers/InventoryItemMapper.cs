@@ -22,14 +22,14 @@ public static class InventoryItemMapper
             SourceCustomerBlindBoxId = item.SourceCustomerBlindBoxId,
             OrderDetailId = item.OrderDetailId,
             //OrderDetail = item.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(item.OrderDetail) : null,
-            ShipmentId = item.ShipmentId,
+            ShipmentId = item.ShipmentId
             //Shipment = item.Shipment != null ? ShipmentDtoMapper.ToShipmentDto(item.Shipment) : null
         };
     }
 
     public static InventoryItemDto ToInventoryItemDtoFullIncluded(InventoryItem item)
     {
-       var result = ToInventoryItemDto(item);
+        var result = ToInventoryItemDto(item);
         result.OrderDetail = item.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(item.OrderDetail) : null;
         result.Shipment = item.Shipment != null ? ShipmentDtoMapper.ToShipmentDto(item.Shipment) : null;
         result.Product = item.Product != null ? ProductDtoMapper.ToProducDetailDto(item.Product) : null;

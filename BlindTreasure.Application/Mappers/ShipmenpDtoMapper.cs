@@ -31,8 +31,7 @@ public static class ShipmentDtoMapper
             ShippedAt = shipment.ShippedAt,
             EstimatedDelivery = shipment.EstimatedDelivery,
             DeliveredAt = shipment.DeliveredAt,
-            Status = shipment.Status,
-
+            Status = shipment.Status
         };
     }
 
@@ -45,7 +44,7 @@ public static class ShipmentDtoMapper
         result.InventoryItems = shipment.InventoryItems?.Select(InventoryItemMapper.ToInventoryItemDto).ToList() ??
                                 new List<InventoryItemDto>();
         result.OrderDetails = shipment.OrderDetails?.Select(OrderDtoMapper.ToOrderDetailDto).ToList() ??
-                                new List<OrderDetailDto>();
+                              new List<OrderDetailDto>();
 
         return result;
     }

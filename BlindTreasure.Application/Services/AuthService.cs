@@ -407,6 +407,7 @@ public class AuthService : IAuthService
     #endregion
 
     #region PRIVATE HELPER METHODS
+
     /// <summary>
     ///     Checks if a user exists in cache or DB.
     /// </summary>
@@ -435,10 +436,8 @@ public class AuthService : IAuthService
             if (user != null)
                 await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
             else
-            {
                 throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
-            }
-                return user;
+            return user;
         }
 
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
