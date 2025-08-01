@@ -23,5 +23,4 @@ public class SellerProfileDto
     public string? RejectReason { get; set; }
 
     public string? StripeAccountId { get; set; }
-
 }

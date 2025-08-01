@@ -10,19 +10,22 @@ public class OrderDetail : BaseEntity
 
     // Có thể là Product hoặc BlindBox
     public Guid? ProductId { get; set; } = null;
+
     public Product Product { get; set; } = null;
+
     //
     public Guid? BlindBoxId { get; set; } = null;
     public BlindBox BlindBox { get; set; } = null;
-    public int? TotalItemsShippingFee { get; set; } = null; // Tổng phí vận chuyển của từ shipment của các items thuộc OrderDetail
 
+    public int? TotalItemsShippingFee { get; set; } =
+        null; // Tổng phí vận chuyển của từ shipment của các items thuộc OrderDetail
 
 
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public OrderDetailItemStatus Status { get; set; }
-    public string? Logs { get; set; } = string.Empty;// Lưu trữ nhật ký trạng thái
+    public string? Logs { get; set; } = string.Empty; // Lưu trữ nhật ký trạng thái
 
 
     // Tách rõ SellerId ở đây

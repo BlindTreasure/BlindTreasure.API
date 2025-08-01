@@ -653,8 +653,8 @@ public class BlindTreasureDbContext : DbContext
         });
 
         modelBuilder.Entity<OrderDetail>()
-    .HasMany(od => od.Shipments)
-    .WithMany(s => s.OrderDetails)
-    .UsingEntity(j => j.ToTable("OrderDetailShipments"));
+            .HasMany(od => od.Shipments)
+            .WithMany(s => s.OrderDetails)
+            .UsingEntity(j => j.ToTable("OrderDetailShipments"));
     }
 }

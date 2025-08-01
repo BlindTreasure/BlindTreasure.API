@@ -14,5 +14,4 @@ public class OrderDto
     public PaymentDto? Payment { get; set; } // Thêm dòng này
     public decimal FinalAmount { get; set; }
     public decimal? TotalShippingFee { get; set; } = 0; // Tổng phí vận chuyển của từ shipment của các items thuộc Order
-
 }

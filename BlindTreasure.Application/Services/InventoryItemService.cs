@@ -141,7 +141,8 @@ public class InventoryItemService : IInventoryItemService
             return InventoryItemMapper.ToInventoryItemDto(cached);
         }
 
-        var item = await _unitOfWork.InventoryItems.GetByIdAsync(id, i => i.Product, i => i.Shipment, i => i.OrderDetail);
+        var item = await _unitOfWork.InventoryItems.GetByIdAsync(id, i => i.Product, i => i.Shipment,
+            i => i.OrderDetail);
         if (item == null || item.IsDeleted)
             return null;
 
@@ -427,6 +428,7 @@ public class InventoryItemService : IInventoryItemService
                 await _unitOfWork.OrderDetails.Update(orderDetail);
             }
         }
+
         await _unitOfWork.SaveChangesAsync();
 
         return new ShipmentItemResponseDTO

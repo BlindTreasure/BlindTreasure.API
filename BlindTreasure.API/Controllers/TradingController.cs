@@ -43,15 +43,13 @@ public class TradingController : ControllerBase
     /// Nếu Listing miễn phí, User B không cần cung cấp item để trao đổi, nếu không, User B nhập item trong invent
     /// </summary>
     [HttpPost("{listingId}/trade-requests")]
-    public async Task<IActionResult> CreateTradeRequest([FromRoute] Guid listingId, [FromBody] CreateTradeRequestDto dto)
+    public async Task<IActionResult> CreateTradeRequest([FromRoute] Guid listingId,
+        [FromBody] CreateTradeRequestDto dto)
     {
-    
         // Kiểm tra GUID hợp lệ
         if (listingId == Guid.Empty)
-        {
             return BadRequest(ApiResult<TradeRequestDto>.Failure("400", "ID listing không hợp lệ."));
-        }
-    
+
         try
         {
             var result = await _tradingService.CreateTradeRequestAsync(listingId, dto);
@@ -59,7 +57,7 @@ public class TradingController : ControllerBase
         }
         catch (Exception ex)
         {
-           var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var error = ExceptionUtils.CreateErrorResponse<TradeRequestDto>(ex);
             return StatusCode(statusCode, error);
         }

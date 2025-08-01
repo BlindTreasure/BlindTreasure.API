@@ -57,17 +57,17 @@ public class StripeService : IStripeService
 
         // 2. Lấy order, include luôn OrderDetails, Product, BlindBox, Shipments, và OrderSellerPromotions
         var order = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
-            .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
-            .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Shipments)
-            .Include(o => o.OrderSellerPromotions)
-                .ThenInclude(p => p.Promotion)
-            .FirstOrDefaultAsync()
-            ?? throw ErrorHelper.NotFound("Đơn hàng không tồn tại.");
+                        .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
+                        .Include(o => o.OrderDetails)
+                        .ThenInclude(od => od.Product)
+                        .Include(o => o.OrderDetails)
+                        .ThenInclude(od => od.BlindBox)
+                        .Include(o => o.OrderDetails)
+                        .ThenInclude(od => od.Shipments)
+                        .Include(o => o.OrderSellerPromotions)
+                        .ThenInclude(p => p.Promotion)
+                        .FirstOrDefaultAsync()
+                    ?? throw ErrorHelper.NotFound("Đơn hàng không tồn tại.");
 
         // 3. Kiểm tra trạng thái đơn cho checkout hoặc renew
         if (!isRenew)
@@ -92,14 +92,11 @@ public class StripeService : IStripeService
         // 5. Chuẩn bị shipmentDescriptions (nếu cần)
         var shipmentDescriptions = new List<string>();
         foreach (var od in order.OrderDetails)
-        {
-            foreach (var s in od.Shipments)
-            {
-                shipmentDescriptions.Add(
-                    $"#{od.Id}: {s.Provider} - mã {s.OrderCode ?? "N/A"} - phí {s.TotalFee:N0}đ - trạng thái {s.Status}"
-                );
-            }
-        }
+        foreach (var s in od.Shipments)
+            shipmentDescriptions.Add(
+                $"#{od.Id}: {s.Provider} - mã {s.OrderCode ?? "N/A"} - phí {s.TotalFee:N0}đ - trạng thái {s.Status}"
+            );
+
         var shipmentDesc = shipmentDescriptions.Any()
             ? string.Join(" | ", shipmentDescriptions)
             : "Không có thông tin giao hàng.";
@@ -132,7 +129,6 @@ public class StripeService : IStripeService
 
         // 6.2: Tổng phí vận chuyển
         if (totalShipping > 0)
-        {
             lineItems.Add(new SessionLineItemOptions
             {
                 PriceData = new SessionLineItemPriceDataOptions
@@ -147,11 +143,9 @@ public class StripeService : IStripeService
                 },
                 Quantity = 1
             });
-        }
 
         // 6.3: Tổng khuyến mãi (âm)
         if (totalDiscount > 0)
-        {
             lineItems.Add(new SessionLineItemOptions
             {
                 PriceData = new SessionLineItemPriceDataOptions
@@ -166,7 +160,6 @@ public class StripeService : IStripeService
                 },
                 Quantity = 1
             });
-        }
 
         // 7. Tạo session Stripe
         var options = new SessionCreateOptions
@@ -228,7 +221,7 @@ public class StripeService : IStripeService
                 NetAmount = netAmount,
                 Method = "Stripe",
                 Status = PaymentStatus.Pending,
-                PaymentIntentId = "",// this field is nowhere ???
+                PaymentIntentId = "", // this field is nowhere ???
                 PaidAt = now,
                 RefundedAmount = 0,
                 CreatedAt = now,
@@ -436,9 +429,7 @@ public class StripeService : IStripeService
                         State = seller.CompanyDistrictName,
                         PostalCode = "700000", // Mã bưu điện tạm thời
                         Country = "VN"
-                    },
-
-
+                    }
                 },
                 TosAcceptance = new AccountTosAcceptanceOptions
                 {
@@ -482,6 +473,4 @@ public class StripeService : IStripeService
         var options = new TransferReversalCreateOptions();
         return await reversalService.CreateAsync(transferId, options);
     }
-
-    
 }

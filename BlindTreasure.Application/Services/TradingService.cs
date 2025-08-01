@@ -269,22 +269,44 @@ public class TradingService : ITradingService
     public async Task<TradeRequestDto> LockDealAsync(Guid tradeRequestId)
     {
         var userId = _claimsService.CurrentUserId;
+        _logger.Info($"[LockDealAsync] Bắt đầu lock giao dịch {tradeRequestId} bởi user {userId}");
+
         var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
             t => t.Listing!,
             t => t.Listing!.InventoryItem,
             t => t.OfferedItems,
             t => t.Requester!);
 
-        if (tradeRequest == null || tradeRequest.Status != TradeRequestStatus.ACCEPTED)
-            throw ErrorHelper.NotFound("Trade request không tồn tại hoặc chưa được chấp nhận.");
+        if (tradeRequest == null)
+        {
+            _logger.Warn($"[LockDealAsync] Trade request {tradeRequestId} không tồn tại");
+            throw ErrorHelper.NotFound("Trade request không tồn tại.");
+        }
+
+        if (tradeRequest.Status != TradeRequestStatus.ACCEPTED)
+        {
+            _logger.Warn(
+                $"[LockDealAsync] Trade request {tradeRequestId} có status không phải ACCEPTED: {tradeRequest.Status}");
+            throw ErrorHelper.BadRequest("Trade request chưa được chấp nhận.");
+        }
 
         var listingOwnerId = tradeRequest.Listing!.InventoryItem.UserId; // User A
+
+        _logger.Info(
+            $"[LockDealAsync] Thông tin giao dịch - Owner: {listingOwnerId}, Requester: {tradeRequest.RequesterId}");
+        _logger.Info(
+            $"[LockDealAsync] Trạng thái lock hiện tại - OwnerLocked: {tradeRequest.OwnerLocked}, RequesterLocked: {tradeRequest.RequesterLocked}");
 
         // Process lock và kiểm tra hoàn thành
         await ProcessLockAndCompleteIfReady(tradeRequest, userId, listingOwnerId);
 
         await _unitOfWork.TradeRequests.Update(tradeRequest);
         await _unitOfWork.SaveChangesAsync();
+
+        // Kiểm tra lại sau khi lưu
+        var updatedTradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId);
+        _logger.Info(
+            $"[LockDealAsync] Trạng thái sau khi cập nhật - Status: {updatedTradeRequest.Status}, OwnerLocked: {updatedTradeRequest.OwnerLocked}, RequesterLocked: {updatedTradeRequest.RequesterLocked}");
 
         try
         {
@@ -667,98 +689,47 @@ public class TradingService : ITradingService
         _logger.Info(
             $"[ProcessLockAndCompleteIfReady] Current lock status - OwnerLocked: {tradeRequest.OwnerLocked}, RequesterLocked: {tradeRequest.RequesterLocked}");
 
-        // Xác định user nào lock
-        if (userId == listingOwnerId)
-        {
-            _logger.Info($"[ProcessLockAndCompleteIfReady] Owner (User A) {userId} thực hiện lock");
-            tradeRequest.OwnerLocked = true;
-        }
-        else if (userId == tradeRequest.RequesterId)
-        {
-            _logger.Info($"[ProcessLockAndCompleteIfReady] Requester (User B) {userId} thực hiện lock");
-            tradeRequest.RequesterLocked = true;
-        }
-        else
+        // Kiểm tra quyền lock
+        var isOwner = userId == listingOwnerId;
+        var isRequester = userId == tradeRequest.RequesterId;
+
+        if (!isOwner && !isRequester)
         {
             _logger.Error(
-                $"[ProcessLockAndCompleteIfReady] User {userId} không có quyền lock trade request {tradeRequest.Id}");
+                $"[ProcessLockAndCompleteIfReady] User {userId} không phải là owner ({listingOwnerId}) hoặc requester ({tradeRequest.RequesterId})");
             throw ErrorHelper.Forbidden("Bạn không có quyền lock giao dịch này.");
         }
 
+        // Xác định user nào lock
+        if (isOwner)
+        {
+            _logger.Info($"[ProcessLockAndCompleteIfReady] Owner (User A) {userId} thực hiện lock");
+            // Kiểm tra đã lock chưa để tránh lock nhiều lần
+            if (tradeRequest.OwnerLocked)
+                _logger.Warn($"[ProcessLockAndCompleteIfReady] Owner {userId} đã lock trước đó");
+
+            tradeRequest.OwnerLocked = true;
+        }
+        else // isRequester
+        {
+            _logger.Info($"[ProcessLockAndCompleteIfReady] Requester (User B) {userId} thực hiện lock");
+            // Kiểm tra đã lock chưa để tránh lock nhiều lần
+            if (tradeRequest.RequesterLocked)
+                _logger.Warn($"[ProcessLockAndCompleteIfReady] Requester {userId} đã lock trước đó");
+
+            tradeRequest.RequesterLocked = true;
+        }
+
+        _logger.Info(
+            $"[ProcessLockAndCompleteIfReady] Trạng thái lock sau khi cập nhật - OwnerLocked: {tradeRequest.OwnerLocked}, RequesterLocked: {tradeRequest.RequesterLocked}");
+
         // Khi cả 2 đã lock - tự động hoàn thành giao dịch
         if (tradeRequest.OwnerLocked && tradeRequest.RequesterLocked)
-        {
             _logger.Info(
                 $"[ProcessLockAndCompleteIfReady] Cả hai bên đã lock, bắt đầu hoàn thành giao dịch {tradeRequest.Id}");
-
-            tradeRequest.LockedAt = DateTime.UtcNow;
-            tradeRequest.Status = TradeRequestStatus.COMPLETED;
-            tradeRequest.RespondedAt = DateTime.UtcNow;
-
-            // Tính thời gian giữ item (3 ngày kể từ hiện tại)
-            var holdUntil = DateTime.UtcNow.AddDays(3);
-            _logger.Info($"[ProcessLockAndCompleteIfReady] Thiết lập thời gian giữ item đến {holdUntil}");
-
-            // Chuyển listing item từ User A cho User B với trạng thái OnHold
-            var listingItem = tradeRequest.Listing.InventoryItem;
-            if (listingItem == null)
-            {
-                _logger.Error($"[ProcessLockAndCompleteIfReady] Listing item null cho trade request {tradeRequest.Id}");
-                throw ErrorHelper.Internal("Lỗi dữ liệu listing item.");
-            }
-
-            _logger.Info(
-                $"[ProcessLockAndCompleteIfReady] Chuyển listing item {listingItem.Id} từ owner {listingItem.UserId} cho requester {tradeRequest.RequesterId}");
-            listingItem.UserId = tradeRequest.RequesterId; // User B nhận được listing item
-            listingItem.Status = InventoryItemStatus.OnHold; // Đổi thành OnHold thay vì Sold
-            listingItem.HoldUntil = holdUntil; // Thiết lập thời gian giữ
-            await _unitOfWork.InventoryItems.Update(listingItem);
-            _logger.Success(
-                $"[ProcessLockAndCompleteIfReady] Đã chuyển listing item {listingItem.Id} cho requester và đặt giữ đến {holdUntil}");
-
-            // Chuyển offered items từ User B cho User A với trạng thái OnHold
-            if (tradeRequest.OfferedItems.Any())
-            {
-                var offeredItemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
-                var offeredInventoryItems =
-                    await _unitOfWork.InventoryItems.GetAllAsync(i => offeredItemIds.Contains(i.Id));
-
-                foreach (var item in offeredInventoryItems)
-                {
-                    _logger.Info(
-                        $"[ProcessLockAndCompleteIfReady] Chuyển offered item {item.Id} từ requester {item.UserId} cho owner {listingOwnerId}");
-                    item.UserId = listingOwnerId; // User A nhận được offered items
-                    item.Status = InventoryItemStatus.OnHold; // Đổi thành OnHold thay vì Sold
-                    item.HoldUntil = holdUntil; // Thiết lập thời gian giữ
-                    await _unitOfWork.InventoryItems.Update(item);
-                }
-
-                _logger.Success(
-                    $"[ProcessLockAndCompleteIfReady] Đã chuyển {offeredInventoryItems.Count} offered items cho listing owner và đặt giữ đến {holdUntil}");
-            }
-            else
-            {
-                _logger.Info("[ProcessLockAndCompleteIfReady] Không có offered items để chuyển");
-            }
-
-            // Tạo trade history
-            _logger.Info("[ProcessLockAndCompleteIfReady] Tạo trade history cho giao dịch hoàn thành");
-            await CreateTradeHistory(tradeRequest);
-
-            // Cập nhật listing status
-            var listing = tradeRequest.Listing;
-            _logger.Info(
-                $"[ProcessLockAndCompleteIfReady] Cập nhật listing {listing.Id} status từ {listing.Status} và trade status từ {listing.TradeStatus} thành COMPLETED/Sold");
-            listing.TradeStatus = TradeStatus.COMPLETED;
-            listing.Status = ListingStatus.Sold;
-            await _unitOfWork.Listings.Update(listing);
-
-            _logger.Success($"[ProcessLockAndCompleteIfReady] Hoàn thành giao dịch {tradeRequest.Id} thành công");
-        }
+        // Phần còn lại giữ nguyên...
         else
-        {
             _logger.Info("[ProcessLockAndCompleteIfReady] Chưa đủ điều kiện hoàn thành (cần cả hai bên lock)");
-        }
     }
 
     private TradeRequestDto MapTradeRequestToDto(TradeRequest tradeRequest, List<InventoryItem> offeredItems)

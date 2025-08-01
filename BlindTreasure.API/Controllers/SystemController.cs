@@ -417,7 +417,8 @@ public class SystemController : ControllerBase
             await _context.CartItems.AddRangeAsync(cartItems);
             await _context.SaveChangesAsync();
 
-            _logger.Success($"[SeedUserCartItems] Seed thành công {cartItems.Count} items vào giỏ hàng của user {user.Email}.");
+            _logger.Success(
+                $"[SeedUserCartItems] Seed thành công {cartItems.Count} items vào giỏ hàng của user {user.Email}.");
 
             return Ok(ApiResult<object>.Success("200",
                 $"Đã seed {cartItems.Count} items vào giỏ hàng của user {user.Email}."));

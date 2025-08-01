@@ -96,7 +96,7 @@ public class SellerVerificationServiceTests
             Type = NotificationType.System,
             Message = "m đã bi gay"
         };
-        
+
         _notificationServiceMock
             .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
             .ReturnsAsync(mockNotification);
@@ -198,7 +198,7 @@ public class SellerVerificationServiceTests
             Message = $"Hồ sơ seller của bạn đã bị từ chối. Lý do: {rejectReason}",
             Type = NotificationType.System
         };
-        
+
         _notificationServiceMock
             .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
             .ReturnsAsync(mockNotification);
@@ -269,7 +269,7 @@ public class SellerVerificationServiceTests
             .ReturnsAsync((Seller)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => 
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
             _sellerVerificationService.VerifySellerAsync(sellerId, verificationDto));
 
         exception.Message.Should().Contain("Không tìm thấy hồ sơ seller");
@@ -310,7 +310,7 @@ public class SellerVerificationServiceTests
             .ReturnsAsync(seller);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => 
+        var exception = await Assert.ThrowsAsync<Exception>(() =>
             _sellerVerificationService.VerifySellerAsync(sellerId, verificationDto));
 
         exception.Message.Should().Contain("Không tìm thấy thông tin người dùng");
@@ -374,7 +374,7 @@ public class SellerVerificationServiceTests
             Type = NotificationType.System,
             Message = "Hồ sơ đã được duyệt"
         };
-        
+
         _notificationServiceMock
             .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
             .ReturnsAsync(mockNotification);
@@ -450,7 +450,7 @@ public class SellerVerificationServiceTests
             Type = NotificationType.System,
             Message = $"Hồ sơ seller của bạn đã bị từ chối. Lý do: {rejectReason}"
         };
-        
+
         _notificationServiceMock
             .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
             .ReturnsAsync(mockNotification);
@@ -459,7 +459,7 @@ public class SellerVerificationServiceTests
         string capturedRejectReason = null;
         _emailServiceMock
             .Setup(x => x.SendSellerRejectionAsync(It.IsAny<EmailRequestDto>(), It.IsAny<string>()))
-            .Callback<EmailRequestDto, string>((request, reason) => 
+            .Callback<EmailRequestDto, string>((request, reason) =>
             {
                 capturedEmailRequest = request;
                 capturedRejectReason = reason;
@@ -530,7 +530,7 @@ public class SellerVerificationServiceTests
             Type = NotificationType.System,
             Message = "Hồ sơ đã được duyệt"
         };
-        
+
         _notificationServiceMock
             .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
             .ReturnsAsync(mockNotification);
@@ -540,7 +540,7 @@ public class SellerVerificationServiceTests
             .Returns(Task.CompletedTask);
 
         // Setup cache mocks to capture the cache keys
-        List<string> removedCacheKeys = new List<string>();
+        var removedCacheKeys = new List<string>();
         _cacheServiceMock
             .Setup(x => x.RemoveAsync(It.IsAny<string>()))
             .Callback<string>(key => removedCacheKeys.Add(key))
@@ -610,7 +610,7 @@ public class SellerVerificationServiceTests
             Type = NotificationType.System,
             Message = "Hồ sơ đã được duyệt"
         };
-        
+
         _notificationServiceMock
             .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
             .ReturnsAsync(mockNotification);
