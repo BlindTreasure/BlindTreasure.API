@@ -1,6 +1,5 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Domain.DTOs.ListingDTOs;
 using BlindTreasure.Domain.DTOs.TradeHistoryDTOs;
 using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using BlindTreasure.Infrastructure.Commons;
@@ -26,7 +25,7 @@ public class TradingController : ControllerBase
     {
         try
         {
-            var result = await _tradingService.GetAllTradeHistoriesAsync(param);
+            var result = await _tradingService.GetTradeHistoriesAsync(param, false);
             return Ok(ApiResult<Pagination<TradeHistoryDto>>.Success(result, "200",
                 "Lấy lịch sử TRADING thành công."));
         }
@@ -150,7 +149,7 @@ public class TradingController : ControllerBase
     {
         try
         {
-            var result = await _tradingService.GetMyTradeHistoriesAsync(param);
+            var result = await _tradingService.GetTradeHistoriesAsync(param, true);
             return Ok(ApiResult<Pagination<TradeHistoryDto>>.Success(result, "200",
                 "Lấy lịch sử giao dịch của bạn thành công."));
         }
@@ -158,6 +157,27 @@ public class TradingController : ControllerBase
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var error = ExceptionUtils.CreateErrorResponse<Pagination<TradeHistoryDto>>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+    /// <summary>
+    /// Lấy thông tin chi tiết của một trade request theo ID
+    /// </summary>
+    /// <param name="tradeRequestId">ID của trade request cần lấy thông tin</param>
+    /// <returns>Chi tiết của trade request</returns>
+    [HttpGet("trade-requests/{tradeRequestId}")]
+    public async Task<IActionResult> GetTradeRequestById(Guid tradeRequestId)
+    {
+        try
+        {
+            var result = await _tradingService.GetTradeRequestByIdAsync(tradeRequestId);
+            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", 
+                "Lấy thông tin chi tiết trade request thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<TradeRequestDto>(ex);
             return StatusCode(statusCode, error);
         }
     }
