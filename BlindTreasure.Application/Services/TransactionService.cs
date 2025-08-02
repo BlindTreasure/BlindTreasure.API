@@ -161,9 +161,17 @@ public class TransactionService : ITransactionService
                 .Include(od => od.InventoryItems)
                 .ToListAsync();
 
-            foreach (var od in orderDetailsWithInventory)
+           
+            foreach (var od in orderDetails)
             {
-                od.Status = OrderDetailItemStatus.DELIVERING;
+                if (od.InventoryItems == null || !od.InventoryItems.Any() || !od.ProductId.HasValue)
+                {
+                    _logger.Warn($"[HandleSuccessfulPaymentAsync] OrderDetail {od.Id} không có InventoryItems.");
+                    continue;
+                }
+                // Cập nhật trạng thái và log cho từng OrderDetail
+                _logger.Info($"[HandleSuccessfulPaymentAsync] {od.InventoryItems}");
+               
                 OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
                 await _unitOfWork.OrderDetails.Update(od);
             }
@@ -362,21 +370,32 @@ public class TransactionService : ITransactionService
                         : InventoryItemStatus.Available;
                 }
 
-                var dto = new CreateInventoryItemDto
+                var dto = new InventoryItem
                 {
                     ProductId = od.ProductId!.Value,
-                    Quantity = 1,
                     Location = od.Seller.CompanyAddress,
                     Status = status,
                     ShipmentId = shipmentId,
+                    IsFromBlindBox=false, // Không phải từ BlindBox
                     OrderDetailId = od.Id,
-                    AddressId = shippingAddress?.Id
+                    AddressId = shippingAddress?.Id,
+                    UserId = order.UserId, // Gán chủ sở hữu là user của order
                 };
 
-                await _inventoryItemService.CreateAsync(dto, order.UserId);
+
+                var newInventoryItem = await _unitOfWork.InventoryItems.AddAsync(dto); // savechange trả về ở đây rồi
+
+                // Attach inventory item vào navigation property của orderDetail trong bộ nhớ
+                if (od.InventoryItems == null)
+                    od.InventoryItems = new List<InventoryItem>();
+                od.InventoryItems.Add(newInventoryItem);
+
                 _logger.Success(
                     $"[HandlePayment] Created inventory #{++createdCount} " +
                     $"for Product {od.ProductId} in Order {order.Id}.");
+                
+
+
             }
         }
     }
