@@ -18,34 +18,60 @@ public static class OrderDtoMapper
             return;
 
         int total = inventoryItems.Count;
+        Console.WriteLine($"Updating OrderDetail {orderDetail.Id} with {total} inventory items.");
+
         int requested = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Shipment_requested);
         int delivering = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Delivering);
         int available = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Available);
 
+        Console.WriteLine($"Inventory item quantity with status: Requested: {requested}, Delivering: {delivering}, Available: {available}");
+
         var oldStatus = orderDetail.Status;
+        Console.WriteLine($"Old status: {oldStatus}");
 
-        // Trạng thái SHIPPING_REQUESTED
-        if (requested == total)
-            orderDetail.Status = OrderDetailItemStatus.SHIPPING_REQUESTED;
-        else if (requested > 0)
-            orderDetail.Status = OrderDetailItemStatus.PARTIALLY_SHIPPING_REQUESTED;
+        // ✅ SỬA LẠI: Dùng if-else if để đảm bảo chỉ 1 trạng thái được set
+        // Ưu tiên theo thứ tự: DELIVERING → SHIPPING_REQUESTED → IN_INVENTORY → giữ nguyên PENDING
 
-        // Trạng thái DELIVERING
         if (delivering == total)
+        {
+            // Tất cả đang giao hàng
             orderDetail.Status = OrderDetailItemStatus.DELIVERING;
+        }
         else if (delivering > 0)
+        {
+            // Một phần đang giao hàng
             orderDetail.Status = OrderDetailItemStatus.PARTIALLY_DELIVERING;
-
-        // Nếu tất cả đều Available (chưa yêu cầu ship, đã về kho)
-        if (available == total)
+        }
+        else if (requested == total)
+        {
+            // Tất cả đã yêu cầu ship
+            orderDetail.Status = OrderDetailItemStatus.SHIPPING_REQUESTED;
+        }
+        else if (requested > 0)
+        {
+            // Một phần đã yêu cầu ship
+            orderDetail.Status = OrderDetailItemStatus.PARTIALLY_SHIPPING_REQUESTED;
+        }
+        else if (available == total)
+        {
+            // ✅ QUAN TRỌNG: Tất cả đều Available (chưa yêu cầu ship, đã về kho)
+            // Đây là trường hợp thanh toán KHÔNG có yêu cầu ship
             orderDetail.Status = OrderDetailItemStatus.IN_INVENTORY;
-
-        // Nếu chưa có inventory nào được request ship/delivering/available thì giữ nguyên (PENDING)
+        }
+        // ✅ Nếu không match case nào → giữ nguyên trạng thái hiện tại (PENDING)
 
         // Ghi log thay đổi trạng thái nếu có
         if (orderDetail.Status != oldStatus)
+        {
             orderDetail.Logs +=
                 $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Status changed: {oldStatus} → {orderDetail.Status}";
+
+            Console.WriteLine($"✅ Status updated: {oldStatus} → {orderDetail.Status}");
+        }
+        else
+        {
+            Console.WriteLine($"ℹ️ Status unchanged: {orderDetail.Status}");
+        }
 
         // Ghi log trạng thái inventory item hiện tại
         var logLines = inventoryItems
@@ -96,7 +122,8 @@ public static class OrderDtoMapper
             Quantity = od.Quantity,
             UnitPrice = od.UnitPrice,
             TotalPrice = od.TotalPrice,
-            Status = od.Status
+            Status = od.Status,
+            OrderId = od.OrderId,
             //Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>()
         };
     }
