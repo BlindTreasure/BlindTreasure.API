@@ -74,59 +74,23 @@ public class TradingService : ITradingService
         return dtos;
     }
 
-    public async Task<Pagination<TradeHistoryDto>> GetMyTradeHistoriesAsync(TradeHistoryQueryParameter param)
+    public async Task<Pagination<TradeHistoryDto>> GetTradeHistoriesAsync(TradeHistoryQueryParameter param,
+        bool onlyMine = false)
     {
         var userId = _claimsService.CurrentUserId;
 
-        _logger.Info(
-            $"[GetMyTradeHistoriesAsync] Lấy trade histories của user {userId}, Page: {param.PageIndex}, Size: {param.PageSize}");
-
-        var query = _unitOfWork.TradeHistories.GetQueryable()
-            .Include(th => th.Listing)
-            .ThenInclude(l => l.InventoryItem)
-            .ThenInclude(i => i.Product)
-            .Include(th => th.Requester)
-            .Include(th => th.OfferedInventory)
-            .ThenInclude(oi => oi!.Product)
-            .Where(th => !th.IsDeleted && th.RequesterId == userId) // Chỉ lấy của user hiện tại
-            .AsNoTracking();
-
-        // Apply filters (trừ RequesterId vì đã filter ở trên)
-        var filteredParam = new TradeHistoryQueryParameter
+        // Ghi log với thông tin phù hợp dựa vào chế độ truy vấn
+        if (onlyMine)
         {
-            FinalStatus = param.FinalStatus,
-            ListingId = param.ListingId,
-            CompletedFromDate = param.CompletedFromDate,
-            CompletedToDate = param.CompletedToDate,
-            CreatedFromDate = param.CreatedFromDate,
-            CreatedToDate = param.CreatedToDate,
-            SortBy = param.SortBy,
-            Desc = param.Desc,
-            PageIndex = param.PageIndex,
-            PageSize = param.PageSize
-        };
-
-        query = ApplyTradeHistoryFilters(query, filteredParam);
-        query = ApplyTradeHistorySorting(query, filteredParam);
-
-        var count = await query.CountAsync();
-
-        var tradeHistories = await query
-            .Skip((param.PageIndex - 1) * param.PageSize)
-            .Take(param.PageSize)
-            .ToListAsync();
-
-        var tradeHistoryDtos = tradeHistories.Select(MapTradeHistoryToDto).ToList();
-
-        _logger.Success($"[GetMyTradeHistoriesAsync] Tìm thấy {count} trade histories của user {userId}");
-
-        return new Pagination<TradeHistoryDto>(tradeHistoryDtos, count, param.PageIndex, param.PageSize);
-    }
-
-    public async Task<Pagination<TradeHistoryDto>> GetAllTradeHistoriesAsync(TradeHistoryQueryParameter param)
-    {
-        _logger.Info($"[GetAllTradeHistoriesAsync] Page: {param.PageIndex}, Size: {param.PageSize}, " +
-                     $"Status: {param.FinalStatus}, RequesterId: {param.RequesterId}, Desc: {param.Desc}");
+            _logger.Info(
+                $"[GetTradeHistoriesAsync] Lấy trade histories của user {userId}, Page: {param.PageIndex}, Size: {param.PageSize}");
+        }
+        else
+        {
+            _logger.Info(
+                $"[GetTradeHistoriesAsync] Lấy tất cả trade histories, Page: {param.PageIndex}, Size: {param.PageSize}, " +
+                $"Status: {param.FinalStatus}, RequesterId: {param.RequesterId}, Desc: {param.Desc}");
+        }
 
         var query = _unitOfWork.TradeHistories.GetQueryable()
             .Include(th => th.Listing)
@@ -135,23 +99,52 @@ public class TradingService : ITradingService
             .Include(th => th.Requester)
             .Include(th => th.OfferedInventory)
             .ThenInclude(oi => oi!.Product)
-            .Where(th => !th.IsDeleted)
-            .AsNoTracking();
+            .Where(th => !th.IsDeleted);
 
-        // Apply filters
+        // Áp dụng bộ lọc "chỉ của tôi" nếu được yêu cầu
+        if (onlyMine)
+        {
+            query = query.Where(th => th.RequesterId == userId);
+
+            // Tạo param mới bỏ qua RequesterId vì đã lọc ở trên
+            param = new TradeHistoryQueryParameter
+            {
+                FinalStatus = param.FinalStatus,
+                ListingId = param.ListingId,
+                CompletedFromDate = param.CompletedFromDate,
+                CompletedToDate = param.CompletedToDate,
+                CreatedFromDate = param.CreatedFromDate,
+                CreatedToDate = param.CreatedToDate,
+                SortBy = param.SortBy,
+                Desc = param.Desc,
+                PageIndex = param.PageIndex,
+                PageSize = param.PageSize
+            };
+        }
+
+        query = query.AsNoTracking();
+
+        // Áp dụng các bộ lọc và sắp xếp thống nhất
         query = ApplyTradeHistoryFilters(query, param);
-
-        // Apply sorting
         query = ApplyTradeHistorySorting(query, param);
 
+        // Đếm tổng số bản ghi
         var count = await query.CountAsync();
 
+        // Phân trang dữ liệu
         var tradeHistories = await query
             .Skip((param.PageIndex - 1) * param.PageSize)
             .Take(param.PageSize)
             .ToListAsync();
 
+        // Chuyển đổi sang DTO
         var tradeHistoryDtos = tradeHistories.Select(MapTradeHistoryToDto).ToList();
+
+        // Ghi log thành công nếu là "chỉ của tôi"
+        if (onlyMine)
+        {
+            _logger.Success($"[GetTradeHistoriesAsync] Tìm thấy {count} trade histories của user {userId}");
+        }
 
         return new Pagination<TradeHistoryDto>(tradeHistoryDtos, count, param.PageIndex, param.PageSize);
     }
@@ -361,7 +354,7 @@ public class TradingService : ITradingService
             }
     }
 
-    private async Task<TradeRequestDto> GetTradeRequestByIdAsync(Guid tradeRequestId)
+    public async Task<TradeRequestDto> GetTradeRequestByIdAsync(Guid tradeRequestId)
     {
         var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
             t => t.Listing!,
