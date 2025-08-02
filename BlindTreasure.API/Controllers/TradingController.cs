@@ -10,7 +10,7 @@ namespace BlindTreasure.API.Controllers;
 
 [Route("api/trading")]
 [ApiController]
-[Authorize(Roles = "Customer")]
+[Authorize]
 public class TradingController : ControllerBase
 {
     private readonly ITradingService _tradingService;
