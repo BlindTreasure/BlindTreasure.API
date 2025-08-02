@@ -16,4 +16,5 @@ public class TradeRequest : BaseEntity
     public bool OwnerLocked { get; set; } // User A lock
     public bool RequesterLocked { get; set; } // User B lock
     public DateTime? LockedAt { get; set; } // Thời điểm đủ lock (cả 2)
+    public int TimeRemaining { get; set; } // Thời gian còn lại tính bằng giây
 }

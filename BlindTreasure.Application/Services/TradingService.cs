@@ -101,7 +101,6 @@ public class TradingService : ITradingService
             .ThenInclude(oi => oi!.Product)
             .Where(th => !th.IsDeleted);
 
-        // Áp dụng bộ lọc "chỉ của tôi" nếu được yêu cầu
         if (onlyMine)
         {
             query = query.Where(th => th.RequesterId == userId);
@@ -758,9 +757,7 @@ public class TradingService : ITradingService
     {
         var listingItem = tradeRequest.Listing?.InventoryItem;
         var listingItemName = listingItem?.Product?.Name ?? "Unknown";
-
-        // Gán giá trị mặc định cho tier nếu null
-        var listingItemTier = listingItem?.Tier ?? RarityName.Common; // Giá trị mặc định
+        var listingItemTier = listingItem?.Tier ?? RarityName.Common;
         var requesterName = tradeRequest.Requester?.FullName ?? "Unknown";
 
         var offeredItemDtos = offeredItems.Select(item => new OfferedItemDto
@@ -768,15 +765,27 @@ public class TradingService : ITradingService
             InventoryItemId = item.Id,
             ItemName = item.Product?.Name,
             ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
-            Tier = item.Tier ?? RarityName.Common // Giá trị mặc định
+            Tier = item.Tier ?? RarityName.Common
         }).ToList();
+
+        // Tính toán thời gian còn lại
+        int timeRemaining = 0;
+        if (tradeRequest.Status == TradeRequestStatus.ACCEPTED && tradeRequest.RespondedAt.HasValue)
+        {
+            var timeoutMinutes = 2; // 2 phút timeout
+            var elapsedTime = DateTime.UtcNow - tradeRequest.RespondedAt.Value;
+            var remainingTime = TimeSpan.FromMinutes(timeoutMinutes) - elapsedTime;
+        
+            // Nếu còn thời gian thì tính bằng giây, nếu không thì = 0
+            timeRemaining = remainingTime.TotalSeconds > 0 ? (int)remainingTime.TotalSeconds : 0;
+        }
 
         var dto = new TradeRequestDto
         {
             Id = tradeRequest.Id,
             ListingId = tradeRequest.ListingId,
             ListingItemName = listingItemName,
-            ListingItemTier = listingItemTier, // Luôn có giá trị (không null)
+            ListingItemTier = listingItemTier,
             RequesterId = tradeRequest.RequesterId,
             RequesterName = requesterName,
             OfferedItems = offeredItemDtos,
@@ -785,12 +794,12 @@ public class TradingService : ITradingService
             RespondedAt = tradeRequest.RespondedAt,
             OwnerLocked = tradeRequest.OwnerLocked,
             RequesterLocked = tradeRequest.RequesterLocked,
-            LockedAt = tradeRequest.LockedAt
+            LockedAt = tradeRequest.LockedAt,
+            TimeRemaining = timeRemaining // Gán giá trị tính toán được
         };
 
         return dto;
     }
-
     #endregion
 
     #region Private Methods for TradeHistory

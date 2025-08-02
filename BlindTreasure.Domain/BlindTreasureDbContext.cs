@@ -619,6 +619,10 @@ public class BlindTreasureDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(32);
 
+            // Thêm cấu hình cho TimeRemaining
+            entity.Property(t => t.TimeRemaining)
+                .HasDefaultValue(0);
+            
             entity.HasOne(t => t.Listing)
                 .WithMany()
                 .HasForeignKey(t => t.ListingId)
