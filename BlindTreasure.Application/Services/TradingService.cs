@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.TradeHistoryDTOs;
@@ -8,6 +9,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
@@ -20,6 +22,8 @@ public class TradingService : ITradingService
     private readonly IListingService _listingService;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IHubContext<NotificationHub> _notificationHub;
+
 
     public TradingService(IClaimsService claimsService, ILoggerService logger,
         IUnitOfWork unitOfWork, INotificationService notificationService, ICacheService cacheService,
@@ -268,36 +272,50 @@ public class TradingService : ITradingService
 
     public async Task<TradeRequestDto> LockDealAsync(Guid tradeRequestId)
     {
+        // BƯỚC 1: LẤY THÔNG TIN USER HIỆN TẠI
         var userId = _claimsService.CurrentUserId;
-        // Lấy tradeRequest và thực hiện logic lock như cũ
+
+        // BƯỚC 2: TẢI TRADE REQUEST VÀ CÁC THÔNG TIN LIÊN QUAN
         var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
-            t => t.Listing!,
-            t => t.Listing!.InventoryItem,
-            t => t.Listing!.InventoryItem.Product!,
-            t => t.OfferedItems,
-            t => t.Requester!);
+            t => t.Listing!, // Thông tin listing được trade
+            t => t.Listing!.InventoryItem, // Item trong listing
+            t => t.Listing!.InventoryItem.Product!, // Chi tiết sản phẩm
+            t => t.OfferedItems, // Các item được đề xuất trao đổi
+            t => t.Requester!); // Người gửi yêu cầu trade
 
-        if (tradeRequest == null) throw ErrorHelper.NotFound("Trade request không tồn tại.");
+        // BƯỚC 3: VALIDATE TRADE REQUEST TỒN TẠI
+        if (tradeRequest == null)
+            throw ErrorHelper.NotFound("Trade request không tồn tại.");
 
+        // BƯỚC 4: VALIDATE TRẠNG THÁI TRADE REQUEST
         if (tradeRequest.Status != TradeRequestStatus.ACCEPTED)
             throw ErrorHelper.BadRequest("Trade request chưa được chấp nhận.");
 
-        var listingOwnerId = tradeRequest.Listing!.InventoryItem.UserId; // User A
+        // BƯỚC 5: XÁC ĐỊNH LISTING OWNER (User A)
+        // User A = người sở hữu item trong listing
+        var listingOwnerId = tradeRequest.Listing!.InventoryItem.UserId;
 
-
-        // Process lock và kiểm tra hoàn thành
+        // BƯỚC 6: XỬ LÝ LOGIC LOCK VÀ KIỂM TRA HOÀN THÀNH
+        // - Nếu cả 2 đã lock → tự động complete trade
         await ProcessLockAndCompleteIfReady(tradeRequest, userId, listingOwnerId);
 
+        // BƯỚC 7: GỬI REAL-TIME NOTIFICATION QUA SIGNALR
+        // - Thông báo cho user còn lại rằng đối tác đã lock
+        // - Update UI real-time để hiển thị trạng thái lock
+        await SendRealTimeLockNotification(tradeRequest, userId, listingOwnerId);
+
+        // BƯỚC 8: LƯU THAY ĐỔI VÀO DATABASE
         await _unitOfWork.TradeRequests.Update(tradeRequest);
         await _unitOfWork.SaveChangesAsync();
 
-        // Kiểm tra lại sau khi lưu
-        var updatedTradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId);
+        // BƯỚC 9: LẤY LẠI TRADE REQUEST ĐÃ CẬP NHẬT
+        await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId);
 
+        // BƯỚC 10: GỬI NOTIFICATION THÔNG THƯỜNG (BACKUP)
         try
         {
-            var requester = await _unitOfWork.Users.GetByIdAsync(tradeRequest.RequesterId);
-            var listingOwner = await _unitOfWork.Users.GetByIdAsync(listingOwnerId);
+            var requester = await _unitOfWork.Users.GetByIdAsync(tradeRequest.RequesterId); // User B
+            var listingOwner = await _unitOfWork.Users.GetByIdAsync(listingOwnerId); // User A
 
             if (requester != null && listingOwner != null)
                 await SendDealLockedNotificationAsync(requester, listingOwner);
@@ -307,6 +325,7 @@ public class TradingService : ITradingService
             _logger.Error($"[LockDealAsync] Lỗi khi gửi notification: {ex.Message}");
         }
 
+        // BƯỚC 11: TRẢ VỀ KẾT QUẢ
         return await GetTradeRequestByIdAsync(tradeRequestId);
     }
 
@@ -433,6 +452,20 @@ public class TradingService : ITradingService
         );
 
         await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(15));
+    }
+
+    private async Task SendRealTimeLockNotification(TradeRequest tradeRequest, Guid currentUserId, Guid listingOwnerId)
+    {
+        var otherUserId = currentUserId == listingOwnerId ? tradeRequest.RequesterId : listingOwnerId;
+
+        await _notificationHub.Clients.User(otherUserId.ToString())
+            .SendAsync("TradeRequestLocked", new
+            {
+                TradeRequestId = tradeRequest.Id,
+                Message = "Đối tác đã lock giao dịch. Hãy kiểm tra!",
+                OwnerLocked = tradeRequest.OwnerLocked,
+                RequesterLocked = tradeRequest.RequesterLocked
+            });
     }
 
     private async Task SendDealLockedNotificationAsync(User requester, User listingOwner)
