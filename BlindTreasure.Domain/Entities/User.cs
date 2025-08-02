@@ -46,5 +46,5 @@ public class User : BaseEntity
     public ICollection<Notification> Notifications { get; set; }
     public ICollection<Certificate> VerifiedCertificates { get; set; }
     public ICollection<ProbabilityConfig> ApprovedProbabilityConfigs { get; set; }
-    public virtual ICollection<CustomerFavourite> CustomerFavourites { get; set; } = new List<CustomerFavourite>();
-}
+    public ICollection<CustomerFavourite> CustomerFavourites { get; set; } = new List<CustomerFavourite>();
+}    
