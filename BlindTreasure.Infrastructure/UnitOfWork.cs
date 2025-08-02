@@ -42,8 +42,7 @@ public class UnitOfWork : IUnitOfWork
         IGenericRepository<TradeRequest> tradeRequests,
         IGenericRepository<TradeRequestItem> tradeRequestItems,
         IGenericRepository<CustomerFavourite> customerFavourites,
-        IGenericRepository<OrderSellerPromotion> orderSellerPromotion,
-        IDbContextTransaction? transaction = null
+        IGenericRepository<OrderSellerPromotion> orderSellerPromotion, IGenericRepository<Review> reviews, IDbContextTransaction? transaction = null
     )
     {
         _dbContext = dbContext;
@@ -78,6 +77,7 @@ public class UnitOfWork : IUnitOfWork
         TradeRequests = tradeRequests;
         TradeRequestItems = tradeRequestItems;
         OrderSellerPromotions = orderSellerPromotion;
+        Reviews = reviews;
     }
 
     public void Dispose()
@@ -165,4 +165,5 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<TradeRequest> TradeRequests { get; }
     public IGenericRepository<TradeRequestItem> TradeRequestItems { get; }
     public IGenericRepository<OrderSellerPromotion> OrderSellerPromotions { get; }
+    public IGenericRepository<Review> Reviews { get; }
 }

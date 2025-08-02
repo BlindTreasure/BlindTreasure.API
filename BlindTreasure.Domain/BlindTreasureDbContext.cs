@@ -555,30 +555,45 @@ public class BlindTreasureDbContext : DbContext
             .WithMany(u => u.Addresses)
             .HasForeignKey(a => a.UserId);
 
-        //// Shipment ↔ OrderDetail (n-1)
-        //modelBuilder.Entity<Shipment>()
-        //    .HasOne(s => s.OrderDetail)
-        //    .WithMany(od => od.Shipments)
-        //    .HasForeignKey(s => s.OrderDetailId)
-        //    .OnDelete(DeleteBehavior.Cascade); // This will delete Shipments when OrderDetail is deleted
+        modelBuilder.Entity<Review>(entity =>
+        {
+            entity.Property(r => r.Status)
+                .HasConversion<string>()
+                .HasMaxLength(32);
 
-        // Review ↔ User / Product / BlindBox (n-1), set null
-        modelBuilder.Entity<Review>()
-            .HasOne(r => r.User)
-            .WithMany(u => u.Reviews)
-            .HasForeignKey(r => r.UserId);
+            entity.Property(r => r.ImageUrls)
+                .HasConversion(
+                    v => string.Join(";", v),
+                    v => v.Split(";", StringSplitOptions.RemoveEmptyEntries).ToList()
+                );
 
-        modelBuilder.Entity<Review>()
-            .HasOne(r => r.Product)
-            .WithMany(p => p.Reviews)
-            .HasForeignKey(r => r.ProductId)
-            .OnDelete(DeleteBehavior.SetNull);
+            entity.Property(r => r.OriginalComment)
+                .HasMaxLength(2000)
+                .IsRequired();
 
-        modelBuilder.Entity<Review>()
-            .HasOne(r => r.BlindBox)
-            .WithMany(b => b.Reviews)
-            .HasForeignKey(r => r.BlindBoxId)
-            .OnDelete(DeleteBehavior.SetNull);
+            entity.Property(r => r.ProcessedComment)
+                .HasMaxLength(2000);
+
+            entity.Property(r => r.ValidationReason)
+                .HasMaxLength(500);
+
+            entity.Property(r => r.AiValidationDetails)
+                .HasColumnType("jsonb");
+
+            // Relationships...
+            entity.HasOne(r => r.OrderDetail)
+                .WithMany(od => od.Reviews)
+                .HasForeignKey(r => r.OrderDetailId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(r => r.Seller)
+                .WithMany(s => s.Reviews)
+                .HasForeignKey(r => r.SellerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Unique constraint: 1 OrderDetail chỉ có 1 review
+            entity.HasIndex(r => r.OrderDetailId).IsUnique();
+        });
 
         // SupportTicket ↔ User / AssignedTo (n-1), set null
         modelBuilder.Entity<SupportTicket>()

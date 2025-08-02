@@ -187,8 +187,8 @@ public class InventoryItemService : IInventoryItemService
 
         // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
         query = param.Desc
-        ? query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt)
-        : query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
+            ? query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt)
+            : query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
 
 
         var count = await query.CountAsync();

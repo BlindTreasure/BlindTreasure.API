@@ -21,10 +21,8 @@ public interface ITradingService
     /// </summary>
     Task<TradeRequestDto> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted);
 
-    /// <summary>
-    /// Lấy tất cả lịch sử giao dịch với phân trang và bộ lọc (dành cho admin)
-    /// </summary>
-    Task<Pagination<TradeHistoryDto>> GetAllTradeHistoriesAsync(TradeHistoryQueryParameter param);
+    Task<Pagination<TradeHistoryDto>> GetTradeHistoriesAsync(TradeHistoryQueryParameter param,
+        bool onlyMine = false);
 
     /// <summary>
     /// Khóa giao dịch khi cả hai bên đồng ý hoàn tất
@@ -41,8 +39,5 @@ public interface ITradingService
     /// </summary>
     Task<List<TradeRequestDto>> GetMyTradeRequestsAsync();
 
-    /// <summary>
-    /// Lấy lịch sử giao dịch của người dùng hiện tại với phân trang và bộ lọc
-    /// </summary>
-    Task<Pagination<TradeHistoryDto>> GetMyTradeHistoriesAsync(TradeHistoryQueryParameter param);
+    Task<TradeRequestDto> GetTradeRequestByIdAsync(Guid tradeRequestId);
 }

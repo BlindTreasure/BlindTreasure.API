@@ -956,7 +956,8 @@ public class SystemController : ControllerBase
                     // Find the Smiski seller
                     if (sellerSmiski == null)
                     {
-                        _logger.Error("Không tìm thấy user Seller với email smiskiofficial@gmail.com để tạo Smiski products.");
+                        _logger.Error(
+                            "Không tìm thấy user Seller với email smiskiofficial@gmail.com để tạo Smiski products.");
                         break;
                     }
 
@@ -966,7 +967,7 @@ public class SystemController : ControllerBase
                         _logger.Error("User smiskiofficial@gmail.com chưa có Seller tương ứng.");
                         break;
                     }
-                    
+
                     products.AddRange(new[]
                     {
                         new Product
