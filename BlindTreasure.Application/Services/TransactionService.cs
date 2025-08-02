@@ -161,18 +161,17 @@ public class TransactionService : ITransactionService
                 .Include(od => od.InventoryItems)
                 .ToListAsync();
 
-
-            foreach (var od in orderDetails)
+           
+            foreach (var od in orderDetailsWithInventory)
             {
                 if (od.InventoryItems == null || !od.InventoryItems.Any() || !od.ProductId.HasValue)
                 {
                     _logger.Warn($"[HandleSuccessfulPaymentAsync] OrderDetail {od.Id} không có InventoryItems.");
                     continue;
                 }
-
                 // Cập nhật trạng thái và log cho từng OrderDetail
                 _logger.Info($"[HandleSuccessfulPaymentAsync] {od.InventoryItems}");
-
+               
                 OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
                 await _unitOfWork.OrderDetails.Update(od);
             }
@@ -356,44 +355,56 @@ public class TransactionService : ITransactionService
             shipmentsByDetail.TryGetValue(od.Id, out var shipmentList);
             _logger.Info($"[CreateInventory] OrderDetail {od.Id} có {shipmentList?.Count ?? 0} shipment.");
 
+            // ✅ FIXED: Logic xác định status cho InventoryItem
             for (var i = 0; i < od.Quantity; i++)
             {
                 Guid? shipmentId = null;
-                var status = InventoryItemStatus.Available;
+                var status = InventoryItemStatus.Available; // Default
 
                 if (shipmentList != null && shipmentList.Count > 0)
                 {
-                    // Lấy shipment đầu tiên (vì mỗi order detail chỉ có 1 shipment trong 1 lần checkout)
                     var selectedShipment = shipmentList[0];
                     shipmentId = selectedShipment.Id;
-                    status = selectedShipment.Status == ShipmentStatus.PROCESSING
-                        ? InventoryItemStatus.Delivering
-                        : InventoryItemStatus.Available;
+
+                    // ✅ SỬA LẠI: Logic rõ ràng hơn
+                    status = selectedShipment.Status switch
+                    {
+                        ShipmentStatus.PROCESSING => InventoryItemStatus.Delivering,
+                        //ShipmentStatus.DELIVERED => InventoryItemStatus.Available, // Đã giao, về kho
+                        ShipmentStatus.WAITING_PAYMENT => InventoryItemStatus.Available, // Chưa thanh toán
+                        ShipmentStatus.CANCELLED => InventoryItemStatus.Available, // Hủy, về kho
+                        _ => InventoryItemStatus.Available // Default fallback
+                    };
+
+                    _logger.Info($"[CreateInventory] Shipment {selectedShipment.Id} status: {selectedShipment.Status} → InventoryItem status: {status}");
+                }
+                else
+                {
+                    // ✅ Không có shipment = không cần giao hàng = Available ngay
+                    _logger.Info($"[CreateInventory] No shipment for OrderDetail {od.Id} → InventoryItem status: Available");
                 }
 
                 var dto = new InventoryItem
                 {
                     ProductId = od.ProductId!.Value,
                     Location = od.Seller.CompanyAddress,
-                    Status = status,
+                    Status = status, // ✅ Status đã được xác định chính xác
                     ShipmentId = shipmentId,
-                    IsFromBlindBox = false, // Không phải từ BlindBox
+                    IsFromBlindBox = false,
                     OrderDetailId = od.Id,
                     AddressId = shippingAddress?.Id,
-                    UserId = order.UserId // Gán chủ sở hữu là user của order
+                    UserId = order.UserId,
                 };
 
+                var newInventoryItem = await _unitOfWork.InventoryItems.AddAsync(dto);
 
-                var newInventoryItem = await _unitOfWork.InventoryItems.AddAsync(dto); // savechange trả về ở đây rồi
-
-                // Attach inventory item vào navigation property của orderDetail trong bộ nhớ
                 if (od.InventoryItems == null)
                     od.InventoryItems = new List<InventoryItem>();
                 od.InventoryItems.Add(newInventoryItem);
 
-                _logger.Success(
-                    $"[HandlePayment] Created inventory #{++createdCount} " +
-                    $"for Product {od.ProductId} in Order {order.Id}.");
+                _logger.Info($"[CreateInventory] Summary for OrderDetail {od.Id}: " +
+                           $"Created {od.Quantity} InventoryItems, " +
+                           $"Shipment: {(shipmentId.HasValue ? "Yes" : "No")}");
             }
         }
     }
