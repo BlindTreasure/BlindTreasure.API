@@ -19,6 +19,8 @@ public class TradeRequestDto
     public bool OwnerLocked { get; set; }
     public bool RequesterLocked { get; set; }
     public DateTime? LockedAt { get; set; }
+    public int TimeRemaining { get; set; } // Thời gian còn lại tính bằng giây
+
 }
 
 public class OfferedItemDto
