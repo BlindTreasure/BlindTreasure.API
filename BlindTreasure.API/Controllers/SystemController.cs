@@ -547,14 +547,14 @@ public class SystemController : ControllerBase
             },
             new()
             {
-                Email = "honhatquang2@gmail.com",
+                Email = "smiskiofficial@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
-                FullName = "Official Brand Seller",
+                FullName = "Official Smiski Brand ",
                 Phone = "0900000001",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar
+                AvatarUrl = "https://smiski.com/e/wp-content/uploads/2018/02/news_01e-1.png"
             },
             new()
             {
@@ -651,7 +651,7 @@ public class SystemController : ControllerBase
         await SeedSellerForUser("blindtreasurefpt@gmail.com");
         await SeedSellerForUser("hanhnthse170189@fpt.edu.vn");
         await SeedSellerForUser("quanghnse170229@fpt.edu.vn");
-        await SeedSellerForUser("honhatquang2@gmail.com");
+        await SeedSellerForUser("smiskiofficial@gmail.com");
         await SeedSellerForUser("honhatquang3@gmail.com");
 
         _logger.Success("Users and seller seeded successfully.");
@@ -716,6 +716,7 @@ public class SystemController : ControllerBase
     private async Task SeedProducts()
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
+        var sellerSmiski = await _context.Users.FirstOrDefaultAsync(u => u.Email == "smiskiofficial@gmail.com");
         if (sellerUser == null)
         {
             _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo product.");
@@ -952,6 +953,20 @@ public class SystemController : ControllerBase
                     break;
 
                 case "Smiski":
+                    // Find the Smiski seller
+                    if (sellerSmiski == null)
+                    {
+                        _logger.Error("Không tìm thấy user Seller với email smiskiofficial@gmail.com để tạo Smiski products.");
+                        break;
+                    }
+
+                    var smiskiSeller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == sellerSmiski.Id);
+                    if (smiskiSeller == null)
+                    {
+                        _logger.Error("User smiskiofficial@gmail.com chưa có Seller tương ứng.");
+                        break;
+                    }
+                    
                     products.AddRange(new[]
                     {
                         new Product
@@ -961,7 +976,7 @@ public class SystemController : ControllerBase
                             Description =
                                 "Hãy cùng chìm đắm trong một thế giới mộng mơ với SMISKI Blowing Bubbles. Phiên bản này khắc họa hình ảnh SMISKI đang tập trung thổi những quả bong bóng xà phòng lấp lánh, mỗi quả bóng như chứa đựng một ước mơ nhỏ bé bay lên. Với vẻ mặt ngây thơ và hành động đáng yêu, SMISKI không chỉ là một vật trang trí mà còn là nguồn cảm hứng cho những khoảnh khắc thư giãn, mang lại cảm giác bình yên và một chút phép màu cho không gian sống của bạn. Đặt SMISKI ở góc làm việc hay đầu giường, và để những 'quả bóng mơ ước' này nhắc nhở bạn về niềm vui trong những điều giản dị.",
                             CategoryId = category.Id,
-                            SellerId = seller.Id,
+                            SellerId = smiskiSeller.Id,
                             Price = 299000,
                             Stock = 40,
                             Status = ProductStatus.Active,
@@ -982,7 +997,7 @@ public class SystemController : ControllerBase
                             Description =
                                 "Cùng SMISKI Paper Airplane nuôi dưỡng những giấc mơ bay cao, bay xa. Hình ảnh SMISKI cẩn thận cầm trên tay chiếc máy bay giấy, ánh mắt hướng về một chân trời vô định, thể hiện cho khát khao khám phá và chinh phục những vùng đất mới. Đây không chỉ là một món đồ chơi, mà là biểu tượng của lòng dũng cảm, của những hoài bão tuổi trẻ và niềm tin vào một tương lai rộng mở. Hãy để SMISKI Paper Airplane trên bàn làm việc của bạn như một lời nhắc nhở rằng không có giấc mơ nào là quá lớn và không có hành trình nào là không thể.",
                             CategoryId = category.Id,
-                            SellerId = seller.Id,
+                            SellerId = smiskiSeller.Id,
                             Price = 255000,
                             Stock = 25,
                             Status = ProductStatus.Active,
@@ -1003,7 +1018,7 @@ public class SystemController : ControllerBase
                             Description =
                                 "Tận hưởng sự bình yên tuyệt đối cùng SMISKI Sunbathing. Trong một buổi chiều nắng đẹp, SMISKI nằm dài thư giãn, trên bụng là một chú mèo nhỏ đang say ngủ, tạo nên một bức tranh hoàn hảo về tình bạn và sự tin tưởng. Vẻ mặt mãn nguyện của SMISKI và sự yên bình của khung cảnh sẽ giúp bạn tạm gác lại những lo toan, bộn bề của cuộc sống. Sản phẩm này là một lời nhắn nhủ ngọt ngào, rằng hạnh phúc đôi khi chỉ đơn giản là được ở bên cạnh người mình yêu thương, cùng nhau tận hưởng những giây phút tĩnh lặng.",
                             CategoryId = category.Id,
-                            SellerId = seller.Id,
+                            SellerId = smiskiSeller.Id,
                             Price = 319000,
                             Stock = 10,
                             Status = ProductStatus.Active,
@@ -1024,7 +1039,7 @@ public class SystemController : ControllerBase
                             Description =
                                 "Lắng nghe giai điệu của tâm hồn cùng SMISKI Sing-Along. Với cây đàn guitar trên tay, SMISKI say sưa trong thế giới âm nhạc của riêng mình, mỗi nốt nhạc vang lên là một cảm xúc, một câu chuyện được kể. Bức tượng này không chỉ dành cho những người yêu âm nhạc, mà còn dành cho những ai tìm kiếm sự đồng điệu và niềm vui trong cô đơn. SMISKI Sing-Along sẽ là người bạn tâm giao thầm lặng, cùng bạn chia sẻ mọi khoảnh khắc, biến những góc nhỏ trong nhà bạn thành một sân khấu của cảm xúc và sự sáng tạo.",
                             CategoryId = category.Id,
-                            SellerId = seller.Id,
+                            SellerId = smiskiSeller.Id,
                             Price = 275000,
                             Stock = 70,
                             Status = ProductStatus.Active,
@@ -1045,7 +1060,7 @@ public class SystemController : ControllerBase
                             Description =
                                 "Giải phóng năng lượng và cá tính của bạn cùng SMISKI Skateboarding. SMISKI xuất hiện với vẻ ngoài cực ngầu trên chiếc ván trượt, sẵn sàng cho những cú lướt điệu nghệ trên mọi địa hình. Đây là hình ảnh đại diện cho tuổi trẻ, sự năng động và tinh thần không ngại thử thách. Dù bạn là một skater hay chỉ đơn giản là người yêu thích sự tự do, SMISKI Skateboarding chắc chắn sẽ truyền cảm hứng để bạn sống hết mình, phá vỡ mọi giới hạn và tự tin thể hiện phong cách riêng.",
                             CategoryId = category.Id,
-                            SellerId = seller.Id,
+                            SellerId = smiskiSeller.Id,
                             Price = 319000,
                             Stock = 10,
                             Status = ProductStatus.Active,
@@ -1066,7 +1081,7 @@ public class SystemController : ControllerBase
                             Description =
                                 "Khám phá niềm vui từ việc chăm sóc và nuôi dưỡng sự sống với SMISKI Gardening. Với bình tưới trên tay, SMISKI chăm chú tưới nước cho một mầm cây nhỏ, biểu tượng của sự khởi đầu và hy vọng. Điều thú vị và hài hước nhất là một mầm xanh cũng đang nhú lên từ chính đỉnh đầu của SMISKI, như một phần thưởng cho tình yêu thiên nhiên của nó. Sản phẩm này là món quà tuyệt vời cho những người yêu cây cối, mang lại thông điệp về sự kiên nhẫn và niềm hạnh phúc khi thấy công sức của mình đơm hoa kết trái.",
                             CategoryId = category.Id,
-                            SellerId = seller.Id,
+                            SellerId = smiskiSeller.Id,
                             Price = 275000,
                             Stock = 70,
                             Status = ProductStatus.Active,
@@ -1350,10 +1365,10 @@ public class SystemController : ControllerBase
     private async Task SmiskiBlindBoxes()
     {
         var now = DateTime.UtcNow;
-        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
+        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "smiskiofficial@gmail.com");
         if (sellerUser == null)
         {
-            _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo blind box.");
+            _logger.Error("Không tìm thấy user Seller để tạo blind box.");
             return;
         }
 
@@ -1550,257 +1565,6 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
 
         _logger.Success("[SmiskiBlindBoxes] Đã seed blind box cho SMISKI Series1 thành công.");
-    }
-
-    private async Task SeedCounterStrikeCases()
-    {
-        var now = DateTime.UtcNow;
-        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
-        if (sellerUser == null)
-        {
-            _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo blind box.");
-            return;
-        }
-
-        var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == sellerUser.Id);
-        if (seller == null)
-        {
-            _logger.Error("User này chưa có Seller tương ứng.");
-            return;
-        }
-
-        // Lấy tất cả category con (ParentId != null)
-        var categories = await _context.Categories
-            .Where(c => !c.IsDeleted && c.ParentId != null)
-            .ToListAsync();
-
-        if (!categories.Any())
-        {
-            _logger.Warn("[SeedBlindBoxes] Không tìm thấy category con để tạo blind box.");
-            return;
-        }
-
-
-        foreach (var category in categories)
-        {
-            // Tạo mới 6 sản phẩm cho mỗi category, ProductSaleType là BlindBoxOnly
-            var gunsItems = new List<Product>
-            {
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "AWP LIGHTNING STRIKE",
-                    Description = "Skin súng huyền thoại AWP với thiết kế tia sét ánh tím.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    Price = 820000,
-                    Stock = 40,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FAWP%20LIGHTNING%20STRIKE.png&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "Digital",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "AWP MEDUSA",
-                    Description = "AWP phiên bản Medusa, hoa văn rắn cổ điển cực hiếm.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    Price = 1250000,
-                    Stock = 35,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FAWP%20Medusa.png&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "Digital",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "GLOCK-18 FADE",
-                    Description = "Skin Glock-18 với hiệu ứng chuyển màu mượt mà FADE.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    Price = 480000,
-                    Stock = 50,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FGLOCK-18%20FADE.png&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "Digital",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "M4A4 ICARUS FELL",
-                    Description = "Skin M4A4 với chủ đề Icarus xanh đậm độc đáo.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    Price = 950000,
-                    Stock = 30,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FM4A4%20ICARUS%20FELL.png&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "Digital",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "M4A4 POSEIDON",
-                    Description = "Skin M4A4 với biểu tượng thần biển Poseidon.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    Price = 1350000,
-                    Stock = 25,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FM4A4%20POSEIDON.png&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "Digital",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = "★ Karambit Doppler",
-                    Description = "Dao Karambit Doppler với hiệu ứng galaxy nổi bật, vật phẩm cực hiếm.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    Price = 1750000,
-                    Stock = 20,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2F%E2%98%85%20Karambit%20Doppler.png&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "Digital",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                }
-            };
-
-
-            await _context.Products.AddRangeAsync(gunsItems);
-            await _context.SaveChangesAsync();
-
-            var blindBox = new BlindBox
-            {
-                Id = Guid.NewGuid(),
-                SellerId = seller.Id,
-                CategoryId = category.Id,
-                Name = "Counter-Strike Midnight Case",
-                Description = "Blind box gồm các skin súng Counter-Strike hiếm và độc quyền.",
-                Price = 850000,
-                TotalQuantity = 30,
-                HasSecretItem = true,
-                SecretProbability = 0, // sẽ cập nhật bên dưới
-                Status = BlindBoxStatus.Approved,
-                ImageUrl =
-                    "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FMidnight%20Race%20Case%2FMidnight%20Race%20Case.png&version_id=null",
-                ReleaseDate = now,
-                CreatedAt = now
-            };
-
-            var blindBoxItems = new List<BlindBoxItem>();
-            var rarityConfigs = new List<RarityConfig>();
-            var probabilityConfigs = new List<ProbabilityConfig>();
-
-            var rarityArr = new[]
-            {
-                new { Name = "AWP LIGHTNING STRIKE", Rarity = RarityName.Epic, Weight = 15, Quantity = 5 },
-                new { Name = "AWP MEDUSA", Rarity = RarityName.Epic, Weight = 15, Quantity = 4 },
-                new { Name = "GLOCK-18 FADE", Rarity = RarityName.Common, Weight = 30, Quantity = 8 },
-                new { Name = "M4A4 ICARUS FELL", Rarity = RarityName.Common, Weight = 30, Quantity = 8 },
-                new { Name = "M4A4 POSEIDON", Rarity = RarityName.Epic, Weight = 10, Quantity = 3 },
-                new { Name = "★ Karambit Doppler", Rarity = RarityName.Secret, Weight = 100, Quantity = 2 }
-            };
-
-            var totalWeightQty = rarityArr.Sum(x => x.Quantity * x.Weight);
-
-            foreach (var itemConfig in rarityArr)
-            {
-                var product = gunsItems.First(p => p.Name == itemConfig.Name);
-                var dropRate = Math.Round((decimal)(itemConfig.Quantity * itemConfig.Weight) / totalWeightQty * 100m,
-                    2);
-                var itemId = Guid.NewGuid();
-
-                blindBoxItems.Add(new BlindBoxItem
-                {
-                    Id = itemId,
-                    BlindBoxId = blindBox.Id,
-                    ProductId = product.Id,
-                    Quantity = itemConfig.Quantity,
-                    DropRate = dropRate,
-                    IsSecret = itemConfig.Rarity == RarityName.Secret,
-                    IsActive = true,
-                    CreatedAt = now
-                });
-
-                rarityConfigs.Add(new RarityConfig
-                {
-                    Id = Guid.NewGuid(),
-                    BlindBoxItemId = itemId,
-                    Name = itemConfig.Rarity,
-                    Weight = itemConfig.Weight,
-                    IsSecret = itemConfig.Rarity == RarityName.Secret,
-                    CreatedAt = now
-                });
-
-                probabilityConfigs.Add(new ProbabilityConfig
-                {
-                    Id = Guid.NewGuid(),
-                    BlindBoxItemId = itemId,
-                    Probability = dropRate,
-                    EffectiveFrom = now,
-                    EffectiveTo = now.AddYears(1),
-                    ApprovedBy = sellerUser.Id,
-                    ApprovedAt = now,
-                    CreatedAt = now
-                });
-            }
-
-            blindBox.SecretProbability = blindBoxItems
-                .Where(i => i.IsSecret)
-                .Sum(i => Math.Round(i.DropRate, 2));
-
-            await _context.BlindBoxes.AddAsync(blindBox);
-            await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
-            await _context.RarityConfigs.AddRangeAsync(rarityConfigs);
-            await _context.ProbabilityConfigs.AddRangeAsync(probabilityConfigs);
-            await _context.SaveChangesAsync();
-
-            _logger.Success(
-                $"[SeedCounterStrikeCases] Đã seed Counter-Strike blind box cho category {category.Name} thành công.");
-        }
     }
 
     private async Task SeedHighSecretBlindBoxes()
@@ -2224,25 +1988,51 @@ public class SystemController : ControllerBase
             return;
         }
 
-        var seller = new Seller
+        Seller seller;
+
+        switch (sellerEmail)
         {
-            UserId = sellerUser.Id,
-            IsVerified = true,
-            CoaDocumentUrl = "https://example.com/coa.pdf",
-            CompanyName = "Blind Treasure Ltd.",
-            TaxId = "987654321",
-            CompanyAddress = "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, Vietnam",
-            Status = SellerStatus.Approved,
-            CreatedAt = DateTime.UtcNow,
-            CompanyPhone = "0325134357",
-            CompanyWardName = "Phường 14",
-            CompanyDistrictName = "Quận 10",
-            CompanyProvinceName = "HCM"
-        };
+            case "smiskiofficial@gmail.com":
+                seller = new Seller
+                {
+                    UserId = sellerUser.Id,
+                    IsVerified = true,
+                    CoaDocumentUrl = "https://example.com/smiski-coa.pdf",
+                    CompanyName = "Smiski Official Store",
+                    TaxId = "123456789",
+                    CompanyAddress = "Tokyo, Japan - Vietnam Representative Office",
+                    Status = SellerStatus.Approved,
+                    CreatedAt = DateTime.UtcNow,
+                    CompanyPhone = "0901234567",
+                    CompanyWardName = "Phường 1",
+                    CompanyDistrictName = "Quận 1",
+                    CompanyProvinceName = "HCM"
+                };
+                break;
+
+            case "blindtreasurefpt@gmail.com":
+            default:
+                seller = new Seller
+                {
+                    UserId = sellerUser.Id,
+                    IsVerified = true,
+                    CoaDocumentUrl = "https://example.com/coa.pdf",
+                    CompanyName = "Blind Treasure Ltd.",
+                    TaxId = "987654321",
+                    CompanyAddress = "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, Vietnam",
+                    Status = SellerStatus.Approved,
+                    CreatedAt = DateTime.UtcNow,
+                    CompanyPhone = "0325134357",
+                    CompanyWardName = "Phường 14",
+                    CompanyDistrictName = "Quận 10",
+                    CompanyProvinceName = "HCM"
+                };
+                break;
+        }
 
         await _context.Sellers.AddAsync(seller);
         await _context.SaveChangesAsync();
-        _logger.Info("Seller seeded successfully.");
+        _logger.Info($"Seller seeded successfully for {sellerEmail}.");
     }
 
     private async Task SeedRoles()
