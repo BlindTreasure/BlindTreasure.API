@@ -1998,15 +1998,16 @@ public class SystemController : ControllerBase
                     UserId = sellerUser.Id,
                     IsVerified = true,
                     CoaDocumentUrl = "https://example.com/smiski-coa.pdf",
-                    CompanyName = "Smiski Official Store",
+                    CompanyName = "Smiski Official Store Tokyo Japan",
                     TaxId = "123456789",
-                    CompanyAddress = "Tokyo, Japan - Vietnam Representative Office",
+                    CompanyAddress = "336 Trường Sa, Phường 7, quận Phú Nhuận",
                     Status = SellerStatus.Approved,
                     CreatedAt = DateTime.UtcNow,
                     CompanyPhone = "0901234567",
-                    CompanyWardName = "Phường 1",
-                    CompanyDistrictName = "Quận 1",
-                    CompanyProvinceName = "HCM"
+                    CompanyWardName = "Phường 7",
+                    CompanyDistrictName = "Quận Phú Nhuận",
+                    CompanyProvinceName = "HCM",
+
                 };
                 break;
 
@@ -2019,11 +2020,11 @@ public class SystemController : ControllerBase
                     CoaDocumentUrl = "https://example.com/coa.pdf",
                     CompanyName = "Blind Treasure Ltd.",
                     TaxId = "987654321",
-                    CompanyAddress = "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, Vietnam",
+                    CompanyAddress = "72 Thành Thái, Phường 12, Quận 10, Hồ Chí Minh, Vietnam",
                     Status = SellerStatus.Approved,
                     CreatedAt = DateTime.UtcNow,
                     CompanyPhone = "0325134357",
-                    CompanyWardName = "Phường 14",
+                    CompanyWardName = "Phường 12",
                     CompanyDistrictName = "Quận 10",
                     CompanyProvinceName = "HCM"
                 };
