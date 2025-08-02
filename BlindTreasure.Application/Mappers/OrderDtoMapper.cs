@@ -17,10 +17,10 @@ public static class OrderDtoMapper
         if (!inventoryItems.Any())
             return;
 
-        int total = inventoryItems.Count;
-        int requested = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Shipment_requested);
-        int delivering = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Delivering);
-        int available = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Available);
+        var total = inventoryItems.Count;
+        var requested = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Shipment_requested);
+        var delivering = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Delivering);
+        var available = inventoryItems.Count(ii => ii.Status == InventoryItemStatus.Available);
 
         var oldStatus = orderDetail.Status;
 

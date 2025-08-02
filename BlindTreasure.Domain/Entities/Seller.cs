@@ -38,4 +38,5 @@ public class Seller : BaseEntity
     public ICollection<BlindBox>? BlindBoxes { get; set; }
 
     public ICollection<PromotionParticipant>? PromotionParticipants { get; set; }
+    public ICollection<Review>? Reviews { get; set; } = new List<Review>();
 }

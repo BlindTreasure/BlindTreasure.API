@@ -35,7 +35,8 @@ public class UnitOfWork(
     IGenericRepository<TradeRequest> tradeRequests,
     IGenericRepository<TradeRequestItem> tradeRequestItems,
     IGenericRepository<CustomerFavourite> customerFavourites,
-    IGenericRepository<OrderSellerPromotion> orderSellerPromotion)
+    IGenericRepository<OrderSellerPromotion> orderSellerPromotion,
+    IGenericRepository<Review> reviews)
     : IUnitOfWork
 {
     public IGenericRepository<User> Users { get; } = userRepository;
@@ -68,6 +69,7 @@ public class UnitOfWork(
     public IGenericRepository<TradeRequest> TradeRequests { get; } = tradeRequests;
     public IGenericRepository<TradeRequestItem> TradeRequestItems { get; } = tradeRequestItems;
     public IGenericRepository<OrderSellerPromotion> OrderSellerPromotions { get; } = orderSellerPromotion;
+    public IGenericRepository<Review> Reviews { get; } = reviews;
 
     public void Dispose()
     {

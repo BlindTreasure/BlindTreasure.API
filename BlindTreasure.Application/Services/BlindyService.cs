@@ -1,6 +1,9 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Text;
+using System.Text.Json;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
+using BlindTreasure.Domain.DTOs.GeminiDTOs;
 
 namespace BlindTreasure.Application.Services;
 
@@ -15,6 +18,55 @@ public class BlindyService : IBlindyService
         _analyzerService = analyzerService;
     }
 
+    public async Task<ReviewValidationResult> ValidateReviewAsync(string comment, int rating, string? sellerName = null,
+        string? productName = null)
+    {
+        var promptBuilder = new StringBuilder();
+        promptBuilder.AppendLine(
+            "Phân tích và validate nội dung review sau đây cho nền tảng thương mại điện tử BlindTreasure:");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine($"**Nội dung review:** \"{comment}\"");
+        promptBuilder.AppendLine($"**Đánh giá:** {rating}/5 sao");
+        promptBuilder.AppendLine($"**Sản phẩm:** {productName ?? "Không rõ"}");
+        promptBuilder.AppendLine($"**Seller:** {sellerName ?? "Không rõ"}");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Kiểm tra các tiêu chí sau:");
+        promptBuilder.AppendLine("1. **Ngôn từ độc hại:** Có chửi thề, xúc phạm, hate speech không?");
+        promptBuilder.AppendLine("2. **Spam/Fake:** Có dấu hiệu review ảo, copy-paste, không liên quan không?");
+        promptBuilder.AppendLine("3. **Thông tin cá nhân:** Có tiết lộ số điện thoại, email, địa chỉ cụ thể không?");
+        promptBuilder.AppendLine("4. **Nội dung bất hợp pháp:** Có quảng cáo sản phẩm khác, link lừa đảo không?");
+        promptBuilder.AppendLine("5. **Tính nhất quán:** Rating có phù hợp với nội dung comment không?");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Trả về JSON format:");
+        promptBuilder.AppendLine("{");
+        promptBuilder.AppendLine("    \"isValid\": true/false,");
+        promptBuilder.AppendLine("    \"confidence\": 0.0-1.0,");
+        promptBuilder.AppendLine("    \"issues\": [\"danh sách vấn đề phát hiện\"],");
+        promptBuilder.AppendLine("    \"suggestedAction\": \"approve/moderate/reject\",");
+        promptBuilder.AppendLine("    \"cleanedComment\": \"nội dung đã được làm sạch (nếu có)\",");
+        promptBuilder.AppendLine("    \"reason\": \"lý do cụ thể\"");
+        promptBuilder.AppendLine("}");
+
+        var prompt = promptBuilder.ToString();
+        var aiResponse = await _geminiService.GenerateResponseAsync(prompt);
+
+        try
+        {
+            var result = JsonSerializer.Deserialize<ReviewValidationResult>(aiResponse);
+            return result;
+        }
+        catch
+        {
+            return new ReviewValidationResult
+            {
+                IsValid = false,
+                Confidence = 0.5,
+                Issues = new[] { "AI validation error" },
+                SuggestedAction = "moderate",
+                Reason = "Không thể phân tích được nội dung"
+            };
+        }
+    }
 
     /// <summary>
     ///     HÀM NÀY ĐỂ STAFF GỌI CHO AI PHÂN TÍCH HỆ THỐNG
@@ -34,7 +86,7 @@ public class BlindyService : IBlindyService
                Giới tính: {(u.Gender.HasValue ? u.Gender.Value ? "Nam" : "Nữ" : "Không rõ")}
                Trạng thái: {u.Status}
                Vai trò: {u.RoleName}
-               Ngày tạo: {u.CreatedAt:yyyy-MM-dd HH:mm}
+               Ngày tạo: {u.CreatedAt:yyyy-M-d HH:mm}
              """
         ));
 

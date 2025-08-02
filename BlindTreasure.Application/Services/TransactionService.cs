@@ -161,7 +161,7 @@ public class TransactionService : ITransactionService
                 .Include(od => od.InventoryItems)
                 .ToListAsync();
 
-           
+
             foreach (var od in orderDetails)
             {
                 if (od.InventoryItems == null || !od.InventoryItems.Any() || !od.ProductId.HasValue)
@@ -169,9 +169,10 @@ public class TransactionService : ITransactionService
                     _logger.Warn($"[HandleSuccessfulPaymentAsync] OrderDetail {od.Id} không có InventoryItems.");
                     continue;
                 }
+
                 // Cập nhật trạng thái và log cho từng OrderDetail
                 _logger.Info($"[HandleSuccessfulPaymentAsync] {od.InventoryItems}");
-               
+
                 OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
                 await _unitOfWork.OrderDetails.Update(od);
             }
@@ -376,10 +377,10 @@ public class TransactionService : ITransactionService
                     Location = od.Seller.CompanyAddress,
                     Status = status,
                     ShipmentId = shipmentId,
-                    IsFromBlindBox=false, // Không phải từ BlindBox
+                    IsFromBlindBox = false, // Không phải từ BlindBox
                     OrderDetailId = od.Id,
                     AddressId = shippingAddress?.Id,
-                    UserId = order.UserId, // Gán chủ sở hữu là user của order
+                    UserId = order.UserId // Gán chủ sở hữu là user của order
                 };
 
 
@@ -393,9 +394,6 @@ public class TransactionService : ITransactionService
                 _logger.Success(
                     $"[HandlePayment] Created inventory #{++createdCount} " +
                     $"for Product {od.ProductId} in Order {order.Id}.");
-                
-
-
             }
         }
     }
