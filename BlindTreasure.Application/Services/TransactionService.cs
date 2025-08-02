@@ -424,6 +424,8 @@ public class TransactionService : ITransactionService
                     OrderDetailId = od.Id,
                     IsOpened = false
                 };
+                od.Status = OrderDetailItemStatus.IN_INVENTORY;
+
                 await _customerBlindBoxService.CreateAsync(createBlindBoxDto, order.UserId);
                 _logger.Success(
                     $"[HandleSuccessfulPaymentAsync] Đã tạo customer inventory thứ {++blindBoxCount} cho BlindBox {od.BlindBoxId.Value} trong order {order.Id}.");

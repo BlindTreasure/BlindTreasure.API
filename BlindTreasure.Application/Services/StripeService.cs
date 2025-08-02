@@ -178,7 +178,7 @@ public class StripeService : IStripeService
             },
             SuccessUrl = $"{_successRedirectUrl}?order_id={order.Id}&status=success",
             CancelUrl = $"{_failRedirectUrl}?order_id={order.Id}&status=pending",
-            ExpiresAt = DateTime.UtcNow.AddMinutes(30),
+            ExpiresAt = DateTime.UtcNow.AddHours(24),
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
                 Metadata = new Dictionary<string, string>
