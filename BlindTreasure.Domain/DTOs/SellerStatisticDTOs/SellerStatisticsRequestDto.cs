@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,12 +9,19 @@ namespace BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
 
 public class SellerStatisticsRequestDto
 {
-    public DateTime From { get; set; }
+    [Required]
+    public StatisticsTimeRange Range { get; set; } = StatisticsTimeRange.Week;
 
-    public DateTime To { get; set; }
+    public DateTime? StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
 
-    // Cho tương lai nếu cần phân trang, lọc theo sản phẩm, category…
-    public Guid? ProductId { get; set; }
-    public int Page { get; set; } = 1;
-    public int PageSize { get; set; } = 50;
+    // Validation: Custom range requires StartDate and EndDate
+    public bool IsValid()
+    {
+        if (Range == StatisticsTimeRange.Custom)
+        {
+            return StartDate.HasValue && EndDate.HasValue && StartDate <= EndDate;
+        }
+        return true;
+    }
 }

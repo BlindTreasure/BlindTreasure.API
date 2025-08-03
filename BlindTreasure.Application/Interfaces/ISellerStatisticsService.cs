@@ -9,9 +9,5 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface ISellerStatisticsService
 {
-    Task<SellerSalesStatisticsDto> GetSalesStatisticsAsync(Guid? sellerId = null, DateTime? from = null,
-        DateTime? to = null);
-
-    Task<SellerStatisticsDto> GetStatisticsAsync(Guid sellerId, SellerStatisticsRequestDto req,
-        CancellationToken ct = default);
+    Task<SellerDashboardStatisticsDto> GetDashboardStatisticsAsync(Guid sellerId, SellerStatisticsRequestDto req, CancellationToken ct = default);
 }
