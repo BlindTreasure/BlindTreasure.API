@@ -229,37 +229,111 @@ public class TradingService : ITradingService
 
     public async Task<TradeRequestDto> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted)
     {
-        var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
-            t => t.Listing!,
-            t => t.Listing!.InventoryItem);
-
-        if (tradeRequest == null)
-            throw ErrorHelper.NotFound("Trade Request không tồn tại.");
-
-        if (tradeRequest.Status != TradeRequestStatus.PENDING)
-            throw ErrorHelper.BadRequest("Giao dịch này đã được xử lý hoặc hết hạn.");
-
-        tradeRequest.Status = isAccepted ? TradeRequestStatus.ACCEPTED : TradeRequestStatus.REJECTED;
-        tradeRequest.RespondedAt = DateTime.UtcNow;
-
-        await UpdateInventoryItemStatusOnReject(tradeRequest, isAccepted);
-        await _unitOfWork.TradeRequests.Update(tradeRequest);
-        await _unitOfWork.SaveChangesAsync();
+        _logger.Info(
+            $"[RespondTradeRequestAsync] Bắt đầu xử lý respond trade request {tradeRequestId}, isAccepted: {isAccepted}");
 
         try
         {
-            var requester = await _unitOfWork.Users.GetByIdAsync(tradeRequest.RequesterId);
-            var responder = await _unitOfWork.Users.GetByIdAsync(_claimsService.CurrentUserId);
+            // BƯỚC 1: Lấy trade request với đầy đủ thông tin liên quan
+            var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
+                t => t.Listing!,
+                t => t.Listing!.InventoryItem,
+                t => t.Listing!.InventoryItem.Product!,
+                t => t.Requester!);
 
-            if (requester != null && responder != null)
-                await SendTradeResponseNotificationAsync(requester, responder.FullName, isAccepted);
+            if (tradeRequest == null)
+            {
+                _logger.Error($"[RespondTradeRequestAsync] Trade Request {tradeRequestId} không tồn tại");
+                throw ErrorHelper.NotFound("Trade Request không tồn tại.");
+            }
+
+            _logger.Info(
+                $"[RespondTradeRequestAsync] Tìm thấy trade request {tradeRequestId}, status hiện tại: {tradeRequest.Status}");
+
+            // BƯỚC 2: Validate trạng thái
+            if (tradeRequest.Status != TradeRequestStatus.PENDING)
+            {
+                _logger.Warn(
+                    $"[RespondTradeRequestAsync] Trade request {tradeRequestId} không ở trạng thái PENDING, status: {tradeRequest.Status}");
+                throw ErrorHelper.BadRequest("Giao dịch này đã được xử lý hoặc hết hạn.");
+            }
+
+            // BƯỚC 3: Validate listing
+            if (tradeRequest.Listing == null)
+            {
+                _logger.Error($"[RespondTradeRequestAsync] Listing null cho trade request {tradeRequestId}");
+                throw ErrorHelper.Internal("Thông tin listing không hợp lệ.");
+            }
+
+            // BƯỚC 4: Validate inventory item
+            if (tradeRequest.Listing.InventoryItem == null)
+            {
+                _logger.Error($"[RespondTradeRequestAsync] InventoryItem null cho listing {tradeRequest.Listing.Id}");
+                throw ErrorHelper.Internal("Thông tin inventory item không hợp lệ.");
+            }
+
+            // BƯỚC 5: Kiểm tra quyền respond (chỉ owner của listing mới được respond)
+            var currentUserId = _claimsService.CurrentUserId;
+            if (tradeRequest.Listing.InventoryItem.UserId != currentUserId)
+            {
+                _logger.Warn(
+                    $"[RespondTradeRequestAsync] User {currentUserId} không phải owner của listing, owner thực tế: {tradeRequest.Listing.InventoryItem.UserId}");
+                throw ErrorHelper.Forbidden("Bạn không có quyền phản hồi trade request này.");
+            }
+
+            _logger.Info(
+                $"[RespondTradeRequestAsync] User {currentUserId} có quyền respond trade request {tradeRequestId}");
+
+            // BƯỚC 6: Cập nhật trạng thái trade request
+            var originalStatus = tradeRequest.Status;
+            tradeRequest.Status = isAccepted ? TradeRequestStatus.ACCEPTED : TradeRequestStatus.REJECTED;
+            tradeRequest.RespondedAt = DateTime.UtcNow;
+
+            // Reset TimeRemaining dựa trên trạng thái mới
+            if (isAccepted)
+            {
+                // Nếu accept, tính toán TimeRemaining = 2 phút = 120 giây
+                tradeRequest.TimeRemaining = 120;
+            }
+            else
+            {
+                // Nếu reject, TimeRemaining = 0
+                tradeRequest.TimeRemaining = 0;
+            }
+
+            _logger.Info(
+                $"[RespondTradeRequestAsync] Cập nhật trade request {tradeRequestId} từ {originalStatus} sang {tradeRequest.Status}, TimeRemaining: {tradeRequest.TimeRemaining}");
+
+            // BƯỚC 7: Xử lý inventory item status
+            await UpdateInventoryItemStatusOnReject(tradeRequest, isAccepted);
+
+            // BƯỚC 8: Lưu thay đổi
+            await _unitOfWork.TradeRequests.Update(tradeRequest);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.Success($"[RespondTradeRequestAsync] Đã lưu thành công trade request {tradeRequestId}");
+
+            // BƯỚC 9: Gửi notification (với error handling)
+            try
+            {
+                await SendTradeResponseNotificationSafe(tradeRequest, currentUserId, isAccepted);
+            }
+            catch (Exception notificationEx)
+            {
+                _logger.Error($"[RespondTradeRequestAsync] Lỗi khi gửi notification: {notificationEx.Message}");
+                // Không throw để không ảnh hưởng đến logic chính
+            }
+
+            // BƯỚC 10: Trả về kết quả
+            _logger.Info($"[RespondTradeRequestAsync] Hoàn thành xử lý trade request {tradeRequestId}");
+            return await GetTradeRequestByIdAsync(tradeRequestId);
         }
         catch (Exception ex)
         {
-            _logger.Error($"[RespondTradeRequestAsync] Lỗi khi gửi notification: {ex.Message}");
+            _logger.Error($"[RespondTradeRequestAsync] Lỗi khi xử lý trade request {tradeRequestId}: {ex.Message}");
+            _logger.Error($"[RespondTradeRequestAsync] Stack trace: {ex.StackTrace}");
+            throw;
         }
-
-        return await GetTradeRequestByIdAsync(tradeRequestId);
     }
 
     public async Task<TradeRequestDto> LockDealAsync(Guid tradeRequestId)
@@ -399,6 +473,44 @@ public class TradingService : ITradingService
         );
 
         await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
+    }
+
+    private async Task SendTradeResponseNotificationSafe(TradeRequest tradeRequest, Guid responderId, bool isAccepted)
+    {
+        try
+        {
+            if (tradeRequest.Requester == null)
+            {
+                _logger.Warn(
+                    $"[SendTradeResponseNotificationSafe] Requester null cho trade request {tradeRequest.Id}, cố gắng load từ database");
+
+                var requester = await _unitOfWork.Users.GetByIdAsync(tradeRequest.RequesterId);
+                if (requester == null)
+                {
+                    _logger.Error(
+                        $"[SendTradeResponseNotificationSafe] Không thể tìm thấy requester {tradeRequest.RequesterId}");
+                    return;
+                }
+
+                tradeRequest.Requester = requester;
+            }
+
+            var responder = await _unitOfWork.Users.GetByIdAsync(responderId);
+            if (responder == null)
+            {
+                _logger.Error($"[SendTradeResponseNotificationSafe] Không thể tìm thấy responder {responderId}");
+                return;
+            }
+
+            await SendTradeResponseNotificationAsync(tradeRequest.Requester, responder.FullName ?? "Unknown",
+                isAccepted);
+            _logger.Success(
+                $"[SendTradeResponseNotificationSafe] Đã gửi notification thành công cho trade request {tradeRequest.Id}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[SendTradeResponseNotificationSafe] Lỗi khi gửi notification: {ex.Message}");
+        }
     }
 
     private async Task SendTradeRequestNotificationIfNotSentAsync(User user, string? requesterName)
@@ -677,28 +789,50 @@ public class TradingService : ITradingService
         _logger.Info(
             $"[UpdateInventoryItemStatusOnReject] Bắt đầu xử lý reject status - TradeRequestId: {tradeRequest.Id}, IsAccepted: {isAccepted}");
 
-        if (!isAccepted)
+        try
         {
-            _logger.Info(
-                $"[UpdateInventoryItemStatusOnReject] Trade request {tradeRequest.Id} bị reject, khôi phục status listing item");
-
-            var listingItem = tradeRequest.Listing.InventoryItem;
-            if (listingItem == null)
+            if (!isAccepted)
             {
-                _logger.Error(
-                    $"[UpdateInventoryItemStatusOnReject] Listing item null cho trade request {tradeRequest.Id}");
-                return;
-            }
+                _logger.Info(
+                    $"[UpdateInventoryItemStatusOnReject] Trade request {tradeRequest.Id} bị reject, khôi phục status listing item");
 
-            listingItem.Status = InventoryItemStatus.Available;
-            await _unitOfWork.InventoryItems.Update(listingItem);
-            _logger.Success(
-                $"[UpdateInventoryItemStatusOnReject] Đã khôi phục listing item {listingItem.Id} về status Available");
+                // Kiểm tra null safety
+                if (tradeRequest.Listing == null)
+                {
+                    _logger.Error(
+                        $"[UpdateInventoryItemStatusOnReject] Listing null cho trade request {tradeRequest.Id}");
+                    return;
+                }
+
+                var listingItem = tradeRequest.Listing.InventoryItem;
+                if (listingItem == null)
+                {
+                    _logger.Error(
+                        $"[UpdateInventoryItemStatusOnReject] Listing item null cho trade request {tradeRequest.Id}");
+                    return;
+                }
+
+                _logger.Info(
+                    $"[UpdateInventoryItemStatusOnReject] Khôi phục listing item {listingItem.Id} từ status {listingItem.Status} về Available");
+
+                listingItem.Status = InventoryItemStatus.Available;
+                listingItem.LockedByRequestId = null; // Reset lock nếu có
+
+                await _unitOfWork.InventoryItems.Update(listingItem);
+
+                _logger.Success(
+                    $"[UpdateInventoryItemStatusOnReject] Đã khôi phục listing item {listingItem.Id} về status Available");
+            }
+            else
+            {
+                _logger.Info(
+                    $"[UpdateInventoryItemStatusOnReject] Trade request {tradeRequest.Id} được accept, không cần khôi phục status");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            _logger.Info(
-                $"[UpdateInventoryItemStatusOnReject] Trade request {tradeRequest.Id} được accept, không cần khôi phục status");
+            _logger.Error($"[UpdateInventoryItemStatusOnReject] Lỗi khi cập nhật inventory status: {ex.Message}");
+            throw;
         }
     }
 
@@ -775,7 +909,7 @@ public class TradingService : ITradingService
             var timeoutMinutes = 2; // 2 phút timeout
             var elapsedTime = DateTime.UtcNow - tradeRequest.RespondedAt.Value;
             var remainingTime = TimeSpan.FromMinutes(timeoutMinutes) - elapsedTime;
-        
+
             // Nếu còn thời gian thì tính bằng giây, nếu không thì = 0
             timeRemaining = remainingTime.TotalSeconds > 0 ? (int)remainingTime.TotalSeconds : 0;
         }
@@ -800,6 +934,7 @@ public class TradingService : ITradingService
 
         return dto;
     }
+
     #endregion
 
     #region Private Methods for TradeHistory
