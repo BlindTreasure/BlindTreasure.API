@@ -81,16 +81,12 @@ public class TradingService : ITradingService
 
         // Ghi log với thông tin phù hợp dựa vào chế độ truy vấn
         if (onlyMine)
-        {
             _logger.Info(
                 $"[GetTradeHistoriesAsync] Lấy trade histories của user {userId}, Page: {param.PageIndex}, Size: {param.PageSize}");
-        }
         else
-        {
             _logger.Info(
                 $"[GetTradeHistoriesAsync] Lấy tất cả trade histories, Page: {param.PageIndex}, Size: {param.PageSize}, " +
                 $"Status: {param.FinalStatus}, RequesterId: {param.RequesterId}, Desc: {param.Desc}");
-        }
 
         var query = _unitOfWork.TradeHistories.GetQueryable()
             .Include(th => th.Listing)
@@ -140,10 +136,7 @@ public class TradingService : ITradingService
         var tradeHistoryDtos = tradeHistories.Select(MapTradeHistoryToDto).ToList();
 
         // Ghi log thành công nếu là "chỉ của tôi"
-        if (onlyMine)
-        {
-            _logger.Success($"[GetTradeHistoriesAsync] Tìm thấy {count} trade histories của user {userId}");
-        }
+        if (onlyMine) _logger.Success($"[GetTradeHistoriesAsync] Tìm thấy {count} trade histories của user {userId}");
 
         return new Pagination<TradeHistoryDto>(tradeHistoryDtos, count, param.PageIndex, param.PageSize);
     }
@@ -291,15 +284,11 @@ public class TradingService : ITradingService
 
             // Reset TimeRemaining dựa trên trạng thái mới
             if (isAccepted)
-            {
                 // Nếu accept, tính toán TimeRemaining = 2 phút = 120 giây
                 tradeRequest.TimeRemaining = 120;
-            }
             else
-            {
                 // Nếu reject, TimeRemaining = 0
                 tradeRequest.TimeRemaining = 0;
-            }
 
             _logger.Info(
                 $"[RespondTradeRequestAsync] Cập nhật trade request {tradeRequestId} từ {originalStatus} sang {tradeRequest.Status}, TimeRemaining: {tradeRequest.TimeRemaining}");
@@ -462,6 +451,7 @@ public class TradingService : ITradingService
         }
     }
 
+
     public async Task ReleaseHeldItemsAsync()
     {
         var now = DateTime.UtcNow;
@@ -522,63 +512,83 @@ public class TradingService : ITradingService
 
     #region Private Methods
 
-    #region notifications
+    private async Task CreateTradeHistoryAsync(TradeRequest tradeRequest, TradeRequestStatus finalStatus)
+    {
+        var tradeHistory = new TradeHistory
+        {
+            ListingId = tradeRequest.ListingId,
+            RequesterId = tradeRequest.RequesterId,
+            OfferedInventoryId =
+                tradeRequest.OfferedItems.FirstOrDefault()?.InventoryItemId, // Lấy item đầu tiên nếu có nhiều
+            FinalStatus = finalStatus,
+            CompletedAt = DateTime.UtcNow,
+            CreatedAt = tradeRequest.CreatedAt
+        };
+
+        await _unitOfWork.TradeHistories.AddAsync(tradeHistory);
+    }
 
     // Method helper mới để xử lý lock logic an toàn hơn
-    private async Task ProcessLockAndCompleteIfReadySafe(TradeRequest tradeRequest, Guid userId, Guid listingOwnerId,
-        bool isOwner, bool isRequester)
+    private async Task CompleteTradeExchangeAsync(TradeRequest tradeRequest)
     {
-        _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Xử lý lock logic cho trade request {tradeRequest.Id}");
+        _logger.Info($"[CompleteTradeExchangeAsync] Bắt đầu trao đổi item cho trade request {tradeRequest.Id}");
 
         try
         {
-            // Cập nhật trạng thái lock
-            if (isOwner)
-            {
-                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Owner {userId} thực hiện lock");
-                tradeRequest.OwnerLocked = true;
-            }
-            else if (isRequester)
-            {
-                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Requester {userId} thực hiện lock");
-                tradeRequest.RequesterLocked = true;
-            }
+            // 1. Lấy thông tin listing item (item của owner)
+            var listingItem = tradeRequest.Listing.InventoryItem;
+            var originalOwnerId = listingItem.UserId;
+            var newOwnerId = tradeRequest.RequesterId;
 
             _logger.Info(
-                $"[ProcessLockAndCompleteIfReadySafe] Trạng thái lock sau cập nhật - OwnerLocked: {tradeRequest.OwnerLocked}, RequesterLocked: {tradeRequest.RequesterLocked}");
+                $"[CompleteTradeExchangeAsync] Listing item {listingItem.Id} sẽ chuyển từ {originalOwnerId} sang {newOwnerId}");
 
-            // Kiểm tra nếu cả hai đã lock
-            if (tradeRequest.OwnerLocked && tradeRequest.RequesterLocked)
+            // 2. Lấy thông tin offered items (items của requester)
+            var offeredItemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
+            var offeredItems = await _unitOfWork.InventoryItems.GetAllAsync(
+                i => offeredItemIds.Contains(i.Id),
+                i => i.Product);
+
+            _logger.Info($"[CompleteTradeExchangeAsync] Sẽ trao đổi {offeredItems.Count} offered items");
+
+            // 3. Trao đổi ownership của listing item
+            listingItem.UserId = newOwnerId; // Chuyển item của owner sang requester
+            listingItem.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày để tránh trade liên tục
+            listingItem.HoldUntil = DateTime.UtcNow.AddDays(3);
+            listingItem.LockedByRequestId = null; // Reset lock
+
+            await _unitOfWork.InventoryItems.Update(listingItem);
+
+            // 4. Trao đổi ownership của offered items
+            foreach (var offeredItem in offeredItems)
             {
                 _logger.Info(
-                    $"[ProcessLockAndCompleteIfReadySafe] Cả hai bên đã lock, đặt LockedAt = {DateTime.UtcNow}");
-                tradeRequest.LockedAt = DateTime.UtcNow;
-                tradeRequest.TimeRemaining = 0; // Đã hoàn thành, không còn thời gian chờ
+                    $"[CompleteTradeExchangeAsync] Chuyển offered item {offeredItem.Id} từ {offeredItem.UserId} sang {originalOwnerId}");
 
-                // TODO: Thêm logic hoàn thành giao dịch ở đây nếu cần
-                _logger.Info(
-                    $"[ProcessLockAndCompleteIfReadySafe] Giao dịch {tradeRequest.Id} đã được lock bởi cả hai bên");
+                offeredItem.UserId = originalOwnerId; // Chuyển item của requester sang owner
+                offeredItem.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày
+                offeredItem.HoldUntil = DateTime.UtcNow.AddDays(3);
+
+                await _unitOfWork.InventoryItems.Update(offeredItem);
             }
-            else
-            {
-                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Chưa đủ điều kiện hoàn thành, chờ bên còn lại lock");
 
-                // Tính toán thời gian còn lại dựa trên RespondedAt
-                if (tradeRequest.RespondedAt.HasValue)
-                {
-                    var timeoutMinutes = 2;
-                    var elapsedTime = DateTime.UtcNow - tradeRequest.RespondedAt.Value;
-                    var remainingTime = TimeSpan.FromMinutes(timeoutMinutes) - elapsedTime;
-                    tradeRequest.TimeRemaining = remainingTime.TotalSeconds > 0 ? (int)remainingTime.TotalSeconds : 0;
+            // 5. Cập nhật trạng thái trade request
+            tradeRequest.Status = TradeRequestStatus.COMPLETED;
+            tradeRequest.RespondedAt = DateTime.UtcNow;
 
-                    _logger.Info(
-                        $"[ProcessLockAndCompleteIfReadySafe] Cập nhật TimeRemaining = {tradeRequest.TimeRemaining} giây");
-                }
-            }
+            // 6. Cập nhật trạng thái listing thành inactive
+            var listing = tradeRequest.Listing;
+            listing.Status = ListingStatus.Sold;
+            await _unitOfWork.Listings.Update(listing);
+
+            // 7. Tạo trade history record
+            await CreateTradeHistoryAsync(tradeRequest, TradeRequestStatus.COMPLETED);
+
+            _logger.Success($"[CompleteTradeExchangeAsync] Hoàn thành trao đổi cho trade request {tradeRequest.Id}");
         }
         catch (Exception ex)
         {
-            _logger.Error($"[ProcessLockAndCompleteIfReadySafe] Lỗi trong quá trình xử lý lock: {ex.Message}");
+            _logger.Error($"[CompleteTradeExchangeAsync] Lỗi khi trao đổi item: {ex.Message}");
             throw;
         }
     }
@@ -792,8 +802,6 @@ public class TradingService : ITradingService
             await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
         }
     }
-
-    #endregion
 
 
     private async Task ValidateMultipleOfferedItems(List<Guid> offeredInventoryIds,
@@ -1023,55 +1031,64 @@ public class TradingService : ITradingService
         }
     }
 
-    private Task ProcessLockAndCompleteIfReady(TradeRequest tradeRequest, Guid userId, Guid listingOwnerId)
+    private async Task ProcessLockAndCompleteIfReadySafe(TradeRequest tradeRequest, Guid userId, Guid listingOwnerId,
+        bool isOwner, bool isRequester)
     {
-        _logger.Info(
-            $"[ProcessLockAndCompleteIfReady] Xử lý lock - TradeRequestId: {tradeRequest.Id}, UserId: {userId}, ListingOwnerId: {listingOwnerId}");
-        _logger.Info(
-            $"[ProcessLockAndCompleteIfReady] Current lock status - OwnerLocked: {tradeRequest.OwnerLocked}, RequesterLocked: {tradeRequest.RequesterLocked}");
+        _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Xử lý lock logic cho trade request {tradeRequest.Id}");
 
-        // Kiểm tra quyền lock
-        var isOwner = userId == listingOwnerId;
-        var isRequester = userId == tradeRequest.RequesterId;
-
-        if (!isOwner && !isRequester)
+        try
         {
-            _logger.Error(
-                $"[ProcessLockAndCompleteIfReady] User {userId} không phải là owner ({listingOwnerId}) hoặc requester ({tradeRequest.RequesterId})");
-            throw ErrorHelper.Forbidden("Bạn không có quyền lock giao dịch này.");
-        }
+            // Cập nhật trạng thái lock
+            if (isOwner)
+            {
+                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Owner {userId} thực hiện lock");
+                tradeRequest.OwnerLocked = true;
+            }
+            else if (isRequester)
+            {
+                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Requester {userId} thực hiện lock");
+                tradeRequest.RequesterLocked = true;
+            }
 
-        // Xác định user nào lock
-        if (isOwner)
-        {
-            _logger.Info($"[ProcessLockAndCompleteIfReady] Owner (User A) {userId} thực hiện lock");
-            // Kiểm tra đã lock chưa để tránh lock nhiều lần
-            if (tradeRequest.OwnerLocked)
-                _logger.Warn($"[ProcessLockAndCompleteIfReady] Owner {userId} đã lock trước đó");
-
-            tradeRequest.OwnerLocked = true;
-        }
-        else // isRequester
-        {
-            _logger.Info($"[ProcessLockAndCompleteIfReady] Requester (User B) {userId} thực hiện lock");
-            // Kiểm tra đã lock chưa để tránh lock nhiều lần
-            if (tradeRequest.RequesterLocked)
-                _logger.Warn($"[ProcessLockAndCompleteIfReady] Requester {userId} đã lock trước đó");
-
-            tradeRequest.RequesterLocked = true;
-        }
-
-        _logger.Info(
-            $"[ProcessLockAndCompleteIfReady] Trạng thái lock sau khi cập nhật - OwnerLocked: {tradeRequest.OwnerLocked}, RequesterLocked: {tradeRequest.RequesterLocked}");
-
-        // Khi cả 2 đã lock - tự động hoàn thành giao dịch
-        if (tradeRequest.OwnerLocked && tradeRequest.RequesterLocked)
             _logger.Info(
-                $"[ProcessLockAndCompleteIfReady] Cả hai bên đã lock, bắt đầu hoàn thành giao dịch {tradeRequest.Id}");
-        // Phần còn lại giữ nguyên...
-        else
-            _logger.Info("[ProcessLockAndCompleteIfReady] Chưa đủ điều kiện hoàn thành (cần cả hai bên lock)");
-        return Task.CompletedTask;
+                $"[ProcessLockAndCompleteIfReadySafe] Trạng thái lock sau cập nhật - OwnerLocked: {tradeRequest.OwnerLocked}, RequesterLocked: {tradeRequest.RequesterLocked}");
+
+            // Kiểm tra nếu cả hai đã lock
+            if (tradeRequest.OwnerLocked && tradeRequest.RequesterLocked)
+            {
+                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Cả hai bên đã lock, bắt đầu hoàn thành giao dịch");
+
+                tradeRequest.LockedAt = DateTime.UtcNow;
+                tradeRequest.TimeRemaining = 0;
+
+                // THỰC HIỆN TRAO ĐỔI ITEM
+                await CompleteTradeExchangeAsync(tradeRequest);
+
+                _logger.Success(
+                    $"[ProcessLockAndCompleteIfReadySafe] Hoàn thành trao đổi cho trade request {tradeRequest.Id}");
+            }
+            else
+            {
+                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Chưa đủ điều kiện hoàn thành, chờ bên còn lại lock");
+
+                // Tính toán thời gian còn lại
+                if (tradeRequest.RespondedAt.HasValue)
+                {
+                    var timeoutMinutes = 2;
+                    var elapsedTime = DateTime.UtcNow - tradeRequest.RespondedAt.Value;
+                    var remainingTime = TimeSpan.FromMinutes(timeoutMinutes) - elapsedTime;
+                    tradeRequest.TimeRemaining = remainingTime.TotalSeconds > 0 ? (int)remainingTime.TotalSeconds : 0;
+
+                    _logger.Info(
+                        $"[ProcessLockAndCompleteIfReadySafe] Cập nhật TimeRemaining = {tradeRequest.TimeRemaining} giây");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[ProcessLockAndCompleteIfReadySafe] Lỗi trong quá trình xử lý lock: {ex.Message}");
+            throw;
+        }
     }
 
     private static TradeRequestDto MapTradeRequestToDto(TradeRequest tradeRequest, List<InventoryItem> offeredItems)
@@ -1091,7 +1108,7 @@ public class TradingService : ITradingService
         }).ToList();
 
         // Tính toán thời gian còn lại
-        int timeRemaining = 0;
+        var timeRemaining = 0;
         if (tradeRequest.Status == TradeRequestStatus.ACCEPTED && tradeRequest.RespondedAt.HasValue)
         {
             var timeoutMinutes = 2; // 2 phút timeout

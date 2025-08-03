@@ -4,7 +4,9 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ReviewDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
 
@@ -101,28 +103,45 @@ public class ReviewService : IReviewService
         return MapReviewToDto(createdReview!);
     }
 
-    public async Task<List<ReviewResponseDto>> GetAllReviewsAsync(int page = 1, int pageSize = 20,
-        Guid? productId = null, Guid? blindBoxId = null, Guid? sellerId = null)
+    public async Task<Pagination<ReviewResponseDto>> GetAllReviewsAsync(ReviewQueryParameter param)
     {
-        var reviews = await _unitOfWork.Reviews.GetAllAsync(
-            r => r.IsPublished &&
-                 (productId == null || r.ProductId == productId) &&
-                 (blindBoxId == null || r.BlindBoxId == blindBoxId) &&
-                 (sellerId == null || r.SellerId == sellerId),
-            r => r.User,
-            r => r.Product,
-            r => r.BlindBox,
-            r => r.Seller
-        );
+        var baseQuery = _unitOfWork.Reviews.GetQueryable()
+            .Include(r => r.User)
+            .Include(r => r.Product)
+            .Include(r => r.BlindBox)
+            .Include(r => r.Seller)
+            .Where(r =>
+                (param.IsPublished == null || r.IsPublished == param.IsPublished) &&
+                (param.ProductId == null || r.ProductId == param.ProductId) &&
+                (param.BlindBoxId == null || r.BlindBoxId == param.BlindBoxId) &&
+                (param.SellerId == null || r.SellerId == param.SellerId) &&
+                (param.UserId == null || r.UserId == param.UserId) &&
+                (param.Status == null || r.Status == param.Status) &&
+                (param.MinRating == null || r.OverallRating >= param.MinRating) &&
+                (param.IsVerifiedPurchase == null || r.IsVerifiedPurchase == param.IsVerifiedPurchase)
+            )
+            .AsNoTracking();
 
-        var pagedReviews = reviews
-            .OrderByDescending(r => r.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToList();
+        // Sắp xếp mặc định theo ngày tạo giảm dần
+        var query = baseQuery.OrderByDescending(r => r.CreatedAt);
 
-        return pagedReviews.Select(MapReviewToDto).ToList();
+        var count = await query.CountAsync();
+
+        List<Review> items;
+        if (param.PageIndex == 0)
+            items = await query.ToListAsync();
+        else
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+
+        var dtos = items.Select(MapReviewToDto).ToList();
+        var result = new Pagination<ReviewResponseDto>(dtos, count, param.PageIndex, param.PageSize);
+
+        return result;
     }
+
 
     public async Task<ReviewResponseDto> GetReviewByIdAsync(Guid reviewId)
     {
