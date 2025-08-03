@@ -10,4 +10,9 @@ public class PromotionQueryParameter : PaginationParameter
     public PromotionStatus? Status { get; set; }
 
     public Guid? SellerId { get; set; } // Cho phép lọc theo seller cụ thể
+    
+    /// <summary>
+    /// Lọc theo loại voucher: true = global, false = seller-specific
+    /// </summary>
+    public bool? IsGlobal { get; set; }
 }

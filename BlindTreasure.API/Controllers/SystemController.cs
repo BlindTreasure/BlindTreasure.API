@@ -432,6 +432,147 @@ public class SystemController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Giả lập user đã mua hàng để t test chức năng review
+    /// </summary>
+    /// <param name="userId">ID of the user to seed products. If not provided, defaults to user trangiaphuc362003181@gmail.com</param>
+    [HttpPost("dev/seed-products-users")]
+    public async Task<IActionResult> SeedProductsUsers([FromQuery] Guid? userId = null)
+    {
+        try
+        {
+            User? user;
+
+            if (userId.HasValue)
+            {
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedProductsUsers] User not found with Id: {userId}");
+                    return NotFound($"User not found with Id: {userId}");
+                }
+
+                _logger.Info($"[SeedProductsUsers] Seeding products for user Id: {userId}");
+            }
+            else
+            {
+                var email = "trangiaphuc362003181@gmail.com";
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedProductsUsers] User not found with email: {email}");
+                    return NotFound($"User not found with email: {email}");
+                }
+
+                _logger.Info($"[SeedProductsUsers] Seeding products for user: {email}");
+            }
+
+            // Get 3 random products that can be reviewed (active, in stock)
+            var products = await _context.Products
+                .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 && !p.IsDeleted)
+                .OrderBy(p => Guid.NewGuid())
+                .Take(3)
+                .ToListAsync();
+
+            if (products.Count < 3)
+            {
+                _logger.Warn("[SeedProductsUsers] Not enough valid products found (need at least 3)");
+                return BadRequest("Not enough valid products found (need at least 3)");
+            }
+
+            var now = DateTime.UtcNow;
+
+            // Create a new order
+            var order = new Order
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                Status = "Completed",
+                TotalAmount = products.Sum(p => p.Price),
+                FinalAmount = products.Sum(p => p.Price),
+                PlacedAt = now.AddDays(-7), // Order was placed 7 days ago
+                CompletedAt = now.AddDays(-5), // Completed 5 days ago
+                CreatedAt = now
+            };
+
+            // Create order details and inventory items for each product
+            var orderDetails = new List<OrderDetail>();
+            var inventoryItems = new List<InventoryItem>();
+
+            foreach (var product in products)
+            {
+                var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.Id == product.SellerId);
+                if (seller == null)
+                {
+                    _logger.Warn($"[SeedProductsUsers] Seller not found for product {product.Id}");
+                    continue;
+                }
+
+                // Create order detail
+                var orderDetail = new OrderDetail
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    ProductId = product.Id,
+                    Quantity = 1,
+                    UnitPrice = product.Price,
+                    TotalPrice = product.Price,
+                    Status = OrderDetailItemStatus.DELIVERED,
+                    SellerId = seller.Id,
+                    CreatedAt = now
+                };
+                orderDetails.Add(orderDetail);
+
+                // Create inventory item
+                var inventoryItem = new InventoryItem
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    ProductId = product.Id,
+                    OrderDetailId = orderDetail.Id,
+                    Status = InventoryItemStatus.Available,
+                    IsFromBlindBox = false,
+                    Location = "HCM",
+                    Tier = RarityName.Common, // Default rarity for direct purchases
+                    CreatedAt = now
+                };
+                inventoryItems.Add(inventoryItem);
+            }
+
+            if (!orderDetails.Any())
+            {
+                _logger.Warn("[SeedProductsUsers] No valid order details could be created");
+                return BadRequest("No valid order details could be created");
+            }
+
+            // Save to database
+            await _context.Orders.AddAsync(order);
+            await _context.OrderDetails.AddRangeAsync(orderDetails);
+            await _context.InventoryItems.AddRangeAsync(inventoryItems);
+            await _context.SaveChangesAsync();
+
+            _logger.Success(
+                $"[SeedProductsUsers] Successfully seeded {orderDetails.Count} products and inventory items for user {user.Email}");
+
+            return Ok(ApiResult<object>.Success(new
+            {
+                Message =
+                    $"Successfully seeded {orderDetails.Count} purchased products and inventory items for user {user.Email}",
+                OrderId = order.Id,
+                ProductIds = orderDetails.Select(od => od.ProductId).ToList(),
+                InventoryItemIds = inventoryItems.Select(ii => ii.Id).ToList()
+            }));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            _logger.Error($"[SeedProductsUsers] Exception: {ex.Message}");
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+
     [HttpDelete("clear-caching")]
     public async Task<IActionResult> ClearCaching()
     {
@@ -1849,6 +1990,21 @@ public class SystemController : ControllerBase
             return;
         }
 
+        // Lấy seller smiski
+        var smiskiUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "smiskiofficial@gmail.com");
+        if (smiskiUser == null)
+        {
+            _logger.Warn("[SeedPromotions] Không tìm thấy User 'smiskiofficial@gmail.com' để tạo promotion.");
+            return;
+        }
+
+        var smiskiSeller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == smiskiUser.Id);
+        if (smiskiSeller == null)
+        {
+            _logger.Warn("[SeedPromotions] Không tìm thấy Seller cho user 'smiskiofficial@gmail.com'.");
+            return;
+        }
+
         var promotions = new List<Promotion>
         {
             new()
@@ -1858,7 +2014,7 @@ public class SystemController : ControllerBase
                 Description = "Giảm 10% cho tất cả đơn hàng.",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 10,
-                StartDate = now.AddDays(3),
+                StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
                 SellerId = seller.Id,
@@ -1873,7 +2029,7 @@ public class SystemController : ControllerBase
                 Description = "Giảm 50K cho đơn từ 500K.",
                 DiscountType = DiscountType.Fixed,
                 DiscountValue = 50000,
-                StartDate = now.AddDays(3),
+                StartDate = now,
                 EndDate = now.AddMonths(2),
                 Status = PromotionStatus.Pending,
                 SellerId = seller.Id,
@@ -1888,7 +2044,7 @@ public class SystemController : ControllerBase
                 Description = "Voucher giới hạn cho khách VIP.",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 15,
-                StartDate = now.AddDays(3),
+                StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
                 SellerId = seller.Id,
@@ -1926,12 +2082,27 @@ public class SystemController : ControllerBase
                 UsageLimit = null,
                 CreatedByRole = RoleType.Staff,
                 CreatedAt = now
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "SMISKI15",
+                Description = "Giảm 15% cho các sản phẩm Smiski.",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 15,
+                StartDate = now,
+                EndDate = now.AddMonths(1),
+                Status = PromotionStatus.Approved,
+                SellerId = smiskiSeller.Id, // Assign to smiski seller
+                UsageLimit = 150,
+                CreatedByRole = RoleType.Seller,
+                CreatedAt = now
             }
         };
 
         await _context.Promotions.AddRangeAsync(promotions);
         await _context.SaveChangesAsync();
-        _logger.Success("[SeedPromotions] Đã seed 5 promotion mẫu.");
+        _logger.Success("[SeedPromotions] Đã seed 6 promotion mẫu.");
     }
 
     private async Task SeedPromotionParticipants()
@@ -1979,7 +2150,6 @@ public class SystemController : ControllerBase
         _logger.Success("[SeedPromotionParticipants] Đã seed promotion participant mẫu.");
     }
 
-
     private async Task SeedSellerForUser(string sellerEmail)
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == sellerEmail);
@@ -2008,7 +2178,6 @@ public class SystemController : ControllerBase
                     CompanyWardName = "Phường 7",
                     CompanyDistrictName = "Quận Phú Nhuận",
                     CompanyProvinceName = "HCM",
-
                 };
                 break;
 
