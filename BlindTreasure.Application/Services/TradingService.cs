@@ -525,117 +525,125 @@ public class TradingService : ITradingService
     #region notifications
 
     // Method helper mới để xử lý lock logic an toàn hơn
-private async Task ProcessLockAndCompleteIfReadySafe(TradeRequest tradeRequest, Guid userId, Guid listingOwnerId, bool isOwner, bool isRequester)
-{
-    _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Xử lý lock logic cho trade request {tradeRequest.Id}");
-
-    try
+    private async Task ProcessLockAndCompleteIfReadySafe(TradeRequest tradeRequest, Guid userId, Guid listingOwnerId,
+        bool isOwner, bool isRequester)
     {
-        // Cập nhật trạng thái lock
-        if (isOwner)
-        {
-            _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Owner {userId} thực hiện lock");
-            tradeRequest.OwnerLocked = true;
-        }
-        else if (isRequester)
-        {
-            _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Requester {userId} thực hiện lock");
-            tradeRequest.RequesterLocked = true;
-        }
+        _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Xử lý lock logic cho trade request {tradeRequest.Id}");
 
-        _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Trạng thái lock sau cập nhật - OwnerLocked: {tradeRequest.OwnerLocked}, RequesterLocked: {tradeRequest.RequesterLocked}");
-
-        // Kiểm tra nếu cả hai đã lock
-        if (tradeRequest.OwnerLocked && tradeRequest.RequesterLocked)
+        try
         {
-            _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Cả hai bên đã lock, đặt LockedAt = {DateTime.UtcNow}");
-            tradeRequest.LockedAt = DateTime.UtcNow;
-            tradeRequest.TimeRemaining = 0; // Đã hoàn thành, không còn thời gian chờ
-
-            // TODO: Thêm logic hoàn thành giao dịch ở đây nếu cần
-            _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Giao dịch {tradeRequest.Id} đã được lock bởi cả hai bên");
-        }
-        else
-        {
-            _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Chưa đủ điều kiện hoàn thành, chờ bên còn lại lock");
-            
-            // Tính toán thời gian còn lại dựa trên RespondedAt
-            if (tradeRequest.RespondedAt.HasValue)
+            // Cập nhật trạng thái lock
+            if (isOwner)
             {
-                var timeoutMinutes = 2;
-                var elapsedTime = DateTime.UtcNow - tradeRequest.RespondedAt.Value;
-                var remainingTime = TimeSpan.FromMinutes(timeoutMinutes) - elapsedTime;
-                tradeRequest.TimeRemaining = remainingTime.TotalSeconds > 0 ? (int)remainingTime.TotalSeconds : 0;
-                
-                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Cập nhật TimeRemaining = {tradeRequest.TimeRemaining} giây");
+                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Owner {userId} thực hiện lock");
+                tradeRequest.OwnerLocked = true;
+            }
+            else if (isRequester)
+            {
+                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Requester {userId} thực hiện lock");
+                tradeRequest.RequesterLocked = true;
+            }
+
+            _logger.Info(
+                $"[ProcessLockAndCompleteIfReadySafe] Trạng thái lock sau cập nhật - OwnerLocked: {tradeRequest.OwnerLocked}, RequesterLocked: {tradeRequest.RequesterLocked}");
+
+            // Kiểm tra nếu cả hai đã lock
+            if (tradeRequest.OwnerLocked && tradeRequest.RequesterLocked)
+            {
+                _logger.Info(
+                    $"[ProcessLockAndCompleteIfReadySafe] Cả hai bên đã lock, đặt LockedAt = {DateTime.UtcNow}");
+                tradeRequest.LockedAt = DateTime.UtcNow;
+                tradeRequest.TimeRemaining = 0; // Đã hoàn thành, không còn thời gian chờ
+
+                // TODO: Thêm logic hoàn thành giao dịch ở đây nếu cần
+                _logger.Info(
+                    $"[ProcessLockAndCompleteIfReadySafe] Giao dịch {tradeRequest.Id} đã được lock bởi cả hai bên");
+            }
+            else
+            {
+                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Chưa đủ điều kiện hoàn thành, chờ bên còn lại lock");
+
+                // Tính toán thời gian còn lại dựa trên RespondedAt
+                if (tradeRequest.RespondedAt.HasValue)
+                {
+                    var timeoutMinutes = 2;
+                    var elapsedTime = DateTime.UtcNow - tradeRequest.RespondedAt.Value;
+                    var remainingTime = TimeSpan.FromMinutes(timeoutMinutes) - elapsedTime;
+                    tradeRequest.TimeRemaining = remainingTime.TotalSeconds > 0 ? (int)remainingTime.TotalSeconds : 0;
+
+                    _logger.Info(
+                        $"[ProcessLockAndCompleteIfReadySafe] Cập nhật TimeRemaining = {tradeRequest.TimeRemaining} giây");
+                }
             }
         }
+        catch (Exception ex)
+        {
+            _logger.Error($"[ProcessLockAndCompleteIfReadySafe] Lỗi trong quá trình xử lý lock: {ex.Message}");
+            throw;
+        }
     }
-    catch (Exception ex)
-    {
-        _logger.Error($"[ProcessLockAndCompleteIfReadySafe] Lỗi trong quá trình xử lý lock: {ex.Message}");
-        throw;
-    }
-}
 
 // Method helper để gửi SignalR notification an toàn
-private async Task SendRealTimeLockNotificationSafe(TradeRequest tradeRequest, Guid currentUserId, Guid listingOwnerId)
-{
-    try
+    private async Task SendRealTimeLockNotificationSafe(TradeRequest tradeRequest, Guid currentUserId,
+        Guid listingOwnerId)
     {
-        var otherUserId = currentUserId == listingOwnerId ? tradeRequest.RequesterId : listingOwnerId;
-        
-        _logger.Info($"[SendRealTimeLockNotificationSafe] Gửi SignalR notification cho user {otherUserId}");
+        try
+        {
+            var otherUserId = currentUserId == listingOwnerId ? tradeRequest.RequesterId : listingOwnerId;
 
-        await _notificationHub.Clients.User(otherUserId.ToString())
-            .SendAsync("TradeRequestLocked", new
-            {
-                TradeRequestId = tradeRequest.Id,
-                Message = "Đối tác đã lock giao dịch. Hãy kiểm tra!",
-                OwnerLocked = tradeRequest.OwnerLocked,
-                RequesterLocked = tradeRequest.RequesterLocked,
-                TimeRemaining = tradeRequest.TimeRemaining
-            });
+            _logger.Info($"[SendRealTimeLockNotificationSafe] Gửi SignalR notification cho user {otherUserId}");
 
-        _logger.Success($"[SendRealTimeLockNotificationSafe] Đã gửi SignalR notification thành công cho user {otherUserId}");
+            await _notificationHub.Clients.User(otherUserId.ToString())
+                .SendAsync("TradeRequestLocked", new
+                {
+                    TradeRequestId = tradeRequest.Id,
+                    Message = "Đối tác đã lock giao dịch. Hãy kiểm tra!",
+                    OwnerLocked = tradeRequest.OwnerLocked,
+                    RequesterLocked = tradeRequest.RequesterLocked,
+                    TimeRemaining = tradeRequest.TimeRemaining
+                });
+
+            _logger.Success(
+                $"[SendRealTimeLockNotificationSafe] Đã gửi SignalR notification thành công cho user {otherUserId}");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[SendRealTimeLockNotificationSafe] Lỗi khi gửi SignalR notification: {ex.Message}");
+            throw;
+        }
     }
-    catch (Exception ex)
-    {
-        _logger.Error($"[SendRealTimeLockNotificationSafe] Lỗi khi gửi SignalR notification: {ex.Message}");
-        throw;
-    }
-}
 
 // Method helper để gửi notification thông thường an toàn
-private async Task SendDealLockedNotificationSafe(TradeRequest tradeRequest, Guid listingOwnerId)
-{
-    try
+    private async Task SendDealLockedNotificationSafe(TradeRequest tradeRequest, Guid listingOwnerId)
     {
-        var requester = await _unitOfWork.Users.GetByIdAsync(tradeRequest.RequesterId);
-        var listingOwner = await _unitOfWork.Users.GetByIdAsync(listingOwnerId);
-
-        if (requester == null)
+        try
         {
-            _logger.Warn($"[SendDealLockedNotificationSafe] Không tìm thấy requester {tradeRequest.RequesterId}");
-            return;
-        }
+            var requester = await _unitOfWork.Users.GetByIdAsync(tradeRequest.RequesterId);
+            var listingOwner = await _unitOfWork.Users.GetByIdAsync(listingOwnerId);
 
-        if (listingOwner == null)
+            if (requester == null)
+            {
+                _logger.Warn($"[SendDealLockedNotificationSafe] Không tìm thấy requester {tradeRequest.RequesterId}");
+                return;
+            }
+
+            if (listingOwner == null)
+            {
+                _logger.Warn($"[SendDealLockedNotificationSafe] Không tìm thấy listing owner {listingOwnerId}");
+                return;
+            }
+
+            await SendDealLockedNotificationAsync(requester, listingOwner);
+            _logger.Success(
+                $"[SendDealLockedNotificationSafe] Đã gửi notification thành công cho trade request {tradeRequest.Id}");
+        }
+        catch (Exception ex)
         {
-            _logger.Warn($"[SendDealLockedNotificationSafe] Không tìm thấy listing owner {listingOwnerId}");
-            return;
+            _logger.Error($"[SendDealLockedNotificationSafe] Lỗi khi gửi notification: {ex.Message}");
+            throw;
         }
+    }
 
-        await SendDealLockedNotificationAsync(requester, listingOwner);
-        _logger.Success($"[SendDealLockedNotificationSafe] Đã gửi notification thành công cho trade request {tradeRequest.Id}");
-    }
-    catch (Exception ex)
-    {
-        _logger.Error($"[SendDealLockedNotificationSafe] Lỗi khi gửi notification: {ex.Message}");
-        throw;
-    }
-}
-    
     private async Task NotifyItemReleased(InventoryItem item)
     {
         var cacheKey = $"noti:item_released:{item.UserId}:{item.Id}";
@@ -646,7 +654,7 @@ private async Task SendDealLockedNotificationSafe(TradeRequest tradeRequest, Gui
             new NotificationDTO
             {
                 Title = "Vật phẩm sẵn sàng trade!",
-                Message = $"'{item.Product?.Name}' đã có thể trao đổi lại.",    
+                Message = $"'{item.Product?.Name}' đã có thể trao đổi lại.",
                 Type = NotificationType.System
             }
         );
@@ -1070,6 +1078,7 @@ private async Task SendDealLockedNotificationSafe(TradeRequest tradeRequest, Gui
     {
         var listingItem = tradeRequest.Listing?.InventoryItem;
         var listingItemName = listingItem?.Product?.Name ?? "Unknown";
+        var listingItemImgUrl = listingItem?.Product?.ImageUrls?.FirstOrDefault();
         var listingItemTier = listingItem?.Tier ?? RarityName.Common;
         var requesterName = tradeRequest.Requester?.FullName ?? "Unknown";
 
@@ -1099,6 +1108,7 @@ private async Task SendDealLockedNotificationSafe(TradeRequest tradeRequest, Gui
             ListingId = tradeRequest.ListingId,
             ListingItemName = listingItemName,
             ListingItemTier = listingItemTier,
+            ListingItemImgUrl = listingItemImgUrl,
             RequesterId = tradeRequest.RequesterId,
             RequesterName = requesterName,
             OfferedItems = offeredItemDtos,
