@@ -24,10 +24,9 @@ public class TradingService : ITradingService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<NotificationHub> _notificationHub;
 
-
     public TradingService(IClaimsService claimsService, ILoggerService logger,
         IUnitOfWork unitOfWork, INotificationService notificationService, ICacheService cacheService,
-        IListingService listingService)
+        IListingService listingService, IHubContext<NotificationHub> notificationHub)
     {
         _claimsService = claimsService;
         _logger = logger;
@@ -35,6 +34,7 @@ public class TradingService : ITradingService
         _notificationService = notificationService;
         _cacheService = cacheService;
         _listingService = listingService;
+        _notificationHub = notificationHub;
     }
 
     public async Task<List<TradeRequestDto>> GetTradeRequestsAsync(Guid listingId)
@@ -593,7 +593,7 @@ public class TradingService : ITradingService
         }
     }
 
-// Method helper để gửi SignalR notification an toàn
+    // Method helper để gửi SignalR notification an toàn
     private async Task SendRealTimeLockNotificationSafe(TradeRequest tradeRequest, Guid currentUserId,
         Guid listingOwnerId)
     {
@@ -623,7 +623,7 @@ public class TradingService : ITradingService
         }
     }
 
-// Method helper để gửi notification thông thường an toàn
+    // Method helper để gửi notification thông thường an toàn
     private async Task SendDealLockedNotificationSafe(TradeRequest tradeRequest, Guid listingOwnerId)
     {
         try
@@ -755,20 +755,6 @@ public class TradingService : ITradingService
         await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(15));
     }
 
-    private async Task SendRealTimeLockNotification(TradeRequest tradeRequest, Guid currentUserId, Guid listingOwnerId)
-    {
-        var otherUserId = currentUserId == listingOwnerId ? tradeRequest.RequesterId : listingOwnerId;
-
-        await _notificationHub.Clients.User(otherUserId.ToString())
-            .SendAsync("TradeRequestLocked", new
-            {
-                TradeRequestId = tradeRequest.Id,
-                Message = "Đối tác đã lock giao dịch. Hãy kiểm tra!",
-                OwnerLocked = tradeRequest.OwnerLocked,
-                RequesterLocked = tradeRequest.RequesterLocked
-            });
-    }
-
     private async Task SendDealLockedNotificationAsync(User requester, User listingOwner)
     {
         var notifications = new[]
@@ -802,7 +788,6 @@ public class TradingService : ITradingService
             await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
         }
     }
-
 
     private async Task ValidateMultipleOfferedItems(List<Guid> offeredInventoryIds,
         Listing listing, Guid userId)
