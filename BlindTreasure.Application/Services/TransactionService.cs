@@ -161,7 +161,7 @@ public class TransactionService : ITransactionService
                 .Include(od => od.InventoryItems)
                 .ToListAsync();
 
-           
+
             foreach (var od in orderDetailsWithInventory)
             {
                 if (od.InventoryItems == null || !od.InventoryItems.Any() || !od.ProductId.HasValue)
@@ -169,9 +169,10 @@ public class TransactionService : ITransactionService
                     _logger.Warn($"[HandleSuccessfulPaymentAsync] OrderDetail {od.Id} không có InventoryItems.");
                     continue;
                 }
+
                 // Cập nhật trạng thái và log cho từng OrderDetail
                 _logger.Info($"[HandleSuccessfulPaymentAsync] {od.InventoryItems}");
-               
+
                 OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
                 await _unitOfWork.OrderDetails.Update(od);
             }
@@ -376,12 +377,14 @@ public class TransactionService : ITransactionService
                         _ => InventoryItemStatus.Available // Default fallback
                     };
 
-                    _logger.Info($"[CreateInventory] Shipment {selectedShipment.Id} status: {selectedShipment.Status} → InventoryItem status: {status}");
+                    _logger.Info(
+                        $"[CreateInventory] Shipment {selectedShipment.Id} status: {selectedShipment.Status} → InventoryItem status: {status}");
                 }
                 else
                 {
                     // ✅ Không có shipment = không cần giao hàng = Available ngay
-                    _logger.Info($"[CreateInventory] No shipment for OrderDetail {od.Id} → InventoryItem status: Available");
+                    _logger.Info(
+                        $"[CreateInventory] No shipment for OrderDetail {od.Id} → InventoryItem status: Available");
                 }
 
                 var dto = new InventoryItem
@@ -393,7 +396,7 @@ public class TransactionService : ITransactionService
                     IsFromBlindBox = false,
                     OrderDetailId = od.Id,
                     AddressId = shippingAddress?.Id,
-                    UserId = order.UserId,
+                    UserId = order.UserId
                 };
 
                 var newInventoryItem = await _unitOfWork.InventoryItems.AddAsync(dto);
@@ -403,8 +406,8 @@ public class TransactionService : ITransactionService
                 od.InventoryItems.Add(newInventoryItem);
 
                 _logger.Info($"[CreateInventory] Summary for OrderDetail {od.Id}: " +
-                           $"Created {od.Quantity} InventoryItems, " +
-                           $"Shipment: {(shipmentId.HasValue ? "Yes" : "No")}");
+                             $"Created {od.Quantity} InventoryItems, " +
+                             $"Shipment: {(shipmentId.HasValue ? "Yes" : "No")}");
             }
         }
     }
