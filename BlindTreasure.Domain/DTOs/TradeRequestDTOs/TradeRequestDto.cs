@@ -8,7 +8,7 @@ public class TradeRequestDto
     public Guid ListingId { get; set; }
     public string? ListingItemName { get; set; }
     public RarityName? ListingItemTier { get; set; } // Đảm bảo trường này tồn tại
-    public string? ListingItemTierDisplayName { get; set; } // Đảm bảo trường này tồn tại
+    public string? ListingItemImgUrl  { get; set; }
     public Guid RequesterId { get; set; }
     public string? RequesterName { get; set; }
     public List<OfferedItemDto> OfferedItems { get; set; } = new();
