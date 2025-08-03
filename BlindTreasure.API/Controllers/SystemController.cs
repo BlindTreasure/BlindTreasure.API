@@ -1849,6 +1849,21 @@ public class SystemController : ControllerBase
             return;
         }
 
+        // Lấy seller smiski
+        var smiskiUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "smiskiofficial@gmail.com");
+        if (smiskiUser == null)
+        {
+            _logger.Warn("[SeedPromotions] Không tìm thấy User 'smiskiofficial@gmail.com' để tạo promotion.");
+            return;
+        }
+
+        var smiskiSeller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == smiskiUser.Id);
+        if (smiskiSeller == null)
+        {
+            _logger.Warn("[SeedPromotions] Không tìm thấy Seller cho user 'smiskiofficial@gmail.com'.");
+            return;
+        }
+
         var promotions = new List<Promotion>
         {
             new()
@@ -1858,7 +1873,7 @@ public class SystemController : ControllerBase
                 Description = "Giảm 10% cho tất cả đơn hàng.",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 10,
-                StartDate = now.AddDays(3),
+                StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
                 SellerId = seller.Id,
@@ -1873,7 +1888,7 @@ public class SystemController : ControllerBase
                 Description = "Giảm 50K cho đơn từ 500K.",
                 DiscountType = DiscountType.Fixed,
                 DiscountValue = 50000,
-                StartDate = now.AddDays(3),
+                StartDate = now,
                 EndDate = now.AddMonths(2),
                 Status = PromotionStatus.Pending,
                 SellerId = seller.Id,
@@ -1888,7 +1903,7 @@ public class SystemController : ControllerBase
                 Description = "Voucher giới hạn cho khách VIP.",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 15,
-                StartDate = now.AddDays(3),
+                StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
                 SellerId = seller.Id,
@@ -1926,12 +1941,27 @@ public class SystemController : ControllerBase
                 UsageLimit = null,
                 CreatedByRole = RoleType.Staff,
                 CreatedAt = now
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "SMISKI15",
+                Description = "Giảm 15% cho các sản phẩm Smiski.",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 15,
+                StartDate = now,
+                EndDate = now.AddMonths(1),
+                Status = PromotionStatus.Approved,
+                SellerId = smiskiSeller.Id, // Assign to smiski seller
+                UsageLimit = 150,
+                CreatedByRole = RoleType.Seller,
+                CreatedAt = now
             }
         };
 
         await _context.Promotions.AddRangeAsync(promotions);
         await _context.SaveChangesAsync();
-        _logger.Success("[SeedPromotions] Đã seed 5 promotion mẫu.");
+        _logger.Success("[SeedPromotions] Đã seed 6 promotion mẫu.");
     }
 
     private async Task SeedPromotionParticipants()
