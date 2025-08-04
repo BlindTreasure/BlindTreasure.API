@@ -114,7 +114,9 @@ public static class OrderDtoMapper
             UnitPrice = od.UnitPrice,
             TotalPrice = od.TotalPrice,
             Status = od.Status,
-            OrderId = od.OrderId
+            OrderId = od.OrderId,
+            DetailDiscountPromotion = od.DetailDiscountPromotion,
+            FinalDetailPrice= od.FinalDetailPrice ?? (od.TotalPrice - od.DetailDiscountPromotion ?? 0), 
             //Shipments = od.Shipments?.Select(ShipmentDtoMapper.ToShipmentDto).ToList() ?? new List<ShipmentDto>()
         };
     }
