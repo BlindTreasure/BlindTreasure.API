@@ -1,7 +1,9 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
+using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
@@ -242,6 +244,73 @@ public class GhnShippingService : IGhnShippingService
 
         var apiResp = JsonSerializer.Deserialize<ApiResponse<CalculateShippingFeeResponse>>(body);
         return apiResp?.Data;
+    }
+
+    public GhnOrderRequest BuildGhnOrderRequest<T>(
+    IEnumerable<T> items,
+    Seller seller,
+    Address toAddress,
+    Func<T, Product> getProduct,
+    Func<T, int> getQuantity)
+    {
+        var ghnOrderItems = items.Select(item =>
+        {
+            var product = getProduct(item);
+            var category = product.Category;
+            var length = Convert.ToInt32(product.Length ?? 10);
+            var width = Convert.ToInt32(product.Width ?? 10);
+            var height = Convert.ToInt32(product.Height ?? 10);
+            var weight = Convert.ToInt32(product.Weight ?? 1000);
+
+            return new GhnOrderItemDto
+            {
+                Name = product.Name,
+                Code = product.Id.ToString(),
+                Quantity = getQuantity(item),
+                Price = Convert.ToInt32(product.Price),
+                Length = length,
+                Width = width,
+                Height = height,
+                Weight = weight,
+                Category = new GhnItemCategory
+                {
+                    Level1 = category?.Name,
+                    Level2 = category?.Parent?.Name
+                }
+            };
+        }).ToList();
+
+        _logger.Info($"Build GHN order request for seller {seller.Id} with {ghnOrderItems.Count} items.");
+
+        return new GhnOrderRequest
+        {
+            PaymentTypeId = 2,
+            Note = $"Giao hàng cho seller {seller.CompanyName}",
+            RequiredNote = "CHOXEMHANGKHONGTHU",
+            FromName = seller.CompanyName ?? "BlindTreasure Warehouse",
+            FromPhone = "0925136907" ?? seller.CompanyPhone,
+            FromAddress = seller.CompanyAddress ?? "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, TP.HCM",
+            FromWardName = seller.CompanyWardName ?? "Phường 14",
+            FromDistrictName = seller.CompanyDistrictName ?? "Quận 10",
+            FromProvinceName = seller.CompanyProvinceName ?? "HCM",
+            ToName = toAddress.FullName,
+            ToPhone = toAddress.Phone,
+            ToAddress = toAddress.AddressLine,
+            ToWardName = toAddress.Ward ?? "",
+            ToDistrictName = toAddress.District ?? "",
+            ToProvinceName = toAddress.Province,
+            CodAmount = 0,
+            Content = $"Giao hàng cho {toAddress.FullName} từ seller {seller.CompanyName}",
+            Length = ghnOrderItems.Max(i => i.Length),
+            Width = ghnOrderItems.Max(i => i.Width),
+            Height = ghnOrderItems.Max(i => i.Height),
+            Weight = ghnOrderItems.Sum(i => i.Weight),
+            InsuranceValue = ghnOrderItems.Sum(i => i.Price * i.Quantity) <= 5000000
+                ? ghnOrderItems.Sum(i => i.Price * i.Quantity)
+                : 5000000,
+            ServiceTypeId = 2,
+            Items = ghnOrderItems.ToArray()
+        };
     }
 }
 
