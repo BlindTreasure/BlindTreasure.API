@@ -6,6 +6,6 @@ public class CurrentTime : ICurrentTime
 {
     public DateTime GetCurrentTime()
     {
-        return DateTime.UtcNow;
+        return DateTime.UtcNow.ToUniversalTime();
     }
 }

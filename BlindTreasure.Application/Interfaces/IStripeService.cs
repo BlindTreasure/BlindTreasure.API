@@ -5,6 +5,7 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface IStripeService
 {
+    Task CleanupStripeCoupon(string couponId);
     Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false);
     Task<string> CreateShipmentCheckoutSessionAsync(List<Shipment> shipments, Guid userId, int totalShippingFee);
     Task<string> GenerateExpressLoginLink();
