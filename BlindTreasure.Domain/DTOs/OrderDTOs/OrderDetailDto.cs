@@ -23,4 +23,6 @@ public class OrderDetailDto
     public OrderDetailItemStatus Status { get; set; }
     public ICollection<ShipmentDto>? Shipments { get; set; } = new List<ShipmentDto>();
     public ICollection<InventoryItemDto>? InventoryItems { get; set; } = new List<InventoryItemDto>();
+    public decimal? DetailDiscountPromotion { get; set; }
+    public decimal? FinalDetailPrice { get; set; } // TotalPrice - DetailDiscountPromotion ?? 0;
 }
