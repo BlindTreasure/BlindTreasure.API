@@ -459,7 +459,7 @@ public class TradingService : ITradingService
             i => i.Status == InventoryItemStatus.OnHold &&
                  i.HoldUntil.HasValue &&
                  i.HoldUntil.Value <= now,
-            i => i.Product); // Include Product để có thể lấy tên
+            i => i.Product!); // Include Product để có thể lấy tên
 
         if (!itemsToRelease.Any()) return;
 
@@ -536,7 +536,7 @@ public class TradingService : ITradingService
         try
         {
             // 1. Lấy thông tin listing item (item của owner)
-            var listingItem = tradeRequest.Listing.InventoryItem;
+            var listingItem = tradeRequest.Listing!.InventoryItem;
             var originalOwnerId = listingItem.UserId;
             var newOwnerId = tradeRequest.RequesterId;
 
@@ -547,7 +547,7 @@ public class TradingService : ITradingService
             var offeredItemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
             var offeredItems = await _unitOfWork.InventoryItems.GetAllAsync(
                 i => offeredItemIds.Contains(i.Id),
-                i => i.Product);
+                i => i.Product!);
 
             _logger.Info($"[CompleteTradeExchangeAsync] Sẽ trao đổi {offeredItems.Count} offered items");
 
@@ -841,7 +841,7 @@ public class TradingService : ITradingService
         if (heldItems.Any())
         {
             var heldItem = heldItems.First();
-            var remainingTime = heldItem.HoldUntil.Value - now;
+            var remainingTime = heldItem.HoldUntil!.Value - now;
             _logger.Warn(
                 $"[ValidateMultipleOfferedItems] Item {heldItem.Id} đang trong thời gian giữ, còn {remainingTime.TotalDays:F1} ngày");
             throw ErrorHelper.BadRequest(
@@ -859,13 +859,13 @@ public class TradingService : ITradingService
         // Sử dụng ListingService để kiểm tra tồn tại của listing
         try
         {
-            var listingDto = await _listingService.GetListingByIdAsync(listingId);
+            await _listingService.GetListingByIdAsync(listingId);
             _logger.Info($"[ValidateTradeRequestCreation] Đã tìm thấy listing {listingId} qua ListingService");
 
             // Sau khi xác nhận listing tồn tại, lấy thông tin đầy đủ từ database
             var listing = await _unitOfWork.Listings.GetByIdAsync(listingId,
                 l => l.InventoryItem,
-                l => l.InventoryItem.User);
+                l => l.InventoryItem.User!);
 
             if (listing == null)
             {
@@ -938,7 +938,7 @@ public class TradingService : ITradingService
 
         var items = await _unitOfWork.InventoryItems.GetAllAsync(
             i => itemIds.Contains(i.Id),
-            i => i.Product);
+            i => i.Product!);
 
         if (items.Count != itemIds.Count)
             throw ErrorHelper.BadRequest("Một số item bạn muốn đổi không hợp lệ.");
@@ -985,12 +985,6 @@ public class TradingService : ITradingService
                 }
 
                 var listingItem = tradeRequest.Listing.InventoryItem;
-                if (listingItem == null)
-                {
-                    _logger.Error(
-                        $"[UpdateInventoryItemStatusOnReject] Listing item null cho trade request {tradeRequest.Id}");
-                    return;
-                }
 
                 _logger.Info(
                     $"[UpdateInventoryItemStatusOnReject] Khôi phục listing item {listingItem.Id} từ status {listingItem.Status} về Available");
@@ -1083,6 +1077,9 @@ public class TradingService : ITradingService
         var listingItemImgUrl = listingItem?.Product?.ImageUrls?.FirstOrDefault();
         var listingItemTier = listingItem?.Tier ?? RarityName.Common;
         var requesterName = tradeRequest.Requester?.FullName ?? "Unknown";
+        var listingOwnerName = tradeRequest.Listing?.InventoryItem.User?.FullName ?? "Unknown";
+        var listingOwnerAvatarUrl = tradeRequest.Listing?.InventoryItem.User?.AvatarUrl;
+        var requesterAvatarUrl = tradeRequest.Requester?.AvatarUrl;
 
         var offeredItemDtos = offeredItems.Select(item => new OfferedItemDto
         {
@@ -1113,6 +1110,9 @@ public class TradingService : ITradingService
             ListingItemImgUrl = listingItemImgUrl,
             RequesterId = tradeRequest.RequesterId,
             RequesterName = requesterName,
+            ListingOwnerName = listingOwnerName,
+            ListingOwnerAvatarUrl = listingOwnerAvatarUrl,
+            RequesterAvatarUrl = requesterAvatarUrl,
             OfferedItems = offeredItemDtos,
             Status = tradeRequest.Status,
             RequestedAt = tradeRequest.RequestedAt,

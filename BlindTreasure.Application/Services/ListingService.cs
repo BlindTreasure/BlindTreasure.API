@@ -121,10 +121,10 @@ public class ListingService : IListingService
             x => x.UserId == userId &&
                  x.IsFromBlindBox &&
                  !x.IsDeleted &&
-                 x.Status == InventoryItemStatus.Available &&
-                 (!x.Listings.Any() || x.Listings.All(l => l.Status != ListingStatus.Active)),
+                 x.Status == InventoryItemStatus.Available,
             i => i.Product,
-            i => i.Listings
+            i => i.Listings,
+            i => i.LastTradeHistory
         );
 
         var result = items.Select(item =>
@@ -135,10 +135,15 @@ public class ListingService : IListingService
             // Thêm thông tin về tên sản phẩm và hình ảnh
             if (item.Product != null)
             {
-                // Nếu Product đã được include, sử dụng trực tiếp
                 dto.ProductName = item.Product.Name;
                 dto.Image = item.Product.ImageUrls?.FirstOrDefault() ?? "";
             }
+
+            // Kiểm tra nếu item đang bị hold (vừa trade xong trong 3 ngày)
+            dto.IsOnHold = item.HoldUntil.HasValue && item.HoldUntil.Value > DateTime.UtcNow;
+        
+            // Kiểm tra nếu item đã có listing active
+            dto.HasActiveListing = item.Listings?.Any(l => l.Status == ListingStatus.Active) ?? false;
 
             return dto;
         }).ToList();
