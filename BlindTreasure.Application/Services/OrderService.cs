@@ -495,7 +495,17 @@ public class OrderService : IOrderService
                 var promo = await _unitOfWork.Promotions.GetByIdAsync(group.PromotionId.Value);
                 if (promo == null || promo.Status != PromotionStatus.Approved)
                     throw ErrorHelper.BadRequest("Invalid promotion");
-                var subTotal = order.OrderDetails.Where(d => d.SellerId == group.SellerId).Sum(d => d.TotalPrice);
+                //check xem seller có partipate vào promotion này không
+                var participant = await _unitOfWork.PromotionParticipants.GetQueryable()
+                    .Where(p => p.PromotionId == promo.Id && p.SellerId == group.SellerId)
+                    .FirstOrDefaultAsync();
+                if (participant == null)
+                {
+                    _loggerService.Warn($"Seller {group.SellerId} not participate in promotion {promo.Code}");
+                    throw ErrorHelper.BadRequest("Promotion not applicable for this seller. ( Seller did not participate to this promotion");
+                }
+
+                    var subTotal = order.OrderDetails.Where(d => d.SellerId == group.SellerId).Sum(d => d.TotalPrice);
                 var discount = promo.DiscountType == DiscountType.Percentage
                     ? Math.Round(subTotal * promo.DiscountValue / 100m, 2)
                     : promo.DiscountValue;
