@@ -27,7 +27,7 @@ public class ReviewController : ControllerBase
     [ProducesResponseType(typeof(ApiResult<ReviewResponseDto>), 400)]
     [ProducesResponseType(typeof(ApiResult<ReviewResponseDto>), 404)]
     [ProducesResponseType(typeof(ApiResult<ReviewResponseDto>), 409)]
-    public async Task<IActionResult> CreateReview([FromBody] CreateReviewDto createDto)
+    public async Task<IActionResult> CreateReview([FromForm] CreateReviewDto createDto)
     {
         try
         {
