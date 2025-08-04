@@ -28,4 +28,5 @@ public class InventoryItemDto
     
     public bool IsOnHold { get; set; }
     public bool HasActiveListing { get; set; }
+
 }

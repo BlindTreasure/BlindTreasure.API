@@ -106,22 +106,19 @@ public class ListingService : IListingService
         var userId = _claimsService.CurrentUserId;
         var cacheKey = CacheKeyManager.GetAvailableItemsKey(userId);
 
-        // Kiểm tra cache trước
+        // Check cache first
         var cachedItems = await _cacheService.GetAsync<List<InventoryItemDto>>(cacheKey);
         if (cachedItems != null)
         {
-            _logger.Info(
-                $"[GetAvailableItemsForListingAsync] Đã lấy vật phẩm có thể listing từ cache cho user: {userId}");
+            _logger.Info($"[GetAvailableItemsForListingAsync] Retrieved items from cache for user: {userId}");
             return cachedItems;
         }
 
-        _logger.Info($"[GetAvailableItemsForListingAsync] Cache miss cho user: {userId}, đang truy vấn database");
+        _logger.Info($"[GetAvailableItemsForListingAsync] Cache miss for user: {userId}, querying database");
 
+        // Get ALL inventory items for the user (no status filtering)
         var items = await _unitOfWork.InventoryItems.GetAllAsync(
-            x => x.UserId == userId &&
-                 x.IsFromBlindBox &&
-                 !x.IsDeleted &&
-                 x.Status == InventoryItemStatus.Available,
+            x => x.UserId == userId && !x.IsDeleted,
             i => i.Product,
             i => i.Listings,
             i => i.LastTradeHistory
@@ -132,26 +129,28 @@ public class ListingService : IListingService
             var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
             dto.Id = item.Id;
 
-            // Thêm thông tin về tên sản phẩm và hình ảnh
+            // Product info
             if (item.Product != null)
             {
                 dto.ProductName = item.Product.Name;
                 dto.Image = item.Product.ImageUrls?.FirstOrDefault() ?? "";
             }
 
-            // Kiểm tra nếu item đang bị hold (vừa trade xong trong 3 ngày)
+            // Trade hold status (3 days after trade)
             dto.IsOnHold = item.HoldUntil.HasValue && item.HoldUntil.Value > DateTime.UtcNow;
-        
-            // Kiểm tra nếu item đã có listing active
+
+            // Active listing check
             dto.HasActiveListing = item.Listings?.Any(l => l.Status == ListingStatus.Active) ?? false;
+
+            // Additional status flag for frontend
+            dto.Status = item.Status;
 
             return dto;
         }).ToList();
 
-        // Lưu vào cache
+        // Cache the results
         await _cacheService.SetAsync(cacheKey, result, CacheKeyManager.AVAILABLE_ITEMS_CACHE_DURATION);
-        _logger.Info(
-            $"[GetAvailableItemsForListingAsync] Đã lưu danh sách vật phẩm có thể listing vào cache cho user: {userId}");
+        _logger.Info($"[GetAvailableItemsForListingAsync] Cached items for user: {userId}");
 
         return result;
     }
