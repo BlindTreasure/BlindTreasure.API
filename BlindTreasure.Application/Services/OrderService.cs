@@ -503,6 +503,7 @@ public class OrderService : IOrderService
                 order.OrderSellerPromotions.Add(new OrderSellerPromotion
                 {
                     Order = order,
+                    OrderId = order.Id,
                     SellerId = group.SellerId,
                     Promotion = promo,
                     DiscountAmount = discount,

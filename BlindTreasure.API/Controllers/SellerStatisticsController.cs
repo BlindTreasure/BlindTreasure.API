@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -34,7 +35,7 @@ namespace BlindTreasure.API.Controllers
         /// <param name="ct">CancellationToken</param>
         /// <returns>SellerDashboardStatisticsDto</returns>
         [HttpPost("me")]
-        [Authorize(Roles = "Seller")]
+        //[Authorize(Roles = "Seller")]
         [ProducesResponseType(typeof(SellerDashboardStatisticsDto), 200)]
         [ProducesResponseType(typeof(string), 403)]
         [ProducesResponseType(typeof(string), 404)]
@@ -46,11 +47,11 @@ namespace BlindTreasure.API.Controllers
                 if (sellerId == Guid.Empty)
                     return Forbid("Không tìm thấy seller đang đăng nhập.");
 
-                var seller = await _sellerService.GetSellerProfileByIdAsync(sellerId);
+                var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
                 if (seller == null)
                     return NotFound("Seller không tồn tại.");
 
-                var result = await _sellerStatisticsService.GetDashboardStatisticsAsync(sellerId, request, ct);
+                var result = await _sellerStatisticsService.GetDashboardStatisticsAsync(seller.SellerId, request, ct);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -68,7 +69,7 @@ namespace BlindTreasure.API.Controllers
         /// <param name="ct">CancellationToken</param>
         /// <returns>SellerDashboardStatisticsDto</returns>
         [HttpPost("{sellerId}")]
-        [Authorize(Roles = "Admin,Staff")]
+    //    [Authorize(Roles = "Admin,Staff")]
         [ProducesResponseType(typeof(SellerDashboardStatisticsDto), 200)]
         [ProducesResponseType(typeof(string), 404)]
         public async Task<IActionResult> GetStatisticsBySellerId(Guid sellerId, [FromBody] SellerStatisticsRequestDto request, CancellationToken ct)
@@ -86,6 +87,136 @@ namespace BlindTreasure.API.Controllers
             {
                 // Có thể log lỗi tại đây nếu cần
                 return StatusCode(500, $"Đã xảy ra lỗi: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Lấy thống kê tổng quan cho seller (Overview).
+        /// </summary>
+        [Authorize(Roles = "Seller,Admin,Staff")]
+        [HttpPost("overview")]
+        [ProducesResponseType(typeof(ApiResult<SellerOverviewStatisticsDto>), 200)]
+        public async Task<IActionResult> GetOverviewStatistics([FromBody] SellerStatisticsRequestDto req, CancellationToken ct)
+        {
+            try
+            {
+                var sellerId = _claimsService.CurrentUserId;
+                if (sellerId == Guid.Empty)
+                    return Forbid("Không tìm thấy seller đang đăng nhập.");
+
+                var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
+                if (seller == null)
+                    return NotFound("Seller không tồn tại.");
+                var result = await _sellerStatisticsService.GetOverviewStatisticsAsync(seller.SellerId, req, ct);
+                return Ok(ApiResult<SellerOverviewStatisticsDto>.Success(result, "200", "Thống kê tổng quan thành công."));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResult<SellerOverviewStatisticsDto>.Failure("500", ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// Lấy top 5 sản phẩm bán chạy nhất.
+        /// </summary>
+        [Authorize(Roles = "Seller,Admin,Staff")]
+        [HttpPost("top-products")]
+        [ProducesResponseType(typeof(ApiResult<System.Collections.Generic.List<TopSellingProductDto>>), 200)]
+        public async Task<IActionResult> GetTopProducts([FromBody] SellerStatisticsRequestDto req, CancellationToken ct)
+        {
+            try
+            {
+                var sellerId = _claimsService.CurrentUserId;
+                if (sellerId == Guid.Empty)
+                    return Forbid("Không tìm thấy seller đang đăng nhập.");
+
+                var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
+                if (seller == null)
+                    return NotFound("Seller không tồn tại.");
+                var result = await _sellerStatisticsService.GetTopProductsAsync(seller.SellerId, req, ct);
+                return Ok(ApiResult<System.Collections.Generic.List<TopSellingProductDto>>.Success(result, "200", "Lấy top sản phẩm thành công."));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResult<System.Collections.Generic.List<TopSellingProductDto>>.Failure("500", ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// Lấy top 5 blindbox bán chạy nhất.
+        /// </summary>
+        [Authorize(Roles = "Seller,Admin,Staff")]
+        [HttpPost("top-blindboxes")]
+        [ProducesResponseType(typeof(ApiResult<System.Collections.Generic.List<TopSellingBlindBoxDto>>), 200)]
+        public async Task<IActionResult> GetTopBlindBoxes([FromBody] SellerStatisticsRequestDto req, CancellationToken ct)
+        {
+            try
+            {
+                var sellerId = _claimsService.CurrentUserId;
+                if (sellerId == Guid.Empty)
+                    return Forbid("Không tìm thấy seller đang đăng nhập.");
+
+                var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
+                if (seller == null)
+                    return NotFound("Seller không tồn tại.");
+                var result = await _sellerStatisticsService.GetTopBlindBoxesAsync(seller.SellerId, req, ct);
+                return Ok(ApiResult<System.Collections.Generic.List<TopSellingBlindBoxDto>>.Success(result, "200", "Lấy top blindbox thành công."));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResult<System.Collections.Generic.List<TopSellingBlindBoxDto>>.Failure("500", ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// Lấy thống kê trạng thái đơn hàng.
+        /// </summary>
+        [Authorize(Roles = "Seller,Admin,Staff")]
+        [HttpPost("order-status")]
+        [ProducesResponseType(typeof(ApiResult<System.Collections.Generic.List<OrderStatusStatisticsDto>>), 200)]
+        public async Task<IActionResult> GetOrderStatusStatistics([FromBody] SellerStatisticsRequestDto req, CancellationToken ct)
+        {
+            try
+            {
+                var sellerId = _claimsService.CurrentUserId;
+                if (sellerId == Guid.Empty)
+                    return Forbid("Không tìm thấy seller đang đăng nhập.");
+
+                var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
+                if (seller == null)
+                    return NotFound("Seller không tồn tại.");
+                var result = await _sellerStatisticsService.GetOrderStatusStatisticsAsync(seller.SellerId, req, ct);
+                return Ok(ApiResult<System.Collections.Generic.List<OrderStatusStatisticsDto>>.Success(result, "200", "Lấy thống kê trạng thái đơn hàng thành công."));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResult<System.Collections.Generic.List<OrderStatusStatisticsDto>>.Failure("500", ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// Lấy thống kê theo thời gian (time series).
+        /// </summary>
+        [Authorize(Roles = "Seller,Admin,Staff")]
+        [HttpPost("time-series")]
+        [ProducesResponseType(typeof(ApiResult<SellerStatisticsResponseDto>), 200)]
+        public async Task<IActionResult> GetTimeSeriesStatistics([FromBody] SellerStatisticsRequestDto req, CancellationToken ct)
+        {
+            try
+            {
+                var sellerId = _claimsService.CurrentUserId;
+                if (sellerId == Guid.Empty)
+                    return Forbid("Không tìm thấy seller đang đăng nhập.");
+
+                var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
+                if (seller == null)
+                    return NotFound("Seller không tồn tại.");
+                var result = await _sellerStatisticsService.GetTimeSeriesStatisticsAsync(seller.SellerId, req, ct);
+                return Ok(ApiResult<SellerStatisticsResponseDto>.Success(result, "200", "Lấy thống kê theo thời gian thành công."));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResult<SellerStatisticsResponseDto>.Failure("500", ex.Message));
             }
         }
     }
