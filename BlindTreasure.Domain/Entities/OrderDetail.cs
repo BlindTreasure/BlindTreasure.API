@@ -24,6 +24,7 @@ public class OrderDetail : BaseEntity
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
+   // public  decimal? DetailDiscountPromotion { get; set; }
     public OrderDetailItemStatus Status { get; set; }
     public string? Logs { get; set; } = string.Empty; // Lưu trữ nhật ký trạng thái
 

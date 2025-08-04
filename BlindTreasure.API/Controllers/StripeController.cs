@@ -488,6 +488,16 @@ public class StripeController : ControllerBase
                 await _transactionService.HandleSuccessfulPaymentAsync(session.Id, orderId);
                 _logger.Success(
                     $"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {session.Id}");
+
+                // Clean up Stripe coupon nếu có
+                if (session.Metadata != null &&
+                    session.Metadata.TryGetValue("couponId", out var couponId) &&
+                    !string.IsNullOrWhiteSpace(couponId))
+                {
+                    _logger.Info($"[Stripe][Webhook] Cleanup Stripe coupon: {couponId}");
+                    await _stripeService.CleanupStripeCoupon(couponId);
+                    _logger.Success($"[Stripe][Webhook] Đã xóa coupon Stripe: {couponId}");
+                }
             }
             else
             {
