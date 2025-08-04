@@ -1,5 +1,6 @@
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,12 +22,12 @@ public class NotificationController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetNotifications([FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetNotifications([FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 10, NotificationType? type = null)
     {
         try
         {
             var userId = _claimsService.CurrentUserId;
-            var items = await _notificationService.GetNotificationsAsync(userId, pageIndex, pageSize);
+            var items = await _notificationService.GetNotificationsAsync(userId, pageIndex, pageSize, type);
             var totalCount = await _notificationService.CountNotificationsAsync(userId);
 
             return Ok(ApiResult<object>.Success(new
