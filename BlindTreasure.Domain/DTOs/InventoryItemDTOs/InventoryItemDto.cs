@@ -25,4 +25,8 @@ public class InventoryItemDto
     public OrderDetailDto? OrderDetail { get; set; }
     public Guid? ShipmentId { get; set; }
     public ShipmentDto? Shipment { get; set; }
+    
+    public bool IsOnHold { get; set; }
+    public bool HasActiveListing { get; set; }
+
 }

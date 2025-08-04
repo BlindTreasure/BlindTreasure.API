@@ -2075,7 +2075,7 @@ public class SystemController : ControllerBase
                 Description = "Voucher toàn sàn cho mọi khách hàng.",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 5,
-                StartDate = now.AddDays(3),
+                StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
                 SellerId = null, // Toàn sàn
@@ -2096,6 +2096,51 @@ public class SystemController : ControllerBase
                 SellerId = smiskiSeller.Id, // Assign to smiski seller
                 UsageLimit = 150,
                 CreatedByRole = RoleType.Seller,
+                CreatedAt = now
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "FIXED100K",
+                Description = "Giảm 100K cho đơn từ 1 triệu.",
+                DiscountType = DiscountType.Fixed,
+                DiscountValue = 100000,
+                StartDate = now,
+                EndDate = now.AddMonths(2),
+                Status = PromotionStatus.Approved,
+                SellerId = seller.Id,
+                UsageLimit = 50,
+                CreatedByRole = RoleType.Staff,
+                CreatedAt = now
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "SHIP20K",
+                Description = "Giảm phí vận chuyển 20K.",
+                DiscountType = DiscountType.Fixed,
+                DiscountValue = 20000,
+                StartDate = now,
+                EndDate = now.AddMonths(1),
+                Status = PromotionStatus.Approved,
+                SellerId = seller.Id,
+                UsageLimit = 300,
+                CreatedByRole = RoleType.Seller,
+                CreatedAt = now
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "GLOBAL20K",
+                Description = "Giảm 20K cho mọi đơn hàng trên toàn sàn.",
+                DiscountType = DiscountType.Fixed,
+                DiscountValue = 20000,
+                StartDate = now,
+                EndDate = now.AddMonths(1),
+                Status = PromotionStatus.Approved,
+                SellerId = null, // Toàn sàn
+                UsageLimit = 500,
+                CreatedByRole = RoleType.Staff,
                 CreatedAt = now
             }
         };
