@@ -5,12 +5,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Services;
 
@@ -22,6 +17,8 @@ public class OrderDetailStatisticsItem
     public Guid OrderId { get; set; }
     public int Quantity { get; set; }
     public decimal TotalPrice { get; set; }
+    public decimal? DetailDiscountPromotion { get; set; }
+    public decimal? FinalDetailPrice { get; set; }
     public Guid? ProductId { get; set; }
     public string? ProductName { get; set; }
     public string? ProductImageUrl { get; set; }
@@ -39,9 +36,7 @@ public class SellerStatisticsService : ISellerStatisticsService
     private readonly ILoggerService _loggerService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public SellerStatisticsService(
-        ILoggerService loggerService,
-        IUnitOfWork unitOfWork)
+    public SellerStatisticsService(ILoggerService loggerService, IUnitOfWork unitOfWork)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
@@ -57,58 +52,32 @@ public class SellerStatisticsService : ISellerStatisticsService
     {
         _loggerService.Info($"[SellerStatistics] Start dashboard statistics for seller {sellerId}");
 
+        // Xác định khoảng thời gian thống kê dựa trên request
         var (start, end) = GetStatisticsDateRange(req);
         _loggerService.Info($"[SellerStatistics] Date range: {start:O} - {end:O}");
 
         // Truy vấn orderDetails đã filter, chỉ lấy các trường cần thiết
-        var orderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable()
-            .AsNoTracking()
-            .Where(od =>
-                od.SellerId == sellerId &&
-                od.Order.Status == OrderStatus.PAID.ToString() &&
-                od.Status != OrderDetailItemStatus.CANCELLED &&
-                od.Order.CompletedAt >= start &&
-                od.Order.CompletedAt < end);
+        _loggerService.Info("[SellerStatistics] Querying order details for statistics...");
+        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
+        _loggerService.Info($"[SellerStatistics] Fetched {orderDetails.Count} order details.");
 
-        // Sử dụng DTO thay cho anonymous type
-        var orderDetails = await orderDetailsQuery
-            .Select(od => new OrderDetailStatisticsItem
-            {
-                OrderId = od.OrderId,
-                Quantity = od.Quantity,
-                TotalPrice = od.TotalPrice,
-                ProductId = od.ProductId,
-                ProductName = od.Product != null ? od.Product.Name : null,
-                ProductImageUrl = od.Product != null ? od.Product.ImageUrls.FirstOrDefault() : null,
-                ProductPrice = od.Product != null ? od.Product.Price : 0,
-                BlindBoxId = od.BlindBoxId,
-                BlindBoxName = od.BlindBox != null ? od.BlindBox.Name : null,
-                BlindBoxImageUrl = od.BlindBox != null ? od.BlindBox.ImageUrl : null,
-                BlindBoxPrice = od.BlindBox != null ? od.BlindBox.Price : 0,
-                Status = od.Status.ToString(),
-                CompletedAt = od.Order.CompletedAt
-            })
-            .ToListAsync(ct);
+        // Tổng hợp các module thống kê cho dashboard
+        var overview = await BuildOverviewStatisticsAsync(sellerId, req, start, end, ct, orderDetails);
+        _loggerService.Info("[SellerStatistics] Overview statistics built.");
 
-        // Lấy danh sách orderId
-        var orderIds = orderDetails.Select(od => od.OrderId).Distinct().ToList();
-
-        // Tính tổng discount trực tiếp trên DB
-        var totalDiscount = await _unitOfWork.OrderSellerPromotions.GetQueryable()
-            .Where(osp => osp.SellerId == sellerId && orderIds.Contains(osp.OrderId))
-            .SumAsync(osp => (decimal?)osp.DiscountAmount) ?? 0m;
-
-        // Tính tổng refund trực tiếp trên DB
-        var totalRefunded = await _unitOfWork.Payments.GetQueryable()
-            .Where(p => orderIds.Contains(p.OrderId))
-            .SumAsync(p => (decimal?)p.RefundedAmount) ?? 0m;
-
-        // Build các module thống kê
-        var overview = await BuildOverviewStatisticsAsync(sellerId, req, start, end, ct, orderDetails, totalDiscount, totalRefunded);
         var topProducts = BuildTopProducts(orderDetails);
+        _loggerService.Info("[SellerStatistics] Top selling products calculated.");
+
         var topBlindBoxes = BuildTopBlindBoxes(orderDetails);
+        _loggerService.Info("[SellerStatistics] Top selling blindboxes calculated.");
+
         var orderStatusStats = BuildOrderStatusStatistics(orderDetails);
+        _loggerService.Info("[SellerStatistics] Order status statistics calculated.");
+
         var timeSeries = BuildTimeSeriesData(orderDetails, req.Range, start, end);
+        _loggerService.Info("[SellerStatistics] Time series statistics calculated.");
+
+        overview.TimeSeriesData = timeSeries;
 
         _loggerService.Success($"[SellerStatistics] Dashboard statistics built for seller {sellerId}");
 
@@ -131,78 +100,75 @@ public class SellerStatisticsService : ISellerStatisticsService
         DateTime start,
         DateTime end,
         CancellationToken ct,
-        List<OrderDetailStatisticsItem> orderDetails,
-        decimal totalDiscount,
-        decimal totalRefunded)
+        List<OrderDetailStatisticsItem> orderDetails)
     {
-        // Tổng hợp các chỉ số hiện tại
+        // Lấy danh sách orderId duy nhất
         var orderIds = orderDetails.Select(od => od.OrderId).Distinct().ToList();
         var totalOrders = orderIds.Count;
         var totalProductsSold = orderDetails.Sum(od => od.Quantity);
+
+        // Doanh thu gộp (chưa trừ giảm giá)
         var grossRevenue = orderDetails.Sum(od => od.TotalPrice);
-        var netRevenue = grossRevenue - totalDiscount - totalRefunded;
+
+        // Tổng giảm giá từ từng OrderDetail
+        var totalDiscount = orderDetails.Sum(od => od.DetailDiscountPromotion ?? 0m);
+
+        // Doanh thu thực nhận (đã trừ giảm giá từng item)
+        var netRevenue = orderDetails.Sum(od => od.FinalDetailPrice ?? (od.TotalPrice - (od.DetailDiscountPromotion ?? 0m)));
+
+        // Tổng tiền refund từ các payment liên quan
+        var totalRefunded = await _unitOfWork.Payments.GetQueryable()
+            .Where(p => orderIds.Contains(p.OrderId))
+            .SumAsync(p => (decimal?)p.RefundedAmount) ?? 0m;
+
+        netRevenue -= totalRefunded;
+
         var averageOrderValue = totalOrders > 0 ? Math.Round(netRevenue / totalOrders, 2) : 0m;
+
+        _loggerService.Info($"[SellerStatistics] GrossRevenue={grossRevenue}, NetRevenue={netRevenue}, TotalDiscount={totalDiscount}, TotalRefunded={totalRefunded}");
 
         // Lấy dữ liệu kỳ trước để tính growth
         var (lastStart, lastEnd) = GetPreviousDateRange(req.Range, start, end);
-        var lastOrderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable()
-            .AsNoTracking()
-            .Where(od =>
-                od.SellerId == sellerId &&
-                od.Order.Status == OrderStatus.PAID.ToString() &&
-                od.Status != OrderDetailItemStatus.CANCELLED &&
-                od.Order.CompletedAt >= lastStart &&
-                od.Order.CompletedAt < lastEnd);
-
-        var lastOrderDetails = await lastOrderDetailsQuery
-            .Select(od => new OrderDetailStatisticsItem
-            {
-                OrderId = od.OrderId,
-                Quantity = od.Quantity,
-                TotalPrice = od.TotalPrice
-            })
-            .ToListAsync(ct);
+        var lastOrderDetails = await GetOrderDetailsAsync(sellerId, lastStart, lastEnd, ct);
 
         var lastOrderIds = lastOrderDetails.Select(od => od.OrderId).Distinct().ToList();
         var lastOrders = lastOrderIds.Count;
         var lastProductsSold = lastOrderDetails.Sum(od => od.Quantity);
-        var lastRevenue = lastOrderDetails.Sum(od => od.TotalPrice);
+        var lastRevenue = lastOrderDetails.Sum(od => od.FinalDetailPrice ?? (od.TotalPrice - (od.DetailDiscountPromotion ?? 0m)));
         var lastAOV = lastOrders > 0 ? Math.Round(lastRevenue / lastOrders, 2) : 0m;
 
-        // Tính growth
+        // Tính phần trăm tăng trưởng so với kỳ trước
         decimal revenueGrowth = lastRevenue > 0 ? Math.Round((netRevenue - lastRevenue) * 100 / lastRevenue, 2) : 0m;
         decimal ordersGrowth = lastOrders > 0 ? Math.Round((decimal)(totalOrders - lastOrders) * 100 / lastOrders, 2) : 0m;
         decimal productsGrowth = lastProductsSold > 0 ? Math.Round((decimal)(totalProductsSold - lastProductsSold) * 100 / lastProductsSold, 2) : 0m;
         decimal aovGrowth = lastAOV > 0 ? Math.Round((averageOrderValue - lastAOV) * 100 / lastAOV, 2) : 0m;
+
+        _loggerService.Info($"[SellerStatistics] Growth: Revenue={revenueGrowth}%, Orders={ordersGrowth}%, Products={productsGrowth}%, AOV={aovGrowth}%");
 
         return new SellerOverviewStatisticsDto
         {
             TotalRevenue = decimal.Round(netRevenue, 2),
             TotalRevenueLastPeriod = decimal.Round(lastRevenue, 2),
             RevenueGrowthPercent = revenueGrowth,
-
             TotalOrders = totalOrders,
             TotalOrdersLastPeriod = lastOrders,
             OrdersGrowthPercent = ordersGrowth,
-
             TotalProductsSold = totalProductsSold,
             TotalProductsSoldLastPeriod = lastProductsSold,
             ProductsSoldGrowthPercent = productsGrowth,
-
             AverageOrderValue = averageOrderValue,
             AverageOrderValueLastPeriod = lastAOV,
-            AverageOrderValueGrowthPercent = aovGrowth,
-
-            TimeSeriesData = null // Gán ở orchestration nếu cần
+            AverageOrderValueGrowthPercent = aovGrowth
         };
     }
 
     /// <summary>
-    /// Trả về top 5 sản phẩm bán chạy nhất.
+    /// Trả về top 5 sản phẩm bán chạy nhất (theo số lượng).
     /// </summary>
     private List<TopSellingProductDto> BuildTopProducts(List<OrderDetailStatisticsItem> orderDetails)
     {
-        return orderDetails
+        // Nhóm theo ProductId, tính tổng số lượng và doanh thu thực nhận
+        var result = orderDetails
             .Where(od => od.ProductId != null)
             .GroupBy(od => od.ProductId)
             .Select(g => new TopSellingProductDto
@@ -211,20 +177,24 @@ public class SellerStatisticsService : ISellerStatisticsService
                 ProductName = g.First().ProductName ?? string.Empty,
                 ProductImageUrl = g.First().ProductImageUrl ?? string.Empty,
                 QuantitySold = g.Sum(x => x.Quantity),
-                Revenue = g.Sum(x => x.TotalPrice),
+                Revenue = g.Sum(x => x.FinalDetailPrice ?? (x.TotalPrice - (x.DetailDiscountPromotion ?? 0m))),
+
                 Price = g.First().ProductPrice
             })
             .OrderByDescending(x => x.QuantitySold)
             .Take(5)
             .ToList();
+
+        _loggerService.Info($"[SellerStatistics] TopProducts: {string.Join(", ", result.Select(x => x.ProductName))}");
+        return result;
     }
 
     /// <summary>
-    /// Trả về top 5 blindbox bán chạy nhất.
+    /// Trả về top 5 blindbox bán chạy nhất (theo số lượng).
     /// </summary>
     private List<TopSellingBlindBoxDto> BuildTopBlindBoxes(List<OrderDetailStatisticsItem> orderDetails)
     {
-        return orderDetails
+        var result = orderDetails
             .Where(od => od.BlindBoxId != null)
             .GroupBy(od => od.BlindBoxId)
             .Select(g => new TopSellingBlindBoxDto
@@ -233,30 +203,36 @@ public class SellerStatisticsService : ISellerStatisticsService
                 BlindBoxName = g.First().BlindBoxName ?? string.Empty,
                 BlindBoxImageUrl = g.First().BlindBoxImageUrl ?? string.Empty,
                 QuantitySold = g.Sum(x => x.Quantity),
-                Revenue = g.Sum(x => x.TotalPrice),
+                Revenue = g.Sum(x => x.FinalDetailPrice ?? (x.TotalPrice - (x.DetailDiscountPromotion ?? 0m))),
                 Price = g.First().BlindBoxPrice
             })
             .OrderByDescending(x => x.QuantitySold)
             .Take(5)
             .ToList();
+
+        _loggerService.Info($"[SellerStatistics] TopBlindBoxes: {string.Join(", ", result.Select(x => x.BlindBoxName))}");
+        return result;
     }
 
     /// <summary>
-    /// Thống kê trạng thái đơn hàng.
+    /// Thống kê trạng thái đơn hàng (số lượng, doanh thu, phần trăm).
     /// </summary>
     private List<OrderStatusStatisticsDto> BuildOrderStatusStatistics(List<OrderDetailStatisticsItem> orderDetails)
     {
         var totalOrders = orderDetails.Select(od => od.OrderId).Distinct().Count();
-        return orderDetails
+        var result = orderDetails
             .GroupBy(od => od.Status)
             .Select(g => new OrderStatusStatisticsDto
             {
                 Status = g.Key,
                 Count = g.Count(),
-                Revenue = g.Sum(x => x.TotalPrice),
+                Revenue = g.Sum(x => x.FinalDetailPrice ?? (x.TotalPrice - (x.DetailDiscountPromotion ?? 0m))),
                 Percentage = totalOrders > 0 ? Math.Round((decimal)g.Count() * 100 / totalOrders, 2) : 0m
             })
             .ToList();
+
+        _loggerService.Info($"[SellerStatistics] OrderStatusStats: {string.Join(", ", result.Select(x => $"{x.Status}:{x.Count}"))}");
+        return result;
     }
 
     /// <summary>
@@ -272,6 +248,11 @@ public class SellerStatisticsService : ISellerStatisticsService
         var sales = new List<int>();
         var revenue = new List<decimal>();
 
+        // Hàm lấy doanh thu thực nhận cho từng item
+        Func<OrderDetailStatisticsItem, decimal> netRevenueSelector = od =>
+            od.FinalDetailPrice ?? (od.TotalPrice - (od.DetailDiscountPromotion ?? 0m));
+
+        // Tùy theo range, chia nhỏ theo giờ/ngày/tháng/quý/năm
         switch (range)
         {
             case StatisticsTimeRange.Day:
@@ -281,7 +262,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                     var details = orderDetails.Where(od => od.CompletedAt.HasValue &&
                         od.CompletedAt.Value.Hour == hour);
                     sales.Add(details.Count());
-                    revenue.Add(details.Sum(od => od.TotalPrice));
+                    revenue.Add(details.Sum(netRevenueSelector));
                 }
                 break;
             case StatisticsTimeRange.Week:
@@ -293,7 +274,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                     var details = orderDetails.Where(od => od.CompletedAt.HasValue &&
                         (int)od.CompletedAt.Value.DayOfWeek == i);
                     sales.Add(details.Count());
-                    revenue.Add(details.Sum(od => od.TotalPrice));
+                    revenue.Add(details.Sum(netRevenueSelector));
                 }
                 break;
             case StatisticsTimeRange.Month:
@@ -305,7 +286,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                     var details = orderDetails.Where(od => od.CompletedAt.HasValue &&
                         od.CompletedAt.Value.Date == date.Date);
                     sales.Add(details.Count());
-                    revenue.Add(details.Sum(od => od.TotalPrice));
+                    revenue.Add(details.Sum(netRevenueSelector));
                 }
                 break;
             case StatisticsTimeRange.Quarter:
@@ -319,7 +300,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                         od.CompletedAt.Value.Month == monthDate.Month &&
                         od.CompletedAt.Value.Year == monthDate.Year);
                     sales.Add(details.Count());
-                    revenue.Add(details.Sum(od => od.TotalPrice));
+                    revenue.Add(details.Sum(netRevenueSelector));
                 }
                 break;
             case StatisticsTimeRange.Custom:
@@ -331,10 +312,12 @@ public class SellerStatisticsService : ISellerStatisticsService
                     var details = orderDetails.Where(od => od.CompletedAt.HasValue &&
                         od.CompletedAt.Value.Date == date.Date);
                     sales.Add(details.Count());
-                    revenue.Add(details.Sum(od => od.TotalPrice));
+                    revenue.Add(details.Sum(netRevenueSelector));
                 }
                 break;
         }
+
+        _loggerService.Info($"[SellerStatistics] TimeSeries: {categories.Count} categories, {sales.Sum()} sales, {revenue.Sum()} revenue");
 
         return new SellerStatisticsResponseDto
         {
@@ -390,6 +373,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                 end = start.AddDays(1);
                 break;
         }
+        _loggerService.Info($"[SellerStatistics] Calculated statistics range: {start:O} - {end:O}");
         return (start, end);
     }
 
@@ -418,91 +402,16 @@ public class SellerStatisticsService : ISellerStatisticsService
         }
     }
 
-
     /// <summary>
-    /// API lấy thống kê tổng quan cho seller (Overview).
+    /// Truy vấn order details cho seller trong khoảng thời gian, trả về danh sách DTO đã chuẩn hóa.
     /// </summary>
-    public async Task<SellerOverviewStatisticsDto> GetOverviewStatisticsAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-
-        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
-
-        var orderIds = orderDetails.Select(od => od.OrderId).Distinct().ToList();
-
-        var totalDiscount = await _unitOfWork.OrderSellerPromotions.GetQueryable()
-            .Where(osp => osp.SellerId == sellerId && orderIds.Contains(osp.OrderId))
-            .SumAsync(osp => (decimal?)osp.DiscountAmount) ?? 0m;
-
-        var totalRefunded = await _unitOfWork.Payments.GetQueryable()
-            .Where(p => orderIds.Contains(p.OrderId))
-            .SumAsync(p => (decimal?)p.RefundedAmount) ?? 0m;
-
-        return await BuildOverviewStatisticsAsync(sellerId, req, start, end, ct, orderDetails, totalDiscount, totalRefunded);
-    }
-
-    /// <summary>
-    /// API lấy top 5 sản phẩm bán chạy nhất.
-    /// </summary>
-    public async Task<List<TopSellingProductDto>> GetTopProductsAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
-        return BuildTopProducts(orderDetails);
-    }
-
-    /// <summary>
-    /// API lấy top 5 blindbox bán chạy nhất.
-    /// </summary>
-    public async Task<List<TopSellingBlindBoxDto>> GetTopBlindBoxesAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
-        return BuildTopBlindBoxes(orderDetails);
-    }
-
-    /// <summary>
-    /// API lấy thống kê trạng thái đơn hàng.
-    /// </summary>
-    public async Task<List<OrderStatusStatisticsDto>> GetOrderStatusStatisticsAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
-        return BuildOrderStatusStatistics(orderDetails);
-    }
-
-    /// <summary>
-    /// API lấy thống kê theo thời gian (time series).
-    /// </summary>
-    public async Task<SellerStatisticsResponseDto> GetTimeSeriesStatisticsAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
-        return BuildTimeSeriesData(orderDetails, req.Range, start, end);
-    }
-
-    // Helper method để tránh lặp lại truy vấn
     private async Task<List<OrderDetailStatisticsItem>> GetOrderDetailsAsync(
         Guid sellerId,
         DateTime start,
         DateTime end,
         CancellationToken ct)
     {
+        _loggerService.Info($"[SellerStatistics] Querying OrderDetails for seller {sellerId} from {start:O} to {end:O}");
         var orderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable()
             .AsNoTracking()
             .Where(od =>
@@ -512,12 +421,14 @@ public class SellerStatisticsService : ISellerStatisticsService
                 od.Order.CompletedAt >= start &&
                 od.Order.CompletedAt < end);
 
-        return await orderDetailsQuery
+        var result = await orderDetailsQuery
             .Select(od => new OrderDetailStatisticsItem
             {
                 OrderId = od.OrderId,
                 Quantity = od.Quantity,
                 TotalPrice = od.TotalPrice,
+                DetailDiscountPromotion = od.DetailDiscountPromotion,
+                FinalDetailPrice = od.FinalDetailPrice,
                 ProductId = od.ProductId,
                 ProductName = od.Product != null ? od.Product.Name : null,
                 ProductImageUrl = od.Product != null ? od.Product.ImageUrls.FirstOrDefault() : null,
@@ -530,5 +441,59 @@ public class SellerStatisticsService : ISellerStatisticsService
                 CompletedAt = od.Order.CompletedAt
             })
             .ToListAsync(ct);
+
+        _loggerService.Info($"[SellerStatistics] Loaded {result.Count} OrderDetails for statistics.");
+        return result;
+    }
+
+    // API methods (unchanged signatures)
+    public async Task<SellerOverviewStatisticsDto> GetOverviewStatisticsAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
+        return await BuildOverviewStatisticsAsync(sellerId, req, start, end, ct, orderDetails);
+    }
+
+    public async Task<List<TopSellingProductDto>> GetTopProductsAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
+        return BuildTopProducts(orderDetails);
+    }
+
+    public async Task<List<TopSellingBlindBoxDto>> GetTopBlindBoxesAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
+        return BuildTopBlindBoxes(orderDetails);
+    }
+
+    public async Task<List<OrderStatusStatisticsDto>> GetOrderStatusStatisticsAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
+        return BuildOrderStatusStatistics(orderDetails);
+    }
+
+    public async Task<SellerStatisticsResponseDto> GetTimeSeriesStatisticsAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orderDetails = await GetOrderDetailsAsync(sellerId, start, end, ct);
+        return BuildTimeSeriesData(orderDetails, req.Range, start, end);
     }
 }

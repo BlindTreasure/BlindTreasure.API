@@ -601,6 +601,150 @@ public class SystemController : ControllerBase
         }
     }
 
+
+
+    [HttpPost("dev/seed-statistics-orders")]
+    public async Task<IActionResult> SeedStatisticsOrders([FromQuery] Guid? sellerId = null)
+    {
+        try
+        {
+            var users = await _context.Users
+                .Where(u => u.Status == UserStatus.Active && !u.IsDeleted)
+                .ToListAsync();
+
+            List<Seller> sellers;
+            List<Product> products;
+
+            if (sellerId.HasValue)
+            {
+                sellers = await _context.Sellers
+                    .Where(s => s.Status == SellerStatus.Approved && !s.IsDeleted && s.Id == sellerId.Value)
+                    .ToListAsync();
+                products = await _context.Products
+                    .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 && !p.IsDeleted && p.SellerId == sellerId.Value)
+                    .ToListAsync();
+            }
+            else
+            {
+                sellers = await _context.Sellers
+                    .Where(s => s.Status == SellerStatus.Approved && !s.IsDeleted)
+                    .ToListAsync();
+                products = await _context.Products
+                    .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 && !p.IsDeleted)
+                    .ToListAsync();
+            }
+
+            if (!users.Any() || !sellers.Any() || !products.Any())
+                return BadRequest("Not enough users, sellers, or products to seed.");
+
+            var now = DateTime.UtcNow;
+            var random = new Random();
+            var orderStatusArr = new[] {
+            OrderStatus.PAID.ToString(),
+            OrderStatus.PENDING.ToString(),
+            OrderStatus.CANCELLED.ToString(),
+            OrderStatus.EXPIRED.ToString()
+        };
+            var detailStatusArr = new[] {
+            OrderDetailItemStatus.DELIVERED,
+            OrderDetailItemStatus.PENDING,
+            OrderDetailItemStatus.SHIPPING_REQUESTED,
+            OrderDetailItemStatus.CANCELLED
+        };
+
+            var orders = new List<Order>();
+            var orderDetails = new List<OrderDetail>();
+            var inventoryItems = new List<InventoryItem>();
+
+            for (int i = 0; i < 7; i++)
+            {
+                var user = users[random.Next(users.Count)];
+                var orderProducts = products.OrderBy(_ => Guid.NewGuid()).Take(random.Next(1, 3)).ToList();
+                var orderId = Guid.NewGuid();
+
+                var status = orderStatusArr[i % orderStatusArr.Length];
+                var placedAt = now.AddDays(-random.Next(2, 20));
+                var completedAt = status == OrderStatus.PAID.ToString() ? placedAt.AddDays(1) : (DateTime?)null;
+
+                var totalAmount = orderProducts.Sum(p => p.Price);
+                var finalAmount = totalAmount - (i % 2 == 0 ? 50000 : 0); // Some orders have a discount
+
+                var order = new Order
+                {
+                    Id = orderId,
+                    UserId = user.Id,
+                    Status = status,
+                    TotalAmount = totalAmount,
+                    FinalAmount = finalAmount,
+                    PlacedAt = placedAt,
+                    CompletedAt = completedAt,
+                    CreatedAt = placedAt
+                };
+                orders.Add(order);
+
+                foreach (var product in orderProducts)
+                {
+                    var seller = sellers.FirstOrDefault(s => s.Id == product.SellerId);
+                    if (seller == null) continue;
+
+                    var quantity = random.Next(1, 3);
+                    var discount = (i + quantity) % 3 == 0 ? Math.Round(product.Price * 0.1m, 0) : 0m;
+                    var finalDetailPrice = product.Price * quantity - discount;
+                    var detailStatus = detailStatusArr[(i + quantity) % detailStatusArr.Length];
+
+                    var orderDetail = new OrderDetail
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = orderId,
+                        ProductId = product.Id,
+                        Quantity = quantity,
+                        UnitPrice = product.Price,
+                        TotalPrice = product.Price * quantity,
+                        DetailDiscountPromotion = discount,
+                        FinalDetailPrice = finalDetailPrice,
+                        Status = detailStatus,
+                        SellerId = seller.Id,
+                        CreatedAt = placedAt
+                    };
+                    orderDetails.Add(orderDetail);
+
+                    var inventoryItem = new InventoryItem
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = user.Id,
+                        ProductId = product.Id,
+                        OrderDetailId = orderDetail.Id,
+                        Status = InventoryItemStatus.Available,
+                        IsFromBlindBox = false,
+                        Location = "HCM",
+                        Tier = RarityName.Common,
+                        CreatedAt = completedAt ?? placedAt
+                    };
+                    inventoryItems.Add(inventoryItem);
+                }
+            }
+
+            await _context.Orders.AddRangeAsync(orders);
+            await _context.OrderDetails.AddRangeAsync(orderDetails);
+            await _context.InventoryItems.AddRangeAsync(inventoryItems);
+            await _context.SaveChangesAsync();
+
+            _logger.Success($"[SeedStatisticsOrders] Seeded {orders.Count} orders, {orderDetails.Count} order details.");
+
+            return Ok(ApiResult<object>.Success(new
+            {
+                Message = $"Seeded {orders.Count} orders and {orderDetails.Count} order details for statistics testing."
+            }));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            _logger.Error($"[SeedStatisticsOrders] Exception: {ex.Message}");
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
     private List<User> GetPredefinedUsers()
     {
         var passwordHasher = new PasswordHasher();
@@ -2287,7 +2431,10 @@ public class SystemController : ControllerBase
         _logger.Success("Roles seeded successfully.");
     }
 
+
     #endregion
+
+
 }
 
 public class MockClaimsService : IClaimsService
