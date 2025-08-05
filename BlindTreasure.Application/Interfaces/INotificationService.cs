@@ -11,7 +11,7 @@ public interface INotificationService
     Task ReadAllNotifications(Guid userId);
     Task DeleteNotification(Guid notificationId);
 
-    Task<List<Notification>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize,
+    Task<List<NotificationDto>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize,
         NotificationType? type = null);
 
     Task<int> CountNotificationsAsync(Guid userId);

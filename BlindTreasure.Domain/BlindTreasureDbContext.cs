@@ -316,6 +316,9 @@ public class BlindTreasureDbContext : DbContext
             entity.Property(n => n.Message)
                 .HasMaxLength(500)
                 .IsRequired();
+            entity.Property(n => n.SourceUrl)
+                .HasMaxLength(500)
+                .IsRequired(false); // Explicitly nullable
         });
 
 

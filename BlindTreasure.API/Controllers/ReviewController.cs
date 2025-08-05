@@ -33,7 +33,6 @@ public class ReviewController : ControllerBase
         {
             // Get userId from claims
             var userId = Guid.Parse(User.FindFirst("sub")?.Value ?? throw new UnauthorizedAccessException());
-
             var result = await _reviewService.CreateReviewAsync(userId, createDto);
             return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Tạo đánh giá thành công."));
         }

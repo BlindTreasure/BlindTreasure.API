@@ -667,8 +667,10 @@ public class TradingService : ITradingService
                 return;
             }
 
+            // Truyền thêm tradeRequestId vào method
             await SendTradeResponseNotificationAsync(tradeRequest.Requester, responder.FullName ?? "Unknown",
-                isAccepted);
+                isAccepted, tradeRequest.Id);
+
             _logger.Success(
                 $"[SendTradeResponseNotificationSafe] Đã gửi notification thành công cho trade request {tradeRequest.Id}");
         }
@@ -700,15 +702,19 @@ public class TradingService : ITradingService
         await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(2));
     }
 
-    private async Task SendTradeResponseNotificationAsync(User requester, string responderName, bool isAccepted)
+    private async Task SendTradeResponseNotificationAsync(User requester, string responderName, bool isAccepted,
+        Guid tradeRequestId)
     {
         var cacheKey = $"noti:trade_response:{requester.Id}";
         if (await _cacheService.ExistsAsync(cacheKey)) return;
 
         var title = isAccepted ? "Yêu cầu trao đổi được chấp nhận!" : "Yêu cầu trao đổi bị từ chối";
         var message = isAccepted
-            ? $"{responderName} đã chấp nhận yêu cầu trao đổi của bạn. Hãy liên hệ để hoàn tất giao dịch!"
+            ? $"{responderName} đã chấp nhận yêu cầu trao đổi của bạn. Hãy xác nhận để hoàn tất giao dịch!"
             : $"{responderName} đã từ chối yêu cầu trao đổi của bạn.";
+
+        // Chỉ tạo URL khi trade request được chấp nhận
+        var sourceUrl = isAccepted ? $"/marketplace/confirm-trading/{tradeRequestId}" : null;
 
         await _notificationService.PushNotificationToUser(
             requester.Id,
@@ -716,7 +722,8 @@ public class TradingService : ITradingService
             {
                 Title = title,
                 Message = message,
-                Type = NotificationType.Trading
+                Type = NotificationType.Trading,
+                SourceUrl = sourceUrl // Null cho reject, có URL cho accept
             }
         );
 

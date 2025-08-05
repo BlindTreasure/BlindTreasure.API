@@ -27,19 +27,29 @@ public class NotificationService : INotificationService
         _userService = userService;
     }
 
-    public async Task<List<Notification>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize,
+    public async Task<List<NotificationDto>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize,
         NotificationType? type = null)
     {
         var query = _unitOfWork.Notifications.GetQueryable()
             .Where(n => n.UserId == userId && !n.IsDeleted);
 
-        if (type.HasValue) query = query.Where(n => n.Type == type.Value);
+        if (type.HasValue) 
+            query = query.Where(n => n.Type == type.Value);
 
-        return await query
+        var notifications = await query
             .OrderByDescending(n => n.SentAt)
             .Skip(pageIndex * pageSize)
             .Take(pageSize)
             .ToListAsync();
+
+        // Map sang DTO với SourceUrl
+        return notifications.Select(n => new NotificationDto
+        {
+            Title = n.Title,
+            Message = n.Message,
+            Type = n.Type,
+            SourceUrl = n.SourceUrl // Sẽ là null nếu không được set
+        }).ToList();
     }
 
     public async Task<int> CountNotificationsAsync(Guid userId)
@@ -108,6 +118,7 @@ public class NotificationService : INotificationService
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null) throw new Exception("User not found");
+    
         var now = _currentTime.GetCurrentTime();
         var notification = new Notification
         {
@@ -116,25 +127,29 @@ public class NotificationService : INotificationService
             Title = notificationDTO.Title,
             Message = notificationDTO.Message,
             Type = notificationDTO.Type,
+            SourceUrl = notificationDTO.SourceUrl, // Có thể null
             IsRead = false,
             SentAt = now,
             CreatedAt = now,
             CreatedBy = user.Id
         };
+    
         await _unitOfWork.Notifications.AddAsync(notification);
         await _unitOfWork.SaveChangesAsync();
+    
         var payload = new
         {
             notification.Id,
             notification.Title,
             notification.Message,
             notification.SentAt,
-            notification.Type
+            notification.Type,
+            notification.SourceUrl // Null sẽ được serialize thành null trong JSON
         };
+    
         await NotificationHub.SendToUser(_hubContext, user.Id.ToString(), payload);
         return notification;
     }
-
     public async Task<Notification> PushNotificationToRole(RoleType role, NotificationDto notificationDTO)
     {
         var users = await _unitOfWork.Users.GetQueryable().Where(u => u.RoleName == role && !u.IsDeleted).ToListAsync();
