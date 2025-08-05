@@ -316,10 +316,9 @@ public class OrderService : IOrderService
     }
 
 
-
     private async Task<string> CheckoutCore(
-     List<SellerCheckoutGroup> groups,
-     Guid? shippingAddressId)
+        List<SellerCheckoutGroup> groups,
+        Guid? shippingAddressId)
     {
         _loggerService.Info("Start core checkout logic.");
 
@@ -382,56 +381,53 @@ public class OrderService : IOrderService
 
         // 6. Build details and reserve stock (WITHOUT promotion calculation first)
         foreach (var group in groups)
+        foreach (var item in group.Items)
         {
-            foreach (var item in group.Items)
+            decimal unitPrice;
+            string itemName;
+            if (item.ProductId.HasValue)
             {
-                decimal unitPrice;
-                string itemName;
-                if (item.ProductId.HasValue)
-                {
-                    var p = prodById[item.ProductId.Value];
-                    if (p.Status != ProductStatus.Active || p.Stock < item.Quantity)
-                        throw ErrorHelper.BadRequest($"Product {p.Name} invalid or out of stock.");
-                    unitPrice = p.Price;
-                    itemName = p.Name;
-                    p.Stock -= item.Quantity;
-                    await _unitOfWork.Products.Update(p);
-                }
-                else
-                {
-                    var b = boxById[item.BlindBoxId!.Value];
-                    if (b.Status != BlindBoxStatus.Approved || b.TotalQuantity < item.Quantity)
-                        throw ErrorHelper.BadRequest($"BlindBox {b.Name} invalid or out of stock.");
-                    unitPrice = b.Price;
-                    itemName = b.Name;
-                    b.TotalQuantity -= item.Quantity;
-                    await _unitOfWork.BlindBoxes.Update(b);
-                }
-
-                var detail = new OrderDetail
-                {
-                    Id = Guid.NewGuid(),
-                    OrderId = order.Id,
-                    ProductId = item.ProductId,
-                    BlindBoxId = item.BlindBoxId,
-                    Quantity = item.Quantity,
-                    UnitPrice = unitPrice,
-                    TotalPrice = unitPrice * item.Quantity,
-                    SellerId = group.SellerId,
-                    Status = OrderDetailItemStatus.PENDING,
-                    CreatedAt = DateTime.UtcNow,
-                    Logs = $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Created {itemName}, Qty={item.Quantity}",
-                    // Initialize new fields
-                    DetailDiscountPromotion = null,
-                    FinalDetailPrice = unitPrice * item.Quantity // Initially same as TotalPrice
-                };
-                order.OrderDetails.Add(detail);
+                var p = prodById[item.ProductId.Value];
+                if (p.Status != ProductStatus.Active || p.Stock < item.Quantity)
+                    throw ErrorHelper.BadRequest($"Product {p.Name} invalid or out of stock.");
+                unitPrice = p.Price;
+                itemName = p.Name;
+                p.Stock -= item.Quantity;
+                await _unitOfWork.Products.Update(p);
             }
+            else
+            {
+                var b = boxById[item.BlindBoxId!.Value];
+                if (b.Status != BlindBoxStatus.Approved || b.TotalQuantity < item.Quantity)
+                    throw ErrorHelper.BadRequest($"BlindBox {b.Name} invalid or out of stock.");
+                unitPrice = b.Price;
+                itemName = b.Name;
+                b.TotalQuantity -= item.Quantity;
+                await _unitOfWork.BlindBoxes.Update(b);
+            }
+
+            var detail = new OrderDetail
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                ProductId = item.ProductId,
+                BlindBoxId = item.BlindBoxId,
+                Quantity = item.Quantity,
+                UnitPrice = unitPrice,
+                TotalPrice = unitPrice * item.Quantity,
+                SellerId = group.SellerId,
+                Status = OrderDetailItemStatus.PENDING,
+                CreatedAt = DateTime.UtcNow,
+                Logs = $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Created {itemName}, Qty={item.Quantity}",
+                // Initialize new fields
+                DetailDiscountPromotion = null,
+                FinalDetailPrice = unitPrice * item.Quantity // Initially same as TotalPrice
+            };
+            order.OrderDetails.Add(detail);
         }
 
         // 7. Apply promotions AFTER all OrderDetails are created
         foreach (var group in groups)
-        {
             if (group.PromotionId.HasValue)
             {
                 var promo = await _unitOfWork.Promotions.GetByIdAsync(group.PromotionId.Value);
@@ -445,7 +441,8 @@ public class OrderService : IOrderService
                 if (participant == null)
                 {
                     _loggerService.Warn($"Seller {group.SellerId} not participate in promotion {promo.Code}");
-                    throw ErrorHelper.BadRequest($"Promotion not applicable for this seller. ( Seller did not participate to this promotion :{promo.Id}");
+                    throw ErrorHelper.BadRequest(
+                        $"Promotion not applicable for this seller. ( Seller did not participate to this promotion :{promo.Id}");
                 }
 
                 // Get order details for this seller
@@ -481,12 +478,8 @@ public class OrderService : IOrderService
                     .Where(d => d.SellerId == group.SellerId)
                     .ToList();
 
-                foreach (var detail in sellerOrderDetails)
-                {
-                    detail.FinalDetailPrice = detail.TotalPrice;
-                }
+                foreach (var detail in sellerOrderDetails) detail.FinalDetailPrice = detail.TotalPrice;
             }
-        }
 
         // 8. Calculate order totals
         order.TotalAmount = order.OrderDetails.Sum(d => d.TotalPrice);
@@ -509,7 +502,8 @@ public class OrderService : IOrderService
             {
                 var seller = grp.First().Product!.Seller;
                 var ghnResp = await _ghnShippingService.PreviewOrderAsync(
-                    _ghnShippingService.BuildGhnOrderRequest(grp, seller, shippingAddress, od => od.Product!, od => od.Quantity));
+                    _ghnShippingService.BuildGhnOrderRequest(grp, seller, shippingAddress, od => od.Product!,
+                        od => od.Quantity));
                 var fee = ghnResp?.TotalFee ?? 0m;
                 order.TotalShippingFee += fee;
                 order.FinalAmount += fee;
@@ -575,7 +569,7 @@ public class OrderService : IOrderService
             var totalDiscount = Math.Min(promotion.DiscountValue, subTotal);
             var remainingDiscount = totalDiscount;
 
-            for (int i = 0; i < orderDetails.Count; i++)
+            for (var i = 0; i < orderDetails.Count; i++)
             {
                 var detail = orderDetails[i];
 
@@ -598,9 +592,8 @@ public class OrderService : IOrderService
 
         // Log promotion application
         foreach (var detail in orderDetails)
-        {
-            detail.Logs += $"\n [{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Applied promotion {promotion.Id}: - Discount amount: {detail.DetailDiscountPromotion:C}";
-        }
+            detail.Logs +=
+                $"\n [{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Applied promotion {promotion.Id}: - Discount amount: {detail.DetailDiscountPromotion:C}";
     }
 
     public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(
@@ -669,8 +662,8 @@ public class OrderService : IOrderService
     //============================================//
 
     private async Task<string> NewCheckoutCore(
-    List<SellerCheckoutGroup> groups,
-    Guid? shippingAddressId)
+        List<SellerCheckoutGroup> groups,
+        Guid? shippingAddressId)
     {
         _loggerService.Info("Start core checkout logic.");
 
@@ -748,51 +741,49 @@ public class OrderService : IOrderService
 
         // 6. Build order details
         foreach (var group in groups)
+        foreach (var item in group.Items)
         {
-            foreach (var item in group.Items)
+            decimal unitPrice;
+            string itemName;
+            var sellerId = group.SellerId;
+            var isProduct = item.ProductId.HasValue;
+
+            if (isProduct)
             {
-                decimal unitPrice;
-                string itemName;
-                Guid sellerId = group.SellerId;
-                bool isProduct = item.ProductId.HasValue;
+                var product = prodById[item.ProductId!.Value];
+                if (product.Status != ProductStatus.Active || product.Stock < item.Quantity)
+                    throw ErrorHelper.BadRequest($"Product {product.Name} invalid or out of stock.");
 
-                if (isProduct)
-                {
-                    var product = prodById[item.ProductId!.Value];
-                    if (product.Status != ProductStatus.Active || product.Stock < item.Quantity)
-                        throw ErrorHelper.BadRequest($"Product {product.Name} invalid or out of stock.");
-
-                    unitPrice = product.Price;
-                    itemName = product.Name;
-                    sellerId = product.SellerId;
-                }
-                else
-                {
-                    var blindBox = boxById[item.BlindBoxId!.Value];
-                    if (blindBox.Status != BlindBoxStatus.Approved || blindBox.TotalQuantity < item.Quantity)
-                        throw ErrorHelper.BadRequest($"BlindBox {blindBox.Name} invalid or out of stock.");
-
-                    unitPrice = blindBox.Price;
-                    itemName = blindBox.Name;
-                    sellerId = blindBox.SellerId;
-                }
-
-                order.OrderDetails.Add(new OrderDetail
-                {
-                    Id = Guid.NewGuid(),
-                    ProductId = item.ProductId,
-                    BlindBoxId = item.BlindBoxId,
-                    Quantity = item.Quantity,
-                    UnitPrice = unitPrice,
-                    TotalPrice = unitPrice * item.Quantity,
-                    SellerId = sellerId,
-                    Status = OrderDetailItemStatus.PENDING,
-                    CreatedAt = DateTime.UtcNow,
-                    Logs = $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Created {itemName}, Qty={item.Quantity}",
-                    DetailDiscountPromotion = null,
-                    FinalDetailPrice = unitPrice * item.Quantity
-                });
+                unitPrice = product.Price;
+                itemName = product.Name;
+                sellerId = product.SellerId;
             }
+            else
+            {
+                var blindBox = boxById[item.BlindBoxId!.Value];
+                if (blindBox.Status != BlindBoxStatus.Approved || blindBox.TotalQuantity < item.Quantity)
+                    throw ErrorHelper.BadRequest($"BlindBox {blindBox.Name} invalid or out of stock.");
+
+                unitPrice = blindBox.Price;
+                itemName = blindBox.Name;
+                sellerId = blindBox.SellerId;
+            }
+
+            order.OrderDetails.Add(new OrderDetail
+            {
+                Id = Guid.NewGuid(),
+                ProductId = item.ProductId,
+                BlindBoxId = item.BlindBoxId,
+                Quantity = item.Quantity,
+                UnitPrice = unitPrice,
+                TotalPrice = unitPrice * item.Quantity,
+                SellerId = sellerId,
+                Status = OrderDetailItemStatus.PENDING,
+                CreatedAt = DateTime.UtcNow,
+                Logs = $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Created {itemName}, Qty={item.Quantity}",
+                DetailDiscountPromotion = null,
+                FinalDetailPrice = unitPrice * item.Quantity
+            });
         }
 
         // 7. Apply promotions
@@ -804,10 +795,7 @@ public class OrderService : IOrderService
 
             if (!group.PromotionId.HasValue)
             {
-                foreach (var detail in sellerDetails)
-                {
-                    detail.FinalDetailPrice = detail.TotalPrice;
-                }
+                foreach (var detail in sellerDetails) detail.FinalDetailPrice = detail.TotalPrice;
                 continue;
             }
 
@@ -826,12 +814,12 @@ public class OrderService : IOrderService
 
             // Apply promotion to order details
             var subTotal = sellerDetails.Sum(d => d.TotalPrice);
-            decimal discount = promotion.DiscountType == DiscountType.Percentage
+            var discount = promotion.DiscountType == DiscountType.Percentage
                 ? Math.Round(subTotal * promotion.DiscountValue / 100m, 2)
                 : Math.Min(promotion.DiscountValue, subTotal);
 
             decimal totalAllocatedDiscount = 0;
-            for (int i = 0; i < sellerDetails.Count; i++)
+            for (var i = 0; i < sellerDetails.Count; i++)
             {
                 var detail = sellerDetails[i];
                 decimal itemDiscount;
@@ -842,7 +830,7 @@ public class OrderService : IOrderService
                 }
                 else
                 {
-                    decimal ratio = detail.TotalPrice / subTotal;
+                    var ratio = detail.TotalPrice / subTotal;
                     itemDiscount = Math.Round(discount * ratio, 2);
                     totalAllocatedDiscount += itemDiscount;
                 }
@@ -899,7 +887,7 @@ public class OrderService : IOrderService
                     )
                 );
 
-                decimal shippingFee = ghnResponse?.TotalFee ?? 0m;
+                var shippingFee = ghnResponse?.TotalFee ?? 0m;
                 order.TotalShippingFee += shippingFee;
 
                 var shipment = new Shipment
@@ -935,7 +923,6 @@ public class OrderService : IOrderService
         _loggerService.Success($"Checkout completed for order {order.Id}");
         return sessionUrl;
     }
-
 
 
     public struct CheckoutItem

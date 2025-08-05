@@ -18,5 +18,7 @@ public interface IGhnShippingService
     Task<CalculateShippingFeeResponse?> CalculateFeeAsync(CalculateShippingFeeRequest request);
     Task<GhnPreviewResponse?> PreviewOrderAsync(GhnOrderRequest req);
     Task<GhnCreateResponse?> CreateOrderAsync(GhnOrderRequest req);
-    GhnOrderRequest BuildGhnOrderRequest<T>(IEnumerable<T> items, Seller seller, Address toAddress, Func<T, Product> getProduct, Func<T, int> getQuantity);
+
+    GhnOrderRequest BuildGhnOrderRequest<T>(IEnumerable<T> items, Seller seller, Address toAddress,
+        Func<T, Product> getProduct, Func<T, int> getQuantity);
 }

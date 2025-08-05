@@ -2143,10 +2143,8 @@ public class SystemController : ControllerBase
         var participants = new List<PromotionParticipant>();
 
         foreach (var promotion in promotions)
-        {
             // Chỉ thêm blindtreasure làm participant (nếu promotion không phải của chính họ)
             if (promotion.SellerId != blindTreasureSeller.Id)
-            {
                 participants.Add(new PromotionParticipant
                 {
                     Id = Guid.NewGuid(),
@@ -2154,8 +2152,6 @@ public class SystemController : ControllerBase
                     SellerId = blindTreasureSeller.Id,
                     JoinedAt = now
                 });
-            }
-        }
 
         await _context.PromotionParticipants.AddRangeAsync(participants);
         await _context.SaveChangesAsync();
@@ -2190,7 +2186,7 @@ public class SystemController : ControllerBase
                     CompanyPhone = "0901234567",
                     CompanyWardName = "Phường 7",
                     CompanyDistrictName = "Quận Phú Nhuận",
-                    CompanyProvinceName = "HCM",
+                    CompanyProvinceName = "HCM"
                 };
                 break;
 

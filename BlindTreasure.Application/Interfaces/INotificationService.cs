@@ -13,6 +13,7 @@ public interface INotificationService
 
     Task<List<Notification>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize,
         NotificationType? type = null);
+
     Task<int> CountNotificationsAsync(Guid userId);
 
 

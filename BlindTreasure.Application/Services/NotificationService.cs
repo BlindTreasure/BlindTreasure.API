@@ -27,15 +27,13 @@ public class NotificationService : INotificationService
         _userService = userService;
     }
 
-    public async Task<List<Notification>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize, NotificationType? type = null)
+    public async Task<List<Notification>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize,
+        NotificationType? type = null)
     {
         var query = _unitOfWork.Notifications.GetQueryable()
             .Where(n => n.UserId == userId && !n.IsDeleted);
 
-        if (type.HasValue)
-        {
-            query = query.Where(n => n.Type == type.Value);
-        }
+        if (type.HasValue) query = query.Where(n => n.Type == type.Value);
 
         return await query
             .OrderByDescending(n => n.SentAt)

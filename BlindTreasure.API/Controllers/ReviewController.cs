@@ -17,7 +17,7 @@ public class ReviewController : ControllerBase
     {
         _reviewService = reviewService;
     }
-    
+
     /// <summary>
     ///     Tạo đánh giá mới
     /// </summary>
@@ -33,7 +33,7 @@ public class ReviewController : ControllerBase
         {
             // Get userId from claims
             var userId = Guid.Parse(User.FindFirst("sub")?.Value ?? throw new UnauthorizedAccessException());
-            
+
             var result = await _reviewService.CreateReviewAsync(userId, createDto);
             return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Tạo đánh giá thành công."));
         }
@@ -93,6 +93,4 @@ public class ReviewController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
-    
 }

@@ -22,7 +22,8 @@ public class NotificationController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetNotifications([FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 10, NotificationType? type = null)
+    public async Task<IActionResult> GetNotifications([FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 10,
+        NotificationType? type = null)
     {
         try
         {

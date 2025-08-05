@@ -49,12 +49,10 @@ public class PromotionService : IPromotionService
 
         // Handle participant filtering for global promotions
         if (param.SellerId.HasValue && param.IsGlobal == true)
-        {
             query = query.Where(p =>
                 p.PromotionParticipants.Any(pp =>
                     pp.SellerId == param.SellerId &&
                     !pp.IsDeleted));
-        }
 
         // For sellers, also include global promotions they participate in
         if (currentUser.RoleName == RoleType.Seller)
@@ -63,22 +61,18 @@ public class PromotionService : IPromotionService
                 s.UserId == currentUser.Id && !s.IsDeleted);
 
             if (seller != null)
-            {
                 query = query.Where(p =>
                     p.SellerId == seller.Id || // Own promotions
                     (p.SellerId == null && // Global promotions
                      p.PromotionParticipants.Any(pp =>
                          pp.SellerId == seller.Id &&
                          !pp.IsDeleted)));
-            }
         }
 
         // For customers, we only want approved promotions that are either global or from specific sellers
         if (currentUser.RoleName == RoleType.Customer)
-        {
             query = query.Where(p => p.Status == PromotionStatus.Approved &&
                                      (p.SellerId == null || (param.SellerId.HasValue && p.SellerId == param.SellerId)));
-        }
 
         // Apply pagination and execute query
         var totalCount = await query.CountAsync();
@@ -421,17 +415,12 @@ public class PromotionService : IPromotionService
         }
 
         // Apply status filter if provided
-        if (param.Status.HasValue)
-        {
-            query = query.Where(p => p.Status == param.Status);
-        }
+        if (param.Status.HasValue) query = query.Where(p => p.Status == param.Status);
 
         // Now include PromotionParticipants if needed (for seller or when filtering by participant)
         if (currentUser.RoleName == RoleType.Seller ||
             (param.SellerId.HasValue && param.IsGlobal == true))
-        {
             query = query.Include(p => p.PromotionParticipants);
-        }
 
         return query;
     }
@@ -445,17 +434,13 @@ public class PromotionService : IPromotionService
         {
             // If isGlobal is true, show global promotions this seller participates in
             if (param.IsGlobal == true)
-            {
                 query = query.Where(p =>
                         p.SellerId == null) // Global promotions
                     // The join with participants will be done after this filter
                     ;
-            }
             // Otherwise show promotions created by this seller
             else
-            {
                 query = query.Where(p => p.SellerId == param.SellerId);
-            }
         }
         // Case 2: Filter by promotion type (global or seller-specific)
         else if (param.IsGlobal.HasValue)

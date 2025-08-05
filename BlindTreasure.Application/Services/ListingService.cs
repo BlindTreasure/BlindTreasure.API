@@ -46,7 +46,7 @@ public class ListingService : IListingService
         var listing = await _unitOfWork.Listings
             .GetQueryable()
             .Include(l => l.InventoryItem)
-                .ThenInclude(i => i.Product)
+            .ThenInclude(i => i.Product)
             .Include(l => l.InventoryItem.User)
             .Where(l => !l.IsDeleted && l.Id == id)
             .FirstOrDefaultAsync();
@@ -57,10 +57,10 @@ public class ListingService : IListingService
         var result = MapListingToDto(listing);
 
         // Lưu vào cache với thời gian khác nhau dựa trên status
-        var cacheDuration = listing.Status == ListingStatus.Active 
-            ? CacheDurations.ActiveListing 
+        var cacheDuration = listing.Status == ListingStatus.Active
+            ? CacheDurations.ActiveListing
             : CacheDurations.InactiveListing;
-            
+
         await _cacheService.SetAsync(cacheKey, result, cacheDuration);
         _logger.Info($"[GetByIdAsync] Đã cache listing {id} với duration: {cacheDuration}");
 
@@ -75,16 +75,14 @@ public class ListingService : IListingService
 
         var query = _unitOfWork.Listings.GetQueryable()
             .Include(l => l.InventoryItem)
-                .ThenInclude(i => i.Product)
+            .ThenInclude(i => i.Product)
             .Include(l => l.InventoryItem.User)
             .Where(l => !l.IsDeleted)
             .AsNoTracking();
 
         // Mặc định loại trừ listings của current user
         if (!(param.IsOwnerListings.HasValue && param.IsOwnerListings.Value))
-        {
             query = query.Where(l => l.InventoryItem.UserId != currentUserId);
-        }
 
         // Áp dụng filters
         query = ApplyFilters(query, param);
@@ -130,7 +128,7 @@ public class ListingService : IListingService
         var result = items.Select(item =>
         {
             var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
-            
+
             // Thông tin sản phẩm
             if (item.Product != null)
             {
@@ -194,7 +192,7 @@ public class ListingService : IListingService
 
         // Xóa cache của user items
         await InvalidateUserItemsCache(userId);
-        
+
         _logger.Info($"[CreateListing] Đã tạo listing {listing.Id} và xóa cache");
 
         // Load đầy đủ thông tin listing vừa tạo
@@ -222,7 +220,7 @@ public class ListingService : IListingService
         // Xóa cache
         await InvalidateListingCache(listingId);
         await InvalidateUserItemsCache(userId);
-        
+
         _logger.Info($"[CloseListing] Đã đóng listing {listingId} và xóa cache");
 
         return await GetListingByIdAsync(listingId);
@@ -244,7 +242,7 @@ public class ListingService : IListingService
 
         await _unitOfWork.ListingReports.AddAsync(report);
         await _unitOfWork.SaveChangesAsync();
-        
+
         _logger.Info($"[ReportListing] User {_claimsService.CurrentUserId} đã báo cáo listing {listingId}");
     }
 
@@ -253,12 +251,16 @@ public class ListingService : IListingService
     private static class CacheKeys
     {
         private const string PREFIX = "listing:";
-        
-        public static string GetListingDetail(Guid listingId) 
-            => $"{PREFIX}detail:{listingId}";
-            
-        public static string GetUserAvailableItems(Guid userId) 
-            => $"{PREFIX}user-items:{userId}";
+
+        public static string GetListingDetail(Guid listingId)
+        {
+            return $"{PREFIX}detail:{listingId}";
+        }
+
+        public static string GetUserAvailableItems(Guid userId)
+        {
+            return $"{PREFIX}user-items:{userId}";
+        }
     }
 
     private static class CacheDurations
@@ -324,17 +326,15 @@ public class ListingService : IListingService
     private ListingDetailDto MapListingToDto(Listing listing)
     {
         var dto = _mapper.Map<Listing, ListingDetailDto>(listing);
-        
+
         dto.InventoryId = listing.InventoryId;
         dto.ProductName = listing.InventoryItem?.Product?.Name ?? "Unknown";
         dto.ProductImage = listing.InventoryItem?.Product?.ImageUrls?.FirstOrDefault() ?? "";
         dto.Description = listing.Description;
         dto.AvatarUrl = listing.InventoryItem?.User?.AvatarUrl;
-        
+
         if (listing.InventoryItem?.User != null)
-        {
             dto.OwnerName = listing.InventoryItem.User.FullName ?? listing.InventoryItem.User.Email;
-        }
 
         return dto;
     }

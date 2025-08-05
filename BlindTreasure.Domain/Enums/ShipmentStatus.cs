@@ -11,5 +11,5 @@ public enum ShipmentStatus
     WAITING_PAYMENT,
     PROCESSING,
     COMPLETED,
-    CANCELLED,
+    CANCELLED
 }

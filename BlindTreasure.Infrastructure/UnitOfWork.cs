@@ -42,7 +42,8 @@ public class UnitOfWork : IUnitOfWork
         IGenericRepository<TradeRequest> tradeRequests,
         IGenericRepository<TradeRequestItem> tradeRequestItems,
         IGenericRepository<CustomerFavourite> customerFavourites,
-        IGenericRepository<OrderSellerPromotion> orderSellerPromotion, IGenericRepository<Review> reviews, IDbContextTransaction? transaction = null
+        IGenericRepository<OrderSellerPromotion> orderSellerPromotion, IGenericRepository<Review> reviews,
+        IDbContextTransaction? transaction = null
     )
     {
         _dbContext = dbContext;

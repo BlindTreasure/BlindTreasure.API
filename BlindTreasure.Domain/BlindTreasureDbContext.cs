@@ -622,7 +622,7 @@ public class BlindTreasureDbContext : DbContext
             // Thêm cấu hình cho TimeRemaining
             entity.Property(t => t.TimeRemaining)
                 .HasDefaultValue(0);
-            
+
             entity.HasOne(t => t.Listing)
                 .WithMany()
                 .HasForeignKey(t => t.ListingId)
