@@ -91,7 +91,7 @@ public class NotificationService : INotificationService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task<Notification> PushNotificationToAll(NotificationDTO notificationDTO)
+    public async Task<Notification> PushNotificationToAll(NotificationDto notificationDTO)
     {
         var users = await _unitOfWork.Users.GetQueryable().Where(u => !u.IsDeleted).ToListAsync();
         Notification? lastNotification = null;
@@ -104,7 +104,7 @@ public class NotificationService : INotificationService
         return lastNotification!;
     }
 
-    public async Task<Notification> PushNotificationToUser(Guid userId, NotificationDTO notificationDTO)
+    public async Task<Notification> PushNotificationToUser(Guid userId, NotificationDto notificationDTO)
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null) throw new Exception("User not found");
@@ -135,7 +135,7 @@ public class NotificationService : INotificationService
         return notification;
     }
 
-    public async Task<Notification> PushNotificationToRole(RoleType role, NotificationDTO notificationDTO)
+    public async Task<Notification> PushNotificationToRole(RoleType role, NotificationDto notificationDTO)
     {
         var users = await _unitOfWork.Users.GetQueryable().Where(u => u.RoleName == role && !u.IsDeleted).ToListAsync();
         Notification? lastNotification = null;

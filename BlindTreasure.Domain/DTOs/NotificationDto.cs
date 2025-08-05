@@ -2,7 +2,7 @@ using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.DTOs;
 
-public class NotificationDTO
+public class NotificationDto
 {
     public required string Title { get; set; }
     public required string Message { get; set; }
