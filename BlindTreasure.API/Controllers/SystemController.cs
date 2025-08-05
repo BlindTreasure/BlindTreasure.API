@@ -2057,7 +2057,7 @@ public class SystemController : ControllerBase
                 StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
-                SellerId = smiskiSeller.Id,
+                SellerId = blindTreasureSeller.Id,
                 UsageLimit = 200,
                 CreatedByRole = RoleType.Seller,
                 CreatedAt = now
@@ -2072,7 +2072,7 @@ public class SystemController : ControllerBase
                 StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
-                SellerId = smiskiSeller.Id,
+                SellerId = blindTreasureSeller.Id,
                 UsageLimit = 100,
                 CreatedByRole = RoleType.Seller,
                 CreatedAt = now
@@ -2256,6 +2256,40 @@ public class SystemController : ControllerBase
     }
 
     #endregion
+
+    /// <summary>
+    /// Seed promotions and promotion participants.
+    /// This will first clear existing promotions and participants before seeding new ones.
+    /// </summary>
+    /// <returns>A confirmation message.</returns>
+    [HttpPost("dev/seed-promotions")]
+    public async Task<IActionResult> SeedPromotionsData()
+    {
+        try
+        {
+            _logger.Info("[SeedPromotionsData] Starting to seed Promotions and PromotionParticipants.");
+
+            _logger.Info("[SeedPromotionsData] Clearing existing PromotionParticipants and Promotions.");
+            await _context.PromotionParticipants.ExecuteDeleteAsync();
+            await _context.Promotions.ExecuteDeleteAsync();
+
+            _logger.Info("[SeedPromotionsData] Seeding new Promotions.");
+            await SeedPromotions();
+
+            _logger.Info("[SeedPromotionsData] Seeding new PromotionParticipants.");
+            await SeedPromotionParticipants();
+
+            _logger.Success("[SeedPromotionsData] Promotions and participants seeded successfully.");
+            return Ok(ApiResult<object>.Success("200", "Promotions and participants seeded successfully."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            _logger.Error($"[SeedPromotionsData] Exception: {ex.Message}");
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 }
 
 public class MockClaimsService : IClaimsService
