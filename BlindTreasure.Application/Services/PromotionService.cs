@@ -381,7 +381,6 @@ public class PromotionService : IPromotionService
 
     #region private methods
 
-    
     private List<PromotionDto> MapPromotionsToDtos(List<Promotion> promotions)
     {
         return promotions.Select(promotion =>
@@ -396,7 +395,7 @@ public class PromotionService : IPromotionService
             ? query.OrderByDescending(p => p.CreatedAt)
             : query.OrderBy(p => p.CreatedAt);
     }
-    
+
     private async Task<Promotion> SetPromotionDataAsync(CreatePromotionDto dto, User user)
     {
         var promotion = new Promotion
@@ -426,6 +425,15 @@ public class PromotionService : IPromotionService
 
                 promotion.SellerId = seller?.Id;
                 promotion.Status = PromotionStatus.Pending;
+
+                // Tự động tạo Participation record
+                await _unitOfWork.PromotionParticipants.AddAsync(new PromotionParticipant
+                {
+                    SellerId = seller.Id,
+                    PromotionId = promotion.Id,
+                    JoinedAt = DateTime.UtcNow
+                });
+
                 break;
 
             default:
@@ -464,40 +472,55 @@ public class PromotionService : IPromotionService
 
     private async Task ValidateParticipantPromotionAsync(User user, Guid promotionId)
     {
-        if (user.RoleName == RoleType.Seller)
+        if (user.RoleName != RoleType.Seller)
+            throw ErrorHelper.Forbidden("Chỉ Seller được phép tham gia chiến dịch.");
+
+        // 1. Kiểm tra seller hợp lệ
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
+            s.UserId == user.Id &&
+            s.IsVerified &&
+            !s.IsDeleted);
+
+        if (seller == null)
         {
-            var seller =
-                await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == user.Id && s.IsVerified && !s.IsDeleted);
-            if (seller == null)
-            {
-                _loggerService.Warn("ValidateParticipantPromotion: Seller chưa xác minh hoặc bị xoá");
-                throw ErrorHelper.Forbidden("Tài khoản không đủ điều kiện để tham gia chiến dịch.");
-            }
-
-            var hasWithdrawn = await _unitOfWork.PromotionParticipants.FirstOrDefaultAsync(pp =>
-                pp.SellerId == seller.Id &&
-                pp.PromotionId == promotionId &&
-                pp.IsDeleted == true);
-
-            if (hasWithdrawn != null)
-                throw ErrorHelper.Conflict("Bạn đã rút khỏi chiến dịch này trước đó và không thể tham gia lại.");
-
-            // Đếm số chiến dịch voucher toàn sàn đang active mà seller đã tham gia
-            var activeParticipantCount = await _unitOfWork.PromotionParticipants.CountAsync(pp =>
-                pp.SellerId == seller.Id &&
-                pp.Promotion.CreatedByRole != RoleType.Seller && // Chỉ voucher toàn sàn
-                pp.Promotion.Status == PromotionStatus.Approved &&
-                pp.Promotion.EndDate >= DateTime.UtcNow && // Chưa hết hạn
-                !pp.Promotion.IsDeleted);
-
-            if (activeParticipantCount >= 2)
-                throw ErrorHelper.BadRequest(
-                    "Bạn chỉ được tham gia tối đa 2 chiến dịch voucher toàn sàn cùng lúc. Vui lòng chờ chiến dịch hiện tại kết thúc.");
-
-            var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == promotionId);
-            if (promotion.StartDate <= DateTime.Now)
-                throw ErrorHelper.BadRequest("Không thể tham gia/rút khỏi chiến dịch đã bắt đầu.");
+            _loggerService.Warn($"ValidateParticipantPromotion: Seller {user.Id} chưa xác minh hoặc bị xoá");
+            throw ErrorHelper.Forbidden("Tài khoản không đủ điều kiện để tham gia chiến dịch.");
         }
+
+        // 2. Lấy thông tin promotion
+        var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == promotionId);
+        if (promotion == null)
+            throw ErrorHelper.NotFound("Không tìm thấy chiến dịch khuyến mãi.");
+
+        // 3. Chỉ cho phép tham gia Global Promotion (do Admin/Staff tạo)
+        if (promotion.SellerId != null)
+            throw ErrorHelper.BadRequest("Chỉ được tham gia chiến dịch toàn sàn.");
+
+        // 4. Kiểm tra promotion đã bắt đầu chưa
+        if (promotion.StartDate <= DateTime.UtcNow)
+            throw ErrorHelper.BadRequest("Không thể tham gia/rút khỏi chiến dịch đã bắt đầu.");
+
+        // 5. Kiểm tra đã từng rút khỏi chiến dịch này chưa
+        var hasWithdrawn = await _unitOfWork.PromotionParticipants.FirstOrDefaultAsync(pp =>
+            pp.SellerId == seller.Id &&
+            pp.PromotionId == promotionId &&
+            pp.IsDeleted);
+
+        if (hasWithdrawn != null)
+            throw ErrorHelper.Conflict("Bạn đã rút khỏi chiến dịch này trước đó và không thể tham gia lại.");
+
+        // 6. Kiểm tra giới hạn số chiến dịch đang tham gia (chỉ áp dụng cho Global Promotion)
+        var activeParticipantCount = await _unitOfWork.PromotionParticipants.CountAsync(pp =>
+            pp.SellerId == seller.Id &&
+            pp.Promotion.SellerId == null && // Chỉ đếm Global Promotion
+            pp.Promotion.Status == PromotionStatus.Approved &&
+            pp.Promotion.EndDate >= DateTime.UtcNow &&
+            !pp.Promotion.IsDeleted &&
+            !pp.IsDeleted);
+
+        if (activeParticipantCount >= 2)
+            throw ErrorHelper.BadRequest(
+                "Bạn chỉ được tham gia tối đa 2 chiến dịch toàn sàn cùng lúc. Vui lòng chờ chiến dịch hiện tại kết thúc.");
     }
 
     private async Task ValidatePromotionInputAsync(CreatePromotionDto dto)
