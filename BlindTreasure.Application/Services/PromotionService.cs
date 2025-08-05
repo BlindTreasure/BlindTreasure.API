@@ -39,55 +39,48 @@ public class PromotionService : IPromotionService
 
     public async Task<Pagination<PromotionDto>> GetPromotionsAsync(PromotionQueryParameter param)
     {
-        var currentUserId = _claimsService.CurrentUserId;
-        var currentUser = await _userService.GetUserById(currentUserId, true);
-        if (currentUser == null)
-            throw ErrorHelper.Unauthorized("Không tìm thấy thông tin người dùng.");
+        // Base query - chỉ lấy promotions chưa bị xóa
+        var query = _unitOfWork.Promotions
+            .GetQueryable()
+            .Where(p => !p.IsDeleted);
 
-        // Get base query with filters applied
-        var query = await GetFilteredPromotionsQuery(param, currentUser);
-
-        // Handle participant filtering for global promotions
-        if (param.SellerId.HasValue && param.IsGlobal == true)
-            query = query.Where(p =>
-                p.PromotionParticipants.Any(pp =>
-                    pp.SellerId == param.SellerId &&
-                    !pp.IsDeleted));
-
-        // For sellers, also include global promotions they participate in
-        if (currentUser.RoleName == RoleType.Seller)
+        // Apply basic filters
+        if (param.SellerId.HasValue)
         {
-            var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
-                s.UserId == currentUser.Id && !s.IsDeleted);
-
-            if (seller != null)
-                query = query.Where(p =>
-                    p.SellerId == seller.Id || // Own promotions
-                    (p.SellerId == null && // Global promotions
-                     p.PromotionParticipants.Any(pp =>
-                         pp.SellerId == seller.Id &&
-                         !pp.IsDeleted)));
+            query = query.Where(p => p.SellerId == param.SellerId);
         }
 
-        // For customers, we only want approved promotions that are either global or from specific sellers
-        if (currentUser.RoleName == RoleType.Customer)
-            query = query.Where(p => p.Status == PromotionStatus.Approved &&
-                                     (p.SellerId == null || (param.SellerId.HasValue && p.SellerId == param.SellerId)));
+        if (param.IsGlobal.HasValue)
+        {
+            if (param.IsGlobal.Value)
+                query = query.Where(p => p.SellerId == null); // Global promotions
+            else
+                query = query.Where(p => p.SellerId != null); // Seller-specific promotions
+        }
 
-        // Apply pagination and execute query
+        if (param.Status.HasValue)
+        {
+            query = query.Where(p => p.Status == param.Status);
+        }
+
+        // Get total count for pagination
         var totalCount = await query.CountAsync();
+
+        // Apply sorting
         var orderedQuery = ApplySorting(query, param.Desc);
 
+        // Apply pagination
         var items = await orderedQuery
             .Skip((param.PageIndex - 1) * param.PageSize)
             .Take(param.PageSize)
             .ToListAsync();
 
-        // Map to DTOs
-        var dtos = await MapPromotionsToDtos(items, currentUser, param.SellerId);
+        // Map to DTOs (simplified version)
+        var dtos = MapPromotionsToDtos(items);
 
         return new Pagination<PromotionDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
+
 
     public async Task<PromotionDto> GetPromotionByIdAsync(Guid id)
     {
@@ -388,144 +381,22 @@ public class PromotionService : IPromotionService
 
     #region private methods
 
-    private async Task<IQueryable<Promotion>> GetFilteredPromotionsQuery(
-        PromotionQueryParameter param,
-        User currentUser)
-    {
-        // Start with base query without include
-        var query = _unitOfWork.Promotions
-            .GetQueryable()
-            .Where(p => !p.IsDeleted);
-
-        // Apply role-specific filters first
-        switch (currentUser.RoleName)
-        {
-            case RoleType.Staff:
-            case RoleType.Admin:
-                query = ApplyStaffFilters(query, param);
-                break;
-
-            case RoleType.Seller:
-                query = await ApplySellerFilters(query, currentUser.Id, param);
-                break;
-
-            case RoleType.Customer:
-                // Customer case is handled in the main method
-                break;
-        }
-
-        // Apply status filter if provided
-        if (param.Status.HasValue) query = query.Where(p => p.Status == param.Status);
-
-        // Now include PromotionParticipants if needed (for seller or when filtering by participant)
-        if (currentUser.RoleName == RoleType.Seller ||
-            (param.SellerId.HasValue && param.IsGlobal == true))
-            query = query.Include(p => p.PromotionParticipants);
-
-        return query;
-    }
-
-    private IQueryable<Promotion> ApplyStaffFilters(
-        IQueryable<Promotion> query,
-        PromotionQueryParameter param)
-    {
-        // Case 1: Filter by specific SellerId (highest priority)
-        if (param.SellerId.HasValue)
-        {
-            // If isGlobal is true, show global promotions this seller participates in
-            if (param.IsGlobal == true)
-                query = query.Where(p =>
-                        p.SellerId == null) // Global promotions
-                    // The join with participants will be done after this filter
-                    ;
-            // Otherwise show promotions created by this seller
-            else
-                query = query.Where(p => p.SellerId == param.SellerId);
-        }
-        // Case 2: Filter by promotion type (global or seller-specific)
-        else if (param.IsGlobal.HasValue)
-        {
-            query = param.IsGlobal.Value
-                ? query.Where(p => p.SellerId == null) // Global promotions
-                : query.Where(p => p.SellerId != null); // Seller-specific promotions
-        }
-
-        return query;
-    }
-
-    private async Task<IQueryable<Promotion>> ApplySellerFilters(
-        IQueryable<Promotion> query,
-        Guid userId,
-        PromotionQueryParameter param)
-    {
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
-            s.UserId == userId && !s.IsDeleted);
-
-        if (seller == null)
-            throw ErrorHelper.NotFound("Không tìm thấy thông tin seller.");
-
-        // For sellers, we want to show:
-        // 1. Their own promotions
-        // 2. Global promotions they participate in
-        query = query.Where(p =>
-            p.SellerId == seller.Id); // Own promotions
-
-        // The join with participants for global promotions will be done after this filter
-
-        return query;
-    }
-
-    private IQueryable<Promotion> ApplySorting(
-        IQueryable<Promotion> query,
-        bool desc)
-    {
-        var orderedQuery = query.OrderBy(p =>
-            p.Status == PromotionStatus.Pending ? 0 :
-            p.Status == PromotionStatus.Approved ? 1 : 2);
-
-        return desc
-            ? orderedQuery.ThenByDescending(p => p.CreatedAt)
-            : orderedQuery.ThenBy(p => p.CreatedAt);
-    }
-
-    private async Task<List<PromotionDto>> MapPromotionsToDtos(
-        List<Promotion> promotions,
-        User currentUser,
-        Guid? sellerIdParam)
-    {
-        // ✅ Cache seller lookup nếu là seller
-        Seller currentSeller = null;
-        if (currentUser.RoleName == RoleType.Seller)
-        {
-            currentSeller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
-                s.UserId == currentUser.Id && !s.IsDeleted);
-        }
-
-        var dtos = new List<PromotionDto>();
     
-        foreach (var promotion in promotions)
-        {
-            var dto = _mapperService.Map<Promotion, PromotionDto>(promotion);
-
-            // Set IsParticipant flag for seller viewing global promotions
-            if (currentUser.RoleName == RoleType.Seller && promotion.CreatedByRole != RoleType.Seller)
-            {
-                var sellerId = sellerIdParam ?? currentSeller?.Id;
-                dto.IsParticipant = sellerId.HasValue &&
-                                    (promotion.PromotionParticipants?
-                                        .Any(pp => pp.SellerId == sellerId && !pp.IsDeleted) ?? false);
-            }
-            else
-            {
-                dto.IsParticipant = null;
-            }
-
-            dtos.Add(dto);
-        }
-
-        return dtos;
+    private List<PromotionDto> MapPromotionsToDtos(List<Promotion> promotions)
+    {
+        return promotions.Select(promotion =>
+            _mapperService.Map<Promotion, PromotionDto>(promotion)
+        ).ToList();
     }
 
+
+    private IQueryable<Promotion> ApplySorting(IQueryable<Promotion> query, bool desc)
+    {
+        return desc
+            ? query.OrderByDescending(p => p.CreatedAt)
+            : query.OrderBy(p => p.CreatedAt);
+    }
+    
     private async Task<Promotion> SetPromotionDataAsync(CreatePromotionDto dto, User user)
     {
         var promotion = new Promotion
@@ -675,11 +546,12 @@ public class PromotionService : IPromotionService
     {
         return _mapperService.Map<PromotionParticipant, ParticipantPromotionDto>(promotionParticipant);
     }
-    
+
     private async Task<PromotionParticipant> SetParticipantPromotionDataAsync(Guid userId, Guid promotionId)
     {
         var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == promotionId);
-        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId && s.IsVerified && !s.IsDeleted);
+        var seller =
+            await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId && s.IsVerified && !s.IsDeleted);
 
         var participantPromotion = new PromotionParticipant
         {
@@ -692,14 +564,15 @@ public class PromotionService : IPromotionService
 
         return participantPromotion;
     }
-    
+
     public async Task<ParticipantPromotionDto> GetParticipantPromotionByIdAsync(Guid id)
     {
         var cacheKey = $"ParticipantPromotion:Detail:{id}";
         var cached = await _cacheService.GetAsync<ParticipantPromotionDto>(cacheKey);
         if (cached != null) return cached;
 
-        var participantPromotion = await _unitOfWork.PromotionParticipants.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+        var participantPromotion =
+            await _unitOfWork.PromotionParticipants.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
         if (participantPromotion == null)
             throw ErrorHelper.NotFound("Không tìm thấy thông tin tham gia voucher.");
 
