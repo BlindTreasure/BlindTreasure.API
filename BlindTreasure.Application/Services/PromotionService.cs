@@ -493,9 +493,7 @@ public class PromotionService : IPromotionService
         User currentUser,
         Guid? sellerIdParam)
     {
-        var dtos = new List<PromotionDto>();
-
-        foreach (var promotion in promotions)
+        var tasks = promotions.Select(async promotion =>
         {
             var dto = _mapperService.Map<Promotion, PromotionDto>(promotion);
 
@@ -515,10 +513,10 @@ public class PromotionService : IPromotionService
                 dto.IsParticipant = null;
             }
 
-            dtos.Add(dto);
-        }
+            return dto;
+        });
 
-        return dtos;
+        return (await Task.WhenAll(tasks)).ToList();
     }
 
     private async Task<Promotion> SetPromotionDataAsync(CreatePromotionDto dto, User user)
@@ -666,18 +664,15 @@ public class PromotionService : IPromotionService
         return dto;
     }
 
-    private async Task<ParticipantPromotionDto> MapParticipantPromotionToDto(PromotionParticipant promotionParticipant)
+    private ParticipantPromotionDto MapParticipantPromotionToDto(PromotionParticipant promotionParticipant)
     {
-        var dto = _mapperService.Map<PromotionParticipant, ParticipantPromotionDto>(promotionParticipant);
-
-        return dto;
+        return _mapperService.Map<PromotionParticipant, ParticipantPromotionDto>(promotionParticipant);
     }
-
+    
     private async Task<PromotionParticipant> SetParticipantPromotionDataAsync(Guid userId, Guid promotionId)
     {
         var promotion = await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == promotionId);
-        var seller =
-            await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId && s.IsVerified && !s.IsDeleted);
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId && s.IsVerified && !s.IsDeleted);
 
         var participantPromotion = new PromotionParticipant
         {
@@ -690,7 +685,7 @@ public class PromotionService : IPromotionService
 
         return participantPromotion;
     }
-
+    
     public async Task<ParticipantPromotionDto> GetParticipantPromotionByIdAsync(Guid id)
     {
         var cacheKey = $"ParticipantPromotion:Detail:{id}";
@@ -702,7 +697,7 @@ public class PromotionService : IPromotionService
         if (participantPromotion == null)
             throw ErrorHelper.NotFound("Không tìm thấy voucher.");
 
-        var result = await MapParticipantPromotionToDto(participantPromotion);
+        var result =  MapParticipantPromotionToDto(participantPromotion);
 
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         return result;

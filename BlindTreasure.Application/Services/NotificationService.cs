@@ -42,16 +42,19 @@ public class NotificationService : INotificationService
             .Take(pageSize)
             .ToListAsync();
 
-        // Map sang DTO với SourceUrl
+        // Map đầy đủ thông tin sang DTO
         return notifications.Select(n => new NotificationDto
         {
+            Id = n.Id,
             Title = n.Title,
             Message = n.Message,
             Type = n.Type,
-            SourceUrl = n.SourceUrl // Sẽ là null nếu không được set
+            SourceUrl = n.SourceUrl, // Đây là field mới
+            IsRead = n.IsRead,
+            SentAt = n.SentAt,
+            ReadAt = n.ReadAt
         }).ToList();
     }
-
     public async Task<int> CountNotificationsAsync(Guid userId)
     {
         return await _unitOfWork.Notifications.GetQueryable()
