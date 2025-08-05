@@ -367,14 +367,29 @@ public class PromotionService : IPromotionService
     {
         var currentUserId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserById(currentUserId, true);
-        if (user?.RoleName != RoleType.Staff && user?.RoleName != RoleType.Admin)
-            throw ErrorHelper.Forbidden("Không có quyền xem danh sách tham gia.");
+        //if (user?.RoleName != RoleType.Staff && user?.RoleName != RoleType.Admin)
+        //    throw ErrorHelper.Forbidden("Không có quyền xem danh sách tham gia.");
 
         var participants = _unitOfWork.PromotionParticipants
             .GetQueryable()
-            .Where(pp => pp.PromotionId == param.PromotionId && !pp.IsDeleted)
             .Include(pp => pp.Seller)
-            .ThenInclude(s => s.User);
+            .ThenInclude(s => s.User)
+            .Where(pp => !pp.IsDeleted);
+
+        if (param.PromotionId.HasValue)
+        {
+            participants = participants.Where(pp => pp.PromotionId == param.PromotionId);
+        }
+
+        if (param.SellerId.HasValue)
+        {
+            participants = participants.Where(pp => pp.SellerId == param.SellerId);
+        }
+
+        participants = participants
+            .OrderByDescending(pp => pp.JoinedAt);
+        await participants.ToListAsync();
+        var count = await participants.CountAsync();
 
         var result = participants.Select(pp => new SellerParticipantDto
         {
@@ -448,7 +463,7 @@ public class PromotionService : IPromotionService
             {
                 query = query.Where(p =>
                         p.SellerId == null) // Global promotions
-                    // The join with participants will be done after this filter
+                                            // The join with participants will be done after this filter
                     ;
             }
             // Otherwise show promotions created by this seller
