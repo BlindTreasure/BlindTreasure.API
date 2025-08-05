@@ -1982,11 +1982,18 @@ public class SystemController : ControllerBase
 
         var now = DateTime.UtcNow;
 
-        // Lấy seller mẫu
-        var seller = await _context.Sellers.FirstOrDefaultAsync();
-        if (seller == null)
+        // Lấy seller blindtreasure
+        var blindTreasureUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
+        if (blindTreasureUser == null)
         {
-            _logger.Warn("[SeedPromotions] Không tìm thấy Seller để tạo promotion.");
+            _logger.Warn("[SeedPromotions] Không tìm thấy User 'blindtreasurefpt@gmail.com'");
+            return;
+        }
+
+        var blindTreasureSeller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == blindTreasureUser.Id);
+        if (blindTreasureSeller == null)
+        {
+            _logger.Warn("[SeedPromotions] Không tìm thấy Seller cho user 'blindtreasurefpt@gmail.com'");
             return;
         }
 
@@ -1994,45 +2001,31 @@ public class SystemController : ControllerBase
         var smiskiUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "smiskiofficial@gmail.com");
         if (smiskiUser == null)
         {
-            _logger.Warn("[SeedPromotions] Không tìm thấy User 'smiskiofficial@gmail.com' để tạo promotion.");
+            _logger.Warn("[SeedPromotions] Không tìm thấy User 'smiskiofficial@gmail.com'");
             return;
         }
 
         var smiskiSeller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == smiskiUser.Id);
         if (smiskiSeller == null)
         {
-            _logger.Warn("[SeedPromotions] Không tìm thấy Seller cho user 'smiskiofficial@gmail.com'.");
+            _logger.Warn("[SeedPromotions] Không tìm thấy Seller cho user 'smiskiofficial@gmail.com'");
             return;
         }
 
         var promotions = new List<Promotion>
         {
+            // Promotions của blindtreasure
             new()
             {
                 Id = Guid.NewGuid(),
-                Code = "SALE10",
-                Description = "Giảm 10% cho tất cả đơn hàng.",
+                Code = "BT10",
+                Description = "Giảm 10% cho đơn hàng từ BlindTreasure",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 10,
                 StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
-                SellerId = seller.Id,
-                UsageLimit = 200,
-                CreatedByRole = RoleType.Staff,
-                CreatedAt = now
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Code = "FREESH",
-                Description = "Giảm 50K cho đơn từ 500K.",
-                DiscountType = DiscountType.Fixed,
-                DiscountValue = 50000,
-                StartDate = now,
-                EndDate = now.AddMonths(2),
-                Status = PromotionStatus.Pending,
-                SellerId = seller.Id,
+                SellerId = blindTreasureSeller.Id,
                 UsageLimit = 100,
                 CreatedByRole = RoleType.Seller,
                 CreatedAt = now
@@ -2040,106 +2033,64 @@ public class SystemController : ControllerBase
             new()
             {
                 Id = Guid.NewGuid(),
-                Code = "LIMITED",
-                Description = "Voucher giới hạn cho khách VIP.",
-                DiscountType = DiscountType.Percentage,
-                DiscountValue = 15,
+                Code = "BTFREESHIP",
+                Description = "Miễn phí vận chuyển từ BlindTreasure",
+                DiscountType = DiscountType.Fixed,
+                DiscountValue = 30000,
                 StartDate = now,
-                EndDate = now.AddMonths(1),
+                EndDate = now.AddMonths(2),
                 Status = PromotionStatus.Approved,
-                SellerId = seller.Id,
-                UsageLimit = 10,
-                CreatedByRole = RoleType.Staff,
+                SellerId = blindTreasureSeller.Id,
+                UsageLimit = 50,
+                CreatedByRole = RoleType.Seller,
                 CreatedAt = now
             },
+
+            // Promotions của smiski
             new()
             {
                 Id = Guid.NewGuid(),
-                Code = "REJECT",
-                Description = "Voucher test bị từ chối.",
-                DiscountType = DiscountType.Fixed,
-                DiscountValue = 30000,
-                StartDate = now.AddDays(3),
+                Code = "BYTHR2",
+                Description = "Giảm 20% cho sản phẩm BABY THREE",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 20,
+                StartDate = now,
                 EndDate = now.AddMonths(1),
-                Status = PromotionStatus.Rejected,
-                SellerId = seller.Id,
-                RejectReason = "Sai thông tin khuyến mãi",
-                UsageLimit = 20,
+                Status = PromotionStatus.Approved,
+                SellerId = smiskiSeller.Id,
+                UsageLimit = 200,
                 CreatedByRole = RoleType.Seller,
                 CreatedAt = now
             },
             new()
             {
                 Id = Guid.NewGuid(),
-                Code = "GLOBAL1",
-                Description = "Voucher toàn sàn cho mọi khách hàng.",
+                Code = "POPMARTSALE",
+                Description = "Sale lớn POPMART",
+                DiscountType = DiscountType.Fixed,
+                DiscountValue = 50000,
+                StartDate = now,
+                EndDate = now.AddMonths(1),
+                Status = PromotionStatus.Approved,
+                SellerId = smiskiSeller.Id,
+                UsageLimit = 100,
+                CreatedByRole = RoleType.Seller,
+                CreatedAt = now
+            },
+
+            // Global promotions
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "GLOBAL5",
+                Description = "Giảm 5% toàn sàn",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 5,
                 StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
-                SellerId = null, // Toàn sàn
+                SellerId = null,
                 UsageLimit = null,
-                CreatedByRole = RoleType.Staff,
-                CreatedAt = now
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Code = "SMISKI15",
-                Description = "Giảm 15% cho các sản phẩm Smiski.",
-                DiscountType = DiscountType.Percentage,
-                DiscountValue = 15,
-                StartDate = now,
-                EndDate = now.AddMonths(1),
-                Status = PromotionStatus.Approved,
-                SellerId = smiskiSeller.Id, // Assign to smiski seller
-                UsageLimit = 150,
-                CreatedByRole = RoleType.Seller,
-                CreatedAt = now
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Code = "FIXED100K",
-                Description = "Giảm 100K cho đơn từ 1 triệu.",
-                DiscountType = DiscountType.Fixed,
-                DiscountValue = 100000,
-                StartDate = now,
-                EndDate = now.AddMonths(2),
-                Status = PromotionStatus.Approved,
-                SellerId = seller.Id,
-                UsageLimit = 50,
-                CreatedByRole = RoleType.Staff,
-                CreatedAt = now
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Code = "SHIP20K",
-                Description = "Giảm phí vận chuyển 20K.",
-                DiscountType = DiscountType.Fixed,
-                DiscountValue = 20000,
-                StartDate = now,
-                EndDate = now.AddMonths(1),
-                Status = PromotionStatus.Approved,
-                SellerId = seller.Id,
-                UsageLimit = 300,
-                CreatedByRole = RoleType.Seller,
-                CreatedAt = now
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Code = "GLOBAL20K",
-                Description = "Giảm 20K cho mọi đơn hàng trên toàn sàn.",
-                DiscountType = DiscountType.Fixed,
-                DiscountValue = 20000,
-                StartDate = now,
-                EndDate = now.AddMonths(1),
-                Status = PromotionStatus.Approved,
-                SellerId = null, // Toàn sàn
-                UsageLimit = 500,
                 CreatedByRole = RoleType.Staff,
                 CreatedAt = now
             }
@@ -2147,52 +2098,69 @@ public class SystemController : ControllerBase
 
         await _context.Promotions.AddRangeAsync(promotions);
         await _context.SaveChangesAsync();
-        _logger.Success("[SeedPromotions] Đã seed 6 promotion mẫu.");
+        _logger.Success($"[SeedPromotions] Đã seed {promotions.Count} promotion mẫu.");
     }
 
     private async Task SeedPromotionParticipants()
     {
         if (_context.PromotionParticipants.Any())
         {
-            _logger.Info("[SeedPromotions] Đã tồn tại promotionparticipants. Bỏ qua seed.");
+            _logger.Info("[SeedPromotionParticipants] Đã tồn tại participants. Bỏ qua seed.");
             return;
         }
 
         var now = DateTime.UtcNow;
 
-        // Lấy seller mẫu
-        var sellers = _context.Sellers.Where(s => s.IsVerified == true && s.IsDeleted == false);
-        if (sellers == null)
+        // Lấy seller blindtreasure (sẽ tham gia)
+        var blindTreasureUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
+        var blindTreasureSeller = blindTreasureUser != null
+            ? await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == blindTreasureUser.Id)
+            : null;
+
+        // Lấy seller smiski (sẽ KHÔNG tham gia)
+        var smiskiUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "smiskiofficial@gmail.com");
+        var smiskiSeller = smiskiUser != null
+            ? await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == smiskiUser.Id)
+            : null;
+
+        if (blindTreasureSeller == null || smiskiSeller == null)
         {
-            _logger.Warn("[SeedSellers] Không tìm thấy Seller để tạo promotion.");
+            _logger.Warn("[SeedPromotionParticipants] Không tìm thấy đủ sellers");
             return;
         }
 
-        var promotion = await _context.Promotions.FirstOrDefaultAsync(p =>
-            p.Status == PromotionStatus.Approved && p.CreatedByRole == RoleType.Staff);
-        if (promotion == null)
+        // Lấy tất cả promotions (trừ của smiski)
+        var promotions = await _context.Promotions
+            .Where(p => p.SellerId != smiskiSeller.Id && p.Status == PromotionStatus.Approved)
+            .ToListAsync();
+
+        if (!promotions.Any())
         {
-            _logger.Warn("[SeedPromotions] Không tìm thấy Promotion để tạo participant.");
+            _logger.Warn("[SeedPromotionParticipants] Không tìm thấy promotions phù hợp");
             return;
         }
 
-        var promotionParticipant = new List<PromotionParticipant>();
+        var participants = new List<PromotionParticipant>();
 
-        foreach (var seller in sellers)
+        foreach (var promotion in promotions)
         {
-            var participantItem = new PromotionParticipant
+            // Chỉ thêm blindtreasure làm participant (nếu promotion không phải của chính họ)
+            if (promotion.SellerId != blindTreasureSeller.Id)
             {
-                Id = Guid.NewGuid(),
-                PromotionId = promotion.Id,
-                SellerId = seller.Id,
-                JoinedAt = now
-            };
-            promotionParticipant.Add(participantItem);
+                participants.Add(new PromotionParticipant
+                {
+                    Id = Guid.NewGuid(),
+                    PromotionId = promotion.Id,
+                    SellerId = blindTreasureSeller.Id,
+                    JoinedAt = now
+                });
+            }
         }
 
-        await _context.PromotionParticipants.AddRangeAsync(promotionParticipant);
+        await _context.PromotionParticipants.AddRangeAsync(participants);
         await _context.SaveChangesAsync();
-        _logger.Success("[SeedPromotionParticipants] Đã seed promotion participant mẫu.");
+        _logger.Success(
+            $"[SeedPromotionParticipants] Đã seed {participants.Count} participant mẫu (chỉ cho blindtreasure).");
     }
 
     private async Task SeedSellerForUser(string sellerEmail)
