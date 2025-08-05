@@ -21,11 +21,12 @@ public class TradingController : ControllerBase
     }
 
     [HttpGet("histories")]
-    public async Task<IActionResult> GetAllListings([FromQuery] TradeHistoryQueryParameter param)
+    public async Task<IActionResult> GetAllListings([FromQuery] TradeHistoryQueryParameter param,
+        [FromQuery] bool onlyMine)
     {
         try
         {
-            var result = await _tradingService.GetTradeHistoriesAsync(param, false);
+            var result = await _tradingService.GetTradeHistoriesAsync(param, onlyMine);
             return Ok(ApiResult<Pagination<TradeHistoryDto>>.Success(result, "200",
                 "Lấy lịch sử TRADING thành công."));
         }
@@ -122,45 +123,6 @@ public class TradingController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách yêu cầu trao đổi mà người dùng hiện tại đã tạo
-    /// </summary>
-    [HttpGet("my-trade-requests")]
-    public async Task<IActionResult> GetMyTradeRequests()
-    {
-        try
-        {
-            var result = await _tradingService.GetMyTradeRequestsAsync();
-            return Ok(ApiResult<List<TradeRequestDto>>.Success(result, "200",
-                "Lấy danh sách yêu cầu trao đổi của bạn thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<List<TradeRequestDto>>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
-
-    /// <summary>
-    /// Lấy lịch sử giao dịch của người dùng hiện tại với phân trang và bộ lọc
-    /// </summary>
-    [HttpGet("my-histories")]
-    public async Task<IActionResult> GetMyTradeHistories([FromQuery] TradeHistoryQueryParameter param)
-    {
-        try
-        {
-            var result = await _tradingService.GetTradeHistoriesAsync(param, true);
-            return Ok(ApiResult<Pagination<TradeHistoryDto>>.Success(result, "200",
-                "Lấy lịch sử giao dịch của bạn thành công."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var error = ExceptionUtils.CreateErrorResponse<Pagination<TradeHistoryDto>>(ex);
-            return StatusCode(statusCode, error);
-        }
-    }
-    /// <summary>
     /// Lấy thông tin chi tiết của một trade request theo ID
     /// </summary>
     /// <param name="tradeRequestId">ID của trade request cần lấy thông tin</param>
@@ -171,7 +133,7 @@ public class TradingController : ControllerBase
         try
         {
             var result = await _tradingService.GetTradeRequestByIdAsync(tradeRequestId);
-            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", 
+            return Ok(ApiResult<TradeRequestDto>.Success(result, "200",
                 "Lấy thông tin chi tiết trade request thành công."));
         }
         catch (Exception ex)
