@@ -1,4 +1,4 @@
-﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
