@@ -160,6 +160,7 @@ public class OrderService : IOrderService
             .Include(od => od.Product)
             .Include(od => od.BlindBox)
             .Include(od => od.Shipments)
+            .Include(od => od.InventoryItems)
             .Where(od => od.Order.UserId == userId && !od.Order.IsDeleted);
 
         if (param.Status.HasValue)
@@ -444,7 +445,7 @@ public class OrderService : IOrderService
                 if (participant == null)
                 {
                     _loggerService.Warn($"Seller {group.SellerId} not participate in promotion {promo.Code}");
-                    throw ErrorHelper.BadRequest("Promotion not applicable for this seller. ( Seller did not participate to this promotion");
+                    throw ErrorHelper.BadRequest($"Promotion not applicable for this seller. ( Seller did not participate to this promotion :{promo.Id}");
                 }
 
                 // Get order details for this seller
@@ -598,7 +599,7 @@ public class OrderService : IOrderService
         // Log promotion application
         foreach (var detail in orderDetails)
         {
-            detail.Logs += $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Applied promotion {promotion.Code}: -{detail.DetailDiscountPromotion:C}";
+            detail.Logs += $"\n [{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Applied promotion {promotion.Id}: - Discount amount: {detail.DetailDiscountPromotion:C}";
         }
     }
 

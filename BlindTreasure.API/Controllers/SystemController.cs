@@ -2185,7 +2185,7 @@ public class SystemController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 Code = "LIMITED",
-                Description = "Voucher giới hạn cho khách VIP.",
+                Description = "Voucher giới hạn cho khách VIP, giảm 15%.",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 15,
                 StartDate = now,
@@ -2240,7 +2240,8 @@ public class SystemController : ControllerBase
                 SellerId = smiskiSeller.Id, // Assign to smiski seller
                 UsageLimit = 150,
                 CreatedByRole = RoleType.Seller,
-                CreatedAt = now
+                CreatedAt = now,
+         
             },
             new()
             {
@@ -2332,6 +2333,22 @@ public class SystemController : ControllerBase
                 JoinedAt = now
             };
             promotionParticipant.Add(participantItem);
+        }
+
+        var smiskySeller = await _context.Sellers.FirstOrDefaultAsync(s => s.CompanyName.Contains("Smiski Official Store Tokyo Japan"));
+        var smiskyPromotion = await _context.Promotions.FirstOrDefaultAsync(p =>
+            p.Code == "SMISKI15" && p.Status == PromotionStatus.Approved );
+
+        if (smiskySeller != null)
+        {
+            var smiskyParticipant = new PromotionParticipant
+            {
+                Id = Guid.NewGuid(),
+                PromotionId = smiskyPromotion.Id,
+                SellerId = smiskySeller.Id,
+                JoinedAt = now
+            };
+            promotionParticipant.Add(smiskyParticipant);
         }
 
         await _context.PromotionParticipants.AddRangeAsync(promotionParticipant);
