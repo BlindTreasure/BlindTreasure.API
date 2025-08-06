@@ -16,7 +16,6 @@ namespace BlindTreasure.Application.Services;
 
 public class TradingService : ITradingService
 {
-    private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IListingService _listingService;
@@ -25,14 +24,13 @@ public class TradingService : ITradingService
     private readonly IHubContext<NotificationHub> _notificationHub;
 
     public TradingService(IClaimsService claimsService, ILoggerService logger,
-        IUnitOfWork unitOfWork, INotificationService notificationService, ICacheService cacheService,
+        IUnitOfWork unitOfWork, INotificationService notificationService,
         IListingService listingService, IHubContext<NotificationHub> notificationHub)
     {
         _claimsService = claimsService;
         _logger = logger;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
-        _cacheService = cacheService;
         _listingService = listingService;
         _notificationHub = notificationHub;
     }
@@ -624,9 +622,6 @@ public class TradingService : ITradingService
 
     private async Task NotifyItemReleased(InventoryItem item)
     {
-        var cacheKey = $"noti:item_released:{item.UserId}:{item.Id}";
-        if (await _cacheService.ExistsAsync(cacheKey)) return;
-
         await _notificationService.PushNotificationToUser(
             item.UserId,
             new NotificationDto
@@ -636,8 +631,6 @@ public class TradingService : ITradingService
                 Type = NotificationType.System
             }
         );
-
-        await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
     }
 
     private async Task SendTradeResponseNotificationSafe(TradeRequest tradeRequest, Guid responderId, bool isAccepted)
@@ -682,9 +675,6 @@ public class TradingService : ITradingService
 
     private async Task SendTradeRequestNotificationIfNotSentAsync(User user, string? requesterName)
     {
-        var cacheKey = $"noti:trade_request:{user.Id}";
-        if (await _cacheService.ExistsAsync(cacheKey)) return;
-
         var message = string.IsNullOrEmpty(requesterName)
             ? "Bạn có một yêu cầu trao đổi vật phẩm mới. Hãy kiểm tra và phản hồi sớm nhé!"
             : $"{requesterName} đã gửi yêu cầu trao đổi vật phẩm với bạn. Hãy kiểm tra ngay!";
@@ -698,16 +688,11 @@ public class TradingService : ITradingService
                 Type = NotificationType.Trading
             }
         );
-
-        await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(2));
     }
 
     private async Task SendTradeResponseNotificationAsync(User requester, string responderName, bool isAccepted,
         Guid tradeRequestId)
     {
-        var cacheKey = $"noti:trade_response:{requester.Id}";
-        if (await _cacheService.ExistsAsync(cacheKey)) return;
-
         var title = isAccepted ? "Yêu cầu trao đổi được chấp nhận!" : "Yêu cầu trao đổi bị từ chối";
         var message = isAccepted
             ? $"{responderName} đã chấp nhận yêu cầu trao đổi của bạn. Hãy xác nhận để hoàn tất giao dịch!"
@@ -726,8 +711,6 @@ public class TradingService : ITradingService
                 SourceUrl = sourceUrl // Null cho reject, có URL cho accept
             }
         );
-
-        await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(15));
     }
 
     private async Task SendDealLockedNotificationAsync(User requester, User listingOwner)
@@ -746,10 +729,6 @@ public class TradingService : ITradingService
         };
 
         foreach (var noti in notifications)
-        {
-            var cacheKey = $"noti:deal_locked:{noti.User.Id}";
-            if (await _cacheService.ExistsAsync(cacheKey)) continue;
-
             await _notificationService.PushNotificationToUser(
                 noti.User.Id,
                 new NotificationDto
@@ -759,9 +738,6 @@ public class TradingService : ITradingService
                     Type = NotificationType.Trading
                 }
             );
-
-            await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromHours(1));
-        }
     }
 
     private async Task ValidateMultipleOfferedItems(List<Guid> offeredInventoryIds,

@@ -62,6 +62,32 @@ public class PromotionService : IPromotionService
         {
             query = query.Where(p => p.Status == param.Status);
         }
+        
+        if (param.IsParticipated.HasValue && param.ParticipantSellerId.HasValue)
+        {
+            if (param.IsParticipated.Value)
+            {
+                // Lấy các promotions mà seller này tham gia
+                query = query.Where(p =>
+                    p.PromotionParticipants.Any(pp =>
+                        pp.SellerId == param.ParticipantSellerId &&
+                        !pp.IsDeleted));
+            }
+            else
+            {
+                // Lấy các promotions mà seller này KHÔNG tham gia
+                query = query.Where(p =>
+                    !p.PromotionParticipants.Any(pp =>
+                        pp.SellerId == param.ParticipantSellerId &&
+                        !pp.IsDeleted));
+            }
+        }
+
+        // Include PromotionParticipants nếu cần filter participation
+        if (param.IsParticipated.HasValue || param.ParticipantSellerId.HasValue)
+        {
+            query = query.Include(p => p.PromotionParticipants);
+        }
 
         // Get total count for pagination
         var totalCount = await query.CountAsync();
@@ -75,12 +101,11 @@ public class PromotionService : IPromotionService
             .Take(param.PageSize)
             .ToListAsync();
 
-        // Map to DTOs (simplified version)
+        // Map to DTOs
         var dtos = MapPromotionsToDtos(items);
 
         return new Pagination<PromotionDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
-
 
     public async Task<PromotionDto> GetPromotionByIdAsync(Guid id)
     {
@@ -440,7 +465,7 @@ public class PromotionService : IPromotionService
 
                 promotion.SellerId = seller?.Id;
                 promotion.Status = PromotionStatus.Pending;
-            
+
                 // ✅ BỎ việc tạo PromotionParticipant ở đây
                 // Sẽ tạo sau khi save promotion
                 break;
@@ -451,6 +476,7 @@ public class PromotionService : IPromotionService
 
         return promotion;
     }
+
     private async Task ValidateCreatePromotionAsync(User user)
     {
         if (user.RoleName == RoleType.Seller)
