@@ -33,7 +33,7 @@ public class NotificationService : INotificationService
         var query = _unitOfWork.Notifications.GetQueryable()
             .Where(n => n.UserId == userId && !n.IsDeleted);
 
-        if (type.HasValue) 
+        if (type.HasValue)
             query = query.Where(n => n.Type == type.Value);
 
         var notifications = await query
@@ -55,6 +55,7 @@ public class NotificationService : INotificationService
             ReadAt = n.ReadAt
         }).ToList();
     }
+
     public async Task<int> CountNotificationsAsync(Guid userId)
     {
         return await _unitOfWork.Notifications.GetQueryable()
@@ -121,7 +122,7 @@ public class NotificationService : INotificationService
     {
         var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == userId);
         if (user == null) throw new Exception("User not found");
-    
+
         var now = _currentTime.GetCurrentTime();
         var notification = new Notification
         {
@@ -136,10 +137,10 @@ public class NotificationService : INotificationService
             CreatedAt = now,
             CreatedBy = user.Id
         };
-    
+
         await _unitOfWork.Notifications.AddAsync(notification);
         await _unitOfWork.SaveChangesAsync();
-    
+
         var payload = new
         {
             notification.Id,
@@ -149,10 +150,11 @@ public class NotificationService : INotificationService
             notification.Type,
             notification.SourceUrl // Null sẽ được serialize thành null trong JSON
         };
-    
+
         await NotificationHub.SendToUser(_hubContext, user.Id.ToString(), payload);
         return notification;
     }
+
     public async Task<Notification> PushNotificationToRole(RoleType role, NotificationDto notificationDTO)
     {
         var users = await _unitOfWork.Users.GetQueryable().Where(u => u.RoleName == role && !u.IsDeleted).ToListAsync();

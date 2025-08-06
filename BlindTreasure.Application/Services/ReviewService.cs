@@ -26,59 +26,17 @@ public class ReviewService : IReviewService
 
     public async Task<ReviewResponseDto> CreateReviewAsync(Guid userId, CreateReviewDto createDto)
     {
-        // Validate input and permissions
+        // 1. Validate input and permissions
         var orderDetail = await ValidateReviewCreationAsync(userId, createDto);
 
-        // AI validate nội dung
-        var validation = await _blindyService.ValidateReviewAsync(
-            createDto.Comment,
-            createDto.OverallRating,
-            orderDetail.Seller?.CompanyName,
-            orderDetail.Product?.Name ?? orderDetail.BlindBox?.Name
-        );
+        // 2. AI validate nội dung
+        var validation = await ValidateReviewContentWithAiAsync(createDto, orderDetail);
 
-        // Create review
-        var review = new Review
-        {
-            UserId = userId,
-            OrderDetailId = createDto.OrderDetailId,
-            ProductId = orderDetail.ProductId,
-            BlindBoxId = orderDetail.BlindBoxId,
-            SellerId = orderDetail.SellerId,
-            OverallRating = createDto.OverallRating,
-            QualityRating = createDto.QualityRating,
-            ServiceRating = createDto.ServiceRating,
-            DeliveryRating = createDto.DeliveryRating,
-            OriginalComment = createDto.Comment,
-            ProcessedComment = validation.CleanedComment ?? createDto.Comment,
-            IsCommentValid = validation.IsValid,
-            ValidationReason = validation.Reason,
-            ImageUrls = createDto.ImageUrls ?? new List<string>(),
-            AiValidatedAt = DateTime.UtcNow,
-            AiValidationDetails = JsonSerializer.Serialize(validation),
-            Status = validation.SuggestedAction switch
-            {
-                "approve" => ReviewStatus.Approved,
-                "moderate" => ReviewStatus.RequiresModeration,
-                "reject" => ReviewStatus.Rejected,
-                _ => ReviewStatus.RequiresModeration
-            },
-            IsPublished = validation.SuggestedAction == "approve",
-            IsVerifiedPurchase = true
-        };
+        // 3. Create and save review
+        var review = await CreateAndSaveReviewAsync(userId, createDto, orderDetail, validation);
 
-        await _unitOfWork.Reviews.AddAsync(review);
-        await _unitOfWork.SaveChangesAsync();
-
-        // Load lại để có đầy đủ thông tin cho response
-        var createdReview = await _unitOfWork.Reviews.GetByIdAsync(review.Id,
-            r => r.User,
-            r => r.Product,
-            r => r.BlindBox,
-            r => r.Seller
-        );
-
-        return MapReviewToDto(createdReview!);
+        // 4. Load and return response
+        return await LoadReviewForResponseAsync(review.Id);
     }
 
     public async Task<Pagination<ReviewResponseDto>> GetAllReviewsAsync(ReviewQueryParameter param)
@@ -86,7 +44,9 @@ public class ReviewService : IReviewService
         var baseQuery = _unitOfWork.Reviews.GetQueryable()
             .Include(r => r.User)
             .Include(r => r.Product)
+            .Include(r => r.Product!.Category) // Thêm này
             .Include(r => r.BlindBox)
+            .Include(r => r.BlindBox!.Category) // Thêm này nếu BlindBox có Category
             .Include(r => r.Seller)
             .Where(r =>
                 (param.IsPublished == null || r.IsPublished == param.IsPublished) &&
@@ -100,9 +60,7 @@ public class ReviewService : IReviewService
             )
             .AsNoTracking();
 
-        // Sắp xếp mặc định theo ngày tạo giảm dần
         var query = baseQuery.OrderByDescending(r => r.CreatedAt);
-
         var count = await query.CountAsync();
 
         List<Review> items;
@@ -125,7 +83,9 @@ public class ReviewService : IReviewService
         var review = await _unitOfWork.Reviews.GetByIdAsync(reviewId,
             r => r.User,
             r => r.Product,
+            r => r.Product.Category, // Thêm này
             r => r.BlindBox,
+            r => r.BlindBox.Category, // Thêm này nếu BlindBox có Category
             r => r.Seller
         );
 
@@ -138,27 +98,139 @@ public class ReviewService : IReviewService
         return MapReviewToDto(review);
     }
 
+
     #region private methods
+
+    private async Task<dynamic> ValidateReviewContentWithAiAsync(CreateReviewDto createDto, OrderDetail orderDetail)
+    {
+        try
+        {
+            var validation = await _blindyService.ValidateReviewAsync(
+                createDto.Comment,
+                createDto.OverallRating,
+                orderDetail.Seller?.CompanyName,
+                orderDetail.Product?.Name ?? orderDetail.BlindBox?.Name
+            );
+
+            _loggerService.Info(
+                $"AI validation completed for review. Valid: {validation.IsValid}, Action: {validation.SuggestedAction}");
+
+            return validation;
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error(
+                $"AI validation failed for review: {ex.Message}");
+
+            // Fallback: cho phép review nhưng cần moderation
+            return new
+            {
+                IsValid = true,
+                SuggestedAction = "moderate",
+                CleanedComment = createDto.Comment,
+                Reason = "AI validation unavailable"
+            };
+        }
+    }
+
+    private async Task<Review> CreateAndSaveReviewAsync(
+        Guid userId,
+        CreateReviewDto createDto,
+        OrderDetail orderDetail,
+        dynamic validation)
+    {
+        var review = BuildReviewFromValidation(userId, createDto, orderDetail, validation);
+
+        await _unitOfWork.Reviews.AddAsync(review);
+        await _unitOfWork.SaveChangesAsync();
+
+        _loggerService.Info(
+            $"Review created successfully. ID: {review.Id}, Status: {review.Status}");
+
+        return review;
+    }
+
+    private Review BuildReviewFromValidation(
+        Guid userId,
+        CreateReviewDto createDto,
+        OrderDetail orderDetail,
+        dynamic validation)
+    {
+        var reviewStatus = DetermineReviewStatus(validation.SuggestedAction);
+        var isPublished = validation.SuggestedAction == "approve";
+
+        return new Review
+        {
+            UserId = userId,
+            OrderDetailId = createDto.OrderDetailId,
+            ProductId = orderDetail.ProductId,
+            BlindBoxId = orderDetail.BlindBoxId,
+            SellerId = orderDetail.SellerId,
+            OverallRating = createDto.OverallRating,
+            OriginalComment = createDto.Comment,
+            ProcessedComment = validation.CleanedComment ?? createDto.Comment,
+            IsCommentValid = validation.IsValid,
+            ValidationReason = validation.Reason,
+            ImageUrls = createDto.ImageUrls ?? new List<string>(),
+            AiValidatedAt = DateTime.UtcNow,
+            AiValidationDetails = JsonSerializer.Serialize(validation),
+            Status = reviewStatus,
+            IsPublished = isPublished,
+            IsVerifiedPurchase = true
+        };
+    }
+
+    private ReviewStatus DetermineReviewStatus(string suggestedAction)
+    {
+        return suggestedAction switch
+        {
+            "approve" => ReviewStatus.Approved,
+            "moderate" => ReviewStatus.RequiresModeration,
+            "reject" => ReviewStatus.Rejected,
+            _ => ReviewStatus.RequiresModeration
+        };
+    }
+
+    private async Task<ReviewResponseDto> LoadReviewForResponseAsync(Guid reviewId)
+    {
+        var createdReview = await _unitOfWork.Reviews.GetByIdAsync(reviewId,
+            r => r.User,
+            r => r.Product,
+            r => r.Product.Category,
+            r => r.BlindBox,
+            r => r.BlindBox.Category,
+            r => r.Seller
+        );
+
+        if (createdReview == null)
+            throw ErrorHelper.Internal("Không thể tải thông tin đánh giá vừa tạo.");
+
+        return MapReviewToDto(createdReview);
+    }
 
     private ReviewResponseDto MapReviewToDto(Review review)
     {
         return new ReviewResponseDto
         {
             Id = review.Id,
+            UserId = review.UserId, // Thêm UserId
             UserName = review.User?.FullName ?? "Ẩn danh",
             UserAvatarUrl = review.User?.AvatarUrl,
             ProductName = review.Product?.Name,
             BlindBoxName = review.BlindBox?.Name,
             SellerName = review.Seller?.CompanyName ?? "Không rõ",
-            OverallRating = review.OverallRating,
-            QualityRating = review.QualityRating,
-            ServiceRating = review.ServiceRating,
-            DeliveryRating = review.DeliveryRating,
+            OverallRating = review.OverallRating, // Thêm rating
             Comment = review.ProcessedComment ?? review.OriginalComment,
+            Category = review.Product?.Category?.Name ?? review.BlindBox?.Category?.Name, // Thêm category
             ImageUrls = review.ImageUrls ?? new List<string>(),
             IsVerifiedPurchase = review.IsVerifiedPurchase,
-            SellerResponse = review.SellerResponse,
-            SellerResponseDate = review.SellerResponseDate,
+            SellerReply = !string.IsNullOrEmpty(review.SellerResponse)
+                ? new SellerReplyDto
+                {
+                    Content = review.SellerResponse,
+                    CreatedAt = review.SellerResponseDate ?? DateTime.UtcNow
+                }
+                : null, // Thay đổi structure cho SellerReply
             CreatedAt = review.CreatedAt,
             Status = review.Status.ToString()
         };

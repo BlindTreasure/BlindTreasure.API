@@ -3,6 +3,7 @@ using System.Text.Json;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
+using BlindTreasure.Application.Services.ThirdParty.AIModels;
 using BlindTreasure.Domain.DTOs.GeminiDTOs;
 
 namespace BlindTreasure.Application.Services;
@@ -22,50 +23,56 @@ public class BlindyService : IBlindyService
         string? productName = null)
     {
         var promptBuilder = new StringBuilder();
+        promptBuilder.AppendLine("Phân tích review:");
+        promptBuilder.AppendLine($"Review: \"{comment}\"");
+        promptBuilder.AppendLine($"Rating: {rating}/5");
+        if (!string.IsNullOrEmpty(productName))
+            promptBuilder.AppendLine($"Product: {productName}");
+
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Return JSON:");
         promptBuilder.AppendLine(
-            "Phân tích và validate nội dung review sau đây cho nền tảng thương mại điện tử BlindTreasure:");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine($"**Nội dung review:** \"{comment}\"");
-        promptBuilder.AppendLine($"**Đánh giá:** {rating}/5 sao");
-        promptBuilder.AppendLine($"**Sản phẩm:** {productName ?? "Không rõ"}");
-        promptBuilder.AppendLine($"**Seller:** {sellerName ?? "Không rõ"}");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Kiểm tra các tiêu chí sau:");
-        promptBuilder.AppendLine("1. **Ngôn từ độc hại:** Có chửi thề, xúc phạm, hate speech không?");
-        promptBuilder.AppendLine("2. **Spam/Fake:** Có dấu hiệu review ảo, copy-paste, không liên quan không?");
-        promptBuilder.AppendLine("3. **Thông tin cá nhân:** Có tiết lộ số điện thoại, email, địa chỉ cụ thể không?");
-        promptBuilder.AppendLine("4. **Nội dung bất hợp pháp:** Có quảng cáo sản phẩm khác, link lừa đảo không?");
-        promptBuilder.AppendLine("5. **Tính nhất quán:** Rating có phù hợp với nội dung comment không?");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Trả về JSON format:");
-        promptBuilder.AppendLine("{");
-        promptBuilder.AppendLine("    \"isValid\": true/false,");
-        promptBuilder.AppendLine("    \"confidence\": 0.0-1.0,");
-        promptBuilder.AppendLine("    \"issues\": [\"danh sách vấn đề phát hiện\"],");
-        promptBuilder.AppendLine("    \"suggestedAction\": \"approve/moderate/reject\",");
-        promptBuilder.AppendLine("    \"cleanedComment\": \"nội dung đã được làm sạch (nếu có)\",");
-        promptBuilder.AppendLine("    \"reason\": \"lý do cụ thể\"");
-        promptBuilder.AppendLine("}");
+            "{\"isValid\":boolean,\"confidence\":number,\"issues\":[],\"suggestedAction\":\"approve|moderate|reject\",\"cleanedComment\":\"string\",\"reason\":\"string\"}");
 
         var prompt = promptBuilder.ToString();
-        var aiResponse = await _geminiService.GenerateResponseAsync(prompt);
+
+        // Sử dụng method tối ưu cho validation
+        var aiResponse = await _geminiService.GenerateValidationResponseAsync(prompt);
 
         try
         {
-            var result = JsonSerializer.Deserialize<ReviewValidationResult>(aiResponse);
-            return result;
+            var jsonStart = aiResponse.IndexOf('{');
+            var jsonEnd = aiResponse.LastIndexOf('}') + 1;
+
+            if (jsonStart >= 0 && jsonEnd > jsonStart)
+            {
+                var jsonContent = aiResponse.Substring(jsonStart, jsonEnd - jsonStart);
+                var result = JsonSerializer.Deserialize<ReviewValidationResult>(
+                    jsonContent,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                );
+                return result ?? CreateFallbackResult();
+            }
         }
         catch
         {
-            return new ReviewValidationResult
-            {
-                IsValid = false,
-                Confidence = 0.5,
-                Issues = new[] { "AI validation error" },
-                SuggestedAction = "moderate",
-                Reason = "Không thể phân tích được nội dung"
-            };
+            // Silent fallback
         }
+
+        return CreateFallbackResult();
+    }
+
+
+    private ReviewValidationResult CreateFallbackResult()
+    {
+        return new ReviewValidationResult
+        {
+            IsValid = true, // Conservative approach - cho qua để human review
+            Confidence = 0.3,
+            Issues = new[] { "AI validation unavailable" },
+            SuggestedAction = "moderate", // Luôn cần human review khi AI fail
+            Reason = "Hệ thống không thể phân tích được nội dung, cần kiểm duyệt thủ công"
+        };
     }
 
     /// <summary>

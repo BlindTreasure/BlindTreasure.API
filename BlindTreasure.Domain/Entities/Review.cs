@@ -6,28 +6,23 @@ public class Review : BaseEntity
 {
     // Thông tin cơ bản
     public Guid UserId { get; set; }
-    public User User { get; set; }
-
-    // Liên kết với đơn hàng (BẮT BUỘC để validate đã mua)
+    public User? User { get; set; }
     public Guid OrderDetailId { get; set; }
-    public OrderDetail OrderDetail { get; set; }
+    public OrderDetail? OrderDetail { get; set; }
 
     // Sản phẩm được review
     public Guid? ProductId { get; set; }
-    public Product Product { get; set; }
+    public Product? Product { get; set; }
     public Guid? BlindBoxId { get; set; }
-    public BlindBox BlindBox { get; set; }
+    public BlindBox? BlindBox { get; set; }
 
     // Thông tin seller
     public Guid SellerId { get; set; }
-    public Seller Seller { get; set; }
+    public Seller? Seller { get; set; }
 
     // Đánh giá
     public int OverallRating { get; set; } // 1-5 sao
-    public int? QualityRating { get; set; } // Chất lượng sản phẩm
-    public int? ServiceRating { get; set; } // Dịch vụ bán hàng
-    public int? DeliveryRating { get; set; } // Giao hàng
-
+    
     // Nội dung review (AI validation)
     public string OriginalComment { get; set; } // Comment gốc từ user
     public string? ProcessedComment { get; set; } // Comment sau khi AI xử lý/filter
