@@ -3,6 +3,7 @@ using System.Text.Json;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
+using BlindTreasure.Application.Services.ThirdParty.AIModels;
 using BlindTreasure.Domain.DTOs.GeminiDTOs;
 
 namespace BlindTreasure.Application.Services;
@@ -18,54 +19,64 @@ public class BlindyService : IBlindyService
         _analyzerService = analyzerService;
     }
 
-    public async Task<ReviewValidationResult> ValidateReviewAsync(string comment, int rating, string? sellerName = null,
-        string? productName = null)
+    public async Task<bool> ValidateReviewAsync(string comment)
     {
+        if (string.IsNullOrWhiteSpace(comment))
+        {
+            return false;
+        }
+
+        // Basic length validation
+        if (comment.Length > 1000 || comment.Length < 10)
+        {
+            return false;
+        }
+
+        // AI validation prompt using StringBuilder with AppendLine
         var promptBuilder = new StringBuilder();
-        promptBuilder.AppendLine(
-            "Phân tích và validate nội dung review sau đây cho nền tảng thương mại điện tử BlindTreasure:");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine($"**Nội dung review:** \"{comment}\"");
-        promptBuilder.AppendLine($"**Đánh giá:** {rating}/5 sao");
-        promptBuilder.AppendLine($"**Sản phẩm:** {productName ?? "Không rõ"}");
-        promptBuilder.AppendLine($"**Seller:** {sellerName ?? "Không rõ"}");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Kiểm tra các tiêu chí sau:");
-        promptBuilder.AppendLine("1. **Ngôn từ độc hại:** Có chửi thề, xúc phạm, hate speech không?");
-        promptBuilder.AppendLine("2. **Spam/Fake:** Có dấu hiệu review ảo, copy-paste, không liên quan không?");
-        promptBuilder.AppendLine("3. **Thông tin cá nhân:** Có tiết lộ số điện thoại, email, địa chỉ cụ thể không?");
-        promptBuilder.AppendLine("4. **Nội dung bất hợp pháp:** Có quảng cáo sản phẩm khác, link lừa đảo không?");
-        promptBuilder.AppendLine("5. **Tính nhất quán:** Rating có phù hợp với nội dung comment không?");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Trả về JSON format:");
+        promptBuilder.AppendLine("Phân tích nội dung đánh giá sản phẩm sau đây và trả về JSON format:");
         promptBuilder.AppendLine("{");
-        promptBuilder.AppendLine("    \"isValid\": true/false,");
-        promptBuilder.AppendLine("    \"confidence\": 0.0-1.0,");
-        promptBuilder.AppendLine("    \"issues\": [\"danh sách vấn đề phát hiện\"],");
-        promptBuilder.AppendLine("    \"suggestedAction\": \"approve/moderate/reject\",");
-        promptBuilder.AppendLine("    \"cleanedComment\": \"nội dung đã được làm sạch (nếu có)\",");
-        promptBuilder.AppendLine("    \"reason\": \"lý do cụ thể\"");
+        promptBuilder.AppendLine("    \"isValid\": boolean, // true nếu nội dung phù hợp");
+        promptBuilder.AppendLine("    \"reasons\": string[] // lý do nếu không hợp lệ");
         promptBuilder.AppendLine("}");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Tiêu chí đánh giá:");
+        promptBuilder.AppendLine("- Không chứa ngôn từ tục tĩu, thô lỗ");
+        promptBuilder.AppendLine("- Không chứa thông tin cá nhân");
+        promptBuilder.AppendLine("- Không spam, quảng cáo");
+        promptBuilder.AppendLine("- Nội dung liên quan đến trải nghiệm sản phẩm");
+        promptBuilder.AppendLine("- Không chứa liên kết hoặc thông tin liên hệ");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Nội dung cần kiểm tra:");
+        promptBuilder.AppendLine(comment);
 
         var prompt = promptBuilder.ToString();
-        var aiResponse = await _geminiService.GenerateResponseAsync(prompt);
 
         try
         {
-            var result = JsonSerializer.Deserialize<ReviewValidationResult>(aiResponse);
-            return result;
+            var response = await _geminiService.GenerateValidationResponseAsync(prompt);
+            var result = JsonSerializer.Deserialize<GeminiValidationResponse>(response);
+
+            return result?.IsValid ?? false;
         }
         catch
         {
-            return new ReviewValidationResult
-            {
-                IsValid = false,
-                Confidence = 0.5,
-                Issues = new[] { "AI validation error" },
-                SuggestedAction = "moderate",
-                Reason = "Không thể phân tích được nội dung"
-            };
+            // Fallback to basic validation if AI fails
+            return BasicTextValidation(comment);
         }
+    }
+
+    private bool BasicTextValidation(string text)
+    {
+        // Basic profanity filter fallback
+        var bannedWords = new[] { "fuck", "shit", "địt", "đụ", "lồn", "cặc" }; // Add more as needed
+        return !bannedWords.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private class GeminiValidationResponse
+    {
+        public bool IsValid { get; set; }
+        public string[] Reasons { get; set; } = Array.Empty<string>();
     }
 
     /// <summary>

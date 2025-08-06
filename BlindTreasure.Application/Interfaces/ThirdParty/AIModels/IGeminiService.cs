@@ -8,4 +8,6 @@ public interface IGeminiService
     /// <param name="userPrompt">Prompt của người dùng</param>
     /// <param name="modelName">Tên model (ví dụ: gemini-2.5-pro)</param>
     Task<string> GenerateResponseAsync(string userPrompt, string? modelName = null);
+
+    Task<string> GenerateValidationResponseAsync(string userPrompt);
 }

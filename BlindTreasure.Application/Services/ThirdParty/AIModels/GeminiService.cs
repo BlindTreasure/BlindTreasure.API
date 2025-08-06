@@ -94,6 +94,81 @@ public class GeminiService : IGeminiService
         await _cache.SetAsync(cacheKey, finalResult, TimeSpan.FromHours(6));
         return finalResult;
     }
+
+    /// <summary>
+    /// Generate response cho các task validation ngắn với model tối ưu
+    /// </summary>
+    public async Task<string> GenerateValidationResponseAsync(string userPrompt)
+    {
+        // Sử dụng model nhẹ nhất và context tối thiểu
+        const string lightSystemPrompt = @"
+Bạn là AI validator cho nền tảng BlindTreasure. 
+Phân tích nội dung và trả về JSON format chính xác.
+Tập trung vào: spam, ngôn từ xấu, thông tin cá nhân, tính phù hợp.
+";
+
+        var fullPrompt = $"{lightSystemPrompt}\n\n{userPrompt}";
+        var cacheKey = $"gemini:validation:{fullPrompt.GetHashCode()}";
+
+        // Check cache
+        if (await _cache.ExistsAsync(cacheKey))
+        {
+            var cached = await _cache.GetAsync<string>(cacheKey);
+            if (!string.IsNullOrWhiteSpace(cached)) return cached;
+        }
+
+        // Sử dụng model nhẹ nhất
+        var url =
+            $"https://generativelanguage.googleapis.com/v1beta/models/{GeminiModels.FlashLiteV2}:generateContent?key={_apiKey}";
+
+        var body = new
+        {
+            contents = new[]
+            {
+                new
+                {
+                    parts = new[]
+                    {
+                        new { text = fullPrompt }
+                    }
+                }
+            },
+            generationConfig = new
+            {
+                temperature = 0.1, // Giảm randomness cho consistency
+                maxOutputTokens = 500, // Giới hạn response length
+                topP = 0.8,
+                topK = 10
+            }
+        };
+
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
+        };
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Gemini API error: {error}");
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        var result = doc.RootElement
+            .GetProperty("candidates")[0]
+            .GetProperty("content")
+            .GetProperty("parts")[0]
+            .GetProperty("text")
+            .GetString();
+
+        var finalResult = result ?? string.Empty;
+
+        // Cache ngắn hơn cho validation (2 giờ)
+        await _cache.SetAsync(cacheKey, finalResult, TimeSpan.FromHours(2));
+        return finalResult;
+    }
 }
 
 public static class GeminiContext

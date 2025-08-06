@@ -1553,14 +1553,15 @@ namespace BlindTreasure.Domain.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("AiValidatedAt")
+                    b.Property<DateTime?>("ApprovedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("AiValidationDetails")
-                        .HasColumnType("jsonb");
 
                     b.Property<Guid?>("BlindBoxId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1574,62 +1575,39 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uuid");
 
-                    b.Property<int?>("DeliveryRating")
-                        .HasColumnType("integer");
-
                     b.Property<string>("ImageUrls")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("jsonb");
 
-                    b.Property<bool>("IsCommentValid")
-                        .HasColumnType("boolean");
+                    b.Property<bool>("IsApproved")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsPublished")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsVerifiedPurchase")
                         .HasColumnType("boolean");
 
                     b.Property<Guid>("OrderDetailId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("OriginalComment")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
                     b.Property<int>("OverallRating")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ProcessedComment")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasAnnotation("Range", new[] { 1, 5 });
 
                     b.Property<Guid?>("ProductId")
                         .HasColumnType("uuid");
-
-                    b.Property<int?>("QualityRating")
-                        .HasColumnType("integer");
 
                     b.Property<Guid>("SellerId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("SellerResponse")
-                        .HasColumnType("text");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<DateTime?>("SellerResponseDate")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("ServiceRating")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1640,16 +1618,15 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ValidationReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("BlindBoxId");
 
-                    b.HasIndex("OrderDetailId")
-                        .IsUnique();
+                    b.HasIndex("IsApproved");
+
+                    b.HasIndex("OrderDetailId");
+
+                    b.HasIndex("OverallRating");
 
                     b.HasIndex("ProductId");
 
@@ -2705,17 +2682,19 @@ namespace BlindTreasure.Domain.Migrations
                 {
                     b.HasOne("BlindTreasure.Domain.Entities.BlindBox", "BlindBox")
                         .WithMany("Reviews")
-                        .HasForeignKey("BlindBoxId");
+                        .HasForeignKey("BlindBoxId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("BlindTreasure.Domain.Entities.OrderDetail", "OrderDetail")
                         .WithMany("Reviews")
                         .HasForeignKey("OrderDetailId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("BlindTreasure.Domain.Entities.Product", "Product")
                         .WithMany("Reviews")
-                        .HasForeignKey("ProductId");
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("BlindTreasure.Domain.Entities.Seller", "Seller")
                         .WithMany("Reviews")
@@ -2726,7 +2705,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.HasOne("BlindTreasure.Domain.Entities.User", "User")
                         .WithMany("Reviews")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("BlindBox");

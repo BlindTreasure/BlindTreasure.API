@@ -171,7 +171,7 @@ public class UnboxingService : IUnboxingService
         sb.AppendLine("| # | Product ID | Tên Sản Phẩm | Rarity | Drop Rate (%) | Range | Status |");
         sb.AppendLine("|---|------------|---------------|--------|---------------|-------|--------|");
 
-        int index = 1;
+        var index = 1;
         decimal cumulative = 0;
 
         foreach (var kvp in probabilities
@@ -255,10 +255,7 @@ public class UnboxingService : IUnboxingService
             var start = cumulative;
             var end = start + kvp.Value;
 
-            if (kvp.Key.Id == selectedItem.Id)
-            {
-                return $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
-            }
+            if (kvp.Key.Id == selectedItem.Id) return $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
 
             cumulative = end;
         }
