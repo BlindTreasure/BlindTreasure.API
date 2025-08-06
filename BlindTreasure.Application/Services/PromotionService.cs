@@ -115,9 +115,25 @@ public class PromotionService : IPromotionService
 
         var promotion = await SetPromotionDataAsync(dto, user);
         await _unitOfWork.Promotions.AddAsync(promotion);
-        await _unitOfWork.SaveChangesAsync();
-        await _cacheService.RemoveByPatternAsync("Promotion:List:*");
 
+        // ✅ SAVE TRƯỚC để có promotion.Id
+        await _unitOfWork.SaveChangesAsync();
+
+        // ✅ SAU ĐÓ MỚI TẠO PromotionParticipant cho Seller
+        if (user.RoleName == RoleType.Seller && promotion.SellerId.HasValue)
+        {
+            var participantPromotion = new PromotionParticipant
+            {
+                PromotionId = promotion.Id, // ✅ Bây giờ đã có Id
+                SellerId = promotion.SellerId.Value,
+                JoinedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.PromotionParticipants.AddAsync(participantPromotion);
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        await _cacheService.RemoveByPatternAsync("Promotion:List:*");
         return await GetPromotionByIdAsync(promotion.Id);
     }
 
@@ -353,15 +369,16 @@ public class PromotionService : IPromotionService
         SellerParticipantPromotionParameter param)
     {
         var currentUserId = _claimsService.CurrentUserId;
-        var user = await _userService.GetUserById(currentUserId, true);
+        var user = await _userService.GetUserById(currentUserId);
         if (user?.RoleName != RoleType.Staff && user?.RoleName != RoleType.Admin)
             throw ErrorHelper.Forbidden("Không có quyền xem danh sách tham gia.");
 
-        var participants = _unitOfWork.PromotionParticipants
+        var participants = await _unitOfWork.PromotionParticipants
             .GetQueryable()
             .Where(pp => pp.PromotionId == param.PromotionId && !pp.IsDeleted)
             .Include(pp => pp.Seller)
-            .ThenInclude(s => s.User);
+            .ThenInclude(s => s.User)
+            .ToListAsync(); // ✅ Thêm await và ToListAsync()
 
         var result = participants.Select(pp => new SellerParticipantDto
         {
@@ -374,7 +391,7 @@ public class PromotionService : IPromotionService
             CompanyAddress = pp.Seller.CompanyAddress,
             IsVerified = pp.Seller.IsVerified,
             JoinedAt = pp.JoinedAt
-        }).ToList();
+        }).ToList(); // ✅ Bây giờ ToList() trên memory
 
         return result;
     }
@@ -419,21 +436,14 @@ public class PromotionService : IPromotionService
                 break;
 
             case RoleType.Seller:
-                var seller =
-                    await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
-                        s.UserId == user.Id && s.IsVerified && !s.IsDeleted);
+                var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
+                    s.UserId == user.Id && s.IsVerified && !s.IsDeleted);
 
                 promotion.SellerId = seller?.Id;
                 promotion.Status = PromotionStatus.Pending;
-
-                // Tự động tạo Participation record
-                await _unitOfWork.PromotionParticipants.AddAsync(new PromotionParticipant
-                {
-                    SellerId = seller.Id,
-                    PromotionId = promotion.Id,
-                    JoinedAt = DateTime.UtcNow
-                });
-
+            
+                // ✅ BỎ việc tạo PromotionParticipant ở đây
+                // Sẽ tạo sau khi save promotion
                 break;
 
             default:
@@ -442,12 +452,6 @@ public class PromotionService : IPromotionService
 
         return promotion;
     }
-
-    private async Task<Promotion?> GetPromotionByIdRawAsync(Guid id)
-    {
-        return await _unitOfWork.Promotions.FirstOrDefaultAsync(p => p.Id == id);
-    }
-
     private async Task ValidateCreatePromotionAsync(User user)
     {
         if (user.RoleName == RoleType.Seller)
