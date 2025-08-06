@@ -2052,11 +2052,11 @@ public class SystemController : ControllerBase
                 Description = "Giảm 5% toàn sàn - Khuyến mãi từ BlindTreasure",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 5,
-                StartDate = now, // ✅ Bắt đầu ngay
+                StartDate = now,
                 EndDate = now.AddMonths(1),
                 UsageLimit = 1000,
-                Status = PromotionStatus.Approved, // ✅ Admin/Staff tự động approved
-                SellerId = null, // ✅ Global promotion
+                Status = PromotionStatus.Approved,
+                SellerId = null, // Global promotion
                 CreatedByRole = RoleType.Staff,
                 CreatedBy = adminUser.Id,
                 CreatedAt = now,
@@ -2064,7 +2064,7 @@ public class SystemController : ControllerBase
                 IsDeleted = false
             },
 
-            // 2. Voucher của BlindTreasure seller - Theo logic Seller  
+            // 2. Voucher của BlindTreasure seller
             new()
             {
                 Id = Guid.NewGuid(),
@@ -2072,11 +2072,11 @@ public class SystemController : ControllerBase
                 Description = "Giảm 10% sản phẩm BlindTreasure - Ưu đãi đặc biệt",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 10,
-                StartDate = now, // ✅ Bắt đầu ngay
+                StartDate = now,
                 EndDate = now.AddMonths(1),
                 UsageLimit = 100,
-                Status = PromotionStatus.Approved, // ✅ Giả sử đã được duyệt
-                SellerId = blindTreasureSeller.Id, // ✅ Seller-specific promotion
+                Status = PromotionStatus.Approved,
+                SellerId = blindTreasureSeller.Id,
                 CreatedByRole = RoleType.Seller,
                 CreatedBy = blindTreasureSeller.UserId,
                 CreatedAt = now,
@@ -2084,7 +2084,7 @@ public class SystemController : ControllerBase
                 IsDeleted = false
             },
 
-            // 3. Thêm 1 voucher Fixed Amount để test
+            // 3. Voucher Fixed Amount toàn sàn
             new()
             {
                 Id = Guid.NewGuid(),
@@ -2092,13 +2092,93 @@ public class SystemController : ControllerBase
                 Description = "Giảm 20,000 VNĐ cho đơn hàng - Toàn sàn",
                 DiscountType = DiscountType.Fixed,
                 DiscountValue = 20000,
-                StartDate = now, // ✅ Bắt đầu ngay
+                StartDate = now,
                 EndDate = now.AddMonths(2),
                 UsageLimit = 500,
                 Status = PromotionStatus.Approved,
                 SellerId = null, // Global
                 CreatedByRole = RoleType.Staff,
                 CreatedBy = adminUser.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+                IsDeleted = false
+            },
+
+            // 4. ✅ Voucher giảm 15% cho khách hàng mới - Global
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "NEWBIE15",
+                Description = "Chào mừng khách hàng mới - Giảm 15% đơn hàng đầu tiên",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 15,
+                StartDate = now,
+                EndDate = now.AddMonths(3),
+                UsageLimit = 200, // Giới hạn 200 lượt sử dụng
+                Status = PromotionStatus.Approved,
+                SellerId = null, // Global
+                CreatedByRole = RoleType.Admin,
+                CreatedBy = adminUser.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+                IsDeleted = false
+            },
+
+            // 5. ✅ Voucher của seller BlindTreasure cho sản phẩm cao cấp
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "PREMBT20",
+                Description = "Giảm 20% cho blind box cao cấp từ BlindTreasure - Chỉ áp dụng cho đơn hàng trên 500K",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 20,
+                StartDate = now,
+                EndDate = now.AddDays(45),
+                UsageLimit = 50,
+                Status = PromotionStatus.Approved,
+                SellerId = blindTreasureSeller.Id,
+                CreatedByRole = RoleType.Seller,
+                CreatedBy = blindTreasureSeller.UserId,
+                CreatedAt = now,
+                UpdatedAt = now,
+                IsDeleted = false
+            },
+
+            // 6. ✅ Voucher fixed amount lớn cho đơn hàng cao - Global
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "MEGA50K",
+                Description = "Giảm 50,000 VNĐ cho đơn hàng từ 1 triệu - Ưu đãi lớn toàn sàn",
+                DiscountType = DiscountType.Fixed,
+                DiscountValue = 50000,
+                StartDate = now,
+                EndDate = now.AddDays(30),
+                UsageLimit = 100,
+                Status = PromotionStatus.Approved,
+                SellerId = null, // Global
+                CreatedByRole = RoleType.Staff,
+                CreatedBy = adminUser.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+                IsDeleted = false
+            },
+
+            // 7. ✅ Voucher seller BlindTreasure cho blind box đặc biệt
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "SPECLBT25",
+                Description = "Giảm 25% cho blind box phiên bản đặc biệt - Limited Edition từ BlindTreasure",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 25,
+                StartDate = now,
+                EndDate = now.AddDays(21), // Thời gian ngắn cho cảm giác khan hiếm
+                UsageLimit = 30,
+                Status = PromotionStatus.Approved,
+                SellerId = blindTreasureSeller.Id,
+                CreatedByRole = RoleType.Seller,
+                CreatedBy = blindTreasureSeller.UserId,
                 CreatedAt = now,
                 UpdatedAt = now,
                 IsDeleted = false
@@ -2122,11 +2202,12 @@ public class SystemController : ControllerBase
 
         if (blindTreasureSeller == null) return;
 
-        // ✅ THEO LOGIC SERVICE: Seller tự tạo promotion sẽ tự động có PromotionParticipant
-        var sellerPromotion = await _context.Promotions
-            .FirstOrDefaultAsync(p => p.SellerId == blindTreasureSeller.Id && p.Code == "BLINDT10");
+        // Lấy tất cả promotions của seller này
+        var sellerPromotions = await _context.Promotions
+            .Where(p => p.SellerId == blindTreasureSeller.Id)
+            .ToListAsync();
 
-        // ✅ THEO LOGIC SERVICE: Lấy các global promotions (đã bắt đầu rồi)
+        // Lấy các global promotions 
         var globalPromotions = await _context.Promotions
             .Where(p => p.SellerId == null &&
                         p.Status == PromotionStatus.Approved)
@@ -2134,15 +2215,15 @@ public class SystemController : ControllerBase
 
         var participants = new List<PromotionParticipant>();
 
-        // 1. ✅ Tự động tạo participant cho promotion của chính seller
-        if (sellerPromotion != null)
+        // 1. ✅ Tự động tạo participant cho TẤT CẢ promotions của chính seller
+        foreach (var sellerPromotion in sellerPromotions)
         {
             participants.Add(new PromotionParticipant
             {
                 Id = Guid.NewGuid(),
                 PromotionId = sellerPromotion.Id,
                 SellerId = blindTreasureSeller.Id,
-                JoinedAt = now, // ✅ Join ngay khi tạo promotion
+                JoinedAt = now.AddMinutes(-5), // Join trước khi promotion bắt đầu
                 CreatedBy = blindTreasureSeller.UserId,
                 CreatedAt = now,
                 UpdatedAt = now,
@@ -2150,18 +2231,18 @@ public class SystemController : ControllerBase
             });
         }
 
-        // 2. ✅ BlindTreasure tham gia các global promotions (tối đa 2)
-        // ⚠️ LUU Ý: Vì promotions đã bắt đầu rồi, nên theo business rule
-        // sẽ không thể join được nữa. Nhưng để test, ta vẫn tạo data.
+        // 2. ✅ BlindTreasure tham gia một số global promotions (tối đa 2)
+        var selectedGlobalPromotions = globalPromotions.Take(2).ToList();
         var joinCount = 0;
-        foreach (var globalPromotion in globalPromotions.Take(2)) // Tối đa 2 global promotions
+
+        foreach (var globalPromotion in selectedGlobalPromotions)
         {
             participants.Add(new PromotionParticipant
             {
                 Id = Guid.NewGuid(),
                 PromotionId = globalPromotion.Id,
                 SellerId = blindTreasureSeller.Id,
-                JoinedAt = now.AddMinutes(-joinCount * 5), // ✅ Join trước khi promotion bắt đầu (để hợp lý)
+                JoinedAt = now.AddMinutes(-10 - joinCount * 5), // Join trước khi promotion bắt đầu
                 CreatedBy = blindTreasureSeller.UserId,
                 CreatedAt = now,
                 UpdatedAt = now,
