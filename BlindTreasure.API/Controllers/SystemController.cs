@@ -2031,40 +2031,77 @@ public class SystemController : ControllerBase
 
         var now = DateTime.UtcNow;
 
-        // Chỉ lấy seller BlindTreasure
+        // Lấy admin/staff user để tạo global promotion
+        var adminUser = await _context.Users
+            .FirstOrDefaultAsync(u => u.RoleName == RoleType.Staff || u.RoleName == RoleType.Admin);
+
+        // Lấy seller BlindTreasure
         var blindTreasureSeller = await _context.Sellers
+            .Include(s => s.User)
             .FirstOrDefaultAsync(s => s.User.Email == "blindtreasurefpt@gmail.com");
 
-        if (blindTreasureSeller == null) return;
+        if (blindTreasureSeller == null || adminUser == null) return;
 
         var promotions = new List<Promotion>
         {
-            // Voucher riêng của BlindTreasure
+            // 1. Voucher toàn sàn (do admin/staff tạo) - Theo logic Admin/Staff
             new()
             {
-                Code = "BT10",
-                Description = "Giảm 10% cho đơn hàng từ BlindTreasure",
-                DiscountType = DiscountType.Percentage,
-                DiscountValue = 10,
-                StartDate = now,
-                EndDate = now.AddMonths(1),
-                Status = PromotionStatus.Approved,
-                SellerId = blindTreasureSeller.Id,
-                CreatedByRole = RoleType.Seller
-            },
-
-            // Voucher toàn sàn (do admin tạo)
-            new()
-            {
+                Id = Guid.NewGuid(),
                 Code = "GLOBAL5",
-                Description = "Giảm 5% toàn sàn",
+                Description = "Giảm 5% toàn sàn - Khuyến mãi từ BlindTreasure",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 5,
-                StartDate = now,
+                StartDate = now, // ✅ Bắt đầu ngay
                 EndDate = now.AddMonths(1),
+                UsageLimit = 1000,
+                Status = PromotionStatus.Approved, // ✅ Admin/Staff tự động approved
+                SellerId = null, // ✅ Global promotion
+                CreatedByRole = RoleType.Staff,
+                CreatedBy = adminUser.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+                IsDeleted = false
+            },
+
+            // 2. Voucher của BlindTreasure seller - Theo logic Seller  
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "BLINDT10",
+                Description = "Giảm 10% sản phẩm BlindTreasure - Ưu đãi đặc biệt",
+                DiscountType = DiscountType.Percentage,
+                DiscountValue = 10,
+                StartDate = now, // ✅ Bắt đầu ngay
+                EndDate = now.AddMonths(1),
+                UsageLimit = 100,
+                Status = PromotionStatus.Approved, // ✅ Giả sử đã được duyệt
+                SellerId = blindTreasureSeller.Id, // ✅ Seller-specific promotion
+                CreatedByRole = RoleType.Seller,
+                CreatedBy = blindTreasureSeller.UserId,
+                CreatedAt = now,
+                UpdatedAt = now,
+                IsDeleted = false
+            },
+
+            // 3. Thêm 1 voucher Fixed Amount để test
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Code = "SAVE20K",
+                Description = "Giảm 20,000 VNĐ cho đơn hàng - Toàn sàn",
+                DiscountType = DiscountType.Fixed,
+                DiscountValue = 20000,
+                StartDate = now, // ✅ Bắt đầu ngay
+                EndDate = now.AddMonths(2),
+                UsageLimit = 500,
                 Status = PromotionStatus.Approved,
                 SellerId = null, // Global
-                CreatedByRole = RoleType.Staff
+                CreatedByRole = RoleType.Staff,
+                CreatedBy = adminUser.Id,
+                CreatedAt = now,
+                UpdatedAt = now,
+                IsDeleted = false
             }
         };
 
@@ -2078,27 +2115,66 @@ public class SystemController : ControllerBase
 
         var now = DateTime.UtcNow;
 
-        // Chỉ lấy seller BlindTreasure
+        // Lấy seller BlindTreasure
         var blindTreasureSeller = await _context.Sellers
+            .Include(s => s.User)
             .FirstOrDefaultAsync(s => s.User.Email == "blindtreasurefpt@gmail.com");
 
         if (blindTreasureSeller == null) return;
 
-        // Chỉ lấy global promotion (của admin)
-        var globalPromotion = await _context.Promotions
-            .FirstOrDefaultAsync(p => p.SellerId == null && p.Code == "GLOBAL5");
+        // ✅ THEO LOGIC SERVICE: Seller tự tạo promotion sẽ tự động có PromotionParticipant
+        var sellerPromotion = await _context.Promotions
+            .FirstOrDefaultAsync(p => p.SellerId == blindTreasureSeller.Id && p.Code == "BLINDT10");
 
-        if (globalPromotion == null) return;
+        // ✅ THEO LOGIC SERVICE: Lấy các global promotions (đã bắt đầu rồi)
+        var globalPromotions = await _context.Promotions
+            .Where(p => p.SellerId == null &&
+                        p.Status == PromotionStatus.Approved)
+            .ToListAsync();
 
-        // BlindTreasure tham gia global promotion
-        await _context.PromotionParticipants.AddAsync(new PromotionParticipant
+        var participants = new List<PromotionParticipant>();
+
+        // 1. ✅ Tự động tạo participant cho promotion của chính seller
+        if (sellerPromotion != null)
         {
-            PromotionId = globalPromotion.Id,
-            SellerId = blindTreasureSeller.Id,
-            JoinedAt = now
-        });
+            participants.Add(new PromotionParticipant
+            {
+                Id = Guid.NewGuid(),
+                PromotionId = sellerPromotion.Id,
+                SellerId = blindTreasureSeller.Id,
+                JoinedAt = now, // ✅ Join ngay khi tạo promotion
+                CreatedBy = blindTreasureSeller.UserId,
+                CreatedAt = now,
+                UpdatedAt = now,
+                IsDeleted = false
+            });
+        }
 
-        await _context.SaveChangesAsync();
+        // 2. ✅ BlindTreasure tham gia các global promotions (tối đa 2)
+        // ⚠️ LUU Ý: Vì promotions đã bắt đầu rồi, nên theo business rule
+        // sẽ không thể join được nữa. Nhưng để test, ta vẫn tạo data.
+        var joinCount = 0;
+        foreach (var globalPromotion in globalPromotions.Take(2)) // Tối đa 2 global promotions
+        {
+            participants.Add(new PromotionParticipant
+            {
+                Id = Guid.NewGuid(),
+                PromotionId = globalPromotion.Id,
+                SellerId = blindTreasureSeller.Id,
+                JoinedAt = now.AddMinutes(-joinCount * 5), // ✅ Join trước khi promotion bắt đầu (để hợp lý)
+                CreatedBy = blindTreasureSeller.UserId,
+                CreatedAt = now,
+                UpdatedAt = now,
+                IsDeleted = false
+            });
+            joinCount++;
+        }
+
+        if (participants.Any())
+        {
+            await _context.PromotionParticipants.AddRangeAsync(participants);
+            await _context.SaveChangesAsync();
+        }
     }
 
     private async Task SeedSellerForUser(string sellerEmail)

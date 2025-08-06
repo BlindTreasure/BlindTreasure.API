@@ -48,7 +48,6 @@ public class PromotionController : ControllerBase
     /// <param name="param"> truyền sellerId vào thì GET những promotions mà seller đã TẠO, không phải tham gia </param>
     /// <returns></returns>
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResult<Pagination<PromotionDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPromotions([FromQuery] PromotionQueryParameter param)
     {
         try
