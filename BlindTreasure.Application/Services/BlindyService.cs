@@ -19,60 +19,64 @@ public class BlindyService : IBlindyService
         _analyzerService = analyzerService;
     }
 
-    public async Task<ReviewValidationResult> ValidateReviewAsync(string comment, int rating, string? sellerName = null,
-        string? productName = null)
+    public async Task<bool> ValidateReviewAsync(string comment)
     {
-        var promptBuilder = new StringBuilder();
-        promptBuilder.AppendLine("Phân tích review:");
-        promptBuilder.AppendLine($"Review: \"{comment}\"");
-        promptBuilder.AppendLine($"Rating: {rating}/5");
-        if (!string.IsNullOrEmpty(productName))
-            promptBuilder.AppendLine($"Product: {productName}");
+        if (string.IsNullOrWhiteSpace(comment))
+        {
+            return false;
+        }
 
+        // Basic length validation
+        if (comment.Length > 1000 || comment.Length < 10)
+        {
+            return false;
+        }
+
+        // AI validation prompt using StringBuilder with AppendLine
+        var promptBuilder = new StringBuilder();
+        promptBuilder.AppendLine("Phân tích nội dung đánh giá sản phẩm sau đây và trả về JSON format:");
+        promptBuilder.AppendLine("{");
+        promptBuilder.AppendLine("    \"isValid\": boolean, // true nếu nội dung phù hợp");
+        promptBuilder.AppendLine("    \"reasons\": string[] // lý do nếu không hợp lệ");
+        promptBuilder.AppendLine("}");
         promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Return JSON:");
-        promptBuilder.AppendLine(
-            "{\"isValid\":boolean,\"confidence\":number,\"issues\":[],\"suggestedAction\":\"approve|moderate|reject\",\"cleanedComment\":\"string\",\"reason\":\"string\"}");
+        promptBuilder.AppendLine("Tiêu chí đánh giá:");
+        promptBuilder.AppendLine("- Không chứa ngôn từ tục tĩu, thô lỗ");
+        promptBuilder.AppendLine("- Không chứa thông tin cá nhân");
+        promptBuilder.AppendLine("- Không spam, quảng cáo");
+        promptBuilder.AppendLine("- Nội dung liên quan đến trải nghiệm sản phẩm");
+        promptBuilder.AppendLine("- Không chứa liên kết hoặc thông tin liên hệ");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Nội dung cần kiểm tra:");
+        promptBuilder.AppendLine(comment);
 
         var prompt = promptBuilder.ToString();
 
-        // Sử dụng method tối ưu cho validation
-        var aiResponse = await _geminiService.GenerateValidationResponseAsync(prompt);
-
         try
         {
-            var jsonStart = aiResponse.IndexOf('{');
-            var jsonEnd = aiResponse.LastIndexOf('}') + 1;
+            var response = await _geminiService.GenerateValidationResponseAsync(prompt);
+            var result = JsonSerializer.Deserialize<GeminiValidationResponse>(response);
 
-            if (jsonStart >= 0 && jsonEnd > jsonStart)
-            {
-                var jsonContent = aiResponse.Substring(jsonStart, jsonEnd - jsonStart);
-                var result = JsonSerializer.Deserialize<ReviewValidationResult>(
-                    jsonContent,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-                );
-                return result ?? CreateFallbackResult();
-            }
+            return result?.IsValid ?? false;
         }
         catch
         {
-            // Silent fallback
+            // Fallback to basic validation if AI fails
+            return BasicTextValidation(comment);
         }
-
-        return CreateFallbackResult();
     }
 
-
-    private ReviewValidationResult CreateFallbackResult()
+    private bool BasicTextValidation(string text)
     {
-        return new ReviewValidationResult
-        {
-            IsValid = true, // Conservative approach - cho qua để human review
-            Confidence = 0.3,
-            Issues = new[] { "AI validation unavailable" },
-            SuggestedAction = "moderate", // Luôn cần human review khi AI fail
-            Reason = "Hệ thống không thể phân tích được nội dung, cần kiểm duyệt thủ công"
-        };
+        // Basic profanity filter fallback
+        var bannedWords = new[] { "fuck", "shit", "địt", "đụ", "lồn", "cặc" }; // Add more as needed
+        return !bannedWords.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private class GeminiValidationResponse
+    {
+        public bool IsValid { get; set; }
+        public string[] Reasons { get; set; } = Array.Empty<string>();
     }
 
     /// <summary>
