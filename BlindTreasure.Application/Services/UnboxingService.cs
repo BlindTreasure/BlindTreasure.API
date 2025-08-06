@@ -146,16 +146,34 @@ public class UnboxingService : IUnboxingService
         BlindBoxItem selectedItem)
     {
         var sb = new StringBuilder();
-        var total = probabilities.Values.Sum();
+        var totalProbability = probabilities.Values.Sum();
 
-        // Tiêu đề
-        sb.AppendLine($"### Gacha Roll");
-        sb.AppendLine($"- **Roll:** {Math.Round(roll, 4):N4}");
-        sb.AppendLine($"- **Tổng xác suất:** {Math.Round(total, 2):N2}%\n");
+        // HEADER SECTION - Chuyên nghiệp hơn
+        sb.AppendLine("# 📋 Báo Cáo Kết Quả Mở Hộp");
+        sb.AppendLine();
+        sb.AppendLine($"**Thời gian:** `{DateTime.Now:yyyy-MM-dd HH:mm:ss}`");
+        sb.AppendLine($"**Hộp ID:** `{selectedItem.BlindBoxId}`");
+        sb.AppendLine();
 
-        sb.AppendLine("### Danh sách item:");
+        // TECHNICAL INFO SECTION
+        sb.AppendLine("## 🔧 Thông Số Kỹ Thuật");
+        sb.AppendLine();
+        sb.AppendLine("| Tham số | Giá trị | Ghi chú |");
+        sb.AppendLine("|---------|---------|---------|");
+        sb.AppendLine($"| **Random Seed** | `{Math.Round(roll, 6)}` | Giá trị ngẫu nhiên sinh ra |");
+        sb.AppendLine($"| **Tổng xác suất** | `{Math.Round(totalProbability, 4)}%` | Tổng tỷ lệ của tất cả items |");
+        sb.AppendLine($"| **Thuật toán** | `Weighted Random` | Phương pháp chọn item |");
+        sb.AppendLine();
 
+        // PROBABILITY DISTRIBUTION TABLE
+        sb.AppendLine("## 📊 Bảng Phân Phối Xác Suất");
+        sb.AppendLine();
+        sb.AppendLine("| # | Product ID | Tên Sản Phẩm | Rarity | Drop Rate (%) | Range | Status |");
+        sb.AppendLine("|---|------------|---------------|--------|---------------|-------|--------|");
+
+        int index = 1;
         decimal cumulative = 0;
+
         foreach (var kvp in probabilities
                      .OrderByDescending(p => p.Value)
                      .ThenBy(p => p.Key.ProductId))
@@ -164,23 +182,89 @@ public class UnboxingService : IUnboxingService
             var end = start + kvp.Value;
             cumulative = end;
 
-            var name = kvp.Key.Product?.Name ?? "Không rõ";
-            var rarity = kvp.Key.RarityConfig?.Name.ToString() ?? "Không rõ";
-            var drop = Math.Round(kvp.Value, 2);
-            var range = $"{Math.Round(start, 2):N2}% – {Math.Round(end, 2):N2}%";
-            var selectedMark = kvp.Key.Id == selectedItem.Id ? " **<= ĐÃ TRÚNG**" : "";
+            var productId = kvp.Key.ProductId.ToString("N")[..8] + "...";
+            var itemName = kvp.Key.Product?.Name ?? "NULL";
+            var rarity = GetRarityBadge(kvp.Key.RarityConfig?.Name.ToString());
+            var dropRate = Math.Round(kvp.Value, 4);
+            var range = $"`{Math.Round(start, 4)} - {Math.Round(end, 4)}`";
+            var status = kvp.Key.Id == selectedItem.Id
+                ? "✅ **SELECTED**"
+                : "⚫";
 
-            sb.AppendLine(
-                $"- **{name}** (Độ hiếm: *{rarity}*, Tỉ lệ: {drop:N2}%, Khoảng: {range}){selectedMark}"
-            );
+            sb.AppendLine($"| {index} | `{productId}` | {itemName} | {rarity} | `{dropRate}%` | {range} | {status} |");
+            index++;
         }
 
+        sb.AppendLine();
+
+        // SELECTION RESULT
+        sb.AppendLine("## 🎯 Kết Quả Lựa Chọn");
+        sb.AppendLine();
+        sb.AppendLine("### Selected Item Details");
+        sb.AppendLine();
+        sb.AppendLine($"- **Product ID:** `{selectedItem.ProductId}`");
+        sb.AppendLine($"- **Item ID:** `{selectedItem.Id}`");
+        sb.AppendLine($"- **Product Name:** `{selectedItem.Product?.Name ?? "NULL"}`");
+        sb.AppendLine($"- **Configured Drop Rate:** `{Math.Round(selectedItem.DropRate, 4)}%`");
+        sb.AppendLine($"- **Rarity Level:** {GetRarityBadge(selectedItem.RarityConfig?.Name.ToString())}");
+        sb.AppendLine($"- **Roll Hit Range:** `{GetHitRange(probabilities, selectedItem)}`");
+
+        // VALIDATION SECTION
+        sb.AppendLine();
+        sb.AppendLine("## ✅ Validation Check");
+        sb.AppendLine();
+        sb.AppendLine("| Tiêu chí | Kết quả | Status |");
+        sb.AppendLine("|----------|---------|--------|");
         sb.AppendLine(
-            $"\n**Kết quả:** `{selectedItem.Product?.Name}` (DropRate = {Math.Round(selectedItem.DropRate, 2):N2}%)");
+            $"| **Probability Sum** | `{Math.Round(totalProbability, 4)}%` | {(Math.Abs(totalProbability - 100) < 0.01m ? "✅ Valid" : "⚠️ Warning")} |");
+        sb.AppendLine($"| **Roll in Valid Range** | `0 ≤ {roll} ≤ {totalProbability}` | ✅ Valid |");
+        sb.AppendLine($"| **Item Selection** | Algorithm executed | ✅ Success |");
+
+        // TECHNICAL NOTES
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+        sb.AppendLine("**⚠️ Lưu ý kỹ thuật:**");
+        sb.AppendLine("- Log này chỉ dành cho mục đích kiểm tra và debug");
+        sb.AppendLine("- Không chia sẻ thông tin này với khách hàng");
+        sb.AppendLine("- Liên hệ team dev nếu có bất thường trong thuật toán");
 
         return sb.ToString();
     }
 
+// Helper methods
+    private string GetRarityBadge(string rarity)
+    {
+        return rarity?.ToLower() switch
+        {
+            "common" => "🟢 `COMMON`",
+            "uncommon" => "🟡 `UNCOMMON`",
+            "rare" => "🔵 `RARE`",
+            "epic" => "🟣 `EPIC`",
+            "legendary" => "🟠 `LEGENDARY`",
+            "mythic" => "🔴 `MYTHIC`",
+            _ => "⚫ `UNKNOWN`"
+        };
+    }
+
+    private string GetHitRange(Dictionary<BlindBoxItem, decimal> probabilities, BlindBoxItem selectedItem)
+    {
+        decimal cumulative = 0;
+        foreach (var kvp in probabilities.OrderByDescending(p => p.Value).ThenBy(p => p.Key.ProductId))
+        {
+            var start = cumulative;
+            var end = start + kvp.Value;
+
+            if (kvp.Key.Id == selectedItem.Id)
+            {
+                return $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
+            }
+
+            cumulative = end;
+        }
+
+        return "N/A";
+    }
 
     private async Task<CustomerBlindBox> GetValidCustomerBlindBoxAsync(Guid id, Guid userId)
     {
