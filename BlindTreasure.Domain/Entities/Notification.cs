@@ -11,6 +11,7 @@ public class Notification : BaseEntity
     public required NotificationType Type { get; set; }
     public required string Title { get; set; }
     public required string Message { get; set; }
+    public string? SourceUrl { get; set; }
 
     public bool IsRead { get; set; }
     public DateTime SentAt { get; set; }

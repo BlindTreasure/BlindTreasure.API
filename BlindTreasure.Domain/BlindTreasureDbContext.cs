@@ -316,6 +316,9 @@ public class BlindTreasureDbContext : DbContext
             entity.Property(n => n.Message)
                 .HasMaxLength(500)
                 .IsRequired();
+            entity.Property(n => n.SourceUrl)
+                .HasMaxLength(500)
+                .IsRequired(false); // Explicitly nullable
         });
 
 
@@ -622,7 +625,7 @@ public class BlindTreasureDbContext : DbContext
             // Thêm cấu hình cho TimeRemaining
             entity.Property(t => t.TimeRemaining)
                 .HasDefaultValue(0);
-            
+
             entity.HasOne(t => t.Listing)
                 .WithMany()
                 .HasForeignKey(t => t.ListingId)

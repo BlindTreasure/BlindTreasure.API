@@ -11,13 +11,14 @@ public interface INotificationService
     Task ReadAllNotifications(Guid userId);
     Task DeleteNotification(Guid notificationId);
 
-    Task<List<Notification>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize,
+    Task<List<NotificationDto>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize,
         NotificationType? type = null);
+
     Task<int> CountNotificationsAsync(Guid userId);
 
 
     // Push notification
-    Task<Notification> PushNotificationToAll(NotificationDTO notificationDTO);
-    Task<Notification> PushNotificationToUser(Guid userId, NotificationDTO notificationDTO);
-    Task<Notification> PushNotificationToRole(RoleType role, NotificationDTO notificationDTO);
+    Task<Notification> PushNotificationToAll(NotificationDto notificationDTO);
+    Task<Notification> PushNotificationToUser(Guid userId, NotificationDto notificationDTO);
+    Task<Notification> PushNotificationToRole(RoleType role, NotificationDto notificationDTO);
 }

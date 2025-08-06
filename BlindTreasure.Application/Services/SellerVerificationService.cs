@@ -42,7 +42,7 @@ public class SellerVerificationService : ISellerVerificationService
 
         await _notificationService.PushNotificationToUser(
             seller.UserId,
-            new NotificationDTO
+            new NotificationDto
             {
                 Title = dto.IsApproved ? "Đã duyệt hồ sơ" : "Hồ sơ bị từ chối",
                 Message = dto.IsApproved

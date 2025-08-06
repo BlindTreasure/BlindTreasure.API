@@ -140,7 +140,7 @@ public class ReviewService : IReviewService
 
     #region private methods
 
-        private ReviewResponseDto MapReviewToDto(Review review)
+    private ReviewResponseDto MapReviewToDto(Review review)
     {
         return new ReviewResponseDto
         {
@@ -198,5 +198,4 @@ public class ReviewService : IReviewService
     }
 
     #endregion
-
 }

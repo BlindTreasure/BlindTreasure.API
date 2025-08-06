@@ -9,8 +9,7 @@ namespace BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
 
 public class SellerStatisticsRequestDto
 {
-    [Required]
-    public StatisticsTimeRange Range { get; set; } = StatisticsTimeRange.Week;
+    [Required] public StatisticsTimeRange Range { get; set; } = StatisticsTimeRange.Week;
 
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
@@ -18,10 +17,7 @@ public class SellerStatisticsRequestDto
     // Validation: Custom range requires StartDate and EndDate
     public bool IsValid()
     {
-        if (Range == StatisticsTimeRange.Custom)
-        {
-            return StartDate.HasValue && EndDate.HasValue && StartDate <= EndDate;
-        }
+        if (Range == StatisticsTimeRange.Custom) return StartDate.HasValue && EndDate.HasValue && StartDate <= EndDate;
         return true;
     }
 }

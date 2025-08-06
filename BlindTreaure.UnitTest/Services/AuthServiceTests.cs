@@ -541,7 +541,7 @@ public class AuthServiceTests
         _cacheServiceMock.Setup(x => x.ExistsAsync($"noti:welcome:{user.Id}"))
             .ReturnsAsync(false); // Chưa gửi thông báo welcome
         _notiService.Setup(x => x.PushNotificationToUser(
-                It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
+                It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
             .ReturnsAsync(new Notification
             {
                 Type = NotificationType.System,
@@ -559,7 +559,7 @@ public class AuthServiceTests
         // Assert
         result.Should().NotBeNull();
         _notiService.Verify(x => x.PushNotificationToUser(
-                user.Id, It.Is<NotificationDTO>(n =>
+                user.Id, It.Is<NotificationDto>(n =>
                     n.Title == "Chào mừng!" &&
                     n.Type == NotificationType.System)),
             Times.Once);
@@ -770,7 +770,7 @@ public class AuthServiceTests
         _unitOfWorkMock.Verify(x => x.Users.Update(It.IsAny<User>()), Times.Never);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Never);
         _notiService.Verify(x => x.PushNotificationToUser(
-                It.IsAny<Guid>(), It.IsAny<NotificationDTO>()),
+                It.IsAny<Guid>(), It.IsAny<NotificationDto>()),
             Times.Never);
     }
 }

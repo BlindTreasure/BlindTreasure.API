@@ -94,14 +94,10 @@ public class StripeService : IStripeService
             // 5. Chuẩn bị shipmentDescriptions (nếu cần)
             var shipmentDescriptions = new List<string>();
             foreach (var od in order.OrderDetails)
-            {
-                foreach (var s in od.Shipments)
-                {
-                    shipmentDescriptions.Add(
-                        $"#{od.Id}: {s.Provider} - mã {s.OrderCode ?? "N/A"} - phí {s.TotalFee:N0}đ - trạng thái {s.Status}"
-                    );
-                }
-            }
+            foreach (var s in od.Shipments)
+                shipmentDescriptions.Add(
+                    $"#{od.Id}: {s.Provider} - mã {s.OrderCode ?? "N/A"} - phí {s.TotalFee:N0}đ - trạng thái {s.Status}"
+                );
 
             var shipmentDesc = shipmentDescriptions.Any()
                 ? string.Join(" | ", shipmentDescriptions)
@@ -138,7 +134,6 @@ public class StripeService : IStripeService
 
             // 6.2: Tổng phí vận chuyển
             if (totalShipping > 0)
-            {
                 lineItems.Add(new SessionLineItemOptions
                 {
                     PriceData = new SessionLineItemPriceDataOptions
@@ -147,20 +142,18 @@ public class StripeService : IStripeService
                         ProductData = new SessionLineItemPriceDataProductDataOptions
                         {
                             Name = "Phí vận chuyển",
-                            Description = shipmentDesc.Length > 200 ? shipmentDesc.Substring(0, 197) + "..." : shipmentDesc
+                            Description = shipmentDesc.Length > 200
+                                ? shipmentDesc.Substring(0, 197) + "..."
+                                : shipmentDesc
                         },
                         UnitAmount = (long)Math.Round(totalShipping)
                     },
                     Quantity = 1
                 });
-            }
 
             // 6.3: Tạo Stripe Coupon cho discount (thay vì line item âm)
             string? couponId = null;
-            if (totalDiscount > 0)
-            {
-                couponId = await CreateStripeCouponForOrder(order.Id, totalDiscount);
-            }
+            if (totalDiscount > 0) couponId = await CreateStripeCouponForOrder(order.Id, totalDiscount);
 
             // 7. Tạo session Stripe
             var options = new SessionCreateOptions
@@ -171,13 +164,15 @@ public class StripeService : IStripeService
                 LineItems = lineItems,
 
                 // Áp dụng coupon nếu có discount
-                Discounts = !string.IsNullOrEmpty(couponId) ? new List<SessionDiscountOptions>
-            {
-                new SessionDiscountOptions
-                {
-                    Coupon = couponId
-                }
-            } : null,
+                Discounts = !string.IsNullOrEmpty(couponId)
+                    ? new List<SessionDiscountOptions>
+                    {
+                        new()
+                        {
+                            Coupon = couponId
+                        }
+                    }
+                    : null,
 
                 Metadata = new Dictionary<string, string>
                 {
@@ -282,7 +277,6 @@ public class StripeService : IStripeService
         catch (StripeException)
         {
             // Log error nhưng không throw - việc cleanup không quan trọng bằng main flow
-
         }
     }
 
