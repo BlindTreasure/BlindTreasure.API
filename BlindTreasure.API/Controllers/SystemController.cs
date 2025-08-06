@@ -670,6 +670,7 @@ public class SystemController : ControllerBase
                     }
                 }
             },
+            // Các user khác không có address
             new()
             {
                 Email = "quanghnse170229@fpt.edu.vn",
@@ -679,24 +680,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar,
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Qang",
-                        Phone = "0933434357",
-                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
-                        City = "Ho Chi Minh City",
-                        Ward = "Phường 7",
-                        District = "Quận Gò Vấp",
-                        Province = "Ho Chi Minh City",
-                        PostalCode = "700000",
-                        Country = "Vietnam",
-                        IsDefault = true,
-                        CreatedAt = now
-                    }
-                }
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -707,24 +691,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Staff,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar,
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Nhân viên năng suất",
-                        Phone = "0933434355",
-                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
-                        City = "Ho Chi Minh City",
-                        Ward = "Phường 7",
-                        District = "Quận Gò Vấp",
-                        Province = "Ho Chi Minh City",
-                        PostalCode = "700000",
-                        Country = "Vietnam",
-                        IsDefault = true,
-                        CreatedAt = now
-                    }
-                }
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -735,24 +702,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Admin,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar,
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Admin Đẹp Trai",
-                        Phone = "0933434387",
-                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
-                        City = "Ho Chi Minh City",
-                        Ward = "Phường 7",
-                        District = "Quận Gò Vấp",
-                        Province = "Ho Chi Minh City",
-                        PostalCode = "700000",
-                        Country = "Vietnam",
-                        IsDefault = true,
-                        CreatedAt = now
-                    }
-                }
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -763,24 +713,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar,
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Official Brand Seller",
-                        Phone = "0932434387",
-                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
-                        City = "Ho Chi Minh City",
-                        Ward = "Phường 7",
-                        District = "Quận Gò Vấp",
-                        Province = "Ho Chi Minh City",
-                        PostalCode = "700000",
-                        Country = "Vietnam",
-                        IsDefault = true,
-                        CreatedAt = now
-                    }
-                }
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -791,24 +724,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar,
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Official Brand Seller",
-                        Phone = "0900000001",
-                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
-                        City = "Ho Chi Minh City",
-                        Ward = "Phường 7",
-                        District = "Quận Gò Vấp",
-                        Province = "Ho Chi Minh City",
-                        PostalCode = "700000",
-                        Country = "Vietnam",
-                        IsDefault = true,
-                        CreatedAt = now
-                    }
-                }
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -819,24 +735,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Customer,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar,
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Hồ Nhật Quang",
-                        Phone = "0900000001",
-                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
-                        City = "Ho Chi Minh City",
-                        Ward = "Phường 7",
-                        District = "Quận Gò Vấp",
-                        Province = "Ho Chi Minh City",
-                        PostalCode = "700000",
-                        Country = "Vietnam",
-                        IsDefault = true,
-                        CreatedAt = now
-                    }
-                }
+                AvatarUrl = defaultAvatar
             },
             new()
             {
@@ -847,24 +746,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = "https://smiski.com/e/wp-content/uploads/2018/02/news_01e-1.png",
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Official Smiski Brand",
-                        Phone = "0900000001",
-                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
-                        City = "Ho Chi Minh City",
-                        Ward = "Phường 7",
-                        District = "Quận Gò Vấp",
-                        Province = "Ho Chi Minh City",
-                        PostalCode = "700000",
-                        Country = "Vietnam",
-                        IsDefault = true,
-                        CreatedAt = now
-                    }
-                }
+                AvatarUrl = "https://smiski.com/e/wp-content/uploads/2018/02/news_01e-1.png"
             },
             new()
             {
@@ -875,24 +757,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar,
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Official Brand Seller",
-                        Phone = "0900000001",
-                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
-                        City = "Ho Chi Minh City",
-                        Ward = "Phường 7",
-                        District = "Quận Gò Vấp",
-                        Province = "Ho Chi Minh City",
-                        PostalCode = "700000",
-                        Country = "Vietnam",
-                        IsDefault = true,
-                        CreatedAt = now
-                    }
-                }
+                AvatarUrl = defaultAvatar
             }
         };
 
