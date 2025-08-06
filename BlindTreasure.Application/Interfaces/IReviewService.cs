@@ -5,5 +5,6 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface IReviewService
 {
-
+    Task<ReviewResponseDto> CreateReviewAsync(CreateReviewDto createDto);
+    
 }

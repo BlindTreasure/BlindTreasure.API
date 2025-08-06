@@ -3,35 +3,20 @@ namespace BlindTreasure.Domain.DTOs.ReviewDTOs;
 public class ReviewResponseDto
 {
     public Guid Id { get; set; }
-    public Guid UserId { get; set; } // Thêm field này
-    public string UserName { get; set; }
-    public string? UserAvatarUrl { get; set; }
-    public string? ProductName { get; set; }
-    public string? BlindBoxName { get; set; }
-    public string SellerName { get; set; }
-    public int OverallRating { get; set; } // Thêm field này (rating)
-    public string Comment { get; set; }
-    public string? Category { get; set; } // Thêm field này
-    public List<string> ImageUrls { get; set; }
-    public bool IsVerifiedPurchase { get; set; }
-    public SellerReplyDto? SellerReply { get; set; } // Thay đổi structure
-    public DateTime CreatedAt { get; set; }
-    public string Status { get; set; }
+    public Guid UserId { get; set; }
+    public string UserName { get; set; } = string.Empty;
+    public string? UserAvatar { get; set; }
+    public int Rating { get; set; }
+    public string Comment { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } // Sử dụng DateTime, khi gửi response ra client sẽ tự format
+    public string? Category { get; set; } // Tên danh mục sản phẩm (nếu review sản phẩm)
+    public List<string>? Images { get; set; } // Danh sách public URLs của ảnh
+    public SellerReplyDto? SellerReply { get; set; }
+    public bool IsApproved { get; set; } // Trạng thái duyệt của review
 }
 
-// DTO con cho seller reply
 public class SellerReplyDto
 {
-    public string Content { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
-// ReviewValidationResult.cs (cho AI)
-public class ReviewValidationResult
-{
-    public bool IsValid { get; set; }
-    public double Confidence { get; set; }
-    public string[] Issues { get; set; } = Array.Empty<string>();
-    public string SuggestedAction { get; set; } // approve, moderate, reject
-    public string? CleanedComment { get; set; }
-    public string Reason { get; set; }
+    public string Content { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; } // Sử dụng DateTime
 }
