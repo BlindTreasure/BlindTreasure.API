@@ -593,7 +593,7 @@ public class AuthService : IAuthService
 
         await _notificationService.PushNotificationToUser(
             user.Id,
-            new NotificationDTO
+            new NotificationDto
             {
                 Title = "Chào mừng!",
                 Message = $"Chào mừng {user.FullName} quay trở lại BlindTreasure.",

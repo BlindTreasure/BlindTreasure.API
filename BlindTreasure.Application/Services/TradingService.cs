@@ -141,38 +141,6 @@ public class TradingService : ITradingService
         return new Pagination<TradeHistoryDto>(tradeHistoryDtos, count, param.PageIndex, param.PageSize);
     }
 
-    public async Task<List<TradeRequestDto>> GetMyTradeRequestsAsync()
-    {
-        var userId = _claimsService.CurrentUserId;
-
-        var tradeRequests = await _unitOfWork.TradeRequests.GetAllAsync(
-            t => t.RequesterId == userId,
-            t => t.Listing!,
-            t => t.Listing!.InventoryItem,
-            t => t.Listing!.InventoryItem.Product!,
-            t => t.Requester!,
-            t => t.OfferedItems);
-
-        var dtos = new List<TradeRequestDto>();
-        foreach (var tradeRequest in tradeRequests)
-        {
-            // Load offered items cho mỗi trade request
-            var offeredInventoryItems = new List<InventoryItem>();
-            if (tradeRequest.OfferedItems.Any())
-            {
-                var itemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
-                offeredInventoryItems = await _unitOfWork.InventoryItems.GetAllAsync(
-                    i => itemIds.Contains(i.Id),
-                    i => i.Product);
-            }
-
-            var dto = MapTradeRequestToDto(tradeRequest, offeredInventoryItems);
-            dtos.Add(dto);
-        }
-
-        return dtos.OrderByDescending(x => x.RequestedAt).ToList();
-    }
-
     public async Task<TradeRequestDto> CreateTradeRequestAsync(Guid listingId, CreateTradeRequestDto request)
     {
         var userId = _claimsService.CurrentUserId;
@@ -661,7 +629,7 @@ public class TradingService : ITradingService
 
         await _notificationService.PushNotificationToUser(
             item.UserId,
-            new NotificationDTO
+            new NotificationDto
             {
                 Title = "Vật phẩm sẵn sàng trade!",
                 Message = $"'{item.Product?.Name}' đã có thể trao đổi lại.",
@@ -699,8 +667,10 @@ public class TradingService : ITradingService
                 return;
             }
 
+            // Truyền thêm tradeRequestId vào method
             await SendTradeResponseNotificationAsync(tradeRequest.Requester, responder.FullName ?? "Unknown",
-                isAccepted);
+                isAccepted, tradeRequest.Id);
+
             _logger.Success(
                 $"[SendTradeResponseNotificationSafe] Đã gửi notification thành công cho trade request {tradeRequest.Id}");
         }
@@ -721,7 +691,7 @@ public class TradingService : ITradingService
 
         await _notificationService.PushNotificationToUser(
             user.Id,
-            new NotificationDTO
+            new NotificationDto
             {
                 Title = "Yêu cầu trao đổi mới!",
                 Message = message,
@@ -732,23 +702,28 @@ public class TradingService : ITradingService
         await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(2));
     }
 
-    private async Task SendTradeResponseNotificationAsync(User requester, string responderName, bool isAccepted)
+    private async Task SendTradeResponseNotificationAsync(User requester, string responderName, bool isAccepted,
+        Guid tradeRequestId)
     {
         var cacheKey = $"noti:trade_response:{requester.Id}";
         if (await _cacheService.ExistsAsync(cacheKey)) return;
 
         var title = isAccepted ? "Yêu cầu trao đổi được chấp nhận!" : "Yêu cầu trao đổi bị từ chối";
         var message = isAccepted
-            ? $"{responderName} đã chấp nhận yêu cầu trao đổi của bạn. Hãy liên hệ để hoàn tất giao dịch!"
+            ? $"{responderName} đã chấp nhận yêu cầu trao đổi của bạn. Hãy xác nhận để hoàn tất giao dịch!"
             : $"{responderName} đã từ chối yêu cầu trao đổi của bạn.";
+
+        // Chỉ tạo URL khi trade request được chấp nhận
+        var sourceUrl = isAccepted ? $"/marketplace/confirm-trading/{tradeRequestId}" : null;
 
         await _notificationService.PushNotificationToUser(
             requester.Id,
-            new NotificationDTO
+            new NotificationDto
             {
                 Title = title,
                 Message = message,
-                Type = NotificationType.Trading
+                Type = NotificationType.Trading,
+                SourceUrl = sourceUrl // Null cho reject, có URL cho accept
             }
         );
 
@@ -777,7 +752,7 @@ public class TradingService : ITradingService
 
             await _notificationService.PushNotificationToUser(
                 noti.User.Id,
-                new NotificationDTO
+                new NotificationDto
                 {
                     Title = "Giao dịch đã được khóa!",
                     Message = noti.Message,

@@ -98,7 +98,7 @@ public class SellerVerificationServiceTests
         };
 
         _notificationServiceMock
-            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
+            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
             .ReturnsAsync(mockNotification);
 
         // Setup email mock
@@ -119,7 +119,7 @@ public class SellerVerificationServiceTests
         _notificationServiceMock.Verify(
             x => x.PushNotificationToUser(
                 userId,
-                It.Is<NotificationDTO>(n =>
+                It.Is<NotificationDto>(n =>
                     n.Type == NotificationType.System &&
                     n.Title == "Đã duyệt hồ sơ")),
             Times.Once);
@@ -200,7 +200,7 @@ public class SellerVerificationServiceTests
         };
 
         _notificationServiceMock
-            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
+            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
             .ReturnsAsync(mockNotification);
 
         // Setup email mock
@@ -221,7 +221,7 @@ public class SellerVerificationServiceTests
         _notificationServiceMock.Verify(
             x => x.PushNotificationToUser(
                 userId,
-                It.Is<NotificationDTO>(n =>
+                It.Is<NotificationDto>(n =>
                     n.Type == NotificationType.System &&
                     n.Title == "Hồ sơ bị từ chối" &&
                     n.Message.Contains(rejectReason))),
@@ -376,7 +376,7 @@ public class SellerVerificationServiceTests
         };
 
         _notificationServiceMock
-            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
+            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
             .ReturnsAsync(mockNotification);
 
         EmailRequestDto capturedEmailRequest = null;
@@ -452,7 +452,7 @@ public class SellerVerificationServiceTests
         };
 
         _notificationServiceMock
-            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
+            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
             .ReturnsAsync(mockNotification);
 
         EmailRequestDto capturedEmailRequest = null;
@@ -532,7 +532,7 @@ public class SellerVerificationServiceTests
         };
 
         _notificationServiceMock
-            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
+            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
             .ReturnsAsync(mockNotification);
 
         _emailServiceMock
@@ -612,7 +612,7 @@ public class SellerVerificationServiceTests
         };
 
         _notificationServiceMock
-            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
+            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
             .ReturnsAsync(mockNotification);
 
         _emailServiceMock
@@ -675,10 +675,10 @@ public class SellerVerificationServiceTests
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
             .ReturnsAsync(1);
 
-        NotificationDTO capturedNotification = null;
+        NotificationDto capturedNotification = null;
         _notificationServiceMock
-            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
-            .Callback<Guid, NotificationDTO>((id, notification) => capturedNotification = notification)
+            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
+            .Callback<Guid, NotificationDto>((id, notification) => capturedNotification = notification)
             .ReturnsAsync(new Notification
             {
                 Id = Guid.NewGuid(),
@@ -750,10 +750,10 @@ public class SellerVerificationServiceTests
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
             .ReturnsAsync(1);
 
-        NotificationDTO capturedNotification = null;
+        NotificationDto capturedNotification = null;
         _notificationServiceMock
-            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDTO>()))
-            .Callback<Guid, NotificationDTO>((id, notification) => capturedNotification = notification)
+            .Setup(x => x.PushNotificationToUser(It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
+            .Callback<Guid, NotificationDto>((id, notification) => capturedNotification = notification)
             .ReturnsAsync(new Notification
             {
                 Id = Guid.NewGuid(),

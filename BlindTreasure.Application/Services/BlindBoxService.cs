@@ -574,7 +574,7 @@ public class BlindBoxService : IBlindBoxService
 
         await _notificationService.PushNotificationToUser(
             blindBox.Seller.UserId,
-            new NotificationDTO
+            new NotificationDto
             {
                 Title = approve ? "Blind Box được duyệt" : "Blind Box bị từ chối",
                 Message = approve

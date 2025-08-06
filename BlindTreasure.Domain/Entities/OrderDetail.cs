@@ -9,13 +9,13 @@ public class OrderDetail : BaseEntity
     public Order Order { get; set; }
 
     // Có thể là Product hoặc BlindBox
-    public Guid? ProductId { get; set; } 
+    public Guid? ProductId { get; set; }
 
-    public Product? Product { get; set; } 
+    public Product? Product { get; set; }
 
     //
-    public Guid? BlindBoxId { get; set; } 
-    public BlindBox? BlindBox { get; set; } 
+    public Guid? BlindBoxId { get; set; }
+    public BlindBox? BlindBox { get; set; }
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }

@@ -144,7 +144,7 @@ public class SellerService : ISellerService
 
         await _notificationService.PushNotificationToUser(
             seller.UserId,
-            new NotificationDTO
+            new NotificationDto
             {
                 Title = "Hồ sơ đã gửi",
                 Message = "Hồ sơ của bạn đang chờ xét duyệt bởi quản trị viên.",
@@ -202,7 +202,7 @@ public class SellerService : ISellerService
 
         await _notificationService.PushNotificationToUser(
             seller.UserId,
-            new NotificationDTO
+            new NotificationDto
             {
                 Title = "Tài liệu đã nộp",
                 Message = "Tài liệu xác minh của bạn đã được gửi và đang chờ xét duyệt.",

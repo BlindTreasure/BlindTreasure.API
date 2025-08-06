@@ -247,11 +247,11 @@ public class GhnShippingService : IGhnShippingService
     }
 
     public GhnOrderRequest BuildGhnOrderRequest<T>(
-    IEnumerable<T> items,
-    Seller seller,
-    Address toAddress,
-    Func<T, Product> getProduct,
-    Func<T, int> getQuantity)
+        IEnumerable<T> items,
+        Seller seller,
+        Address toAddress,
+        Func<T, Product> getProduct,
+        Func<T, int> getQuantity)
     {
         var ghnOrderItems = items.Select(item =>
         {

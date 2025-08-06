@@ -22,7 +22,7 @@ public class InventoryItem : BaseEntity
 
     // FK → OrderDetail
     public Guid? OrderDetailId { get; set; }
-    public OrderDetail? OrderDetail { get; set; } 
+    public OrderDetail? OrderDetail { get; set; }
 
     // FK → Shipment
     public Guid? ShipmentId { get; set; }

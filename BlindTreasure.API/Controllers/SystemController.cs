@@ -572,6 +572,39 @@ public class SystemController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Seed promotions and promotion participants.
+    /// This will first clear existing promotions and participants before seeding new ones.
+    /// </summary>
+    /// <returns>A confirmation message.</returns>
+    [HttpPost("dev/seed-promotions")]
+    public async Task<IActionResult> SeedPromotionsData()
+    {
+        try
+        {
+            _logger.Info("[SeedPromotionsData] Starting to seed Promotions and PromotionParticipants.");
+
+            _logger.Info("[SeedPromotionsData] Clearing existing PromotionParticipants and Promotions.");
+            await _context.PromotionParticipants.ExecuteDeleteAsync();
+            await _context.Promotions.ExecuteDeleteAsync();
+
+            _logger.Info("[SeedPromotionsData] Seeding new Promotions.");
+            await SeedPromotions();
+
+            _logger.Info("[SeedPromotionsData] Seeding new PromotionParticipants.");
+            await SeedPromotionParticipants();
+
+            _logger.Success("[SeedPromotionsData] Promotions and participants seeded successfully.");
+            return Ok(ApiResult<object>.Success("200", "Promotions and participants seeded successfully."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            _logger.Error($"[SeedPromotionsData] Exception: {ex.Message}");
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 
     [HttpDelete("clear-caching")]
     public async Task<IActionResult> ClearCaching()
@@ -607,7 +640,7 @@ public class SystemController : ControllerBase
         var now = DateTime.UtcNow;
         var defaultAvatar = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg";
 
-        return new List<User>
+        var users = new List<User>
         {
             new()
             {
@@ -618,8 +651,26 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Customer,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar
+                AvatarUrl = defaultAvatar,
+                Addresses = new List<Address>
+                {
+                    new()
+                    {
+                        FullName = "Trần Gia Phúc",
+                        Phone = "0354343507",
+                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
+                        City = "Ho Chi Minh City",
+                        Ward = "Phường 7",
+                        District = "Quận Gò Vấp",
+                        Province = "Ho Chi Minh City",
+                        PostalCode = "700000",
+                        Country = "Vietnam",
+                        IsDefault = true,
+                        CreatedAt = now
+                    }
+                }
             },
+            // Các user khác không có address
             new()
             {
                 Email = "quanghnse170229@fpt.edu.vn",
@@ -635,7 +686,7 @@ public class SystemController : ControllerBase
             {
                 Email = "staff@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
-                FullName = "Nhân viên năng suất ",
+                FullName = "Nhân viên năng suất",
                 Phone = "0933434355",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Staff,
@@ -646,7 +697,7 @@ public class SystemController : ControllerBase
             {
                 Email = "admin@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
-                FullName = "Admin Đẹp Trai ",
+                FullName = "Admin Đẹp Trai",
                 Phone = "0933434387",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Admin,
@@ -690,7 +741,7 @@ public class SystemController : ControllerBase
             {
                 Email = "smiskiofficial@gmail.com",
                 Password = passwordHasher.HashPassword("1@"),
-                FullName = "Official Smiski Brand ",
+                FullName = "Official Smiski Brand",
                 Phone = "0900000001",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
@@ -709,6 +760,8 @@ public class SystemController : ControllerBase
                 AvatarUrl = defaultAvatar
             }
         };
+
+        return users;
     }
 
     private async Task ClearDatabase(BlindTreasureDbContext context)
@@ -1974,50 +2027,21 @@ public class SystemController : ControllerBase
 
     private async Task SeedPromotions()
     {
-        if (_context.Promotions.Any())
-        {
-            _logger.Info("[SeedPromotions] Đã tồn tại promotions. Bỏ qua seed.");
-            return;
-        }
+        if (_context.Promotions.Any()) return;
 
         var now = DateTime.UtcNow;
 
-        // Lấy seller blindtreasure
-        var blindTreasureUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
-        if (blindTreasureUser == null)
-        {
-            _logger.Warn("[SeedPromotions] Không tìm thấy User 'blindtreasurefpt@gmail.com'");
-            return;
-        }
+        // Chỉ lấy seller BlindTreasure
+        var blindTreasureSeller = await _context.Sellers
+            .FirstOrDefaultAsync(s => s.User.Email == "blindtreasurefpt@gmail.com");
 
-        var blindTreasureSeller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == blindTreasureUser.Id);
-        if (blindTreasureSeller == null)
-        {
-            _logger.Warn("[SeedPromotions] Không tìm thấy Seller cho user 'blindtreasurefpt@gmail.com'");
-            return;
-        }
-
-        // Lấy seller smiski
-        var smiskiUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "smiskiofficial@gmail.com");
-        if (smiskiUser == null)
-        {
-            _logger.Warn("[SeedPromotions] Không tìm thấy User 'smiskiofficial@gmail.com'");
-            return;
-        }
-
-        var smiskiSeller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == smiskiUser.Id);
-        if (smiskiSeller == null)
-        {
-            _logger.Warn("[SeedPromotions] Không tìm thấy Seller cho user 'smiskiofficial@gmail.com'");
-            return;
-        }
+        if (blindTreasureSeller == null) return;
 
         var promotions = new List<Promotion>
         {
-            // Promotions của blindtreasure
+            // Voucher riêng của BlindTreasure
             new()
             {
-                Id = Guid.NewGuid(),
                 Code = "BT10",
                 Description = "Giảm 10% cho đơn hàng từ BlindTreasure",
                 DiscountType = DiscountType.Percentage,
@@ -2026,62 +2050,12 @@ public class SystemController : ControllerBase
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
                 SellerId = blindTreasureSeller.Id,
-                UsageLimit = 100,
-                CreatedByRole = RoleType.Seller,
-                CreatedAt = now
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Code = "BTFREESHIP",
-                Description = "Miễn phí vận chuyển từ BlindTreasure",
-                DiscountType = DiscountType.Fixed,
-                DiscountValue = 30000,
-                StartDate = now,
-                EndDate = now.AddMonths(2),
-                Status = PromotionStatus.Approved,
-                SellerId = blindTreasureSeller.Id,
-                UsageLimit = 50,
-                CreatedByRole = RoleType.Seller,
-                CreatedAt = now
+                CreatedByRole = RoleType.Seller
             },
 
-            // Promotions của smiski
+            // Voucher toàn sàn (do admin tạo)
             new()
             {
-                Id = Guid.NewGuid(),
-                Code = "BYTHR2",
-                Description = "Giảm 20% cho sản phẩm BABY THREE",
-                DiscountType = DiscountType.Percentage,
-                DiscountValue = 20,
-                StartDate = now,
-                EndDate = now.AddMonths(1),
-                Status = PromotionStatus.Approved,
-                SellerId = blindTreasureSeller.Id,
-                UsageLimit = 200,
-                CreatedByRole = RoleType.Seller,
-                CreatedAt = now
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Code = "POPMARTSALE",
-                Description = "Sale lớn POPMART",
-                DiscountType = DiscountType.Fixed,
-                DiscountValue = 50000,
-                StartDate = now,
-                EndDate = now.AddMonths(1),
-                Status = PromotionStatus.Approved,
-                SellerId = blindTreasureSeller.Id,
-                UsageLimit = 100,
-                CreatedByRole = RoleType.Seller,
-                CreatedAt = now
-            },
-
-            // Global promotions
-            new()
-            {
-                Id = Guid.NewGuid(),
                 Code = "GLOBAL5",
                 Description = "Giảm 5% toàn sàn",
                 DiscountType = DiscountType.Percentage,
@@ -2089,78 +2063,42 @@ public class SystemController : ControllerBase
                 StartDate = now,
                 EndDate = now.AddMonths(1),
                 Status = PromotionStatus.Approved,
-                SellerId = null,
-                UsageLimit = null,
-                CreatedByRole = RoleType.Staff,
-                CreatedAt = now
+                SellerId = null, // Global
+                CreatedByRole = RoleType.Staff
             }
         };
 
         await _context.Promotions.AddRangeAsync(promotions);
         await _context.SaveChangesAsync();
-        _logger.Success($"[SeedPromotions] Đã seed {promotions.Count} promotion mẫu.");
     }
 
     private async Task SeedPromotionParticipants()
     {
-        if (_context.PromotionParticipants.Any())
-        {
-            _logger.Info("[SeedPromotionParticipants] Đã tồn tại participants. Bỏ qua seed.");
-            return;
-        }
+        if (_context.PromotionParticipants.Any()) return;
 
         var now = DateTime.UtcNow;
 
-        // Lấy seller blindtreasure (sẽ tham gia)
-        var blindTreasureUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
-        var blindTreasureSeller = blindTreasureUser != null
-            ? await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == blindTreasureUser.Id)
-            : null;
+        // Chỉ lấy seller BlindTreasure
+        var blindTreasureSeller = await _context.Sellers
+            .FirstOrDefaultAsync(s => s.User.Email == "blindtreasurefpt@gmail.com");
 
-        // Lấy seller smiski (sẽ KHÔNG tham gia)
-        var smiskiUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "smiskiofficial@gmail.com");
-        var smiskiSeller = smiskiUser != null
-            ? await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == smiskiUser.Id)
-            : null;
+        if (blindTreasureSeller == null) return;
 
-        if (blindTreasureSeller == null || smiskiSeller == null)
+        // Chỉ lấy global promotion (của admin)
+        var globalPromotion = await _context.Promotions
+            .FirstOrDefaultAsync(p => p.SellerId == null && p.Code == "GLOBAL5");
+
+        if (globalPromotion == null) return;
+
+        // BlindTreasure tham gia global promotion
+        await _context.PromotionParticipants.AddAsync(new PromotionParticipant
         {
-            _logger.Warn("[SeedPromotionParticipants] Không tìm thấy đủ sellers");
-            return;
-        }
+            PromotionId = globalPromotion.Id,
+            SellerId = blindTreasureSeller.Id,
+            JoinedAt = now
+        });
 
-        // Lấy tất cả promotions (trừ của smiski)
-        var promotions = await _context.Promotions
-            .Where(p => p.SellerId != smiskiSeller.Id && p.Status == PromotionStatus.Approved)
-            .ToListAsync();
-
-        if (!promotions.Any())
-        {
-            _logger.Warn("[SeedPromotionParticipants] Không tìm thấy promotions phù hợp");
-            return;
-        }
-
-        var participants = new List<PromotionParticipant>();
-
-        foreach (var promotion in promotions)
-        {
-            // Chỉ thêm blindtreasure làm participant (nếu promotion không phải của chính họ)
-            if (promotion.SellerId != blindTreasureSeller.Id)
-            {
-                participants.Add(new PromotionParticipant
-                {
-                    Id = Guid.NewGuid(),
-                    PromotionId = promotion.Id,
-                    SellerId = blindTreasureSeller.Id,
-                    JoinedAt = now
-                });
-            }
-        }
-
-        await _context.PromotionParticipants.AddRangeAsync(participants);
         await _context.SaveChangesAsync();
-        _logger.Success(
-            $"[SeedPromotionParticipants] Đã seed {participants.Count} participant mẫu (chỉ cho blindtreasure).");
     }
 
     private async Task SeedSellerForUser(string sellerEmail)
@@ -2190,7 +2128,7 @@ public class SystemController : ControllerBase
                     CompanyPhone = "0901234567",
                     CompanyWardName = "Phường 7",
                     CompanyDistrictName = "Quận Phú Nhuận",
-                    CompanyProvinceName = "HCM",
+                    CompanyProvinceName = "HCM"
                 };
                 break;
 
@@ -2256,40 +2194,6 @@ public class SystemController : ControllerBase
     }
 
     #endregion
-
-    /// <summary>
-    /// Seed promotions and promotion participants.
-    /// This will first clear existing promotions and participants before seeding new ones.
-    /// </summary>
-    /// <returns>A confirmation message.</returns>
-    [HttpPost("dev/seed-promotions")]
-    public async Task<IActionResult> SeedPromotionsData()
-    {
-        try
-        {
-            _logger.Info("[SeedPromotionsData] Starting to seed Promotions and PromotionParticipants.");
-
-            _logger.Info("[SeedPromotionsData] Clearing existing PromotionParticipants and Promotions.");
-            await _context.PromotionParticipants.ExecuteDeleteAsync();
-            await _context.Promotions.ExecuteDeleteAsync();
-
-            _logger.Info("[SeedPromotionsData] Seeding new Promotions.");
-            await SeedPromotions();
-
-            _logger.Info("[SeedPromotionsData] Seeding new PromotionParticipants.");
-            await SeedPromotionParticipants();
-
-            _logger.Success("[SeedPromotionsData] Promotions and participants seeded successfully.");
-            return Ok(ApiResult<object>.Success("200", "Promotions and participants seeded successfully."));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-            _logger.Error($"[SeedPromotionsData] Exception: {ex.Message}");
-            return StatusCode(statusCode, errorResponse);
-        }
-    }
 }
 
 public class MockClaimsService : IClaimsService

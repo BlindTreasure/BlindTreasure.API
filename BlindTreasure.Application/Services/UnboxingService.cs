@@ -265,7 +265,7 @@ public class UnboxingService : IUnboxingService
         if (sellerUser != null)
             await _notificationService.PushNotificationToUser(
                 sellerUser.Id,
-                new NotificationDTO
+                new NotificationDto
                 {
                     Title = $"Item hết hàng trong {blindBox.Name}",
                     Message = $"Sản phẩm '{item.Product.Name}' trong blind box đã hết số lượng.",
