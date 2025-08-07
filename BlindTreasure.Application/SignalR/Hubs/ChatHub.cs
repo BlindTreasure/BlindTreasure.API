@@ -21,6 +21,24 @@ public class ChatHub : Hub
         _blindyService = blindyService;
         _userService = userService;
     }
+    
+    public async Task MarkConversationAsRead(string otherUserId)
+    {
+        try
+        {
+            var currentUserId = Context.UserIdentifier;
+            if (currentUserId == null || string.IsNullOrEmpty(otherUserId)) return;
+
+            if (Guid.TryParse(otherUserId, out var otherUserGuid) && Guid.TryParse(currentUserId, out var currentUserGuid))
+            {
+                await _chatMessageService.MarkConversationAsReadAsync(currentUserGuid, otherUserGuid);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("Error", new { message = "Không thể đánh dấu tin đã đọc", details = ex.Message });
+        }
+    }
 
     /// <summary>
     /// Xử lý khi client kết nối tới SignalR hub
