@@ -11,5 +11,4 @@ public interface IUnboxingService
     Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId);
     Task<List<ProbabilityConfig>> GetApprovedProbabilitiesAsync(Guid blindBoxId);
     Task<Pagination<UnboxLogDto>> GetLogsAsync(PaginationParameter param, Guid? userId, Guid? productId);
-    
 }

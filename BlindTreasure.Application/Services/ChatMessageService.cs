@@ -237,16 +237,12 @@ public class ChatMessageService : IChatMessageService
         // Phân trang danh sách người dùng
         var paginatedUserIds = otherUserIds;
         if (param.PageIndex > 0)
-        {
             paginatedUserIds = otherUserIds
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToList();
-        }
         else if (param.PageSize > 0 && otherUserIds.Count > param.PageSize)
-        {
             paginatedUserIds = otherUserIds.Take(param.PageSize).ToList();
-        }
 
         // Danh sách cuộc trò chuyện
         var conversations = new List<ConversationDto>();

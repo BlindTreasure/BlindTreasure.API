@@ -35,7 +35,7 @@ public class ChatController : ControllerBase
         {
             var currentUserId = _claimsService.CurrentUserId;
             var result = await _chatMessageService.GetConversationsAsync(currentUserId, pagination);
-            
+
             return Ok(ApiResult<object>.Success(new
             {
                 result,
@@ -52,7 +52,7 @@ public class ChatController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
+
     /// <summary>
     /// Lấy số lượng tin nhắn chưa đọc của user hiện tại
     /// </summary>
@@ -74,7 +74,7 @@ public class ChatController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
+
     /// <summary>
     /// Lấy lịch sử tin nhắn giữa user hiện tại và 1 người dùng khác
     /// </summary>
@@ -87,7 +87,7 @@ public class ChatController : ControllerBase
         {
             var currentUserId = _claimsService.CurrentUserId;
             var result = await _chatMessageService.GetMessagesAsync(currentUserId, receiverId, pagination);
-            
+
             return Ok(ApiResult<object>.Success(new
             {
                 result,
@@ -117,7 +117,7 @@ public class ChatController : ControllerBase
         {
             var currentUserId = _claimsService.CurrentUserId;
             var result = await _chatMessageService.GetMessagesAsync(currentUserId, Guid.Empty, pagination);
-            
+
             return Ok(ApiResult<object>.Success(new
             {
                 result,
@@ -178,7 +178,7 @@ public class ChatController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-    
+
     /// <summary>
     /// Đánh dấu tất cả tin nhắn trong một cuộc trò chuyện là đã đọc
     /// </summary>
