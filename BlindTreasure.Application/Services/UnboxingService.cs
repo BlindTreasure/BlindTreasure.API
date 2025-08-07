@@ -118,16 +118,12 @@ public class UnboxingService : IUnboxingService
         // Áp dụng pagination
         List<BlindBoxUnboxLog> items;
         if (param.PageIndex == 0) // Trả về tất cả nếu PageIndex = 0
-        {
             items = await query.Take(100).ToListAsync(); // Giới hạn tối đa 100 records
-        }
         else
-        {
             items = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-        }
 
         // Map sang DTO
         var dtos = items.Select(x => new UnboxLogDto

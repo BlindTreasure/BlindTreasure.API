@@ -44,12 +44,13 @@ public class UnboxController : ControllerBase
     /// Lấy danh sách log mở blind box (dành cho Admin/Seller truy xuất đối chiếu)
     /// </summary>
     [HttpGet("unbox-logs")]
-    public async Task<IActionResult> GetLogs([FromQuery] PaginationParameter param, [FromQuery] Guid? userId, [FromQuery] Guid? productId)
+    public async Task<IActionResult> GetLogs([FromQuery] PaginationParameter param, [FromQuery] Guid? userId,
+        [FromQuery] Guid? productId)
     {
         try
         {
             var result = await _unboxingService.GetLogsAsync(param, userId, productId);
-            
+
             return Ok(ApiResult<object>.Success(new
             {
                 result,

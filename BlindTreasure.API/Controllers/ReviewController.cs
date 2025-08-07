@@ -1,6 +1,7 @@
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ReviewDTOs;
+using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -35,6 +36,31 @@ public class ReviewController : ControllerBase
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<ReviewResponseDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    [HttpGet]
+    [ProducesResponseType(typeof(ApiResult<Pagination<ReviewResponseDto>>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 404)]
+    public async Task<IActionResult> GetAll([FromQuery] ReviewQueryParameter param)
+    {
+        try
+        {
+            var result = await _reviewService.GetAllReviewsAsync(param);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
@@ -116,7 +142,8 @@ public class ReviewController : ControllerBase
         try
         {
             var result = await _reviewService.DeleteReviewAsync(reviewId);
-            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Bạn đã xóa bài đánh giá cho đơn hàng này thành công."));
+            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200",
+                "Bạn đã xóa bài đánh giá cho đơn hàng này thành công."));
         }
         catch (Exception ex)
         {

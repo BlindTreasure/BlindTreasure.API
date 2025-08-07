@@ -4,6 +4,7 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ReviewDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -132,6 +133,50 @@ public class ReviewService : IReviewService
         _loggerService.Success($"Seller {seller.Id} (User {userId}) replied to review {reviewId} successfully");
 
         return await GetByIdAsync(review.Id);
+    }
+
+    public async Task<Pagination<ReviewResponseDto>> GetAllReviewsAsync(ReviewQueryParameter param)
+    {
+        if (param == null)
+            throw ErrorHelper.BadRequest("Tham số truy vấn không hợp lệ");
+
+        // Validate các tham số đầu vào
+        ValidateReviewQueryParameters(param);
+
+        _loggerService.Info(
+            $"Fetching reviews with parameters: ProductId={param.ProductId}, BlindBoxId={param.BlindBoxId}, SellerId={param.SellerId}");
+
+        // Xây dựng truy vấn cơ bản
+        var query = _unitOfWork.Reviews.GetQueryable()
+            .Include(r => r.User)
+            .Include(r => r.OrderDetail)
+            .ThenInclude(od => od!.Product)
+            .ThenInclude(p => p!.Category)
+            .Include(r => r.OrderDetail)
+            .ThenInclude(od => od!.BlindBox)
+            .Include(r => r.Seller)
+            .Where(r => !r.IsDeleted && r.IsApproved);
+
+        // Áp dụng các bộ lọc và sắp xếp
+        query = ApplyFiltersAndSorting(query, param);
+
+        // Đếm tổng số bản ghi trước khi phân trang
+        var count = await query.CountAsync();
+        _loggerService.Info($"Total matching reviews: {count}");
+
+        // Áp dụng phân trang
+        var items = await query
+            .Skip((param.PageIndex - 1) * param.PageSize)
+            .Take(param.PageSize)
+            .ToListAsync();
+
+        _loggerService.Info($"Retrieved {items.Count} reviews for page {param.PageIndex}");
+
+        // Chuyển đổi sang DTO và trả về kết quả
+        var dtos = items.Select(MapToReviewResponseDto).ToList();
+        var result = new Pagination<ReviewResponseDto>(dtos, count, param.PageIndex, param.PageSize);
+
+        return result;
     }
 
     public async Task<ReviewResponseDto> GetByIdAsync(Guid reviewId)
@@ -278,6 +323,126 @@ public class ReviewService : IReviewService
             _loggerService.Error($"Failed to map review {review.Id} to ReviewResponseDto: {ex.Message}");
             throw;
         }
+    }
+
+    /// <summary>
+    /// Kiểm tra tính hợp lệ của các tham số truy vấn đánh giá
+    /// </summary>
+    private void ValidateReviewQueryParameters(ReviewQueryParameter param)
+    {
+        // Không thể lọc đồng thời theo cả Product và BlindBox
+        if (param.ProductId.HasValue && param.BlindBoxId.HasValue)
+        {
+            _loggerService.Warn("Cannot filter by both ProductId and BlindBoxId simultaneously");
+            throw ErrorHelper.BadRequest("Không thể lọc đồng thời theo cả sản phẩm và hộp quà bí mật");
+        }
+
+        // Kiểm tra giá trị Rating hợp lệ
+        if (param.MinRating.HasValue && (param.MinRating.Value < 1 || param.MinRating.Value > 5))
+        {
+            _loggerService.Warn($"Invalid MinRating value: {param.MinRating.Value}");
+            throw ErrorHelper.BadRequest("Giá trị đánh giá tối thiểu phải từ 1 đến 5");
+        }
+
+        if (param.MaxRating.HasValue && (param.MaxRating.Value < 1 || param.MaxRating.Value > 5))
+        {
+            _loggerService.Warn($"Invalid MaxRating value: {param.MaxRating.Value}");
+            throw ErrorHelper.BadRequest("Giá trị đánh giá tối đa phải từ 1 đến 5");
+        }
+
+        // Kiểm tra MinRating <= MaxRating
+        if (param.MinRating.HasValue && param.MaxRating.HasValue && param.MinRating.Value > param.MaxRating.Value)
+        {
+            _loggerService.Warn(
+                $"MinRating ({param.MinRating.Value}) is greater than MaxRating ({param.MaxRating.Value})");
+            throw ErrorHelper.BadRequest("Giá trị đánh giá tối thiểu không thể lớn hơn giá trị đánh giá tối đa");
+        }
+
+        // Kiểm tra giá trị phân trang
+        if (param.PageIndex < 1)
+        {
+            _loggerService.Warn($"Invalid PageIndex value: {param.PageIndex}");
+            throw ErrorHelper.BadRequest("Số trang phải lớn hơn 0");
+        }
+
+        if (param.PageSize < 1 || param.PageSize > 100)
+        {
+            _loggerService.Warn($"Invalid PageSize value: {param.PageSize}");
+            throw ErrorHelper.BadRequest("Kích thước trang phải từ 1 đến 100");
+        }
+
+        _loggerService.Info("Review query parameters validation passed");
+    }
+
+    /// <summary>
+    /// Áp dụng các bộ lọc và sắp xếp cho truy vấn đánh giá
+    /// </summary>
+    private IQueryable<Review> ApplyFiltersAndSorting(IQueryable<Review> query, ReviewQueryParameter param)
+    {
+        // Lọc theo sản phẩm hoặc blindbox nếu có
+        if (param.ProductId.HasValue)
+        {
+            query = query.Where(r => r.ProductId == param.ProductId.Value);
+            _loggerService.Info($"Filtering by ProductId: {param.ProductId.Value}");
+        }
+
+        if (param.BlindBoxId.HasValue)
+        {
+            query = query.Where(r => r.BlindBoxId == param.BlindBoxId.Value);
+            _loggerService.Info($"Filtering by BlindBoxId: {param.BlindBoxId.Value}");
+        }
+
+        // Lọc theo seller nếu có
+        if (param.SellerId.HasValue)
+        {
+            query = query.Where(r => r.SellerId == param.SellerId.Value);
+            _loggerService.Info($"Filtering by SellerId: {param.SellerId.Value}");
+        }
+
+        // Lọc theo rating nếu có
+        if (param.MinRating.HasValue)
+        {
+            query = query.Where(r => r.OverallRating >= param.MinRating.Value);
+            _loggerService.Info($"Filtering by MinRating: {param.MinRating.Value}");
+        }
+
+        if (param.MaxRating.HasValue)
+        {
+            query = query.Where(r => r.OverallRating <= param.MaxRating.Value);
+            _loggerService.Info($"Filtering by MaxRating: {param.MaxRating.Value}");
+        }
+
+        // Lọc theo có comment hay không
+        if (param.HasComment.HasValue)
+        {
+            query = param.HasComment.Value
+                ? query.Where(r => !string.IsNullOrWhiteSpace(r.Content))
+                : query.Where(r => string.IsNullOrWhiteSpace(r.Content));
+            _loggerService.Info($"Filtering by HasComment: {param.HasComment.Value}");
+        }
+
+        // Lọc theo có hình ảnh hay không
+        if (param.HasImages.HasValue)
+        {
+            query = param.HasImages.Value
+                ? query.Where(r => r.ImageUrls.Count > 0)
+                : query.Where(r => r.ImageUrls.Count == 0);
+            _loggerService.Info($"Filtering by HasImages: {param.HasImages.Value}");
+        }
+
+        // Sắp xếp
+        query = param.SortBy?.ToLower() switch
+        {
+            "rating_asc" => query.OrderBy(r => r.OverallRating),
+            "rating_desc" => query.OrderByDescending(r => r.OverallRating),
+            "newest" => query.OrderByDescending(r => r.CreatedAt),
+            "oldest" => query.OrderBy(r => r.CreatedAt),
+            _ => query.OrderByDescending(r => r.CreatedAt) // Mặc định sắp xếp theo thời gian tạo mới nhất
+        };
+
+        _loggerService.Info($"Applied sorting: {param.SortBy ?? "newest (default)"}");
+
+        return query;
     }
 
     /// <summary>
