@@ -1,6 +1,7 @@
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services;
+using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
 using BlindTreasure.Domain.DTOs.UnboxDTOs;
@@ -8,6 +9,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.API.Controllers;
@@ -187,7 +189,6 @@ public class SystemController : ControllerBase
     /// Seed inventory items cho user bằng cách tự động mở 2 blind box ngẫu nhiên
     /// </summary>
     /// <param name="userId">ID của user cần seed inventory. Nếu không truyền sẽ mặc định là user trangiaphuc362003181@gmail.com</param>
-    /// <returns>Thông tin các items đã được thêm vào inventory</returns>
     [HttpPost("dev/seed-user-inventoryItems")]
     public async Task<IActionResult> SeedUserInventory([FromQuery] Guid? userId = null)
     {
@@ -249,14 +250,16 @@ public class SystemController : ControllerBase
             var unitOfWork = HttpContext.RequestServices.GetRequiredService<IUnitOfWork>();
             var currentTime = HttpContext.RequestServices.GetRequiredService<ICurrentTime>();
             var notificationService = HttpContext.RequestServices.GetRequiredService<INotificationService>();
+            var notificationHub = HttpContext.RequestServices.GetRequiredService<IHubContext<UnboxingHub>>();
 
-            // Tạo instance UnboxingService mới với mock ClaimsService (đúng thứ tự tham số)
+            // Tạo instance UnboxingService mới với đầy đủ tham số
             var unboxingService = new UnboxingService(
                 loggerService,
                 unitOfWork,
-                mockClaimsService, // Sử dụng mock thay vì service thật
+                mockClaimsService,
                 currentTime,
-                notificationService
+                notificationService,
+                notificationHub // Thêm tham số mới
             );
 
             var unboxResults = new List<UnboxResultDto>();
