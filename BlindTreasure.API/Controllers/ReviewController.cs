@@ -35,6 +35,22 @@ public class ReviewController : ControllerBase
         }
     }
 
+    [HttpGet("{reviewId}")]
+    public async Task<IActionResult> GetReviewDetailsById(Guid reviewId)
+    {
+        try
+        {
+            var result = await _reviewService.GetByIdAsync(reviewId);
+            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Xem chi tiết review thành công"));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<ReviewResponseDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
     [HttpGet("can-review/{orderDetailId}")]
     public async Task<IActionResult> CanReviewOrderDetail(Guid orderDetailId)
     {

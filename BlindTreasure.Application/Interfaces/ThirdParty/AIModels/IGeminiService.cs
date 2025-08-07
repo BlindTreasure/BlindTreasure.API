@@ -10,4 +10,6 @@ public interface IGeminiService
     Task<string> GenerateResponseAsync(string userPrompt, string? modelName = null);
 
     Task<string> GenerateValidationResponseAsync(string userPrompt);
+
+    string GenerateFallbackValidation(string prompt);
 }

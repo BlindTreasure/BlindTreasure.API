@@ -7,4 +7,5 @@ public interface IReviewService
 {
     Task<ReviewResponseDto> CreateReviewAsync(CreateReviewDto createDto);
     Task<bool> CanReviewOrderDetailAsync(Guid orderDetailId);
+    Task<ReviewResponseDto> GetByIdAsync(Guid reviewId);
 }

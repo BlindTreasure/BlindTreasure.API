@@ -55,6 +55,18 @@ public class ReviewService : IReviewService
         // Upload images sử dụng IFormFile
         var imageUrls = await UploadReviewImages(createDto.Images, userId);
 
+        bool isContentApproved = true;
+
+        if (!string.IsNullOrWhiteSpace(createDto.Comment))
+        {
+            isContentApproved = await _blindyService.ValidateReviewAsync(createDto.Comment);
+            if (!isContentApproved)
+            {
+                throw ErrorHelper.BadRequest("Nội dung đánh giá không phù hợp với tiêu chuẩn cộng đồng. " +
+                                             "Vui lòng không chia sẻ thông tin cá nhân, liên kết hoặc nội dung quảng cáo.");
+            }
+        }
+
         // Create review
         var review = new Review
         {
@@ -66,11 +78,10 @@ public class ReviewService : IReviewService
             OverallRating = createDto.Rating,
             Content = createDto.Comment.Trim(),
             ImageUrls = imageUrls,
-            IsApproved = true,
-            ApprovedAt = DateTime.UtcNow,
+            IsApproved = isContentApproved,
+            ApprovedAt = isContentApproved ? DateTime.UtcNow : null,
             CreatedAt = DateTime.UtcNow
         };
-
         await _unitOfWork.Reviews.AddAsync(review);
         await _unitOfWork.SaveChangesAsync();
 
@@ -81,9 +92,6 @@ public class ReviewService : IReviewService
         return await GetByIdAsync(review.Id);
     }
 
-    /// <summary>
-    /// Lấy review theo ID với đầy đủ thông tin liên quan
-    /// </summary>
     public async Task<ReviewResponseDto> GetByIdAsync(Guid reviewId)
     {
         var review = await _unitOfWork.Reviews.GetQueryable()
