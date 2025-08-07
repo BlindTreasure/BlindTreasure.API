@@ -72,26 +72,27 @@ public class BlindyService : IBlindyService
         {
             var response = await _geminiService.GenerateValidationResponseAsync(prompt);
             Console.WriteLine($"[AI Response] Raw: {response}");
-    
+
             // Kiểm tra response trước khi parse
             if (string.IsNullOrWhiteSpace(response))
             {
                 Console.WriteLine("[AI Warning] Response rỗng, sử dụng validation cơ bản");
                 return BasicTextValidation(comment);
             }
-    
+
             // Cố gắng parse JSON
             try
             {
                 var result = JsonSerializer.Deserialize<GeminiValidationResponse>(response);
-                Console.WriteLine($"[AI Result] IsValid: {result?.IsValid}, Reasons: {(result?.Reasons != null ? string.Join(", ", result.Reasons) : "None")}");
-        
+                Console.WriteLine(
+                    $"[AI Result] IsValid: {result?.IsValid}, Reasons: {(result?.Reasons != null ? string.Join(", ", result.Reasons) : "None")}");
+
                 return result?.IsValid ?? false;
             }
             catch (JsonException jsonEx)
             {
                 Console.WriteLine($"[AI JSON Error] {jsonEx.Message}, response: {response}");
-        
+
                 // Thử parse JSON thủ công nếu có chứa "isValid"
                 if (response.Contains("\"isValid\"", StringComparison.OrdinalIgnoreCase))
                 {
@@ -99,7 +100,7 @@ public class BlindyService : IBlindyService
                     Console.WriteLine($"[AI Manual Parse] isValid: {isValid}");
                     return isValid;
                 }
-        
+
                 return BasicTextValidation(comment);
             }
         }
@@ -107,11 +108,13 @@ public class BlindyService : IBlindyService
         {
             Console.WriteLine($"[AI Error] {ex.Message}");
             var fallbackResponse = _geminiService.GenerateFallbackValidation(prompt);
-            try {
+            try
+            {
                 var result = JsonSerializer.Deserialize<GeminiValidationResponse>(fallbackResponse);
                 return false; // Mặc định reject khi không thể validate
             }
-            catch {
+            catch
+            {
                 return BasicTextValidation(comment);
             }
         }
@@ -159,25 +162,25 @@ public class BlindyService : IBlindyService
 
         // Linh hoạt hơn với thuộc tính Reasons
         [JsonIgnore]
-        public IEnumerable<string> ReasonsList 
-        { 
-            get 
+        public IEnumerable<string> ReasonsList
+        {
+            get
             {
                 if (Reasons != null && Reasons.Length > 0)
                     return Reasons;
-            
+
                 if (ReasonArray != null && ReasonArray.Count > 0)
                     return ReasonArray;
-                
+
                 return Array.Empty<string>();
-            } 
+            }
         }
 
         public string[]? Reasons { get; set; } = Array.Empty<string>();
 
         public List<string>? ReasonArray { get; set; }
     }
-    
+
     /// <summary>
     ///     HÀM NÀY ĐỂ STAFF GỌI CHO AI PHÂN TÍCH HỆ THỐNG
     /// </summary>

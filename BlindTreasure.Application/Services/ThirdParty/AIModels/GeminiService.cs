@@ -165,12 +165,13 @@ public class GeminiService : IGeminiService
         var finalResult = result ?? string.Empty;
         return finalResult;
     }
+
     public string GenerateFallbackValidation(string prompt)
     {
         // Trả về JSON chuẩn khi API lỗi
-        return "{\"isValid\": false, \"reasons\": [\"API validation không khả dụng, bài đánh giá cần kiểm duyệt thủ công.\"]}";
+        return
+            "{\"isValid\": false, \"reasons\": [\"API validation không khả dụng, bài đánh giá cần kiểm duyệt thủ công.\"]}";
     }
-
 }
 
 public static class GeminiContext

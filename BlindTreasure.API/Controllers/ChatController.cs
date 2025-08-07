@@ -23,6 +23,28 @@ public class ChatController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy danh sách cuộc trò chuyện của user hiện tại
+    /// </summary>
+    [HttpGet("conversations")]
+    public async Task<IActionResult> GetConversations([FromQuery] int pageIndex = 0, [FromQuery] int pageSize = 20)
+    {
+        var currentUserId = _claimsService.CurrentUserId;
+        var conversations = await _chatMessageService.GetConversationsAsync(currentUserId, pageIndex, pageSize);
+        return Ok(ApiResult<List<ConversationDto>>.Success(conversations));
+    }
+    
+    /// <summary>
+    /// Lấy số lượng tin nhắn chưa đọc của user hiện tại
+    /// </summary>
+    [HttpGet("unread-count")]
+    public async Task<IActionResult> GetUnreadCount()
+    {
+        var currentUserId = _claimsService.CurrentUserId;
+        var count = await _chatMessageService.GetUnreadMessageCountAsync(currentUserId);
+        return Ok(ApiResult<int>.Success(count));
+    }
+    
+    /// <summary>
     ///     Lấy lịch sử tin nhắn giữa user hiện tại và 1 người dùng khác
     /// </summary>
     [HttpGet("history/{receiverId}")]

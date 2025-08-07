@@ -38,7 +38,7 @@ public class ReviewController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
+
     /// <summary>
     /// Cho phép người bán trả lời đánh giá của khách hàng
     /// </summary>

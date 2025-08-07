@@ -18,7 +18,7 @@ public class ChatMessageService : IChatMessageService
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<ChatHub> _hubContext;
-
+    private readonly Dictionary<string, DateTime> _onlineUsers = new();
 
     public ChatMessageService(ICacheService cacheService, IClaimsService claimsService, ILoggerService logger,
         IUnitOfWork unitOfWork, IHubContext<ChatHub> hubContext)
@@ -30,26 +30,50 @@ public class ChatMessageService : IChatMessageService
         _hubContext = hubContext;
     }
 
-    public async Task SaveAiMessageAsync(Guid userId, string content)
+    public async Task SetUserOffline(string userId)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(userId);
-        if (user == null || user.IsDeleted)
-            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
+        _onlineUsers.Remove(userId);
+        await _cacheService.RemoveAsync($"user_online:{userId}");
+    }
 
-        var message = new ChatMessage
+    public async Task<int> GetUnreadMessageCountAsync(Guid userId)
+    {
+        return await _unitOfWork.ChatMessages.GetQueryable()
+            .CountAsync(m => m.ReceiverId == userId && !m.IsRead);
+    }
+
+    public async Task<ChatMessageDto?> GetMessageByIdAsync(Guid messageId)
+    {
+        var message = await _unitOfWork.ChatMessages.GetQueryable()
+            .Include(m => m.Sender)
+            .Include(m => m.Receiver)
+            .FirstOrDefaultAsync(m => m.Id == messageId);
+
+        if (message == null) return null;
+
+        return new ChatMessageDto
         {
-            SenderId = null,
-            SenderType = ChatParticipantType.AI,
-            ReceiverId = userId,
-            ReceiverType = ChatParticipantType.User,
-            Content = content,
-            SentAt = DateTime.UtcNow,
-            IsRead = false,
-            MessageType = ChatMessageType.AiToUser
+            Id = message.Id,
+            SenderId = message.SenderId,
+            ReceiverId = message.ReceiverId,
+            SenderName = message.SenderType == ChatParticipantType.AI
+                ? "BlindTreasure AI"
+                : message.Sender?.FullName ?? "Unknown",
+            Content = message.Content,
+            SentAt = message.SentAt,
+            IsRead = message.IsRead
         };
+    }
 
-        await _unitOfWork.ChatMessages.AddAsync(message);
-        await _unitOfWork.SaveChangesAsync();
+    public async Task SetUserOnline(string userId)
+    {
+        _onlineUsers[userId] = DateTime.UtcNow;
+        await _cacheService.SetAsync($"user_online:{userId}", DateTime.UtcNow, TimeSpan.FromMinutes(5));
+    }
+
+    public async Task<bool> IsUserOnline(string userId)
+    {
+        return await _cacheService.ExistsAsync($"user_online:{userId}");
     }
 
 
@@ -123,6 +147,36 @@ public class ChatMessageService : IChatMessageService
         }).ToList();
     }
 
+    public async Task<List<ConversationDto>> GetConversationsAsync(Guid userId, int pageIndex = 0, int pageSize = 20)
+    {
+        var conversations = await _unitOfWork.ChatMessages.GetQueryable()
+            .Include(m => m.Sender)
+            .Include(m => m.Receiver)
+            .Where(m => (m.SenderId == userId || m.ReceiverId == userId) &&
+                        m.SenderType == ChatParticipantType.User &&
+                        m.ReceiverType == ChatParticipantType.User)
+            .GroupBy(m => m.SenderId == userId ? m.ReceiverId : m.SenderId)
+            .Select(g => new ConversationDto
+            {
+                OtherUserId = g.Key.Value,
+                OtherUserName = g.FirstOrDefault(m => m.SenderId != userId)!.Sender!.FullName ??
+                                g.FirstOrDefault(m => m.ReceiverId != userId)!.Receiver!.FullName ?? "Unknown",
+                LastMessage = g.OrderByDescending(m => m.SentAt).First().Content,
+                LastMessageTime = g.OrderByDescending(m => m.SentAt).First().SentAt,
+                UnreadCount = g.Count(m => m.ReceiverId == userId && !m.IsRead),
+                IsOnline = false // Sẽ check sau
+            })
+            .OrderByDescending(c => c.LastMessageTime)
+            .Skip(pageIndex * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        // Check online status cho từng conversation
+        foreach (var conversation in conversations)
+            conversation.IsOnline = await IsUserOnline(conversation.OtherUserId.ToString());
+
+        return conversations;
+    }
 
     public async Task MarkMessagesAsReadAsync(Guid fromUserId, Guid toUserId)
     {
@@ -156,6 +210,27 @@ public class ChatMessageService : IChatMessageService
         });
     }
 
+    public async Task SaveAiMessageAsync(Guid userId, string content)
+    {
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null || user.IsDeleted)
+            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
+
+        var message = new ChatMessage
+        {
+            SenderId = null,
+            SenderType = ChatParticipantType.AI,
+            ReceiverId = userId,
+            ReceiverType = ChatParticipantType.User,
+            Content = content,
+            SentAt = DateTime.UtcNow,
+            IsRead = false,
+            MessageType = ChatMessageType.AiToUser
+        };
+
+        await _unitOfWork.ChatMessages.AddAsync(message);
+        await _unitOfWork.SaveChangesAsync();
+    }
 
     private static string GetLastMessageCacheKey(Guid user1Id, Guid user2Id)
     {
