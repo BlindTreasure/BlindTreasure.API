@@ -103,4 +103,26 @@ public class ReviewController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
+    /// <summary>
+    /// Cho phép khách hàng xóa đánh giá của bản thân ở một cửa hàng
+    /// </summary>
+    /// <param name="reviewId">ID của đánh giá cần xóa</param>
+    /// <returns>Trả về thông tin của review đó, và True nếu xóa thành công, False với xóa thất bại</returns>
+    [HttpDelete("{reviewId}")]
+    [Authorize(Policy = "CustomerPolicy")]
+    public async Task<IActionResult> DeleteReview(Guid reviewId)
+    {
+        try
+        {
+            var result = await _reviewService.DeleteReviewAsync(reviewId);
+            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Bạn đã xóa bài đánh giá cho đơn hàng này thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<bool>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 }

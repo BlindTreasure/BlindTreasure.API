@@ -179,6 +179,48 @@ public class ReviewService : IReviewService
         return !existingReview;
     }
 
+    public async Task<ReviewResponseDto> DeleteReviewAsync(Guid reviewId)
+    {
+        // Lấy bài đánh giá bằng id
+        var review = await _unitOfWork.Reviews.GetQueryable()
+            .Include(r => r.User)
+            .Include(r => r.OrderDetail)
+            .ThenInclude(od => od!.Product)
+            .ThenInclude(p => p!.Category)
+            .Include(r => r.OrderDetail)
+            .ThenInclude(od => od!.BlindBox)
+            .Include(r => r.Seller)
+            .Where(r => !r.IsDeleted)
+            .FirstOrDefaultAsync(r => r.Id == reviewId);
+
+        //Lấy userId bằng claim
+        var userId = _claimService.CurrentUserId;
+
+        //Kiểm tra nếu người dùng chưa đăng nhập
+        if (userId == Guid.Empty)
+        {
+            _loggerService.Error("No user ID found in claims");
+            throw ErrorHelper.Unauthorized("Bạn cần đăng nhập để thực hiện hành động này");
+        }
+
+        //Kiểm tra bài đánh giá có tồn tại không
+        if (review == null)
+            throw ErrorHelper.NotFound("Không tìm thấy đánh giá");
+
+        //Kiểm tra bài đánh giá có thuộc về tài khoản đang đăng nhập hay không
+        if (review.UserId != userId)
+            throw ErrorHelper.BadRequest("Đây không phải là bài đánh giá của bạn, không thực hiện được hành động này.");
+
+        review.IsDeleted = true;
+
+        await _unitOfWork.Reviews.Update(review);
+        await _unitOfWork.SaveChangesAsync();
+
+        _loggerService.Success($"User {userId} delete the review {reviewId} successfully");
+
+        return MapToReviewResponseDto(review);
+    }
+
     #region private methods
 
     /// <summary>
