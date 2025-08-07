@@ -134,43 +134,58 @@ public class ReviewService : IReviewService
     private ReviewResponseDto MapToReviewResponseDto(Review review)
     {
         if (review == null)
-            throw new ArgumentNullException(nameof(review));
-
-        // Determine category name
-        var categoryName = review.OrderDetail?.Product?.Category?.Name ?? "BlindBox";
-
-        // Determine item name for logging/display
-        var itemName = review.OrderDetail?.Product?.Name ?? review.OrderDetail?.BlindBox?.Name ?? "Unknown Item";
-
-        return new ReviewResponseDto
         {
-            Id = review.Id,
-            UserId = review.UserId,
-            UserName = review.User?.FullName ?? "Anonymous User",
-            UserAvatar = review.User?.AvatarUrl,
-            Rating = review.OverallRating,
-            Comment = review.Content,
-            CreatedAt = review.CreatedAt,
-            UpdatedAt = review.UpdatedAt,
-            Category = categoryName,
-            ItemName = itemName, // Thêm field này nếu cần
-            Images = review.ImageUrls ?? new List<string>(),
-            IsApproved = review.IsApproved,
-            ApprovedAt = review.ApprovedAt,
-            SellerReply = review.SellerResponseDate.HasValue
-                ? new SellerReplyDto
-                {
-                    Content = review.SellerResponse ?? string.Empty,
-                    CreatedAt = review.SellerResponseDate.Value,
-                    SellerName = review.Seller?.CompanyName ?? "Seller"
-                }
-                : null,
-            // Additional metadata
-            OrderDetailId = review.OrderDetailId,
-            ProductId = review.ProductId,
-            BlindBoxId = review.BlindBoxId,
-            SellerId = review.SellerId
-        };
+            _loggerService.Error("Review entity is null in MapToReviewResponseDto");
+            throw new ArgumentNullException(nameof(review));
+        }
+
+        try
+        {
+            // Determine category name
+            var categoryName = review.OrderDetail?.Product?.Category?.Name ?? "BlindBox";
+            _loggerService.Info($"Determined category name: {categoryName}");
+
+            // Determine item name for logging/display
+            var itemName = review.OrderDetail?.Product?.Name ?? review.OrderDetail?.BlindBox?.Name ?? "Unknown Item";
+            _loggerService.Info($"Determined item name: {itemName}");
+
+            var responseDto = new ReviewResponseDto
+            {
+                Id = review.Id,
+                UserId = review.UserId,
+                UserName = review.User?.FullName ?? "Anonymous User",
+                UserAvatar = review.User?.AvatarUrl,
+                Rating = review.OverallRating,
+                Comment = review.Content,
+                CreatedAt = review.CreatedAt,
+                UpdatedAt = review.UpdatedAt,
+                Category = categoryName,
+                ItemName = itemName,
+                Images = review.ImageUrls ?? new List<string>(),
+                IsApproved = review.IsApproved,
+                ApprovedAt = review.ApprovedAt,
+                SellerReply = review.SellerResponseDate.HasValue
+                    ? new SellerReplyDto
+                    {
+                        Content = review.SellerResponse ?? string.Empty,
+                        CreatedAt = review.SellerResponseDate.Value,
+                        SellerName = review.Seller?.CompanyName ?? "Seller"
+                    }
+                    : null,
+                OrderDetailId = review.OrderDetailId,
+                ProductId = review.ProductId,
+                BlindBoxId = review.BlindBoxId,
+                SellerId = review.SellerId
+            };
+
+            _loggerService.Info($"Successfully mapped review {review.Id} to ReviewResponseDto");
+            return responseDto;
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error($"Failed to map review {review.Id} to ReviewResponseDto: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -179,35 +194,73 @@ public class ReviewService : IReviewService
     private void ValidateCreateReviewInput(CreateReviewDto createDto)
     {
         if (createDto == null)
+        {
+            _loggerService.Error("CreateReviewDto is null in ValidateCreateReviewInput");
             throw ErrorHelper.BadRequest("Dữ liệu đánh giá không hợp lệ");
+        }
 
-        // Validate OrderDetailId
-        if (createDto.OrderDetailId == Guid.Empty)
-            throw ErrorHelper.BadRequest("ID chi tiết đơn hàng là bắt buộc");
+        try
+        {
+            // Validate OrderDetailId
+            if (createDto.OrderDetailId == Guid.Empty)
+            {
+                _loggerService.Warn("Empty OrderDetailId in CreateReviewDto");
+                throw ErrorHelper.BadRequest("ID chi tiết đơn hàng là bắt buộc");
+            }
 
-        // Validate Rating
-        if (createDto.Rating < 1 || createDto.Rating > 5)
-            throw ErrorHelper.BadRequest("Điểm đánh giá phải từ 1 đến 5 sao");
+            // Validate Rating
+            if (createDto.Rating < 1 || createDto.Rating > 5)
+            {
+                _loggerService.Warn($"Invalid rating value: {createDto.Rating}");
+                throw ErrorHelper.BadRequest("Điểm đánh giá phải từ 1 đến 5 sao");
+            }
 
-        // Validate Comment
-        if (string.IsNullOrWhiteSpace(createDto.Comment))
-            throw ErrorHelper.BadRequest("Nội dung đánh giá là bắt buộc");
+            // Validate Comment
+            if (string.IsNullOrWhiteSpace(createDto.Comment))
+            {
+                _loggerService.Warn("Empty comment in CreateReviewDto");
+                throw ErrorHelper.BadRequest("Nội dung đánh giá là bắt buộc");
+            }
 
-        if (createDto.Comment.Length < 10)
-            throw ErrorHelper.BadRequest("Nội dung đánh giá phải có ít nhất 10 ký tự");
+            if (createDto.Comment.Length < 10)
+            {
+                _loggerService.Warn($"Comment too short: {createDto.Comment.Length} characters");
+                throw ErrorHelper.BadRequest("Nội dung đánh giá phải có ít nhất 10 ký tự");
+            }
 
-        if (createDto.Comment.Length > 2000)
-            throw ErrorHelper.BadRequest("Nội dung đánh giá không được vượt quá 2000 ký tự");
+            if (createDto.Comment.Length > 2000)
+            {
+                _loggerService.Warn($"Comment too long: {createDto.Comment.Length} characters");
+                throw ErrorHelper.BadRequest("Nội dung đánh giá không được vượt quá 2000 ký tự");
+            }
 
-        // ✅ Validate Images (tối đa 5 file)
-        if (createDto.Images != null && createDto.Images.Count > 5)
-            throw ErrorHelper.BadRequest("Chỉ được tải lên tối đa 5 hình ảnh");
+            // Validate Images
+            if (createDto.Images != null && createDto.Images.Count > 5)
+            {
+                _loggerService.Warn($"Too many images: {createDto.Images.Count} files");
+                throw ErrorHelper.BadRequest("Chỉ được tải lên tối đa 5 hình ảnh");
+            }
 
-        // Validate each image file
-        if (createDto.Images != null && createDto.Images.Any())
-            foreach (var imageFile in createDto.Images)
-                if (!IsValidImageFile(imageFile))
-                    throw ErrorHelper.BadRequest($"File {imageFile.FileName} không hợp lệ");
+            // Validate each image file
+            if (createDto.Images != null && createDto.Images.Any())
+            {
+                foreach (var imageFile in createDto.Images)
+                {
+                    if (!IsValidImageFile(imageFile))
+                    {
+                        _loggerService.Warn($"Invalid image file: {imageFile.FileName}");
+                        throw ErrorHelper.BadRequest($"File {imageFile.FileName} không hợp lệ");
+                    }
+                }
+            }
+
+            _loggerService.Info("Successfully validated CreateReviewDto input");
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error($"Error validating CreateReviewDto: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -216,18 +269,38 @@ public class ReviewService : IReviewService
     private async Task ValidateOrderDetailForReview(OrderDetail orderDetail, Guid orderDetailId, Guid userId)
     {
         if (orderDetail == null)
+        {
+            _loggerService.Error($"OrderDetail not found for ID: {orderDetailId}");
             throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
+        }
 
-        // Check order status
-        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
-            throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
+        try
+        {
+            // Check order status
+            if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
+            {
+                _loggerService.Warn(
+                    $"Order {orderDetail.OrderId} has invalid status for review: {orderDetail.Order.Status}");
+                throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
+            }
 
-        // Check if already reviewed
-        var existingReview = await _unitOfWork.Reviews.GetQueryable()
-            .FirstOrDefaultAsync(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted);
+            // Check if already reviewed
+            var existingReview = await _unitOfWork.Reviews.GetQueryable()
+                .FirstOrDefaultAsync(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted);
 
-        if (existingReview != null)
-            throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
+            if (existingReview != null)
+            {
+                _loggerService.Warn($"Duplicate review attempt for OrderDetail {orderDetailId} by User {userId}");
+                throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
+            }
+
+            _loggerService.Info($"Successfully validated OrderDetail {orderDetailId} for review eligibility");
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error($"Error validating OrderDetail {orderDetailId} for review: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -235,48 +308,59 @@ public class ReviewService : IReviewService
     /// </summary>
     private bool IsValidImageFile(IFormFile file)
     {
-        // Check if file is null or empty
-        if (file.Length == 0)
+        try
         {
-            _loggerService.Warn("Empty file detected");
+            // Check if file is null or empty
+            if (file.Length == 0)
+            {
+                _loggerService.Warn("Empty file detected");
+                return false;
+            }
+
+            // Check file size (max 5MB)
+            const int maxSizeBytes = 5 * 1024 * 1024; // 5MB
+            if (file.Length > maxSizeBytes)
+            {
+                _loggerService.Warn(
+                    $"File {file.FileName} exceeds size limit: {file.Length} bytes (max: {maxSizeBytes})");
+                return false;
+            }
+
+            // Check file extension
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+            if (string.IsNullOrEmpty(fileExtension) || !allowedExtensions.Contains(fileExtension))
+            {
+                _loggerService.Warn($"File {file.FileName} has invalid extension: {fileExtension}");
+                return false;
+            }
+
+            // Check MIME type
+            var allowedMimeTypes = new[]
+            {
+                "image/jpeg",
+                "image/jpg",
+                "image/png",
+                "image/gif",
+                "image/webp"
+            };
+
+            if (string.IsNullOrEmpty(file.ContentType) ||
+                !allowedMimeTypes.Contains(file.ContentType.ToLowerInvariant()))
+            {
+                _loggerService.Warn($"File {file.FileName} has invalid MIME type: {file.ContentType}");
+                return false;
+            }
+
+            _loggerService.Info($"File {file.FileName} passed validation");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error($"Error validating image file {file?.FileName}: {ex.Message}");
             return false;
         }
-
-        // Check file size (max 5MB)
-        const int maxSizeBytes = 5 * 1024 * 1024; // 5MB
-        if (file.Length > maxSizeBytes)
-        {
-            _loggerService.Warn($"File {file.FileName} exceeds size limit: {file.Length} bytes (max: {maxSizeBytes})");
-            return false;
-        }
-
-        // Check file extension
-        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-        var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
-
-        if (string.IsNullOrEmpty(fileExtension) || !allowedExtensions.Contains(fileExtension))
-        {
-            _loggerService.Warn($"File {file.FileName} has invalid extension: {fileExtension}");
-            return false;
-        }
-
-        // Check MIME type
-        var allowedMimeTypes = new[]
-        {
-            "image/jpeg",
-            "image/jpg",
-            "image/png",
-            "image/gif",
-            "image/webp"
-        };
-
-        if (string.IsNullOrEmpty(file.ContentType) || !allowedMimeTypes.Contains(file.ContentType.ToLowerInvariant()))
-        {
-            _loggerService.Warn($"File {file.FileName} has invalid MIME type: {file.ContentType}");
-            return false;
-        }
-
-        return true;
     }
 
     /// <summary>
@@ -287,17 +371,25 @@ public class ReviewService : IReviewService
         var imageUrls = new List<string>();
 
         if (images == null || !images.Any())
+        {
+            _loggerService.Info("No images to upload");
             return imageUrls;
+        }
 
         var successCount = 0;
         var failCount = 0;
 
+        _loggerService.Info($"Starting upload of {images.Count} images for user {userId}");
+
         foreach (var imageFile in images)
+        {
             try
             {
                 // Generate unique filename
                 var fileExtension = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
                 var fileName = $"reviews/{userId}/{Guid.NewGuid()}{fileExtension}";
+
+                _loggerService.Info($"Uploading image {fileName}");
 
                 // Upload file to MinIO via BlobService
                 using var stream = imageFile.OpenReadStream();
@@ -316,6 +408,7 @@ public class ReviewService : IReviewService
                 _loggerService.Error($"Failed to upload review image {imageFile.FileName}: {ex.Message}");
                 // Continue with other images even if one fails
             }
+        }
 
         _loggerService.Info(
             $"Image upload summary: {successCount} success, {failCount} failed out of {images.Count} total");
