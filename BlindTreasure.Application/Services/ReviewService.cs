@@ -1,13 +1,10 @@
-using System.Text.Json;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ReviewDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
-using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
@@ -36,7 +33,7 @@ public class ReviewService : IReviewService
         if (createDto == null)
             throw ErrorHelper.BadRequest("Dữ liệu đánh giá không hợp lệ");
 
-        if (createDto.ImagesUrls != null && createDto.ImagesUrls.Count > 5)
+        if (createDto.ImagesUrls is { Count: > 5 })
             throw ErrorHelper.BadRequest("Chỉ được tải lên tối đa 5 hình ảnh");
 
         // 2. Validate comment content with AI
@@ -52,14 +49,14 @@ public class ReviewService : IReviewService
         var orderDetail = await _unitOfWork.OrderDetails.GetQueryable()
             .Include(od => od.Order)
             .Include(od => od.Product)
-            .ThenInclude(p => p.Category)
+            .ThenInclude(p => p!.Category)
             .Include(od => od.BlindBox)
             .FirstOrDefaultAsync(od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId);
 
         if (orderDetail == null)
             throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
 
-        if (orderDetail.Order.Status != OrderStatus.PAID.ToString())
+        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
             throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
 
         var existingReview = await _unitOfWork.Reviews.GetQueryable()
@@ -74,7 +71,7 @@ public class ReviewService : IReviewService
 
         // 7. Upload images
         var imageUrls = new List<string>();
-        if (createDto.ImagesUrls != null && createDto.ImagesUrls.Any())
+        if (createDto.ImagesUrls.Any())
             foreach (var base64Image in createDto.ImagesUrls)
                 try
                 {
@@ -114,7 +111,7 @@ public class ReviewService : IReviewService
             BlindBoxId = orderDetail.BlindBoxId,
             SellerId = orderDetail.SellerId,
             OverallRating = createDto.Rating,
-            Content = createDto.Comment?.Trim(),
+            Content = createDto.Comment.Trim(),
             ImageUrls = imageUrls,
             IsApproved = true, // Auto-approve after AI validation
             ApprovedAt = DateTime.UtcNow,
@@ -129,17 +126,17 @@ public class ReviewService : IReviewService
         {
             Id = review.Id,
             UserId = review.UserId,
-            UserName = user.FullName,
+            UserName = user.FullName ?? "Skibidi",
             UserAvatar = user.AvatarUrl,
             Rating = review.OverallRating,
             Comment = review.Content,
             CreatedAt = review.CreatedAt,
-            Category = orderDetail.Product?.Category?.Name ?? "BlindBox",
+            Category = orderDetail.Product?.Category.Name ?? "BlindBox",
             Images = review.ImageUrls,
             SellerReply = review.SellerResponseDate.HasValue
                 ? new SellerReplyDto
                 {
-                    Content = review.SellerResponse,
+                    Content = review.SellerResponse!,
                     CreatedAt = review.SellerResponseDate.Value
                 }
                 : null
@@ -158,7 +155,7 @@ public class ReviewService : IReviewService
             return false;
 
         // Phải là PAID
-        if (orderDetail.Order.Status != OrderStatus.PAID.ToString())
+        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
             return false;
 
         // Chưa review
@@ -173,6 +170,7 @@ public class ReviewService : IReviewService
     {
         try
         {
+            // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
             Convert.FromBase64String(base64String);
             return true;
         }
