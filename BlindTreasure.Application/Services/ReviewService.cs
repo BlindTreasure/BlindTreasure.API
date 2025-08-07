@@ -49,7 +49,7 @@ public class ReviewService : IReviewService
         // Upload images sử dụng IFormFile
         var imageUrls = await UploadReviewImages(createDto.Images, userId);
 
-        bool isContentApproved = true;
+        var isContentApproved = true;
 
         // Create review
         var review = new Review
@@ -107,19 +107,15 @@ public class ReviewService : IReviewService
             throw ErrorHelper.NotFound("Không tìm thấy thông tin người bán");
 
         // Kiểm tra xem sản phẩm hoặc blindbox trong review có thuộc về người bán không
-        bool hasPermission = false;
+        var hasPermission = false;
 
         if (review.ProductId.HasValue)
-        {
             hasPermission = await _unitOfWork.Products.GetQueryable()
                 .AnyAsync(p => p.Id == review.ProductId && p.SellerId == seller.Id);
-        }
 
         if (!hasPermission && review.BlindBoxId.HasValue)
-        {
             hasPermission = await _unitOfWork.BlindBoxes.GetQueryable()
                 .AnyAsync(b => b.Id == review.BlindBoxId && b.SellerId == seller.Id);
-        }
 
         if (!hasPermission)
             throw ErrorHelper.Forbidden("Bạn không có quyền phản hồi đánh giá này");
@@ -372,16 +368,12 @@ public class ReviewService : IReviewService
 
             // Validate each image file
             if (createDto.Images != null && createDto.Images.Any())
-            {
                 foreach (var imageFile in createDto.Images)
-                {
                     if (!IsValidImageFile(imageFile))
                     {
                         _loggerService.Warn($"Invalid image file: {imageFile.FileName}");
                         throw ErrorHelper.BadRequest($"File {imageFile.FileName} không hợp lệ");
                     }
-                }
-            }
 
             _loggerService.Info("Successfully validated CreateReviewDto input");
         }
@@ -511,7 +503,6 @@ public class ReviewService : IReviewService
         _loggerService.Info($"Starting upload of {images.Count} images for user {userId}");
 
         foreach (var imageFile in images)
-        {
             try
             {
                 // Generate unique filename
@@ -537,7 +528,6 @@ public class ReviewService : IReviewService
                 _loggerService.Error($"Failed to upload review image {imageFile.FileName}: {ex.Message}");
                 // Continue with other images even if one fails
             }
-        }
 
         _loggerService.Info(
             $"Image upload summary: {successCount} success, {failCount} failed out of {images.Count} total");

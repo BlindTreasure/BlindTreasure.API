@@ -5,5 +5,4 @@ namespace BlindTreasure.Domain.DTOs.ReviewDTOs;
 
 public class ReviewQueryParameter : PaginationParameter
 {
-    
 }
