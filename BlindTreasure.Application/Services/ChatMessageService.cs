@@ -3,8 +3,10 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ChatDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +46,8 @@ public class ChatMessageService : IChatMessageService
 
     public async Task<ChatMessageDto?> GetMessageByIdAsync(Guid messageId)
     {
+        var currentUserId = _claimsService.CurrentUserId;
+
         var message = await _unitOfWork.ChatMessages.GetQueryable()
             .Include(m => m.Sender)
             .Include(m => m.Receiver)
@@ -59,9 +63,13 @@ public class ChatMessageService : IChatMessageService
             SenderName = message.SenderType == ChatParticipantType.AI
                 ? "BlindTreasure AI"
                 : message.Sender?.FullName ?? "Unknown",
+            SenderAvatar = message.SenderType == ChatParticipantType.AI
+                ? "/assets/blindy-avatar.png" // Avatar mặc định cho AI
+                : message.Sender?.AvatarUrl ?? "",
             Content = message.Content,
             SentAt = message.SentAt,
-            IsRead = message.IsRead
+            IsRead = message.IsRead,
+            IsCurrentUserSender = message.SenderId == currentUserId
         };
     }
 
@@ -101,9 +109,25 @@ public class ChatMessageService : IChatMessageService
         _logger.Info($"[Chat] {senderId} → {receiverId}: {content}");
     }
 
-    public async Task<List<ChatMessageDto>> GetMessagesAsync(Guid currentUserId, Guid targetId, int pageIndex,
-        int pageSize)
+    public async Task<Pagination<ChatMessageDto>> GetMessagesAsync(
+        Guid currentUserId,
+        Guid targetId,
+        PaginationParameter param)
     {
+        _logger.Info(
+            $"[GetMessagesAsync] User {currentUserId} requests messages with {targetId}. Page: {param.PageIndex}, Size: {param.PageSize}");
+
+        // Tạo cache key dựa trên các tham số
+        var cacheKey = $"chat:messages:{currentUserId}:{targetId}:{param.PageIndex}:{param.PageSize}";
+
+        // Thử lấy từ cache trước
+        var cachedResult = await _cacheService.GetAsync<Pagination<ChatMessageDto>>(cacheKey);
+        if (cachedResult != null)
+        {
+            _logger.Info($"[GetMessagesAsync] Cache hit for messages with key: {cacheKey}");
+            return cachedResult;
+        }
+
         IQueryable<ChatMessage> query;
 
         if (targetId == Guid.Empty)
@@ -127,13 +151,26 @@ public class ChatMessageService : IChatMessageService
                      m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
                 );
 
-        var messages = await query
+        // Thêm Include để load thông tin User
+        query = query.Include(m => m.Sender).Include(m => m.Receiver)
             .OrderByDescending(m => m.SentAt)
-            .Skip(pageIndex * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+            .AsNoTracking();
 
-        return messages.Select(m => new ChatMessageDto
+        // Tính tổng số lượng tin nhắn
+        var count = await query.CountAsync();
+
+        // Lấy tin nhắn theo phân trang
+        List<ChatMessage> messages;
+        if (param.PageIndex == 0)
+            messages = await query.ToListAsync();
+        else
+            messages = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+
+        // Map kết quả sang DTO
+        var chatMessageDtos = messages.Select(m => new ChatMessageDto
         {
             Id = m.Id,
             SenderId = m.SenderId,
@@ -141,73 +178,218 @@ public class ChatMessageService : IChatMessageService
             SenderName = m.SenderType == ChatParticipantType.AI
                 ? "BlindTreasure AI"
                 : m.Sender?.FullName ?? "Unknown",
+            SenderAvatar = m.SenderType == ChatParticipantType.AI
+                ? "/assets/blindy-avatar.png" // Avatar mặc định cho AI
+                : m.Sender?.AvatarUrl ?? "",
             Content = m.Content,
             SentAt = m.SentAt,
-            IsRead = m.IsRead
+            IsRead = m.IsRead,
+            IsCurrentUserSender = m.SenderId == currentUserId
         }).ToList();
+
+        // Tạo kết quả phân trang
+        var result = new Pagination<ChatMessageDto>(chatMessageDtos, count, param.PageIndex, param.PageSize);
+
+        // Lưu kết quả vào cache với thời gian hết hạn ngắn (1 phút) vì chat thường xuyên cập nhật
+        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(1));
+        _logger.Info($"[GetMessagesAsync] Messages cached with key: {cacheKey}");
+
+        return result;
     }
 
-    public async Task<List<ConversationDto>> GetConversationsAsync(Guid userId, int pageIndex = 0, int pageSize = 20)
+    public async Task<Pagination<ConversationDto>> GetConversationsAsync(
+        Guid userId,
+        PaginationParameter param)
     {
-        var conversations = await _unitOfWork.ChatMessages.GetQueryable()
+        _logger.Info(
+            $"[GetConversationsAsync] User {userId} requests conversations. Page: {param.PageIndex}, Size: {param.PageSize}");
+
+        // Tạo cache key dựa trên các tham số
+        var cacheKey = $"chat:conversations:{userId}:{param.PageIndex}:{param.PageSize}";
+
+        // Thử lấy từ cache trước
+        var cachedResult = await _cacheService.GetAsync<Pagination<ConversationDto>>(cacheKey);
+        if (cachedResult != null)
+        {
+            _logger.Info($"[GetConversationsAsync] Cache hit for conversations with key: {cacheKey}");
+            return cachedResult;
+        }
+
+        // Truy vấn cơ bản cho tất cả tin nhắn liên quan đến người dùng này
+        var baseQuery = _unitOfWork.ChatMessages.GetQueryable()
             .Include(m => m.Sender)
             .Include(m => m.Receiver)
             .Where(m => (m.SenderId == userId || m.ReceiverId == userId) &&
                         m.SenderType == ChatParticipantType.User &&
                         m.ReceiverType == ChatParticipantType.User)
-            .GroupBy(m => m.SenderId == userId ? m.ReceiverId : m.SenderId)
-            .Select(g => new ConversationDto
-            {
-                OtherUserId = g.Key.Value,
-                OtherUserName = g.FirstOrDefault(m => m.SenderId != userId)!.Sender!.FullName ??
-                                g.FirstOrDefault(m => m.ReceiverId != userId)!.Receiver!.FullName ?? "Unknown",
-                LastMessage = g.OrderByDescending(m => m.SentAt).First().Content,
-                LastMessageTime = g.OrderByDescending(m => m.SentAt).First().SentAt,
-                UnreadCount = g.Count(m => m.ReceiverId == userId && !m.IsRead),
-                IsOnline = false // Sẽ check sau
-            })
-            .OrderByDescending(c => c.LastMessageTime)
-            .Skip(pageIndex * pageSize)
-            .Take(pageSize)
+            .AsNoTracking();
+
+        // Lấy danh sách ID của những người đã trò chuyện với user hiện tại
+        var otherUserIds = await baseQuery
+            .Select(m => m.SenderId == userId ? m.ReceiverId : m.SenderId)
+            .Where(id => id != null)
+            .Distinct()
             .ToListAsync();
 
-        // Check online status cho từng conversation
+        // Đếm tổng số cuộc hội thoại
+        var count = otherUserIds.Count;
+
+        // Phân trang danh sách người dùng
+        var paginatedUserIds = otherUserIds;
+        if (param.PageIndex > 0)
+        {
+            paginatedUserIds = otherUserIds
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToList();
+        }
+        else if (param.PageSize > 0 && otherUserIds.Count > param.PageSize)
+        {
+            paginatedUserIds = otherUserIds.Take(param.PageSize).ToList();
+        }
+
+        // Danh sách cuộc trò chuyện
+        var conversations = new List<ConversationDto>();
+
+        foreach (var otherUserId in paginatedUserIds)
+        {
+            if (otherUserId == null) continue;
+
+            // Lấy tin nhắn mới nhất giữa 2 người
+            var lastMessage = await baseQuery
+                .Where(m =>
+                    (m.SenderId == userId && m.ReceiverId == otherUserId) ||
+                    (m.SenderId == otherUserId && m.ReceiverId == userId))
+                .OrderByDescending(m => m.SentAt)
+                .FirstOrDefaultAsync();
+
+            if (lastMessage == null) continue;
+
+            // Đếm số tin nhắn chưa đọc
+            var unreadCount = await baseQuery
+                .CountAsync(m => m.SenderId == otherUserId &&
+                                 m.ReceiverId == userId &&
+                                 !m.IsRead);
+
+            // Xác định người dùng khác
+            User? otherUser = null;
+            if (lastMessage.SenderId == otherUserId)
+                otherUser = lastMessage.Sender;
+            else
+                otherUser = lastMessage.Receiver;
+
+            var conversation = new ConversationDto
+            {
+                OtherUserId = otherUserId.Value,
+                OtherUserName = otherUser?.FullName ?? "Unknown",
+                OtherUserAvatar = otherUser?.AvatarUrl ?? "",
+                LastMessage = lastMessage.Content,
+                LastMessageTime = lastMessage.SentAt,
+                UnreadCount = unreadCount,
+                IsOnline = false // Sẽ cập nhật sau
+            };
+
+            conversations.Add(conversation);
+        }
+
+        // Sắp xếp theo thời gian của tin nhắn mới nhất
+        conversations = conversations.OrderByDescending(c => c.LastMessageTime).ToList();
+
+        // Kiểm tra trạng thái online
         foreach (var conversation in conversations)
             conversation.IsOnline = await IsUserOnline(conversation.OtherUserId.ToString());
 
-        return conversations;
+        // Tạo kết quả phân trang
+        var result = new Pagination<ConversationDto>(conversations, count, param.PageIndex, param.PageSize);
+
+        // Lưu kết quả vào cache
+        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromSeconds(30));
+        _logger.Info($"[GetConversationsAsync] Conversations cached with key: {cacheKey}");
+
+        return result;
     }
 
     public async Task MarkMessagesAsReadAsync(Guid fromUserId, Guid toUserId)
     {
-        var unreadMessages = await _unitOfWork.ChatMessages.GetQueryable()
-            .Where(m => m.SenderId == fromUserId &&
-                        m.ReceiverId == toUserId &&
-                        !m.IsRead)
-            .ToListAsync();
-
-        if (!unreadMessages.Any()) return;
-
-        var now = DateTime.UtcNow;
-        foreach (var msg in unreadMessages)
+        try
         {
-            msg.IsRead = true;
-            msg.ReadAt = now;
-        }
+            var unreadMessages = await _unitOfWork.ChatMessages.GetQueryable()
+                .Where(m => m.SenderId == fromUserId &&
+                            m.ReceiverId == toUserId &&
+                            !m.IsRead)
+                .ToListAsync();
 
-        await _unitOfWork.ChatMessages.UpdateRange(unreadMessages);
-        await _unitOfWork.SaveChangesAsync();
+            if (!unreadMessages.Any()) return;
 
-        // Gửi sự kiện SignalR cho sender
-        await _hubContext.Clients.User(fromUserId.ToString()).SendAsync("MessageReadConfirmed", new
-        {
-            readerId = toUserId,
-            messages = unreadMessages.Select(m => new
+            var now = DateTime.UtcNow;
+            foreach (var msg in unreadMessages)
             {
-                m.Id,
-                m.ReadAt
-            }).ToList()
-        });
+                msg.IsRead = true;
+                msg.ReadAt = now;
+            }
+
+            await _unitOfWork.ChatMessages.UpdateRange(unreadMessages);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Gửi sự kiện SignalR cho sender và cập nhật UI
+            await _hubContext.Clients.User(fromUserId.ToString()).SendAsync("MessageReadConfirmed", new
+            {
+                readerId = toUserId,
+                messages = unreadMessages.Select(m => new
+                {
+                    m.Id,
+                    m.ReadAt
+                }).ToList()
+            });
+
+            // Thêm phần thông báo cập nhật UnreadCount
+            var unreadCount = await GetUnreadMessageCountAsync(toUserId);
+            await _hubContext.Clients.User(toUserId.ToString()).SendAsync("UnreadCountUpdated", unreadCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error marking messages as read: {ex.Message}");
+            // Không throw exception để không làm gián đoạn luồng
+        }
+    }
+
+    public async Task MarkConversationAsReadAsync(Guid currentUserId, Guid otherUserId)
+    {
+        try
+        {
+            var unreadMessages = await _unitOfWork.ChatMessages.GetQueryable()
+                .Where(m => m.SenderId == otherUserId &&
+                            m.ReceiverId == currentUserId &&
+                            !m.IsRead)
+                .ToListAsync();
+
+            if (!unreadMessages.Any()) return;
+
+            var now = DateTime.UtcNow;
+            foreach (var msg in unreadMessages)
+            {
+                msg.IsRead = true;
+                msg.ReadAt = now;
+            }
+
+            await _unitOfWork.ChatMessages.UpdateRange(unreadMessages);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Thông báo cho người gửi biết tin nhắn đã được đọc
+            await _hubContext.Clients.User(otherUserId.ToString()).SendAsync("ConversationRead", new
+            {
+                readerId = currentUserId,
+                timestamp = now
+            });
+
+            // Cập nhật tổng số tin nhắn chưa đọc cho người dùng hiện tại
+            var totalUnread = await GetUnreadMessageCountAsync(currentUserId);
+            await _hubContext.Clients.User(currentUserId.ToString()).SendAsync("TotalUnreadUpdated", totalUnread);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"Error marking conversation as read: {ex.Message}");
+        }
     }
 
     public async Task SaveAiMessageAsync(Guid userId, string content)
