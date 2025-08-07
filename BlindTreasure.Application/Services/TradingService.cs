@@ -188,8 +188,6 @@ public class TradingService : ITradingService
 
     public async Task<TradeRequestDto> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted)
     {
-        _logger.Info(
-            $"[RespondTradeRequestAsync] Bắt đầu xử lý respond trade request {tradeRequestId}, isAccepted: {isAccepted}");
 
         try
         {
@@ -202,32 +200,25 @@ public class TradingService : ITradingService
 
             if (tradeRequest == null)
             {
-                _logger.Error($"[RespondTradeRequestAsync] Trade Request {tradeRequestId} không tồn tại");
                 throw ErrorHelper.NotFound("Trade Request không tồn tại.");
             }
 
-            _logger.Info(
-                $"[RespondTradeRequestAsync] Tìm thấy trade request {tradeRequestId}, status hiện tại: {tradeRequest.Status}");
 
             // BƯỚC 2: Validate trạng thái
             if (tradeRequest.Status != TradeRequestStatus.PENDING)
             {
-                _logger.Warn(
-                    $"[RespondTradeRequestAsync] Trade request {tradeRequestId} không ở trạng thái PENDING, status: {tradeRequest.Status}");
                 throw ErrorHelper.BadRequest("Giao dịch này đã được xử lý hoặc hết hạn.");
             }
 
             // BƯỚC 3: Validate listing
             if (tradeRequest.Listing == null)
             {
-                _logger.Error($"[RespondTradeRequestAsync] Listing null cho trade request {tradeRequestId}");
                 throw ErrorHelper.Internal("Thông tin listing không hợp lệ.");
             }
 
             // BƯỚC 4: Validate inventory item
             if (tradeRequest.Listing.InventoryItem == null)
             {
-                _logger.Error($"[RespondTradeRequestAsync] InventoryItem null cho listing {tradeRequest.Listing.Id}");
                 throw ErrorHelper.Internal("Thông tin inventory item không hợp lệ.");
             }
 
@@ -235,13 +226,8 @@ public class TradingService : ITradingService
             var currentUserId = _claimsService.CurrentUserId;
             if (tradeRequest.Listing.InventoryItem.UserId != currentUserId)
             {
-                _logger.Warn(
-                    $"[RespondTradeRequestAsync] User {currentUserId} không phải owner của listing, owner thực tế: {tradeRequest.Listing.InventoryItem.UserId}");
                 throw ErrorHelper.Forbidden("Bạn không có quyền phản hồi trade request này.");
             }
-
-            _logger.Info(
-                $"[RespondTradeRequestAsync] User {currentUserId} có quyền respond trade request {tradeRequestId}");
 
             // BƯỚC 6: Cập nhật trạng thái trade request
             var originalStatus = tradeRequest.Status;
@@ -256,17 +242,12 @@ public class TradingService : ITradingService
                 // Nếu reject, TimeRemaining = 0
                 tradeRequest.TimeRemaining = 0;
 
-            _logger.Info(
-                $"[RespondTradeRequestAsync] Cập nhật trade request {tradeRequestId} từ {originalStatus} sang {tradeRequest.Status}, TimeRemaining: {tradeRequest.TimeRemaining}");
-
             // BƯỚC 7: Xử lý inventory item status
             await UpdateInventoryItemStatusOnReject(tradeRequest, isAccepted);
 
             // BƯỚC 8: Lưu thay đổi
             await _unitOfWork.TradeRequests.Update(tradeRequest);
             await _unitOfWork.SaveChangesAsync();
-
-            _logger.Success($"[RespondTradeRequestAsync] Đã lưu thành công trade request {tradeRequestId}");
 
             // BƯỚC 9: Gửi notification (với error handling)
             try
@@ -280,12 +261,10 @@ public class TradingService : ITradingService
             }
 
             // BƯỚC 10: Trả về kết quả
-            _logger.Info($"[RespondTradeRequestAsync] Hoàn thành xử lý trade request {tradeRequestId}");
             return await GetTradeRequestByIdAsync(tradeRequestId);
         }
         catch (Exception ex)
         {
-            _logger.Error($"[RespondTradeRequestAsync] Lỗi khi xử lý trade request {tradeRequestId}: {ex.Message}");
             _logger.Error($"[RespondTradeRequestAsync] Stack trace: {ex.StackTrace}");
             throw;
         }
@@ -698,7 +677,6 @@ public class TradingService : ITradingService
             ? $"{responderName} đã chấp nhận yêu cầu trao đổi của bạn. Hãy xác nhận để hoàn tất giao dịch!"
             : $"{responderName} đã từ chối yêu cầu trao đổi của bạn.";
 
-        // Chỉ tạo URL khi trade request được chấp nhận
         var sourceUrl = isAccepted ? $"/marketplace/confirm-trading/{tradeRequestId}" : null;
 
         await _notificationService.PushNotificationToUser(

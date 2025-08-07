@@ -40,21 +40,22 @@ public class NotificationService : INotificationService
             .OrderByDescending(n => n.SentAt)
             .Skip(pageIndex * pageSize)
             .Take(pageSize)
+            .Select(n => new NotificationDto
+            {
+                Id = n.Id,
+                Title = n.Title,
+                Message = n.Message,
+                Type = n.Type,
+                SourceUrl = n.SourceUrl,
+                IsRead = n.IsRead,
+                SentAt = n.SentAt,
+                ReadAt = n.ReadAt
+            })
             .ToListAsync();
 
-        // Map đầy đủ thông tin sang DTO
-        return notifications.Select(n => new NotificationDto
-        {
-            Id = n.Id,
-            Title = n.Title,
-            Message = n.Message,
-            Type = n.Type,
-            SourceUrl = n.SourceUrl, // Đây là field mới
-            IsRead = n.IsRead,
-            SentAt = n.SentAt,
-            ReadAt = n.ReadAt
-        }).ToList();
+        return notifications;
     }
+
 
     public async Task<int> CountNotificationsAsync(Guid userId)
     {
