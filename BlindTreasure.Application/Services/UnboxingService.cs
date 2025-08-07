@@ -4,10 +4,12 @@ using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UnboxDTOs;
 using BlindTreasure.Domain.DTOs.UnboxLogDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -92,38 +94,58 @@ public class UnboxingService : IUnboxingService
         };
     }
 
-    public async Task<List<UnboxLogDto>> GetLogsAsync(Guid? userId, Guid? productId)
+    public async Task<Pagination<UnboxLogDto>> GetLogsAsync(PaginationParameter param, Guid? userId, Guid? productId)
     {
-        var query = _unitOfWork.BlindBoxUnboxLogs.GetQueryable();
+        var query = _unitOfWork.BlindBoxUnboxLogs.GetQueryable()
+            .Include(x => x.User) // Include User để lấy FullName
+            .Where(x => !x.IsDeleted) // Chỉ lấy records chưa bị xóa
+            .AsNoTracking(); // Tối ưu performance
 
+        // Áp dụng filter theo userId
         if (userId.HasValue)
             query = query.Where(x => x.UserId == userId.Value);
 
+        // Áp dụng filter theo productId
         if (productId.HasValue)
             query = query.Where(x => x.ProductId == productId.Value);
 
-        var result = await query
-            .OrderByDescending(x => x.UnboxedAt)
-            .Take(100)
-            .Select(x => new UnboxLogDto
-            {
-                Id = x.Id,
-                CustomerBlindBoxId = x.CustomerBlindBoxId,
-                CustomerName = x.User!.FullName,
-                ProductId = x.ProductId,
-                ProductName = x.ProductName,
-                Rarity = x.Rarity,
-                DropRate = x.DropRate,
-                RollValue = x.RollValue,
-                UnboxedAt = x.UnboxedAt,
-                BlindBoxName = x.BlindBoxName!,
-                Reason = x.Reason!
-            })
-            .ToListAsync();
+        // Áp dụng sorting theo thời gian unbox (mới nhất trước)
+        query = query.OrderByDescending(x => x.UnboxedAt);
+
+        // Đếm tổng số records
+        var count = await query.CountAsync();
+
+        // Áp dụng pagination
+        List<BlindBoxUnboxLog> items;
+        if (param.PageIndex == 0) // Trả về tất cả nếu PageIndex = 0
+            items = await query.Take(100).ToListAsync(); // Giới hạn tối đa 100 records
+        else
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+
+        // Map sang DTO
+        var dtos = items.Select(x => new UnboxLogDto
+        {
+            Id = x.Id,
+            CustomerBlindBoxId = x.CustomerBlindBoxId,
+            CustomerName = x.User?.FullName ?? "N/A",
+            ProductId = x.ProductId,
+            ProductName = x.ProductName,
+            Rarity = x.Rarity,
+            DropRate = x.DropRate,
+            RollValue = x.RollValue,
+            UnboxedAt = x.UnboxedAt,
+            BlindBoxName = x.BlindBoxName ?? "N/A",
+            Reason = x.Reason ?? "N/A"
+        }).ToList();
+
+        var result = new Pagination<UnboxLogDto>(dtos, count, param.PageIndex, param.PageSize);
+
 
         return result;
     }
-
 
     public async Task<List<ProbabilityConfig>> GetApprovedProbabilitiesAsync(Guid blindBoxId)
     {
@@ -171,7 +193,7 @@ public class UnboxingService : IUnboxingService
         sb.AppendLine("| # | Product ID | Tên Sản Phẩm | Rarity | Drop Rate (%) | Range | Status |");
         sb.AppendLine("|---|------------|---------------|--------|---------------|-------|--------|");
 
-        int index = 1;
+        var index = 1;
         decimal cumulative = 0;
 
         foreach (var kvp in probabilities
@@ -255,10 +277,7 @@ public class UnboxingService : IUnboxingService
             var start = cumulative;
             var end = start + kvp.Value;
 
-            if (kvp.Key.Id == selectedItem.Id)
-            {
-                return $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
-            }
+            if (kvp.Key.Id == selectedItem.Id) return $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
 
             cumulative = end;
         }

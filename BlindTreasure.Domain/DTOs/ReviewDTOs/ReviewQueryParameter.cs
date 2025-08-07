@@ -8,9 +8,9 @@ public class ReviewQueryParameter : PaginationParameter
     public Guid? ProductId { get; set; }
     public Guid? BlindBoxId { get; set; }
     public Guid? SellerId { get; set; }
-    public Guid? UserId { get; set; } // Thêm nếu cần filter theo user
-    public bool? IsPublished { get; set; } = true; // Mặc định chỉ lấy review đã publish
-    public ReviewStatus? Status { get; set; } // Filter theo status nếu cần
-    public int? MinRating { get; set; } // Filter theo rating tối thiểu
-    public bool? IsVerifiedPurchase { get; set; } // Chỉ lấy review từ người đã mua
+    public int? MinRating { get; set; }
+    public int? MaxRating { get; set; }
+    public bool? HasComment { get; set; }
+    public bool? HasImages { get; set; }
+    public string? SortBy { get; set; } // "rating_asc", "rating_desc", "newest", "oldest"
 }

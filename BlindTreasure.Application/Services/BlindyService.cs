@@ -1,8 +1,10 @@
 ﻿using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
+using BlindTreasure.Application.Services.ThirdParty.AIModels;
 using BlindTreasure.Domain.DTOs.GeminiDTOs;
 
 namespace BlindTreasure.Application.Services;
@@ -18,54 +20,165 @@ public class BlindyService : IBlindyService
         _analyzerService = analyzerService;
     }
 
-    public async Task<ReviewValidationResult> ValidateReviewAsync(string comment, int rating, string? sellerName = null,
-        string? productName = null)
+    public async Task<bool> ValidateReviewAsync(string comment)
     {
+        if (string.IsNullOrWhiteSpace(comment)) return false;
+
+        // Basic length validation
+        if (comment.Length > 1000 || comment.Length < 10) return false;
+
+        // Kiểm tra cơ bản trước khi gọi AI để tiết kiệm chi phí
+        if (!BasicTextValidation(comment))
+        {
+            // Log thông tin
+            Console.WriteLine($"[BasicValidation] Phát hiện nội dung không phù hợp: {comment}");
+            return false;
+        }
+
+        // AI validation prompt using StringBuilder with AppendLine
         var promptBuilder = new StringBuilder();
-        promptBuilder.AppendLine(
-            "Phân tích và validate nội dung review sau đây cho nền tảng thương mại điện tử BlindTreasure:");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine($"**Nội dung review:** \"{comment}\"");
-        promptBuilder.AppendLine($"**Đánh giá:** {rating}/5 sao");
-        promptBuilder.AppendLine($"**Sản phẩm:** {productName ?? "Không rõ"}");
-        promptBuilder.AppendLine($"**Seller:** {sellerName ?? "Không rõ"}");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Kiểm tra các tiêu chí sau:");
-        promptBuilder.AppendLine("1. **Ngôn từ độc hại:** Có chửi thề, xúc phạm, hate speech không?");
-        promptBuilder.AppendLine("2. **Spam/Fake:** Có dấu hiệu review ảo, copy-paste, không liên quan không?");
-        promptBuilder.AppendLine("3. **Thông tin cá nhân:** Có tiết lộ số điện thoại, email, địa chỉ cụ thể không?");
-        promptBuilder.AppendLine("4. **Nội dung bất hợp pháp:** Có quảng cáo sản phẩm khác, link lừa đảo không?");
-        promptBuilder.AppendLine("5. **Tính nhất quán:** Rating có phù hợp với nội dung comment không?");
-        promptBuilder.AppendLine();
-        promptBuilder.AppendLine("Trả về JSON format:");
+        promptBuilder.AppendLine("Phân tích nội dung đánh giá sản phẩm sau đây và trả về JSON format chính xác:");
         promptBuilder.AppendLine("{");
-        promptBuilder.AppendLine("    \"isValid\": true/false,");
-        promptBuilder.AppendLine("    \"confidence\": 0.0-1.0,");
-        promptBuilder.AppendLine("    \"issues\": [\"danh sách vấn đề phát hiện\"],");
-        promptBuilder.AppendLine("    \"suggestedAction\": \"approve/moderate/reject\",");
-        promptBuilder.AppendLine("    \"cleanedComment\": \"nội dung đã được làm sạch (nếu có)\",");
-        promptBuilder.AppendLine("    \"reason\": \"lý do cụ thể\"");
+        promptBuilder.AppendLine("    \"isValid\": boolean, // true nếu nội dung phù hợp, false nếu không phù hợp");
+        promptBuilder.AppendLine("    \"reasons\": string[] // mảng các lý do nếu không hợp lệ");
         promptBuilder.AppendLine("}");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Tiêu chí đánh giá nghiêm ngặt:");
+        promptBuilder.AppendLine("- KHÔNG chứa ngôn từ tục tĩu, thô lỗ");
+        promptBuilder.AppendLine("- KHÔNG chứa thông tin cá nhân");
+        promptBuilder.AppendLine("- KHÔNG chứa quảng cáo dưới bất kỳ hình thức nào");
+        promptBuilder.AppendLine("- KHÔNG chứa tên sản phẩm/dịch vụ khác");
+        promptBuilder.AppendLine("- KHÔNG chứa URLs, tên shop, kênh bán hàng");
+        promptBuilder.AppendLine("- KHÔNG chứa thông tin liên hệ (email, số điện thoại, mạng xã hội)");
+        promptBuilder.AppendLine("- KHÔNG chứa so sánh với sản phẩm của đối thủ");
+        promptBuilder.AppendLine("- KHÔNG gợi ý mua sản phẩm ở nơi khác");
+        promptBuilder.AppendLine("- KHÔNG chứa mã giảm giá");
+        promptBuilder.AppendLine("- Nội dung PHẢI liên quan trực tiếp đến trải nghiệm sản phẩm này");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Dấu hiệu quảng cáo cần phát hiện:");
+        promptBuilder.AppendLine("- Tên shop/cửa hàng");
+        promptBuilder.AppendLine("- Cụm từ: \"ghé shop\", \"mua tại\", \"liên hệ\", \"tư vấn\", \"giảm giá\"");
+        promptBuilder.AppendLine("- Số điện thoại");
+        promptBuilder.AppendLine("- Địa chỉ website (.com, .vn, .net, v.v.)");
+        promptBuilder.AppendLine("- Tên mạng xã hội (Facebook, Zalo, Instagram, TikTok)");
+        promptBuilder.AppendLine("- Ký hiệu @ hoặc biểu tượng username");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Nội dung cần kiểm tra:");
+        promptBuilder.AppendLine(comment);
 
         var prompt = promptBuilder.ToString();
-        var aiResponse = await _geminiService.GenerateResponseAsync(prompt);
 
         try
         {
-            var result = JsonSerializer.Deserialize<ReviewValidationResult>(aiResponse);
-            return result;
-        }
-        catch
-        {
-            return new ReviewValidationResult
+            var response = await _geminiService.GenerateValidationResponseAsync(prompt);
+            Console.WriteLine($"[AI Response] Raw: {response}");
+
+            // Kiểm tra response trước khi parse
+            if (string.IsNullOrWhiteSpace(response))
             {
-                IsValid = false,
-                Confidence = 0.5,
-                Issues = new[] { "AI validation error" },
-                SuggestedAction = "moderate",
-                Reason = "Không thể phân tích được nội dung"
-            };
+                Console.WriteLine("[AI Warning] Response rỗng, sử dụng validation cơ bản");
+                return BasicTextValidation(comment);
+            }
+
+            // Cố gắng parse JSON
+            try
+            {
+                var result = JsonSerializer.Deserialize<GeminiValidationResponse>(response);
+                Console.WriteLine(
+                    $"[AI Result] IsValid: {result?.IsValid}, Reasons: {(result?.Reasons != null ? string.Join(", ", result.Reasons) : "None")}");
+
+                return result?.IsValid ?? false;
+            }
+            catch (JsonException jsonEx)
+            {
+                Console.WriteLine($"[AI JSON Error] {jsonEx.Message}, response: {response}");
+
+                // Thử parse JSON thủ công nếu có chứa "isValid"
+                if (response.Contains("\"isValid\"", StringComparison.OrdinalIgnoreCase))
+                {
+                    var isValid = response.Contains("\"isValid\": true") || response.Contains("\"isValid\":true");
+                    Console.WriteLine($"[AI Manual Parse] isValid: {isValid}");
+                    return isValid;
+                }
+
+                return BasicTextValidation(comment);
+            }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AI Error] {ex.Message}");
+            var fallbackResponse = _geminiService.GenerateFallbackValidation(prompt);
+            try
+            {
+                var result = JsonSerializer.Deserialize<GeminiValidationResponse>(fallbackResponse);
+                return false; // Mặc định reject khi không thể validate
+            }
+            catch
+            {
+                return BasicTextValidation(comment);
+            }
+        }
+    }
+
+    private bool BasicTextValidation(string text)
+    {
+        // Từ khóa cấm
+        var bannedWords = new[] { "fuck", "shit", "địt", "đụ", "lồn", "cặc", "đéo", "đm", "đ.m", "clm", "vl", "vcl" };
+
+        // Dấu hiệu quảng cáo
+        var adIndicators = new[]
+        {
+            "shop", "giảm giá", "liên hệ", "mua", "bán", "zalo", "facebook",
+            "instagram", "tiktok", "@", "page", "fanpage", "group", "telegram",
+            ".com", ".vn", ".net", "http", "www", "shopee", "lazada", "tiki",
+            "cod", "freeship", "mã giảm", "tư vấn", "nhắn tin", "inbox", "chat",
+            "follow", "theo dõi", "đặt hàng", "ship", "giao hàng", "chuyển khoản"
+        };
+
+        // Kiểm tra số điện thoại (chuỗi 10-11 số liên tiếp hoặc có dấu cách/gạch ngang)
+        if (System.Text.RegularExpressions.Regex.IsMatch(text,
+                @"(0|\+84)\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}"))
+            return false;
+
+        // Kiểm tra URL/domain
+        if (System.Text.RegularExpressions.Regex.IsMatch(text,
+                @"(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b"))
+            return false;
+
+        // Kiểm tra từ cấm
+        if (bannedWords.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        // Kiểm tra dấu hiệu quảng cáo
+        if (adIndicators.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        return true;
+    }
+
+    private class GeminiValidationResponse
+    {
+        public bool IsValid { get; set; }
+
+        // Linh hoạt hơn với thuộc tính Reasons
+        [JsonIgnore]
+        public IEnumerable<string> ReasonsList
+        {
+            get
+            {
+                if (Reasons != null && Reasons.Length > 0)
+                    return Reasons;
+
+                if (ReasonArray != null && ReasonArray.Count > 0)
+                    return ReasonArray;
+
+                return Array.Empty<string>();
+            }
+        }
+
+        public string[]? Reasons { get; set; } = Array.Empty<string>();
+
+        public List<string>? ReasonArray { get; set; }
     }
 
     /// <summary>

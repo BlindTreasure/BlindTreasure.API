@@ -28,9 +28,9 @@ builder.Configuration
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true, true)
     .AddEnvironmentVariables(); // Cái này luôn phải nằm cuối
 
-builder.Services.AddCors(options =>
+builder.Services.AddCors(hehe =>
 {
-    options.AddPolicy("AllowFrontend",
+    hehe.AddPolicy("AllowFrontend",
         builder =>
         {
             builder

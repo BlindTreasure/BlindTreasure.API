@@ -94,6 +94,84 @@ public class GeminiService : IGeminiService
         await _cache.SetAsync(cacheKey, finalResult, TimeSpan.FromHours(6));
         return finalResult;
     }
+
+    /// <summary>
+    /// Generate response cho các task validation ngắn với model tối ưu
+    /// </summary>
+    public async Task<string> GenerateValidationResponseAsync(string userPrompt)
+    {
+        // Sử dụng model nhẹ nhất và context tối thiểu
+
+        var promptBuilder = new StringBuilder();
+        promptBuilder.Clear();
+        promptBuilder.AppendLine("Bạn là AI validator. Phân tích nội dung đánh giá sản phẩm sau đây.");
+        promptBuilder.AppendLine("Trả về CHÍNH XÁC JSON format theo mẫu:");
+        promptBuilder.AppendLine("{");
+        promptBuilder.AppendLine("  \"isValid\": false,");
+        promptBuilder.AppendLine("  \"reasons\": [\"Lý do 1\", \"Lý do 2\"]");
+        promptBuilder.AppendLine("}");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Nếu hợp lệ thì isValid = true và reasons = []");
+        promptBuilder.AppendLine("KHÔNG được thêm bất kỳ text nào khác ngoài JSON.");
+
+        var fullPrompt = $"{promptBuilder}\n\n{userPrompt}";
+
+        // Sử dụng model nhẹ nhất
+        var url =
+            $"https://generativelanguage.googleapis.com/v1beta/models/{GeminiModels.Flash}:generateContent?key={_apiKey}";
+
+        var body = new
+        {
+            contents = new[]
+            {
+                new
+                {
+                    parts = new[]
+                    {
+                        new { text = fullPrompt }
+                    }
+                }
+            },
+            generationConfig = new
+            {
+                temperature = 0.1, // Giảm randomness cho consistency
+                maxOutputTokens = 500, // Giới hạn response length
+                topP = 0.8,
+                topK = 10
+            }
+        };
+
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
+        };
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Gemini API error: {error}");
+        }
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        var result = doc.RootElement
+            .GetProperty("candidates")[0]
+            .GetProperty("content")
+            .GetProperty("parts")[0]
+            .GetProperty("text")
+            .GetString();
+
+        var finalResult = result ?? string.Empty;
+        return finalResult;
+    }
+
+    public string GenerateFallbackValidation(string prompt)
+    {
+        // Trả về JSON chuẩn khi API lỗi
+        return
+            "{\"isValid\": false, \"reasons\": [\"API validation không khả dụng, bài đánh giá cần kiểm duyệt thủ công.\"]}";
+    }
 }
 
 public static class GeminiContext

@@ -5,7 +5,14 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface IReviewService
 {
-    Task<ReviewResponseDto> CreateReviewAsync(Guid userId, CreateReviewDto createDto);
     Task<Pagination<ReviewResponseDto>> GetAllReviewsAsync(ReviewQueryParameter param);
-    Task<ReviewResponseDto> GetReviewByIdAsync(Guid reviewId);
+
+    // lọc các review của 1 product/ blindbox
+    // lọc theo rating
+    // lọc theo có comment hay không (có những review không cần comment)
+    Task<ReviewResponseDto> CreateReviewAsync(CreateReviewDto createDto);
+    Task<ReviewResponseDto> ReplyToReviewAsync(Guid reviewId, string replyContent);
+    Task<bool> CanReviewOrderDetailAsync(Guid orderDetailId);
+    Task<ReviewResponseDto> GetByIdAsync(Guid reviewId);
+    Task<ReviewResponseDto> DeleteReviewAsync(Guid reviewId);
 }

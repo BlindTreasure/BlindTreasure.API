@@ -45,10 +45,7 @@ public class PromotionService : IPromotionService
             .Where(p => !p.IsDeleted);
 
         // Apply basic filters
-        if (param.SellerId.HasValue)
-        {
-            query = query.Where(p => p.SellerId == param.SellerId);
-        }
+        if (param.SellerId.HasValue) query = query.Where(p => p.SellerId == param.SellerId);
 
         if (param.IsGlobal.HasValue)
         {
@@ -58,36 +55,27 @@ public class PromotionService : IPromotionService
                 query = query.Where(p => p.SellerId != null); // Seller-specific promotions
         }
 
-        if (param.Status.HasValue)
-        {
-            query = query.Where(p => p.Status == param.Status);
-        }
-        
+        if (param.Status.HasValue) query = query.Where(p => p.Status == param.Status);
+
         if (param.IsParticipated.HasValue && param.ParticipantSellerId.HasValue)
         {
             if (param.IsParticipated.Value)
-            {
                 // Lấy các promotions mà seller này tham gia
                 query = query.Where(p =>
                     p.PromotionParticipants.Any(pp =>
                         pp.SellerId == param.ParticipantSellerId &&
                         !pp.IsDeleted));
-            }
             else
-            {
                 // Lấy các promotions mà seller này KHÔNG tham gia
                 query = query.Where(p =>
                     !p.PromotionParticipants.Any(pp =>
                         pp.SellerId == param.ParticipantSellerId &&
                         !pp.IsDeleted));
-            }
         }
 
         // Include PromotionParticipants nếu cần filter participation
         if (param.IsParticipated.HasValue || param.ParticipantSellerId.HasValue)
-        {
             query = query.Include(p => p.PromotionParticipants);
-        }
 
         // Get total count for pagination
         var totalCount = await query.CountAsync();

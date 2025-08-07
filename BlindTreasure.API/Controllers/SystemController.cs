@@ -433,11 +433,11 @@ public class SystemController : ControllerBase
     }
 
     /// <summary>
-    /// Giả lập user đã mua hàng để t test chức năng review
+    /// Giả lập user đã mua hàng để test chức năng review
     /// </summary>
     /// <param name="userId">ID of the user to seed products. If not provided, defaults to user trangiaphuc362003181@gmail.com</param>
-    [HttpPost("dev/seed-products-users")]
-    public async Task<IActionResult> SeedProductsUsers([FromQuery] Guid? userId = null)
+    [HttpPost("dev/seed-orders-users")]
+    public async Task<IActionResult> SeedUserOrder([FromQuery] Guid? userId = null)
     {
         try
         {
@@ -448,11 +448,11 @@ public class SystemController : ControllerBase
                 user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
                 if (user == null)
                 {
-                    _logger.Warn($"[SeedProductsUsers] User not found with Id: {userId}");
+                    _logger.Warn($"[SeedUserOrder] User not found with Id: {userId}");
                     return NotFound($"User not found with Id: {userId}");
                 }
 
-                _logger.Info($"[SeedProductsUsers] Seeding products for user Id: {userId}");
+                _logger.Info($"[SeedUserOrder] Seeding orders for user Id: {userId}");
             }
             else
             {
@@ -460,57 +460,101 @@ public class SystemController : ControllerBase
                 user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
                 if (user == null)
                 {
-                    _logger.Warn($"[SeedProductsUsers] User not found with email: {email}");
+                    _logger.Warn($"[SeedUserOrder] User not found with email: {email}");
                     return NotFound($"User not found with email: {email}");
                 }
 
-                _logger.Info($"[SeedProductsUsers] Seeding products for user: {email}");
+                _logger.Info($"[SeedUserOrder] Seeding orders for user: {email}");
             }
 
             // Get 3 random products that can be reviewed (active, in stock)
             var products = await _context.Products
                 .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 && !p.IsDeleted)
+                .Include(p => p.Seller) // Include seller để lấy thông tin
                 .OrderBy(p => Guid.NewGuid())
                 .Take(3)
                 .ToListAsync();
 
             if (products.Count < 3)
             {
-                _logger.Warn("[SeedProductsUsers] Not enough valid products found (need at least 3)");
+                _logger.Warn("[SeedUserOrder] Not enough valid products found (need at least 3)");
                 return BadRequest("Not enough valid products found (need at least 3)");
             }
 
             var now = DateTime.UtcNow;
-            var groupId = Guid.NewGuid(); // Randomly generated CheckoutGroupId
+            var totalAmount = products.Sum(p => p.Price);
 
-            // Create a new order
+            // 1. Tạo Payment trước
+            var payment = new Payment
+            {
+                Id = Guid.NewGuid(),
+                Amount = totalAmount,
+                Method = "STRIPE",
+                Status = PaymentStatus.Paid,
+                PaidAt = now.AddDays(-5),
+                CreatedAt = now.AddDays(-7),
+                UpdatedAt = now.AddDays(-5),
+                CreatedBy = user.Id,
+                UpdatedBy = user.Id
+            };
+
+            var groupOrderId = Guid.NewGuid();
+            // 2. Tạo Order
             var order = new Order
             {
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
-                Status = "Completed",
-                TotalAmount = products.Sum(p => p.Price),
-                FinalAmount = products.Sum(p => p.Price),
-                PlacedAt = now.AddDays(-7), // Order was placed 7 days ago
-                CompletedAt = now.AddDays(-5), // Completed 5 days ago
-                CreatedAt = now,
-                CheckoutGroupId = groupId
+                Status = OrderStatus.PAID.ToString(), // ✅ QUAN TRỌNG: Phải là "PAID"
+                TotalAmount = totalAmount,
+                FinalAmount = totalAmount,
+                TotalShippingFee = 0,
+                PlacedAt = now.AddDays(-7),
+                CompletedAt = now.AddDays(-5),
+                PaymentId = payment.Id,
+                CreatedAt = now.AddDays(-7),
+                UpdatedAt = now.AddDays(-5),
+                CreatedBy = user.Id,
+                UpdatedBy = user.Id,
+                CheckoutGroupId = groupOrderId, // Mới: Group ID để nhóm các order cùng checkout
             };
 
-            // Create order details and inventory items for each product
+            // Link Payment với Order
+            payment.OrderId = order.Id;
+
+            // 3. Tạo Transaction với đầy đủ field bắt buộc
+            var transaction = new Transaction
+            {
+                Id = Guid.NewGuid(),
+                PaymentId = payment.Id,
+                Type = "PAYMENT", // ✅ QUAN TRỌNG: Set Type để tránh null constraint
+                Amount = totalAmount,
+                Currency = "VND",
+                Status = TransactionStatus.Successful.ToString(),
+                OccurredAt = now.AddDays(-5),
+                ExternalRef = $"test_session_{Guid.NewGuid()}", // Stripe session ID giả lập
+                Notes = "Test transaction for review functionality",
+                CompleteAt = now.AddDays(-5),
+                StripeTransactionId =
+                    $"pi_test_{Guid.NewGuid().ToString("N")[..24]}", // Stripe PaymentIntent ID giả lập
+                CreatedAt = now.AddDays(-5),
+                UpdatedAt = now.AddDays(-5),
+                CreatedBy = user.Id,
+                UpdatedBy = user.Id
+            };
+
+            // 4. Tạo OrderDetails và InventoryItems
             var orderDetails = new List<OrderDetail>();
             var inventoryItems = new List<InventoryItem>();
 
             foreach (var product in products)
             {
-                var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.Id == product.SellerId);
-                if (seller == null)
+                if (product.Seller == null)
                 {
-                    _logger.Warn($"[SeedProductsUsers] Seller not found for product {product.Id}");
+                    _logger.Warn($"[SeedUserOrder] Seller not found for product {product.Id}");
                     continue;
                 }
 
-                // Create order detail
+                // Tạo OrderDetail
                 var orderDetail = new OrderDetail
                 {
                     Id = Guid.NewGuid(),
@@ -519,12 +563,21 @@ public class SystemController : ControllerBase
                     Quantity = 1,
                     UnitPrice = product.Price,
                     TotalPrice = product.Price,
-                    Status = OrderDetailItemStatus.DELIVERED,
-                    CreatedAt = now
+                    DetailDiscountPromotion = 0,
+                    FinalDetailPrice = product.Price,
+                    Status = OrderDetailItemStatus.DELIVERED, // Đã giao hàng
+                    Logs = $"[{now.AddDays(-7):yyyy-MM-dd HH:mm:ss}] Created {product.Name}, Qty=1\n" +
+                           $"[{now.AddDays(-6):yyyy-MM-dd HH:mm:ss}] Status updated to SHIPPING_REQUESTED\n" +
+                           $"[{now.AddDays(-5):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERING\n" +
+                           $"[{now.AddDays(-4):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERED",
+                    CreatedAt = now.AddDays(-7),
+                    UpdatedAt = now.AddDays(-4),
+                    CreatedBy = user.Id,
+                    UpdatedBy = user.Id
                 };
                 orderDetails.Add(orderDetail);
 
-                // Create inventory item
+                // Tạo InventoryItem
                 var inventoryItem = new InventoryItem
                 {
                     Id = Guid.NewGuid(),
@@ -533,42 +586,60 @@ public class SystemController : ControllerBase
                     OrderDetailId = orderDetail.Id,
                     Status = InventoryItemStatus.Available,
                     IsFromBlindBox = false,
-                    Location = "HCM",
-                    Tier = RarityName.Common, // Default rarity for direct purchases
-                    CreatedAt = now
+                    Location = product.Seller.CompanyAddress ?? "HCM Warehouse",
+                    Tier = RarityName.Common,
+                    CreatedAt = now.AddDays(-4), // Tạo inventory khi delivered
+                    UpdatedAt = now.AddDays(-4),
+                    CreatedBy = user.Id,
+                    UpdatedBy = user.Id
                 };
                 inventoryItems.Add(inventoryItem);
+
+                // Giảm stock của product
+                product.Stock -= 1;
             }
 
             if (!orderDetails.Any())
             {
-                _logger.Warn("[SeedProductsUsers] No valid order details could be created");
+                _logger.Warn("[SeedUserOrder] No valid order details could be created");
                 return BadRequest("No valid order details could be created");
             }
 
-            // Save to database
+            // 5. Lưu vào database theo đúng thứ tự dependency
+            await _context.Payments.AddAsync(payment);
             await _context.Orders.AddAsync(order);
+            await _context.Transactions.AddAsync(transaction);
             await _context.OrderDetails.AddRangeAsync(orderDetails);
             await _context.InventoryItems.AddRangeAsync(inventoryItems);
+
+            // Cập nhật stock của products
+            _context.Products.UpdateRange(products);
+
             await _context.SaveChangesAsync();
 
             _logger.Success(
-                $"[SeedProductsUsers] Successfully seeded {orderDetails.Count} products and inventory items for user {user.Email}");
+                $"[SeedUserOrder] Successfully seeded {orderDetails.Count} paid orders with products for user {user.Email}");
 
             return Ok(ApiResult<object>.Success(new
             {
                 Message =
-                    $"Successfully seeded {orderDetails.Count} purchased products and inventory items for user {user.Email}",
+                    $"Successfully seeded {orderDetails.Count} PAID orders with products for user {user.Email}",
                 OrderId = order.Id,
+                OrderStatus = order.Status,
+                PaymentId = payment.Id,
+                PaymentStatus = payment.Status.ToString(),
+                TransactionId = transaction.Id,
+                TransactionStatus = transaction.Status,
                 ProductIds = orderDetails.Select(od => od.ProductId).ToList(),
-                InventoryItemIds = inventoryItems.Select(ii => ii.Id).ToList()
+                InventoryItemIds = inventoryItems.Select(ii => ii.Id).ToList(),
+                CanReviewNow = true // Có thể review ngay vì order đã PAID
             }));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-            _logger.Error($"[SeedProductsUsers] Exception: {ex.Message}");
+            _logger.Error($"[SeedUserOrder] Exception: {ex.Message}");
             return StatusCode(statusCode, errorResponse);
         }
     }
@@ -631,147 +702,6 @@ public class SystemController : ControllerBase
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-            return StatusCode(statusCode, errorResponse);
-        }
-    }
-
-    [HttpPost("dev/seed-statistics-orders")]
-    public async Task<IActionResult> SeedStatisticsOrders([FromQuery] Guid? sellerId = null)
-    {
-        try
-        {
-            var users = await _context.Users
-                .Where(u => u.Status == UserStatus.Active && !u.IsDeleted)
-                .ToListAsync();
-
-            List<Seller> sellers;
-            List<Product> products;
-
-            if (sellerId.HasValue)
-            {
-                sellers = await _context.Sellers
-                    .Where(s => s.Status == SellerStatus.Approved && !s.IsDeleted && s.Id == sellerId.Value)
-                    .ToListAsync();
-                products = await _context.Products
-                    .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 && !p.IsDeleted && p.SellerId == sellerId.Value)
-                    .ToListAsync();
-            }
-            else
-            {
-                sellers = await _context.Sellers
-                    .Where(s => s.Status == SellerStatus.Approved && !s.IsDeleted)
-                    .ToListAsync();
-                products = await _context.Products
-                    .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 && !p.IsDeleted)
-                    .ToListAsync();
-            }
-
-            if (!users.Any() || !sellers.Any() || !products.Any())
-                return BadRequest("Not enough users, sellers, or products to seed.");
-
-            var now = DateTime.UtcNow;
-            var random = new Random();
-            var orderStatusArr = new[] {
-            OrderStatus.PAID.ToString(),
-            OrderStatus.PENDING.ToString(),
-            OrderStatus.CANCELLED.ToString(),
-            OrderStatus.EXPIRED.ToString()
-        };
-            var detailStatusArr = new[] {
-            OrderDetailItemStatus.DELIVERED,
-            OrderDetailItemStatus.PENDING,
-            OrderDetailItemStatus.SHIPPING_REQUESTED,
-            OrderDetailItemStatus.CANCELLED
-        };
-
-            var orders = new List<Order>();
-            var orderDetails = new List<OrderDetail>();
-            var inventoryItems = new List<InventoryItem>();
-
-            for (int i = 0; i < 7; i++)
-            {
-                var user = users[random.Next(users.Count)];
-                var orderProducts = products.OrderBy(_ => Guid.NewGuid()).Take(random.Next(1, 3)).ToList();
-                var orderId = Guid.NewGuid();
-
-                var status = orderStatusArr[i % orderStatusArr.Length];
-                var placedAt = now.AddDays(-random.Next(2, 20));
-                var completedAt = status == OrderStatus.PAID.ToString() ? placedAt.AddDays(1) : (DateTime?)null;
-
-                var totalAmount = orderProducts.Sum(p => p.Price);
-                var finalAmount = totalAmount - (i % 2 == 0 ? 50000 : 0); // Some orders have a discount
-
-                var order = new Order
-                {
-                    Id = orderId,
-                    UserId = user.Id,
-                    Status = status,
-                    TotalAmount = totalAmount,
-                    FinalAmount = finalAmount,
-                    PlacedAt = placedAt,
-                    CompletedAt = completedAt,
-                    CreatedAt = placedAt
-                };
-                orders.Add(order);
-
-                foreach (var product in orderProducts)
-                {
-                    var seller = sellers.FirstOrDefault(s => s.Id == product.SellerId);
-                    if (seller == null) continue;
-
-                    var quantity = random.Next(1, 3);
-                    var discount = (i + quantity) % 3 == 0 ? Math.Round(product.Price * 0.1m, 0) : 0m;
-                    var finalDetailPrice = product.Price * quantity - discount;
-                    var detailStatus = detailStatusArr[(i + quantity) % detailStatusArr.Length];
-
-                    var orderDetail = new OrderDetail
-                    {
-                        Id = Guid.NewGuid(),
-                        OrderId = orderId,
-                        ProductId = product.Id,
-                        Quantity = quantity,
-                        UnitPrice = product.Price,
-                        TotalPrice = product.Price * quantity,
-                        DetailDiscountPromotion = discount,
-                        FinalDetailPrice = finalDetailPrice,
-                        Status = detailStatus,
-                        CreatedAt = placedAt
-                    };
-                    orderDetails.Add(orderDetail);
-
-                    var inventoryItem = new InventoryItem
-                    {
-                        Id = Guid.NewGuid(),
-                        UserId = user.Id,
-                        ProductId = product.Id,
-                        OrderDetailId = orderDetail.Id,
-                        Status = InventoryItemStatus.Available,
-                        IsFromBlindBox = false,
-                        Location = "HCM",
-                        Tier = RarityName.Common,
-                        CreatedAt = completedAt ?? placedAt
-                    };
-                    inventoryItems.Add(inventoryItem);
-                }
-            }
-
-            await _context.Orders.AddRangeAsync(orders);
-            await _context.OrderDetails.AddRangeAsync(orderDetails);
-            await _context.InventoryItems.AddRangeAsync(inventoryItems);
-            await _context.SaveChangesAsync();
-
-            _logger.Success($"[SeedStatisticsOrders] Seeded {orders.Count} orders, {orderDetails.Count} order details.");
-
-            return Ok(ApiResult<object>.Success(new
-            {
-                Message = $"Seeded {orders.Count} orders and {orderDetails.Count} order details for statistics testing."
-            }));
-        }
-        catch (Exception ex)
-        {
-            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-            _logger.Error($"[SeedStatisticsOrders] Exception: {ex.Message}");
             return StatusCode(statusCode, errorResponse);
         }
     }
@@ -920,12 +850,6 @@ public class SystemController : ControllerBase
 
                 var tablesToDelete = new List<Func<Task>>
                 {
-                      () => context.Reviews.ExecuteDeleteAsync(),
-                     () => context.InventoryItems.ExecuteDeleteAsync(),
-                      () => context.Shipments.ExecuteDeleteAsync(),
-
-                    () => context.OrderDetails.ExecuteDeleteAsync(),
-
                     () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerFavourites.ExecuteDeleteAsync(),
                     () => context.ChatMessages.ExecuteDeleteAsync(),
@@ -934,12 +858,16 @@ public class SystemController : ControllerBase
                     () => context.RarityConfigs.ExecuteDeleteAsync(),
                     () => context.BlindBoxItems.ExecuteDeleteAsync(),
                     () => context.CartItems.ExecuteDeleteAsync(),
+                    () => context.OrderDetails.ExecuteDeleteAsync(),
+                    () => context.Shipments.ExecuteDeleteAsync(),
                     () => context.Listings.ExecuteDeleteAsync(),
+                    () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
 
                     () => context.TradeHistories.ExecuteDeleteAsync(),
                     () => context.TradeRequests.ExecuteDeleteAsync(),
                     () => context.SupportTickets.ExecuteDeleteAsync(),
+                    () => context.Reviews.ExecuteDeleteAsync(),
                     () => context.Transactions.ExecuteDeleteAsync(),
                     () => context.Notifications.ExecuteDeleteAsync(),
                     () => context.OtpVerifications.ExecuteDeleteAsync(),
@@ -2361,7 +2289,6 @@ public class SystemController : ControllerBase
 
         // 1. ✅ Tự động tạo participant cho TẤT CẢ promotions của chính seller
         foreach (var sellerPromotion in sellerPromotions)
-        {
             participants.Add(new PromotionParticipant
             {
                 Id = Guid.NewGuid(),
@@ -2373,7 +2300,6 @@ public class SystemController : ControllerBase
                 UpdatedAt = now,
                 IsDeleted = false
             });
-        }
 
         // 2. ✅ BlindTreasure tham gia một số global promotions (tối đa 2)
         var selectedGlobalPromotions = globalPromotions.Take(2).ToList();
