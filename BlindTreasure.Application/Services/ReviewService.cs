@@ -12,32 +12,26 @@ namespace BlindTreasure.Application.Services;
 
 public class ReviewService : IReviewService
 {
-    private readonly IBlindyService _blindyService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILoggerService _loggerService;
     private readonly IClaimsService _claimService;
     private readonly IBlobService _blobService;
+    private readonly IUserService _userService;
 
-    public ReviewService(IBlindyService blindyService, IUnitOfWork unitOfWork, ILoggerService loggerService,
-        IClaimsService claimService, IBlobService blobService)
+    public ReviewService(IUnitOfWork unitOfWork, ILoggerService loggerService,
+        IClaimsService claimService, IBlobService blobService, IUserService userService)
     {
-        _blindyService = blindyService;
         _unitOfWork = unitOfWork;
         _loggerService = loggerService;
         _claimService = claimService;
         _blobService = blobService;
+        _userService = userService;
     }
 
     public async Task<ReviewResponseDto> CreateReviewAsync(CreateReviewDto createDto)
     {
         // 1. Validate input using private methods
         ValidateCreateReviewInput(createDto);
-
-        // 2. Validate comment content with AI
-        if (!string.IsNullOrWhiteSpace(createDto.Comment))
-            if (!await _blindyService.ValidateReviewAsync(createDto.Comment))
-                throw ErrorHelper.BadRequest("Nội dung đánh giá không phù hợp với tiêu chuẩn cộng đồng");
-
         var userId = _claimService.CurrentUserId;
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null || user.IsDeleted)
@@ -56,16 +50,6 @@ public class ReviewService : IReviewService
         var imageUrls = await UploadReviewImages(createDto.Images, userId);
 
         bool isContentApproved = true;
-
-        if (!string.IsNullOrWhiteSpace(createDto.Comment))
-        {
-            isContentApproved = await _blindyService.ValidateReviewAsync(createDto.Comment);
-            if (!isContentApproved)
-            {
-                throw ErrorHelper.BadRequest("Nội dung đánh giá không phù hợp với tiêu chuẩn cộng đồng. " +
-                                             "Vui lòng không chia sẻ thông tin cá nhân, liên kết hoặc nội dung quảng cáo.");
-            }
-        }
 
         // Create review
         var review = new Review
@@ -89,6 +73,68 @@ public class ReviewService : IReviewService
             $"Review created successfully for OrderDetail {createDto.OrderDetailId} by user {userId}");
 
         // SỬ DỤNG GetByIdAsync để đảm bảo data nhất quán
+        return await GetByIdAsync(review.Id);
+    }
+
+    public async Task<ReviewResponseDto> ReplyToReviewAsync(Guid reviewId, string replyContent)
+    {
+        // Xác thực nội dung phản hồi
+        await ValidateReplyContentAsync(replyContent);
+
+        // Xác thực và lấy thông tin người bán
+        var userId = await ValidateAndGetSellerIdAsync();
+
+        // Tìm đánh giá cần phản hồi (bỏ điều kiện r.SellerId == sellerId)
+        var review = await _unitOfWork.Reviews.GetQueryable()
+            .Include(r => r.User)
+            .Include(r => r.OrderDetail)
+            .ThenInclude(od => od!.Product)
+            .ThenInclude(p => p!.Category)
+            .Include(r => r.OrderDetail)
+            .ThenInclude(od => od!.BlindBox)
+            .Include(r => r.Seller)
+            .Where(r => !r.IsDeleted && r.Id == reviewId)
+            .FirstOrDefaultAsync();
+
+        if (review == null)
+            throw ErrorHelper.NotFound("Không tìm thấy đánh giá");
+
+        // Tìm Seller entity dựa trên UserId
+        var seller = await _unitOfWork.Sellers.GetQueryable()
+            .FirstOrDefaultAsync(s => s.UserId == userId);
+
+        if (seller == null)
+            throw ErrorHelper.NotFound("Không tìm thấy thông tin người bán");
+
+        // Kiểm tra xem sản phẩm hoặc blindbox trong review có thuộc về người bán không
+        bool hasPermission = false;
+
+        if (review.ProductId.HasValue)
+        {
+            hasPermission = await _unitOfWork.Products.GetQueryable()
+                .AnyAsync(p => p.Id == review.ProductId && p.SellerId == seller.Id);
+        }
+
+        if (!hasPermission && review.BlindBoxId.HasValue)
+        {
+            hasPermission = await _unitOfWork.BlindBoxes.GetQueryable()
+                .AnyAsync(b => b.Id == review.BlindBoxId && b.SellerId == seller.Id);
+        }
+
+        if (!hasPermission)
+            throw ErrorHelper.Forbidden("Bạn không có quyền phản hồi đánh giá này");
+
+        // Cập nhật phản hồi
+        review.SellerResponse = replyContent.Trim();
+        review.SellerResponseDate = DateTime.UtcNow;
+        review.UpdatedAt = DateTime.UtcNow;
+        review.UpdatedBy = userId;
+
+        await _unitOfWork.Reviews.Update(review);
+        await _unitOfWork.SaveChangesAsync();
+
+        _loggerService.Success($"Seller {seller.Id} (User {userId}) replied to review {reviewId} successfully");
+
         return await GetByIdAsync(review.Id);
     }
 
@@ -193,6 +239,81 @@ public class ReviewService : IReviewService
         {
             _loggerService.Error($"Failed to map review {review.Id} to ReviewResponseDto: {ex.Message}");
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Xác thực nội dung phản hồi của người bán
+    /// </summary>
+    private async Task ValidateReplyContentAsync(string replyContent)
+    {
+        if (string.IsNullOrWhiteSpace(replyContent))
+        {
+            _loggerService.Warn("Empty reply content in seller response");
+            throw ErrorHelper.BadRequest("Nội dung phản hồi không được để trống");
+        }
+
+        if (replyContent.Length > 1000)
+        {
+            _loggerService.Warn($"Reply content too long: {replyContent.Length} characters");
+            throw ErrorHelper.BadRequest("Nội dung phản hồi không được vượt quá 1000 ký tự");
+        }
+    }
+
+    /// <summary>
+    /// Xác thực và lấy ID của người bán hiện tại
+    /// </summary>
+    private async Task<Guid> ValidateAndGetSellerIdAsync()
+    {
+        try
+        {
+            // Lấy ID người dùng từ claims
+            var userId = _claimService.CurrentUserId;
+
+            if (userId == Guid.Empty)
+            {
+                _loggerService.Error("No user ID found in claims");
+                throw ErrorHelper.Unauthorized("Bạn cần đăng nhập để thực hiện hành động này");
+            }
+
+            // Truy vấn thông tin user để kiểm tra vai trò và trạng thái
+            try
+            {
+                var user = await _userService.GetUserById(userId);
+
+                if (user == null)
+                {
+                    _loggerService.Error($"User with ID {userId} not found or deleted");
+                    throw ErrorHelper.NotFound("Không tìm thấy thông tin người dùng");
+                }
+
+                // Kiểm tra role thủ công
+                if (user.RoleName != RoleType.Seller)
+                {
+                    _loggerService.Error($"User with ID {userId} has role {user.RoleName}, not Seller");
+                    throw ErrorHelper.Forbidden("Bạn không có quyền thực hiện hành động này");
+                }
+
+                if (user.Status != UserStatus.Active)
+                {
+                    _loggerService.Warn($"User with ID {userId} has status {user.Status}");
+                    throw ErrorHelper.Forbidden("Tài khoản đang không ở trạng thái hoạt động");
+                }
+
+                _loggerService.Info($"Successfully validated user {userId} with Seller role");
+                return userId;
+            }
+            catch (Exception dbEx) when (!(dbEx is ApplicationException))
+            {
+                _loggerService.Error($"Database error when fetching user: {dbEx.Message}");
+                throw ErrorHelper.Internal("Lỗi khi truy vấn thông tin người dùng");
+            }
+        }
+        catch (Exception ex) when
+            (!(ex is ApplicationException)) // Bắt tất cả ngoại lệ không phải do ErrorHelper tạo ra
+        {
+            _loggerService.Error($"Unexpected error validating seller role: {ex.Message}");
+            throw ErrorHelper.Internal("Đã xảy ra lỗi khi xác thực quyền người bán");
         }
     }
 
