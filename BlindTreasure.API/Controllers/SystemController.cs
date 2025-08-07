@@ -433,214 +433,216 @@ public class SystemController : ControllerBase
     }
 
     /// <summary>
-/// Giả lập user đã mua hàng để test chức năng review
-/// </summary>
-/// <param name="userId">ID of the user to seed products. If not provided, defaults to user trangiaphuc362003181@gmail.com</param>
-[HttpPost("dev/seed-orders-users")]
-public async Task<IActionResult> SeedUserOrder([FromQuery] Guid? userId = null)
-{
-    try
+    /// Giả lập user đã mua hàng để test chức năng review
+    /// </summary>
+    /// <param name="userId">ID of the user to seed products. If not provided, defaults to user trangiaphuc362003181@gmail.com</param>
+    [HttpPost("dev/seed-orders-users")]
+    public async Task<IActionResult> SeedUserOrder([FromQuery] Guid? userId = null)
     {
-        User? user;
-
-        if (userId.HasValue)
+        try
         {
-            user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
-            if (user == null)
+            User? user;
+
+            if (userId.HasValue)
             {
-                _logger.Warn($"[SeedUserOrder] User not found with Id: {userId}");
-                return NotFound($"User not found with Id: {userId}");
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserOrder] User not found with Id: {userId}");
+                    return NotFound($"User not found with Id: {userId}");
+                }
+
+                _logger.Info($"[SeedUserOrder] Seeding orders for user Id: {userId}");
+            }
+            else
+            {
+                var email = "trangiaphuc362003181@gmail.com";
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+                if (user == null)
+                {
+                    _logger.Warn($"[SeedUserOrder] User not found with email: {email}");
+                    return NotFound($"User not found with email: {email}");
+                }
+
+                _logger.Info($"[SeedUserOrder] Seeding orders for user: {email}");
             }
 
-            _logger.Info($"[SeedUserOrder] Seeding orders for user Id: {userId}");
-        }
-        else
-        {
-            var email = "trangiaphuc362003181@gmail.com";
-            user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null)
+            // Get 3 random products that can be reviewed (active, in stock)
+            var products = await _context.Products
+                .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 && !p.IsDeleted)
+                .Include(p => p.Seller) // Include seller để lấy thông tin
+                .OrderBy(p => Guid.NewGuid())
+                .Take(3)
+                .ToListAsync();
+
+            if (products.Count < 3)
             {
-                _logger.Warn($"[SeedUserOrder] User not found with email: {email}");
-                return NotFound($"User not found with email: {email}");
+                _logger.Warn("[SeedUserOrder] Not enough valid products found (need at least 3)");
+                return BadRequest("Not enough valid products found (need at least 3)");
             }
 
-            _logger.Info($"[SeedUserOrder] Seeding orders for user: {email}");
-        }
+            var now = DateTime.UtcNow;
+            var totalAmount = products.Sum(p => p.Price);
 
-        // Get 3 random products that can be reviewed (active, in stock)
-        var products = await _context.Products
-            .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 && !p.IsDeleted)
-            .Include(p => p.Seller) // Include seller để lấy thông tin
-            .OrderBy(p => Guid.NewGuid())
-            .Take(3)
-            .ToListAsync();
-
-        if (products.Count < 3)
-        {
-            _logger.Warn("[SeedUserOrder] Not enough valid products found (need at least 3)");
-            return BadRequest("Not enough valid products found (need at least 3)");
-        }
-
-        var now = DateTime.UtcNow;
-        var totalAmount = products.Sum(p => p.Price);
-
-        // 1. Tạo Payment trước
-        var payment = new Payment
-        {
-            Id = Guid.NewGuid(),
-            Amount = totalAmount,
-            Method = "STRIPE",
-            Status = PaymentStatus.Paid,
-            PaidAt = now.AddDays(-5),
-            CreatedAt = now.AddDays(-7),
-            UpdatedAt = now.AddDays(-5),
-            CreatedBy = user.Id,
-            UpdatedBy = user.Id
-        };
-
-        // 2. Tạo Order
-        var order = new Order
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            Status = OrderStatus.PAID.ToString(), // ✅ QUAN TRỌNG: Phải là "PAID"
-            TotalAmount = totalAmount,
-            FinalAmount = totalAmount,
-            TotalShippingFee = 0,
-            PlacedAt = now.AddDays(-7),
-            CompletedAt = now.AddDays(-5),
-            PaymentId = payment.Id,
-            CreatedAt = now.AddDays(-7),
-            UpdatedAt = now.AddDays(-5),
-            CreatedBy = user.Id,
-            UpdatedBy = user.Id
-        };
-
-        // Link Payment với Order
-        payment.OrderId = order.Id;
-
-        // 3. Tạo Transaction với đầy đủ field bắt buộc
-        var transaction = new Transaction
-        {
-            Id = Guid.NewGuid(),
-            PaymentId = payment.Id,
-            Type = "PAYMENT", // ✅ QUAN TRỌNG: Set Type để tránh null constraint
-            Amount = totalAmount,
-            Currency = "VND",
-            Status = TransactionStatus.Successful.ToString(),
-            OccurredAt = now.AddDays(-5),
-            ExternalRef = $"test_session_{Guid.NewGuid()}", // Stripe session ID giả lập
-            Notes = "Test transaction for review functionality",
-            CompleteAt = now.AddDays(-5),
-            StripeTransactionId = $"pi_test_{Guid.NewGuid().ToString("N")[..24]}", // Stripe PaymentIntent ID giả lập
-            CreatedAt = now.AddDays(-5),
-            UpdatedAt = now.AddDays(-5),
-            CreatedBy = user.Id,
-            UpdatedBy = user.Id
-        };
-
-        // 4. Tạo OrderDetails và InventoryItems
-        var orderDetails = new List<OrderDetail>();
-        var inventoryItems = new List<InventoryItem>();
-
-        foreach (var product in products)
-        {
-            if (product.Seller == null)
-            {
-                _logger.Warn($"[SeedUserOrder] Seller not found for product {product.Id}");
-                continue;
-            }
-
-            // Tạo OrderDetail
-            var orderDetail = new OrderDetail
+            // 1. Tạo Payment trước
+            var payment = new Payment
             {
                 Id = Guid.NewGuid(),
-                OrderId = order.Id,
-                ProductId = product.Id,
-                Quantity = 1,
-                UnitPrice = product.Price,
-                TotalPrice = product.Price,
-                DetailDiscountPromotion = 0,
-                FinalDetailPrice = product.Price,
-                Status = OrderDetailItemStatus.DELIVERED, // Đã giao hàng
-                SellerId = product.SellerId,
-                Logs = $"[{now.AddDays(-7):yyyy-MM-dd HH:mm:ss}] Created {product.Name}, Qty=1\n" +
-                       $"[{now.AddDays(-6):yyyy-MM-dd HH:mm:ss}] Status updated to SHIPPING_REQUESTED\n" +
-                       $"[{now.AddDays(-5):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERING\n" +
-                       $"[{now.AddDays(-4):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERED",
+                Amount = totalAmount,
+                Method = "STRIPE",
+                Status = PaymentStatus.Paid,
+                PaidAt = now.AddDays(-5),
                 CreatedAt = now.AddDays(-7),
-                UpdatedAt = now.AddDays(-4),
+                UpdatedAt = now.AddDays(-5),
                 CreatedBy = user.Id,
                 UpdatedBy = user.Id
             };
-            orderDetails.Add(orderDetail);
 
-            // Tạo InventoryItem
-            var inventoryItem = new InventoryItem
+            // 2. Tạo Order
+            var order = new Order
             {
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
-                ProductId = product.Id,
-                OrderDetailId = orderDetail.Id,
-                Status = InventoryItemStatus.Available,
-                IsFromBlindBox = false,
-                Location = product.Seller.CompanyAddress ?? "HCM Warehouse",
-                Tier = RarityName.Common,
-                CreatedAt = now.AddDays(-4), // Tạo inventory khi delivered
-                UpdatedAt = now.AddDays(-4),
+                Status = OrderStatus.PAID.ToString(), // ✅ QUAN TRỌNG: Phải là "PAID"
+                TotalAmount = totalAmount,
+                FinalAmount = totalAmount,
+                TotalShippingFee = 0,
+                PlacedAt = now.AddDays(-7),
+                CompletedAt = now.AddDays(-5),
+                PaymentId = payment.Id,
+                CreatedAt = now.AddDays(-7),
+                UpdatedAt = now.AddDays(-5),
                 CreatedBy = user.Id,
                 UpdatedBy = user.Id
             };
-            inventoryItems.Add(inventoryItem);
 
-            // Giảm stock của product
-            product.Stock -= 1;
+            // Link Payment với Order
+            payment.OrderId = order.Id;
+
+            // 3. Tạo Transaction với đầy đủ field bắt buộc
+            var transaction = new Transaction
+            {
+                Id = Guid.NewGuid(),
+                PaymentId = payment.Id,
+                Type = "PAYMENT", // ✅ QUAN TRỌNG: Set Type để tránh null constraint
+                Amount = totalAmount,
+                Currency = "VND",
+                Status = TransactionStatus.Successful.ToString(),
+                OccurredAt = now.AddDays(-5),
+                ExternalRef = $"test_session_{Guid.NewGuid()}", // Stripe session ID giả lập
+                Notes = "Test transaction for review functionality",
+                CompleteAt = now.AddDays(-5),
+                StripeTransactionId =
+                    $"pi_test_{Guid.NewGuid().ToString("N")[..24]}", // Stripe PaymentIntent ID giả lập
+                CreatedAt = now.AddDays(-5),
+                UpdatedAt = now.AddDays(-5),
+                CreatedBy = user.Id,
+                UpdatedBy = user.Id
+            };
+
+            // 4. Tạo OrderDetails và InventoryItems
+            var orderDetails = new List<OrderDetail>();
+            var inventoryItems = new List<InventoryItem>();
+
+            foreach (var product in products)
+            {
+                if (product.Seller == null)
+                {
+                    _logger.Warn($"[SeedUserOrder] Seller not found for product {product.Id}");
+                    continue;
+                }
+
+                // Tạo OrderDetail
+                var orderDetail = new OrderDetail
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    ProductId = product.Id,
+                    Quantity = 1,
+                    UnitPrice = product.Price,
+                    TotalPrice = product.Price,
+                    DetailDiscountPromotion = 0,
+                    FinalDetailPrice = product.Price,
+                    Status = OrderDetailItemStatus.DELIVERED, // Đã giao hàng
+                    SellerId = product.SellerId,
+                    Logs = $"[{now.AddDays(-7):yyyy-MM-dd HH:mm:ss}] Created {product.Name}, Qty=1\n" +
+                           $"[{now.AddDays(-6):yyyy-MM-dd HH:mm:ss}] Status updated to SHIPPING_REQUESTED\n" +
+                           $"[{now.AddDays(-5):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERING\n" +
+                           $"[{now.AddDays(-4):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERED",
+                    CreatedAt = now.AddDays(-7),
+                    UpdatedAt = now.AddDays(-4),
+                    CreatedBy = user.Id,
+                    UpdatedBy = user.Id
+                };
+                orderDetails.Add(orderDetail);
+
+                // Tạo InventoryItem
+                var inventoryItem = new InventoryItem
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    ProductId = product.Id,
+                    OrderDetailId = orderDetail.Id,
+                    Status = InventoryItemStatus.Available,
+                    IsFromBlindBox = false,
+                    Location = product.Seller.CompanyAddress ?? "HCM Warehouse",
+                    Tier = RarityName.Common,
+                    CreatedAt = now.AddDays(-4), // Tạo inventory khi delivered
+                    UpdatedAt = now.AddDays(-4),
+                    CreatedBy = user.Id,
+                    UpdatedBy = user.Id
+                };
+                inventoryItems.Add(inventoryItem);
+
+                // Giảm stock của product
+                product.Stock -= 1;
+            }
+
+            if (!orderDetails.Any())
+            {
+                _logger.Warn("[SeedUserOrder] No valid order details could be created");
+                return BadRequest("No valid order details could be created");
+            }
+
+            // 5. Lưu vào database theo đúng thứ tự dependency
+            await _context.Payments.AddAsync(payment);
+            await _context.Orders.AddAsync(order);
+            await _context.Transactions.AddAsync(transaction);
+            await _context.OrderDetails.AddRangeAsync(orderDetails);
+            await _context.InventoryItems.AddRangeAsync(inventoryItems);
+
+            // Cập nhật stock của products
+            _context.Products.UpdateRange(products);
+
+            await _context.SaveChangesAsync();
+
+            _logger.Success(
+                $"[SeedUserOrder] Successfully seeded {orderDetails.Count} paid orders with products for user {user.Email}");
+
+            return Ok(ApiResult<object>.Success(new
+            {
+                Message =
+                    $"Successfully seeded {orderDetails.Count} PAID orders with products for user {user.Email}",
+                OrderId = order.Id,
+                OrderStatus = order.Status,
+                PaymentId = payment.Id,
+                PaymentStatus = payment.Status.ToString(),
+                TransactionId = transaction.Id,
+                TransactionStatus = transaction.Status,
+                ProductIds = orderDetails.Select(od => od.ProductId).ToList(),
+                InventoryItemIds = inventoryItems.Select(ii => ii.Id).ToList(),
+                CanReviewNow = true // Có thể review ngay vì order đã PAID
+            }));
         }
-
-        if (!orderDetails.Any())
+        catch (Exception ex)
         {
-            _logger.Warn("[SeedUserOrder] No valid order details could be created");
-            return BadRequest("No valid order details could be created");
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            _logger.Error($"[SeedUserOrder] Exception: {ex.Message}");
+            return StatusCode(statusCode, errorResponse);
         }
-
-        // 5. Lưu vào database theo đúng thứ tự dependency
-        await _context.Payments.AddAsync(payment);
-        await _context.Orders.AddAsync(order);
-        await _context.Transactions.AddAsync(transaction);
-        await _context.OrderDetails.AddRangeAsync(orderDetails);
-        await _context.InventoryItems.AddRangeAsync(inventoryItems);
-
-        // Cập nhật stock của products
-        _context.Products.UpdateRange(products);
-
-        await _context.SaveChangesAsync();
-
-        _logger.Success(
-            $"[SeedUserOrder] Successfully seeded {orderDetails.Count} paid orders with products for user {user.Email}");
-
-        return Ok(ApiResult<object>.Success(new
-        {
-            Message =
-                $"Successfully seeded {orderDetails.Count} PAID orders with products for user {user.Email}",
-            OrderId = order.Id,
-            OrderStatus = order.Status,
-            PaymentId = payment.Id,
-            PaymentStatus = payment.Status.ToString(),
-            TransactionId = transaction.Id,
-            TransactionStatus = transaction.Status,
-            ProductIds = orderDetails.Select(od => od.ProductId).ToList(),
-            InventoryItemIds = inventoryItems.Select(ii => ii.Id).ToList(),
-            CanReviewNow = true // Có thể review ngay vì order đã PAID
-        }));
     }
-    catch (Exception ex)
-    {
-        var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-        var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
-        _logger.Error($"[SeedUserOrder] Exception: {ex.Message}");
-        return StatusCode(statusCode, errorResponse);
-    }
-}
+
     /// <summary>
     /// Seed promotions and promotion participants.
     /// This will first clear existing promotions and participants before seeding new ones.
@@ -2286,7 +2288,6 @@ public async Task<IActionResult> SeedUserOrder([FromQuery] Guid? userId = null)
 
         // 1. ✅ Tự động tạo participant cho TẤT CẢ promotions của chính seller
         foreach (var sellerPromotion in sellerPromotions)
-        {
             participants.Add(new PromotionParticipant
             {
                 Id = Guid.NewGuid(),
@@ -2298,7 +2299,6 @@ public async Task<IActionResult> SeedUserOrder([FromQuery] Guid? userId = null)
                 UpdatedAt = now,
                 IsDeleted = false
             });
-        }
 
         // 2. ✅ BlindTreasure tham gia một số global promotions (tối đa 2)
         var selectedGlobalPromotions = globalPromotions.Take(2).ToList();

@@ -21,16 +21,10 @@ public class BlindyService : IBlindyService
 
     public async Task<bool> ValidateReviewAsync(string comment)
     {
-        if (string.IsNullOrWhiteSpace(comment))
-        {
-            return false;
-        }
+        if (string.IsNullOrWhiteSpace(comment)) return false;
 
         // Basic length validation
-        if (comment.Length > 1000 || comment.Length < 10)
-        {
-            return false;
-        }
+        if (comment.Length > 1000 || comment.Length < 10) return false;
 
         // AI validation prompt using StringBuilder with AppendLine
         var promptBuilder = new StringBuilder();

@@ -5,6 +5,7 @@ using BlindTreasure.Domain.DTOs.ReviewDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
@@ -29,12 +30,8 @@ public class ReviewService : IReviewService
 
     public async Task<ReviewResponseDto> CreateReviewAsync(CreateReviewDto createDto)
     {
-        // 1. Validate input
-        if (createDto == null)
-            throw ErrorHelper.BadRequest("Dữ liệu đánh giá không hợp lệ");
-
-        if (createDto.ImagesUrls is { Count: > 5 })
-            throw ErrorHelper.BadRequest("Chỉ được tải lên tối đa 5 hình ảnh");
+        // 1. Validate input using private methods
+        ValidateCreateReviewInput(createDto);
 
         // 2. Validate comment content with AI
         if (!string.IsNullOrWhiteSpace(createDto.Comment))
@@ -53,67 +50,23 @@ public class ReviewService : IReviewService
             .Include(od => od.BlindBox)
             .FirstOrDefaultAsync(od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId);
 
-        if (orderDetail == null)
-            throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
+        await ValidateOrderDetailForReview(orderDetail!, createDto.OrderDetailId, userId);
 
-        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
-            throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
+        // Upload images sử dụng IFormFile
+        var imageUrls = await UploadReviewImages(createDto.Images, userId);
 
-        var existingReview = await _unitOfWork.Reviews.GetQueryable()
-            .FirstOrDefaultAsync(r => r.OrderDetailId == createDto.OrderDetailId && r.UserId == userId && !r.IsDeleted);
-
-        if (existingReview != null)
-            throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
-
-        // 6. Validate rating
-        if (createDto.Rating < 1 || createDto.Rating > 5)
-            throw ErrorHelper.BadRequest("Điểm đánh giá phải từ 1 đến 5 sao");
-
-        // 7. Upload images
-        var imageUrls = new List<string>();
-        if (createDto.ImagesUrls.Any())
-            foreach (var base64Image in createDto.ImagesUrls)
-                try
-                {
-                    // Validate base64 format
-                    if (string.IsNullOrWhiteSpace(base64Image) || !IsValidBase64(base64Image))
-                    {
-                        _loggerService.Warn("Invalid base64 image format");
-                        continue;
-                    }
-
-                    var fileName = $"reviews/{userId}/{Guid.NewGuid()}.jpg";
-                    var imageBytes = Convert.FromBase64String(base64Image);
-
-                    // Validate image size (max 5MB)
-                    if (imageBytes.Length > 5 * 1024 * 1024)
-                    {
-                        _loggerService.Warn("Image size exceeds 5MB limit");
-                        continue;
-                    }
-
-                    using var stream = new MemoryStream(imageBytes);
-                    await _blobService.UploadFileAsync(fileName, stream);
-                    var imageUrl = await _blobService.GetPreviewUrlAsync(fileName);
-                    imageUrls.Add(imageUrl);
-                }
-                catch (Exception ex)
-                {
-                    _loggerService.Warn($"Failed to upload review image: {ex.Message}");
-                }
-
-        // 8. Create review
+        // Create review
         var review = new Review
         {
             UserId = userId,
             OrderDetailId = createDto.OrderDetailId,
-            ProductId = orderDetail.ProductId,
+            ProductId = orderDetail!.ProductId,
             BlindBoxId = orderDetail.BlindBoxId,
             SellerId = orderDetail.SellerId,
             OverallRating = createDto.Rating,
             Content = createDto.Comment.Trim(),
             ImageUrls = imageUrls,
-            IsApproved = true, // Auto-approve after AI validation
+            IsApproved = true,
             ApprovedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow
         };
@@ -121,26 +74,33 @@ public class ReviewService : IReviewService
         await _unitOfWork.Reviews.AddAsync(review);
         await _unitOfWork.SaveChangesAsync();
 
-        // 10. Return response
-        return new ReviewResponseDto
-        {
-            Id = review.Id,
-            UserId = review.UserId,
-            UserName = user.FullName ?? "Skibidi",
-            UserAvatar = user.AvatarUrl,
-            Rating = review.OverallRating,
-            Comment = review.Content,
-            CreatedAt = review.CreatedAt,
-            Category = orderDetail.Product?.Category.Name ?? "BlindBox",
-            Images = review.ImageUrls,
-            SellerReply = review.SellerResponseDate.HasValue
-                ? new SellerReplyDto
-                {
-                    Content = review.SellerResponse!,
-                    CreatedAt = review.SellerResponseDate.Value
-                }
-                : null
-        };
+        _loggerService.Success(
+            $"Review created successfully for OrderDetail {createDto.OrderDetailId} by user {userId}");
+
+        // SỬ DỤNG GetByIdAsync để đảm bảo data nhất quán
+        return await GetByIdAsync(review.Id);
+    }
+
+    /// <summary>
+    /// Lấy review theo ID với đầy đủ thông tin liên quan
+    /// </summary>
+    public async Task<ReviewResponseDto> GetByIdAsync(Guid reviewId)
+    {
+        var review = await _unitOfWork.Reviews.GetQueryable()
+            .Include(r => r.User)
+            .Include(r => r.OrderDetail)
+            .ThenInclude(od => od!.Product)
+            .ThenInclude(p => p!.Category)
+            .Include(r => r.OrderDetail)
+            .ThenInclude(od => od!.BlindBox)
+            .Include(r => r.Seller)
+            .Where(r => !r.IsDeleted)
+            .FirstOrDefaultAsync(r => r.Id == reviewId);
+
+        if (review == null)
+            throw ErrorHelper.NotFound("Không tìm thấy đánh giá");
+
+        return MapToReviewResponseDto(review);
     }
 
     public async Task<bool> CanReviewOrderDetailAsync(Guid orderDetailId)
@@ -165,18 +125,203 @@ public class ReviewService : IReviewService
         return !existingReview;
     }
 
-    // Helper method to validate base64
-    private bool IsValidBase64(string base64String)
+    #region private methods
+
+    /// <summary>
+    /// CORE METHOD: Map Review entity sang ReviewResponseDto
+    /// Tất cả methods khác sẽ dùng method này để đảm bảo data mapping nhất quán
+    /// </summary>
+    private ReviewResponseDto MapToReviewResponseDto(Review review)
     {
-        try
+        if (review == null)
+            throw new ArgumentNullException(nameof(review));
+
+        // Determine category name
+        var categoryName = review.OrderDetail?.Product?.Category?.Name ?? "BlindBox";
+
+        // Determine item name for logging/display
+        var itemName = review.OrderDetail?.Product?.Name ?? review.OrderDetail?.BlindBox?.Name ?? "Unknown Item";
+
+        return new ReviewResponseDto
         {
-            // ReSharper disable once ReturnValueOfPureMethodIsNotUsed
-            Convert.FromBase64String(base64String);
-            return true;
-        }
-        catch
+            Id = review.Id,
+            UserId = review.UserId,
+            UserName = review.User?.FullName ?? "Anonymous User",
+            UserAvatar = review.User?.AvatarUrl,
+            Rating = review.OverallRating,
+            Comment = review.Content,
+            CreatedAt = review.CreatedAt,
+            UpdatedAt = review.UpdatedAt,
+            Category = categoryName,
+            ItemName = itemName, // Thêm field này nếu cần
+            Images = review.ImageUrls ?? new List<string>(),
+            IsApproved = review.IsApproved,
+            ApprovedAt = review.ApprovedAt,
+            SellerReply = review.SellerResponseDate.HasValue
+                ? new SellerReplyDto
+                {
+                    Content = review.SellerResponse ?? string.Empty,
+                    CreatedAt = review.SellerResponseDate.Value,
+                    SellerName = review.Seller?.CompanyName ?? "Seller"
+                }
+                : null,
+            // Additional metadata
+            OrderDetailId = review.OrderDetailId,
+            ProductId = review.ProductId,
+            BlindBoxId = review.BlindBoxId,
+            SellerId = review.SellerId
+        };
+    }
+
+    /// <summary>
+    /// Validate basic input data for CreateReviewDto
+    /// </summary>
+    private void ValidateCreateReviewInput(CreateReviewDto createDto)
+    {
+        if (createDto == null)
+            throw ErrorHelper.BadRequest("Dữ liệu đánh giá không hợp lệ");
+
+        // Validate OrderDetailId
+        if (createDto.OrderDetailId == Guid.Empty)
+            throw ErrorHelper.BadRequest("ID chi tiết đơn hàng là bắt buộc");
+
+        // Validate Rating
+        if (createDto.Rating < 1 || createDto.Rating > 5)
+            throw ErrorHelper.BadRequest("Điểm đánh giá phải từ 1 đến 5 sao");
+
+        // Validate Comment
+        if (string.IsNullOrWhiteSpace(createDto.Comment))
+            throw ErrorHelper.BadRequest("Nội dung đánh giá là bắt buộc");
+
+        if (createDto.Comment.Length < 10)
+            throw ErrorHelper.BadRequest("Nội dung đánh giá phải có ít nhất 10 ký tự");
+
+        if (createDto.Comment.Length > 2000)
+            throw ErrorHelper.BadRequest("Nội dung đánh giá không được vượt quá 2000 ký tự");
+
+        // ✅ Validate Images (tối đa 5 file)
+        if (createDto.Images != null && createDto.Images.Count > 5)
+            throw ErrorHelper.BadRequest("Chỉ được tải lên tối đa 5 hình ảnh");
+
+        // Validate each image file
+        if (createDto.Images != null && createDto.Images.Any())
+            foreach (var imageFile in createDto.Images)
+                if (!IsValidImageFile(imageFile))
+                    throw ErrorHelper.BadRequest($"File {imageFile.FileName} không hợp lệ");
+    }
+
+    /// <summary>
+    /// Validate OrderDetail for review eligibility
+    /// </summary>
+    private async Task ValidateOrderDetailForReview(OrderDetail orderDetail, Guid orderDetailId, Guid userId)
+    {
+        if (orderDetail == null)
+            throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
+
+        // Check order status
+        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
+            throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
+
+        // Check if already reviewed
+        var existingReview = await _unitOfWork.Reviews.GetQueryable()
+            .FirstOrDefaultAsync(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted);
+
+        if (existingReview != null)
+            throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
+    }
+
+    /// <summary>
+    /// Validate individual image file
+    /// </summary>
+    private bool IsValidImageFile(IFormFile file)
+    {
+        // Check if file is null or empty
+        if (file.Length == 0)
         {
+            _loggerService.Warn("Empty file detected");
             return false;
         }
+
+        // Check file size (max 5MB)
+        const int maxSizeBytes = 5 * 1024 * 1024; // 5MB
+        if (file.Length > maxSizeBytes)
+        {
+            _loggerService.Warn($"File {file.FileName} exceeds size limit: {file.Length} bytes (max: {maxSizeBytes})");
+            return false;
+        }
+
+        // Check file extension
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+        var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+        if (string.IsNullOrEmpty(fileExtension) || !allowedExtensions.Contains(fileExtension))
+        {
+            _loggerService.Warn($"File {file.FileName} has invalid extension: {fileExtension}");
+            return false;
+        }
+
+        // Check MIME type
+        var allowedMimeTypes = new[]
+        {
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/gif",
+            "image/webp"
+        };
+
+        if (string.IsNullOrEmpty(file.ContentType) || !allowedMimeTypes.Contains(file.ContentType.ToLowerInvariant()))
+        {
+            _loggerService.Warn($"File {file.FileName} has invalid MIME type: {file.ContentType}");
+            return false;
+        }
+
+        return true;
     }
+
+    /// <summary>
+    /// Upload review images and return list of URLs
+    /// </summary>
+    private async Task<List<string>> UploadReviewImages(List<IFormFile>? images, Guid userId)
+    {
+        var imageUrls = new List<string>();
+
+        if (images == null || !images.Any())
+            return imageUrls;
+
+        var successCount = 0;
+        var failCount = 0;
+
+        foreach (var imageFile in images)
+            try
+            {
+                // Generate unique filename
+                var fileExtension = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
+                var fileName = $"reviews/{userId}/{Guid.NewGuid()}{fileExtension}";
+
+                // Upload file to MinIO via BlobService
+                using var stream = imageFile.OpenReadStream();
+                await _blobService.UploadFileAsync(fileName, stream);
+
+                // Get public URL
+                var imageUrl = await _blobService.GetPreviewUrlAsync(fileName);
+                imageUrls.Add(imageUrl);
+                successCount++;
+
+                _loggerService.Info($"Successfully uploaded review image: {fileName}");
+            }
+            catch (Exception ex)
+            {
+                failCount++;
+                _loggerService.Error($"Failed to upload review image {imageFile.FileName}: {ex.Message}");
+                // Continue with other images even if one fails
+            }
+
+        _loggerService.Info(
+            $"Image upload summary: {successCount} success, {failCount} failed out of {images.Count} total");
+
+        return imageUrls;
+    }
+
+    #endregion
 }

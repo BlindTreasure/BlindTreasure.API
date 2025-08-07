@@ -17,18 +17,15 @@ public class ReviewController : ControllerBase
     {
         _reviewService = reviewService;
     }
-    
-    /// <summary>
-    ///     Tạo đánh giá mới
-    /// </summary>
+
     [HttpPost]
-    [Authorize]
+    [Consumes("multipart/form-data")]
     public async Task<IActionResult> CreateReview([FromForm] CreateReviewDto createDto)
     {
         try
         {
             var result = await _reviewService.CreateReviewAsync(createDto);
-            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Tạo đánh giá thành công."));
+            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Đánh giá được tạo thành công"));
         }
         catch (Exception ex)
         {
@@ -37,5 +34,20 @@ public class ReviewController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-   
+
+    [HttpGet("can-review/{orderDetailId}")]
+    public async Task<IActionResult> CanReviewOrderDetail(Guid orderDetailId)
+    {
+        try
+        {
+            var canReview = await _reviewService.CanReviewOrderDetailAsync(orderDetailId);
+            return Ok(ApiResult<bool>.Success(canReview, "200", "Ok bạn có thể để lại đánh giá cho đơn hàng này"));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<bool>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 }
