@@ -18,4 +18,6 @@ public interface IReviewService
     Task<ReviewResponseDto> ReplyToReviewAsync(Guid reviewId, string replyContent);
     Task<bool> CanReviewOrderDetailAsync(Guid orderDetailId);
     Task<ReviewResponseDto> GetByIdAsync(Guid reviewId);
+
+    Task<ReviewResponseDto> DeleteReviewAsync(Guid reviewId);
 }
