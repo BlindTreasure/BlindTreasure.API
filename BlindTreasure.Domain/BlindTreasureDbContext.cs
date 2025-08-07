@@ -558,7 +558,7 @@ public class BlindTreasureDbContext : DbContext
             .HasOne(a => a.User)
             .WithMany(u => u.Addresses)
             .HasForeignKey(a => a.UserId);
-       
+
         // SupportTicket ↔ User / AssignedTo (n-1), set null
         modelBuilder.Entity<SupportTicket>()
             .HasOne(st => st.User)
@@ -598,77 +598,77 @@ public class BlindTreasureDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-         modelBuilder.Entity<Review>(entity =>
-    {
-        // Primary key
-        entity.HasKey(r => r.Id);
+        modelBuilder.Entity<Review>(entity =>
+        {
+            // Primary key
+            entity.HasKey(r => r.Id);
 
-        // Properties configuration
-        entity.Property(r => r.Content)
-            .HasMaxLength(2000)
-            .IsRequired(false); // Optional field
+            // Properties configuration
+            entity.Property(r => r.Content)
+                .HasMaxLength(2000)
+                .IsRequired(false); // Optional field
 
-        entity.Property(r => r.OverallRating)
-            .IsRequired()
-            .HasDefaultValue(1)
-            .HasAnnotation("Range", new[] { 1, 5 });
+            entity.Property(r => r.OverallRating)
+                .IsRequired()
+                .HasDefaultValue(1)
+                .HasAnnotation("Range", new[] { 1, 5 });
 
-        entity.Property(r => r.IsApproved)
-            .IsRequired()
-            .HasDefaultValue(false);
+            entity.Property(r => r.IsApproved)
+                .IsRequired()
+                .HasDefaultValue(false);
 
-        entity.Property(r => r.ApprovedAt)
-            .IsRequired(false);
+            entity.Property(r => r.ApprovedAt)
+                .IsRequired(false);
 
-        entity.Property(r => r.SellerResponse)
-            .HasMaxLength(1000)
-            .IsRequired(false);
+            entity.Property(r => r.SellerResponse)
+                .HasMaxLength(1000)
+                .IsRequired(false);
 
-        // Relationships
-        entity.HasOne(r => r.User)
-            .WithMany(u => u.Reviews)
-            .HasForeignKey(r => r.UserId)
-            .OnDelete(DeleteBehavior.Restrict); // Prevent cascade delete
+            // Relationships
+            entity.HasOne(r => r.User)
+                .WithMany(u => u.Reviews)
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Restrict); // Prevent cascade delete
 
-        entity.HasOne(r => r.OrderDetail)
-            .WithMany(od => od.Reviews)
-            .HasForeignKey(r => r.OrderDetailId)
-            .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(r => r.OrderDetail)
+                .WithMany(od => od.Reviews)
+                .HasForeignKey(r => r.OrderDetailId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-        entity.HasOne(r => r.Product)
-            .WithMany(p => p.Reviews)
-            .HasForeignKey(r => r.ProductId)
-            .IsRequired(false)
-            .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(r => r.Product)
+                .WithMany(p => p.Reviews)
+                .HasForeignKey(r => r.ProductId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
 
-        entity.HasOne(r => r.BlindBox)
-            .WithMany(b => b.Reviews)
-            .HasForeignKey(r => r.BlindBoxId)
-            .IsRequired(false)
-            .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(r => r.BlindBox)
+                .WithMany(b => b.Reviews)
+                .HasForeignKey(r => r.BlindBoxId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
 
-        entity.HasOne(r => r.Seller)
-            .WithMany(s => s.Reviews)
-            .HasForeignKey(r => r.SellerId)
-            .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(r => r.Seller)
+                .WithMany(s => s.Reviews)
+                .HasForeignKey(r => r.SellerId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-        // Indexes
-        entity.HasIndex(r => r.UserId);
-        entity.HasIndex(r => r.OrderDetailId);
-        entity.HasIndex(r => r.ProductId);
-        entity.HasIndex(r => r.BlindBoxId);
-        entity.HasIndex(r => r.SellerId);
-        entity.HasIndex(r => r.IsApproved);
-        entity.HasIndex(r => r.OverallRating);
+            // Indexes
+            entity.HasIndex(r => r.UserId);
+            entity.HasIndex(r => r.OrderDetailId);
+            entity.HasIndex(r => r.ProductId);
+            entity.HasIndex(r => r.BlindBoxId);
+            entity.HasIndex(r => r.SellerId);
+            entity.HasIndex(r => r.IsApproved);
+            entity.HasIndex(r => r.OverallRating);
 
-        // Complex property for ImageUrls (stored as JSON)
-        entity.Property(r => r.ImageUrls)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, (JsonSerializerOptions)null),
-                v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions)null))
-            .HasColumnType("jsonb");
-    });
-        
+            // Complex property for ImageUrls (stored as JSON)
+            entity.Property(r => r.ImageUrls)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, (JsonSerializerOptions)null),
+                    v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions)null))
+                .HasColumnType("jsonb");
+        });
+
         modelBuilder.Entity<TradeHistory>(entity =>
         {
             entity.Property(t => t.FinalStatus)

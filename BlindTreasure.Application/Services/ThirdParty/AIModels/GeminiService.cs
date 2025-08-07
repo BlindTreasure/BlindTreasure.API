@@ -101,25 +101,24 @@ public class GeminiService : IGeminiService
     public async Task<string> GenerateValidationResponseAsync(string userPrompt)
     {
         // Sử dụng model nhẹ nhất và context tối thiểu
-        const string lightSystemPrompt = @"
-Bạn là AI validator cho nền tảng BlindTreasure. 
-Phân tích nội dung và trả về JSON format chính xác.
-Tập trung vào: spam, ngôn từ xấu, thông tin cá nhân, tính phù hợp.
-";
 
-        var fullPrompt = $"{lightSystemPrompt}\n\n{userPrompt}";
-        var cacheKey = $"gemini:validation:{fullPrompt.GetHashCode()}";
+        var promptBuilder = new StringBuilder();
+        promptBuilder.Clear();
+        promptBuilder.AppendLine("Bạn là AI validator. Phân tích nội dung đánh giá sản phẩm sau đây.");
+        promptBuilder.AppendLine("Trả về CHÍNH XÁC JSON format theo mẫu:");
+        promptBuilder.AppendLine("{");
+        promptBuilder.AppendLine("  \"isValid\": false,");
+        promptBuilder.AppendLine("  \"reasons\": [\"Lý do 1\", \"Lý do 2\"]");
+        promptBuilder.AppendLine("}");
+        promptBuilder.AppendLine();
+        promptBuilder.AppendLine("Nếu hợp lệ thì isValid = true và reasons = []");
+        promptBuilder.AppendLine("KHÔNG được thêm bất kỳ text nào khác ngoài JSON.");
 
-        // Check cache
-        if (await _cache.ExistsAsync(cacheKey))
-        {
-            var cached = await _cache.GetAsync<string>(cacheKey);
-            if (!string.IsNullOrWhiteSpace(cached)) return cached;
-        }
+        var fullPrompt = $"{promptBuilder}\n\n{userPrompt}";
 
         // Sử dụng model nhẹ nhất
         var url =
-            $"https://generativelanguage.googleapis.com/v1beta/models/{GeminiModels.FlashLiteV2}:generateContent?key={_apiKey}";
+            $"https://generativelanguage.googleapis.com/v1beta/models/{GeminiModels.Flash}:generateContent?key={_apiKey}";
 
         var body = new
         {
@@ -164,11 +163,14 @@ Tập trung vào: spam, ngôn từ xấu, thông tin cá nhân, tính phù hợp
             .GetString();
 
         var finalResult = result ?? string.Empty;
-
-        // Cache ngắn hơn cho validation (2 giờ)
-        await _cache.SetAsync(cacheKey, finalResult, TimeSpan.FromHours(2));
         return finalResult;
     }
+    public string GenerateFallbackValidation(string prompt)
+    {
+        // Trả về JSON chuẩn khi API lỗi
+        return "{\"isValid\": false, \"reasons\": [\"API validation không khả dụng, bài đánh giá cần kiểm duyệt thủ công.\"]}";
+    }
+
 }
 
 public static class GeminiContext

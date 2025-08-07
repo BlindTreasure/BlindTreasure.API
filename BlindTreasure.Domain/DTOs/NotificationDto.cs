@@ -1,6 +1,7 @@
 using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.DTOs;
+
 public class NotificationDto
 {
     public Guid Id { get; set; } // Thêm Id
