@@ -10,6 +10,7 @@ public enum OrderStatus
 
 public enum OrderDetailItemStatus
 {
+    REFUNDED, // Đã hoàn tiền
     PENDING, // Chưa có yêu cầu ship
     IN_INVENTORY, // ĐANG Ở TRONG TÚI ĐỒ CỦA KHÁCH, CHƯA YÊU CẦU SHIP
     SHIPPING_REQUESTED, // Đã request ship toàn bộ inventory item của order-detail

@@ -44,7 +44,7 @@ public class OrderController : ControllerBase
         try
         {
             var paymentUrl = await _orderService.CheckoutFromClientCartAsync(cart);
-            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+            return Ok(ApiResult<MultiOrderCheckoutResultDto>.Success(paymentUrl, "200",
                 "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)
@@ -69,7 +69,7 @@ public class OrderController : ControllerBase
         try
         {
             var paymentUrl = await _orderService.CheckoutAsync(dto);
-            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+            return Ok(ApiResult<MultiOrderCheckoutResultDto>.Success(paymentUrl, "200",
                 "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)

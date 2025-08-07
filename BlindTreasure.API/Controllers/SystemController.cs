@@ -481,6 +481,7 @@ public class SystemController : ControllerBase
             }
 
             var now = DateTime.UtcNow;
+            var groupId = Guid.NewGuid(); // Randomly generated CheckoutGroupId
 
             // Create a new order
             var order = new Order
@@ -492,7 +493,8 @@ public class SystemController : ControllerBase
                 FinalAmount = products.Sum(p => p.Price),
                 PlacedAt = now.AddDays(-7), // Order was placed 7 days ago
                 CompletedAt = now.AddDays(-5), // Completed 5 days ago
-                CreatedAt = now
+                CreatedAt = now,
+                CheckoutGroupId = groupId
             };
 
             // Create order details and inventory items for each product
@@ -518,7 +520,6 @@ public class SystemController : ControllerBase
                     UnitPrice = product.Price,
                     TotalPrice = product.Price,
                     Status = OrderDetailItemStatus.DELIVERED,
-                    SellerId = seller.Id,
                     CreatedAt = now
                 };
                 orderDetails.Add(orderDetail);
@@ -734,7 +735,6 @@ public class SystemController : ControllerBase
                         DetailDiscountPromotion = discount,
                         FinalDetailPrice = finalDetailPrice,
                         Status = detailStatus,
-                        SellerId = seller.Id,
                         CreatedAt = placedAt
                     };
                     orderDetails.Add(orderDetail);
@@ -920,6 +920,12 @@ public class SystemController : ControllerBase
 
                 var tablesToDelete = new List<Func<Task>>
                 {
+                      () => context.Reviews.ExecuteDeleteAsync(),
+                     () => context.InventoryItems.ExecuteDeleteAsync(),
+                      () => context.Shipments.ExecuteDeleteAsync(),
+
+                    () => context.OrderDetails.ExecuteDeleteAsync(),
+
                     () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerFavourites.ExecuteDeleteAsync(),
                     () => context.ChatMessages.ExecuteDeleteAsync(),
@@ -928,16 +934,12 @@ public class SystemController : ControllerBase
                     () => context.RarityConfigs.ExecuteDeleteAsync(),
                     () => context.BlindBoxItems.ExecuteDeleteAsync(),
                     () => context.CartItems.ExecuteDeleteAsync(),
-                    () => context.OrderDetails.ExecuteDeleteAsync(),
-                    () => context.Shipments.ExecuteDeleteAsync(),
                     () => context.Listings.ExecuteDeleteAsync(),
-                    () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
 
                     () => context.TradeHistories.ExecuteDeleteAsync(),
                     () => context.TradeRequests.ExecuteDeleteAsync(),
                     () => context.SupportTickets.ExecuteDeleteAsync(),
-                    () => context.Reviews.ExecuteDeleteAsync(),
                     () => context.Transactions.ExecuteDeleteAsync(),
                     () => context.Notifications.ExecuteDeleteAsync(),
                     () => context.OtpVerifications.ExecuteDeleteAsync(),

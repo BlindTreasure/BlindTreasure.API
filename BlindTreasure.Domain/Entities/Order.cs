@@ -22,6 +22,13 @@ public class Order : BaseEntity
     public DateTime PlacedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
 
+    // Tách rõ SellerId ở đây
+    public Guid SellerId { get; set; }
+    public Seller Seller { get; set; }
+
+    // MỚI: Group ID để nhóm các order cùng checkout
+    public Guid? CheckoutGroupId { get; set; }
+
     //promotion
     public ICollection<OrderSellerPromotion> OrderSellerPromotions { get; set; }
 

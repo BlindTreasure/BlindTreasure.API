@@ -77,7 +77,7 @@ public class StripeController : ControllerBase
         {
             var paymentUrl = await _orderService.CheckoutFromClientCartAsync(cart);
             _logger.Success("[Stripe][CheckoutDirect] Đặt hàng thành công, trả về link thanh toán.");
-            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+            return Ok(ApiResult<MultiOrderCheckoutResultDto>.Success(paymentUrl, "200",
                 "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)
@@ -105,7 +105,7 @@ public class StripeController : ControllerBase
         {
             var paymentUrl = await _orderService.CheckoutAsync(dto);
             _logger.Success("[Stripe][Checkout] Đặt hàng thành công, trả về link thanh toán.");
-            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+            return Ok(ApiResult<MultiOrderCheckoutResultDto>.Success(paymentUrl, "200",
                 "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)

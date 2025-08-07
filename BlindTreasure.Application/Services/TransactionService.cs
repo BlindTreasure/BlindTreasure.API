@@ -390,7 +390,7 @@ public class TransactionService : ITransactionService
                 var dto = new InventoryItem
                 {
                     ProductId = od.ProductId!.Value,
-                    Location = od.Seller.CompanyAddress,
+                    Location = od.Product.Seller.CompanyAddress,
                     Status = status, // ✅ Status đã được xác định chính xác
                     ShipmentId = shipmentId,
                     IsFromBlindBox = false,

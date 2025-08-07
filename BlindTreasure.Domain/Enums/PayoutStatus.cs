@@ -9,8 +9,6 @@ namespace BlindTreasure.Domain.Enums
 {
     public enum PayoutStatus
     {
-        [Description("Chờ xử lý")]
-        PENDING,
 
         [Description("Đang xử lý")]
         PROCESSING,
@@ -24,8 +22,6 @@ namespace BlindTreasure.Domain.Enums
         [Description("Đã hủy")]
         CANCELLED,
 
-        [Description("Tạm giữ")]
-        ON_HOLD
     }
 
     public enum PayoutPeriodType

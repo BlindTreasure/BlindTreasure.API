@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -46,6 +47,25 @@ public class StripeService : IStripeService
             throw ErrorHelper.BadRequest("Seller chưa có Stripe account. Vui lòng tạo trước khi đăng nhập.");
         var loginLink = await loginLinkService.CreateAsync(seller.StripeAccountId);
         return loginLink.Url;
+    }
+
+    public async Task<List<OrderPaymentInfo>> CreateCheckoutSessionsForOrders(List<Guid> orderIds)
+    {
+        var result = new List<OrderPaymentInfo>();
+        foreach (var orderId in orderIds)
+        {
+            var url = await CreateCheckoutSession(orderId);
+            var order = await _unitOfWork.Orders.GetByIdAsync(orderId);
+            result.Add(new OrderPaymentInfo
+            {
+                OrderId = orderId,
+                SellerId = order.SellerId,
+                SellerName = order.Seller?.CompanyName ?? "Unknown",
+                PaymentUrl = url,
+                FinalAmount = order.FinalAmount ?? 0
+            });
+        }
+        return result;
     }
 
     public async Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false)

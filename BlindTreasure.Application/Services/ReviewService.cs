@@ -33,7 +33,7 @@ public class ReviewService : IReviewService
         var validation = await _blindyService.ValidateReviewAsync(
             createDto.Comment,
             createDto.OverallRating,
-            orderDetail.Seller?.CompanyName,
+            orderDetail.Product.Seller?.CompanyName,
             orderDetail.Product?.Name ?? orderDetail.BlindBox?.Name
         );
 
@@ -44,7 +44,7 @@ public class ReviewService : IReviewService
             OrderDetailId = createDto.OrderDetailId,
             ProductId = orderDetail.ProductId,
             BlindBoxId = orderDetail.BlindBoxId,
-            SellerId = orderDetail.SellerId,
+            SellerId = orderDetail.Product.SellerId,
             OverallRating = createDto.OverallRating,
             QualityRating = createDto.QualityRating,
             ServiceRating = createDto.ServiceRating,
@@ -168,13 +168,21 @@ public class ReviewService : IReviewService
     {
         // 1. Validate user đã mua sản phẩm này
         var orderDetail = await _unitOfWork.OrderDetails
+            .GetQueryable()
+            .Include(od => od.Order)
+                .Include(od => od.Product).ThenInclude(p => p.Seller)
+                .Include(od => od.BlindBox)
             .FirstOrDefaultAsync(
-                od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId,
-                od => od.Order,
-                od => od.Product,
-                od => od.BlindBox,
-                od => od.Seller
+                od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId
             );
+
+
+
+        ////FirstOrDefaultAsync(
+        //    od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId,
+        //    od => od.Order,
+        //    od => od.Product.Seller,
+        //    od => od.BlindBox            );
 
         if (orderDetail == null)
             throw ErrorHelper.NotFound("Không tìm thấy đơn hàng hoặc bạn không có quyền đánh giá.");

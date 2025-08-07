@@ -29,7 +29,7 @@ namespace BlindTreasure.Domain.Entities
         public string? StripeDestinationAccount { get; set; } // Seller's Stripe account
 
         // Trạng thái và thời gian
-        public PayoutStatus Status { get; set; } = PayoutStatus.PENDING;
+        public PayoutStatus Status { get; set; } = PayoutStatus.PROCESSING;
         public DateTime? ProcessedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
 
