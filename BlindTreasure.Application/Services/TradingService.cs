@@ -188,7 +188,6 @@ public class TradingService : ITradingService
 
     public async Task<TradeRequestDto> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted)
     {
-
         try
         {
             // BƯỚC 1: Lấy trade request với đầy đủ thông tin liên quan
@@ -198,36 +197,24 @@ public class TradingService : ITradingService
                 t => t.Listing!.InventoryItem.Product!,
                 t => t.Requester!);
 
-            if (tradeRequest == null)
-            {
-                throw ErrorHelper.NotFound("Trade Request không tồn tại.");
-            }
+            if (tradeRequest == null) throw ErrorHelper.NotFound("Trade Request không tồn tại.");
 
 
             // BƯỚC 2: Validate trạng thái
             if (tradeRequest.Status != TradeRequestStatus.PENDING)
-            {
                 throw ErrorHelper.BadRequest("Giao dịch này đã được xử lý hoặc hết hạn.");
-            }
 
             // BƯỚC 3: Validate listing
-            if (tradeRequest.Listing == null)
-            {
-                throw ErrorHelper.Internal("Thông tin listing không hợp lệ.");
-            }
+            if (tradeRequest.Listing == null) throw ErrorHelper.Internal("Thông tin listing không hợp lệ.");
 
             // BƯỚC 4: Validate inventory item
             if (tradeRequest.Listing.InventoryItem == null)
-            {
                 throw ErrorHelper.Internal("Thông tin inventory item không hợp lệ.");
-            }
 
             // BƯỚC 5: Kiểm tra quyền respond (chỉ owner của listing mới được respond)
             var currentUserId = _claimsService.CurrentUserId;
             if (tradeRequest.Listing.InventoryItem.UserId != currentUserId)
-            {
                 throw ErrorHelper.Forbidden("Bạn không có quyền phản hồi trade request này.");
-            }
 
             // BƯỚC 6: Cập nhật trạng thái trade request
             var originalStatus = tradeRequest.Status;

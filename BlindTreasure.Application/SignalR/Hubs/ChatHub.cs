@@ -8,6 +8,7 @@ public class ChatHub : Hub
     private readonly IChatMessageService _chatMessageService;
     private readonly IBlindyService _blindyService;
     private readonly IUserService _userService;
+    private readonly ICacheService _cacheService;
 
     /// <summary>
     /// Khởi tạo ChatHub với các dependencies cần thiết
@@ -15,13 +16,21 @@ public class ChatHub : Hub
     /// <param name="chatMessageService">Service xử lý tin nhắn chat</param>
     /// <param name="blindyService">Service xử lý AI Blindy</param>
     /// <param name="userService">Service xử lý người dùng</param>
-    public ChatHub(IChatMessageService chatMessageService, IBlindyService blindyService, IUserService userService)
+    /// <param name="cacheService">Service xử lý cache</param>
+    public ChatHub(IChatMessageService chatMessageService, IBlindyService blindyService, IUserService userService,
+        ICacheService cacheService)
     {
         _chatMessageService = chatMessageService;
         _blindyService = blindyService;
         _userService = userService;
+        _cacheService = cacheService;
     }
 
+    /// <summary>
+    /// Đánh dấu toàn bộ tin nhắn trong cuộc trò chuyện là đã đọc
+    /// </summary>
+    /// <param name="otherUserId">ID của người gửi tin nhắn</param>
+    /// <returns>Task</returns>
     public async Task MarkConversationAsRead(string otherUserId)
     {
         try
@@ -31,7 +40,19 @@ public class ChatHub : Hub
 
             if (Guid.TryParse(otherUserId, out var otherUserGuid) &&
                 Guid.TryParse(currentUserId, out var currentUserGuid))
+            {
                 await _chatMessageService.MarkConversationAsReadAsync(currentUserGuid, otherUserGuid);
+
+                // Xóa cache liên quan đến tin nhắn giữa hai người dùng
+                await InvalidateMessageCache(currentUserGuid, otherUserGuid);
+
+                // Thông báo cho client biết đã đọc thành công
+                await Clients.Caller.SendAsync("ConversationReadSuccess", new
+                {
+                    otherUserId,
+                    timestamp = DateTime.UtcNow
+                });
+            }
         }
         catch (Exception ex)
         {
@@ -58,6 +79,13 @@ public class ChatHub : Hub
                 userId,
                 timestamp = DateTime.UtcNow
             });
+
+            // Thông báo số lượng tin nhắn chưa đọc cho user khi kết nối
+            if (Guid.TryParse(userId, out var userGuid))
+            {
+                var unreadCount = await _chatMessageService.GetUnreadMessageCountAsync(userGuid);
+                await Clients.Caller.SendAsync("UnreadCountUpdated", unreadCount);
+            }
         }
 
         await base.OnConnectedAsync();
@@ -76,9 +104,14 @@ public class ChatHub : Hub
             var currentUserId = Context.UserIdentifier;
             if (currentUserId == null) return;
 
-            if (Guid.TryParse(messageId, out var msgId) && Guid.TryParse(senderId, out var senderGuid))
+            if (Guid.TryParse(messageId, out var msgId) &&
+                Guid.TryParse(senderId, out var senderGuid) &&
+                Guid.TryParse(currentUserId, out var currentUserGuid))
             {
-                await _chatMessageService.MarkMessagesAsReadAsync(senderGuid, Guid.Parse(currentUserId));
+                await _chatMessageService.MarkMessagesAsReadAsync(senderGuid, currentUserGuid);
+
+                // Xóa cache liên quan đến tin nhắn
+                await InvalidateMessageCache(currentUserGuid, senderGuid);
 
                 // Gửi event về sender để update UI (message đã được seen)
                 await Clients.User(senderId).SendAsync("MessageSeen", new
@@ -86,6 +119,14 @@ public class ChatHub : Hub
                     messageId,
                     seenBy = currentUserId,
                     seenAt = DateTime.UtcNow
+                });
+
+                // Gửi event về người nhận để cập nhật UI
+                await Clients.Caller.SendAsync("MessageMarkedAsSeen", new
+                {
+                    messageId,
+                    senderId,
+                    timestamp = DateTime.UtcNow
                 });
             }
         }
@@ -107,6 +148,8 @@ public class ChatHub : Hub
         if (userId != null)
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"user_{userId}");
+            await _chatMessageService.SetUserOffline(userId);
+
             await Clients.Others.SendAsync("UserOffline", new
             {
                 userId,
@@ -175,14 +218,30 @@ public class ChatHub : Hub
 
             await _chatMessageService.SaveMessageAsync(senderGuid, receiverGuid, content.Trim());
 
+            // Xóa cache liên quan đến tin nhắn và cuộc trò chuyện
+            await InvalidateMessageCache(senderGuid, receiverGuid);
+            await InvalidateConversationCache(senderGuid);
+            await InvalidateConversationCache(receiverGuid);
+
             // Gửi cho cả sender và receiver
-            await Clients.Users(new[] { senderId, receiverId }).SendAsync("ReceiveMessage", new
+            var message = new
             {
+                id = Guid.NewGuid().ToString(), // Tạo ID tạm thời cho client
                 senderId,
                 receiverId,
                 content = content.Trim(),
+                isRead = false,
                 timestamp = DateTime.UtcNow
-            });
+            };
+
+            await Clients.Users(new[] { senderId, receiverId }).SendAsync("ReceiveMessage", message);
+
+            // Cập nhật số tin chưa đọc cho người nhận
+            if (Guid.TryParse(receiverId, out var recvGuid))
+            {
+                var unreadCount = await _chatMessageService.GetUnreadMessageCountAsync(recvGuid);
+                await Clients.User(receiverId).SendAsync("UnreadCountUpdated", unreadCount);
+            }
         }
         catch (Exception ex)
         {
@@ -218,6 +277,45 @@ public class ChatHub : Hub
             await Clients.User(receiverId).SendAsync("UserStoppedTyping", senderId);
     }
 
+    /// <summary>
+    /// Xóa cache liên quan đến tin nhắn giữa hai người dùng
+    /// </summary>
+    /// <param name="user1Id">ID của người dùng 1</param>
+    /// <param name="user2Id">ID của người dùng 2</param>
+    /// <returns>Task</returns>
+    private async Task InvalidateMessageCache(Guid user1Id, Guid user2Id)
+    {
+        // Xóa cache tin nhắn theo cả hai chiều
+        await _cacheService.RemoveByPatternAsync($"chat:messages:{user1Id}:{user2Id}:*");
+        await _cacheService.RemoveByPatternAsync($"chat:messages:{user2Id}:{user1Id}:*");
+
+        // Xóa cache tin nhắn cuối cùng
+        var lastMsgKey = GetLastMessageCacheKey(user1Id, user2Id);
+        await _cacheService.RemoveAsync(lastMsgKey);
+    }
+
+    /// <summary>
+    /// Xóa cache liên quan đến danh sách cuộc trò chuyện của người dùng
+    /// </summary>
+    /// <param name="userId">ID của người dùng</param>
+    /// <returns>Task</returns>
+    private async Task InvalidateConversationCache(Guid userId)
+    {
+        await _cacheService.RemoveByPatternAsync($"chat:conversations:{userId}:*");
+    }
+
+    /// <summary>
+    /// Tạo key cache cho tin nhắn cuối cùng
+    /// </summary>
+    /// <param name="user1Id">ID của người dùng 1</param>
+    /// <param name="user2Id">ID của người dùng 2</param>
+    /// <returns>String</returns>
+    private static string GetLastMessageCacheKey(Guid user1Id, Guid user2Id)
+    {
+        var ids = new[] { user1Id, user2Id }.OrderBy(x => x).ToList();
+        return $"chat:last:{ids[0]}:{ids[1]}";
+    }
+
     #region AI ko liên quan
 
     /// <summary>
@@ -238,6 +336,9 @@ public class ChatHub : Hub
 
         // Lưu câu trả lời của AI
         await _chatMessageService.SaveAiMessageAsync(senderGuid, reply); // AI → User
+
+        // Xóa cache liên quan đến tin nhắn AI
+        await _cacheService.RemoveByPatternAsync($"chat:messages:{senderGuid}:*");
 
         // Gửi về client 2 chiều
         await Clients.User(senderId).SendAsync("ReceiveMessage", new

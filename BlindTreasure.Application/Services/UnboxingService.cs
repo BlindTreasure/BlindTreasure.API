@@ -89,7 +89,7 @@ public class UnboxingService : IUnboxingService
         // 5. Cập nhật DB (trừ số lượng, cộng Inventory cho user, đánh dấu hộp đã mở)
         await GrantUnboxedItemToUser(selectedItem, customerBox, userId, now);
 
-        
+
         var unboxLog = new UnboxLogDto
         {
             CustomerBlindBoxId = customerBox.Id,
@@ -105,7 +105,7 @@ public class UnboxingService : IUnboxingService
         // Gửi thông báo real-time
         await _notificationHub.Clients.All.SendAsync("ReceiveUnboxingNotification", unboxLog);
 
-        
+
         return new UnboxResultDto
         {
             ProductId = selectedItem.ProductId,
