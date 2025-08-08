@@ -360,6 +360,9 @@ public class OrderService : IOrderService
         var result = new MultiOrderCheckoutResultDto();
 
         var orderGroupId = Guid.NewGuid();
+        result.CheckoutGroupId = orderGroupId;
+        var createdOrderIds = new List<Guid>();
+
 
         foreach (var group in groups)
         {
@@ -473,6 +476,8 @@ public class OrderService : IOrderService
 
             order = await _unitOfWork.Orders.AddAsync(order);
             await _unitOfWork.SaveChangesAsync();
+            createdOrderIds.Add(order.Id);
+
 
             // Shipments for this seller
             if (shippingAddress != null)
@@ -531,6 +536,16 @@ public class OrderService : IOrderService
         }
 
         await _cartItemService.UpdateCartAfterCheckoutAsync(userId, groups.SelectMany(g => g.Items).ToList());
+
+        // Tạo link thanh toán tổng cho tất cả order
+        if(createdOrderIds.Count == 1)
+        {
+            // If only one order, use its payment URL
+            result.GeneralPaymentUrl = result.Orders.First().PaymentUrl;
+        }
+        else
+            // Multiple orders, create a general checkout session
+            result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
 
         result.Message = $"Đã tạo {result.Orders.Count} đơn hàng, mỗi đơn một link thanh toán riêng.";
         return result;

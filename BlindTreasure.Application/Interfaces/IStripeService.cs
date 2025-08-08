@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Domain.DTOs.OrderDTOs;
+using BlindTreasure.Domain.Entities;
 using Stripe;
 
 namespace BlindTreasure.Application.Interfaces;
@@ -7,6 +8,8 @@ public interface IStripeService
 {
     Task CleanupStripeCoupon(string couponId);
     Task<string> CreateCheckoutSession(Guid orderId, bool isRenew = false);
+    Task<List<OrderPaymentInfo>> CreateCheckoutSessionsForOrders(List<Guid> orderIds);
+    Task<string> CreateGeneralCheckoutSessionForOrders(List<Guid> orderIds);
     Task<string> CreateShipmentCheckoutSessionAsync(List<Shipment> shipments, Guid userId, int totalShippingFee);
     Task<string> GenerateExpressLoginLink();
     Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId, string redirectUrl);

@@ -10,6 +10,8 @@ namespace BlindTreasure.Domain.DTOs.OrderDTOs
     {
         public List<OrderPaymentInfo> Orders { get; set; } = new();
         public string Message { get; set; } = string.Empty;
+        public string? GeneralPaymentUrl { get; set; } = string.Empty;
+        public Guid? CheckoutGroupId { get; set; } = null;
     }
 
     public class OrderPaymentInfo

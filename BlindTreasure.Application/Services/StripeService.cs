@@ -49,6 +49,119 @@ public class StripeService : IStripeService
         return loginLink.Url;
     }
 
+    public async Task<string> CreateGeneralCheckoutSessionForOrders(List<Guid> orderIds)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var user = await _unitOfWork.Users.GetByIdAsync(userId)
+                   ?? throw ErrorHelper.NotFound("User không tồn tại.");
+
+        var orders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => orderIds.Contains(o.Id) && o.UserId == userId && !o.IsDeleted)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.OrderSellerPromotions).ThenInclude(p => p.Promotion)
+            .ToListAsync();
+
+        if (!orders.Any())
+            throw ErrorHelper.BadRequest("Không tìm thấy đơn hàng hợp lệ để thanh toán.");
+
+        var lineItems = new List<SessionLineItemOptions>();
+        decimal totalGoods = 0, totalShipping = 0, totalDiscount = 0;
+
+        foreach (var order in orders)
+        {
+            totalGoods += order.OrderDetails.Sum(od => od.TotalPrice);
+            totalShipping += order.TotalShippingFee ?? 0m;
+            totalDiscount += order.OrderSellerPromotions.Sum(p => p.DiscountAmount);
+
+            foreach (var od in order.OrderDetails)
+            {
+                var name = od.ProductId.HasValue ? od.Product!.Name : od.BlindBox!.Name;
+                var unitPrice = Math.Max(1, (long)Math.Round(od.UnitPrice));
+                lineItems.Add(new SessionLineItemOptions
+                {
+                    PriceData = new SessionLineItemPriceDataOptions
+                    {
+                        Currency = "vnd",
+                        ProductData = new SessionLineItemPriceDataProductDataOptions
+                        {
+                            Name = name,
+                            Description = $"Order: {order.Id} | Qty: {od.Quantity}, Tổng: {od.TotalPrice:N0}đ"
+                        },
+                        UnitAmount = unitPrice
+                    },
+                    Quantity = od.Quantity
+                });
+            }
+        }
+
+        if (totalShipping > 0)
+        {
+            lineItems.Add(new SessionLineItemOptions
+            {
+                PriceData = new SessionLineItemPriceDataOptions
+                {
+                    Currency = "vnd",
+                    ProductData = new SessionLineItemPriceDataProductDataOptions
+                    {
+                        Name = "Phí vận chuyển",
+                        Description = $"Tổng phí vận chuyển cho {orders.Count} đơn"
+                    },
+                    UnitAmount = (long)Math.Round(totalShipping)
+                },
+                Quantity = 1
+            });
+        }
+
+        string? couponId = null;
+        if (totalDiscount > 0)
+        {
+            // Tạo coupon cho toàn bộ discount
+            couponId = await CreateStripeCouponForOrder(orderIds.First(), totalDiscount);
+        }
+
+        var finalAmount = totalGoods + totalShipping - totalDiscount;
+        if (finalAmount < 1) finalAmount = 1m;
+
+        var options = new SessionCreateOptions
+        {
+            CustomerEmail = user.Email,
+            PaymentMethodTypes = new List<string> { "card" },
+            Mode = "payment",
+            LineItems = lineItems,
+            Discounts = !string.IsNullOrEmpty(couponId)
+                ? new List<SessionDiscountOptions> { new() { Coupon = couponId } }
+                : null,
+            Metadata = new Dictionary<string, string>
+            {
+                ["orderIds"] = string.Join(",", orderIds),
+                ["userId"] = userId.ToString(),
+                ["totalGoods"] = totalGoods.ToString("F2"),
+                ["totalShipping"] = totalShipping.ToString("F2"),
+                ["totalDiscount"] = totalDiscount.ToString("F2"),
+                ["finalAmount"] = finalAmount.ToString("F2"),
+                ["couponId"] = couponId ?? "",
+                ["isGeneralPayment"] = "true"
+            },
+            SuccessUrl = $"{_successRedirectUrl}?checkout_group={orders.First().CheckoutGroupId}&status=success",
+            CancelUrl = $"{_failRedirectUrl}?checkout_group={orders.First().CheckoutGroupId}&status=pending",
+            ExpiresAt = DateTime.UtcNow.AddHours(24)
+        };
+
+        var service = new SessionService(_stripeClient);
+        var session = await service.CreateAsync(options);
+
+        // Ghi lại transaction cho từng order
+        foreach (var order in orders)
+        {
+            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0);
+        }
+        await _unitOfWork.SaveChangesAsync();
+
+        return session.Url;
+    }
+
     public async Task<List<OrderPaymentInfo>> CreateCheckoutSessionsForOrders(List<Guid> orderIds)
     {
         var result = new List<OrderPaymentInfo>();
