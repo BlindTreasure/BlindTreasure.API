@@ -165,6 +165,7 @@ public static class IocContainer
         services.AddScoped<ITradingService, TradingService>();
         services.AddScoped<ISellerStatisticsService, SellerStatisticsService>();
         services.AddScoped<IReviewService, ReviewService>();
+        services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
 
 
         //cron-jobs

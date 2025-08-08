@@ -60,7 +60,7 @@ public class SellerService : ISellerService
         // Lấy các OrderDetail đã bán thành công của seller
         var orderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable()
             .Include(od => od.Order)
-            .Where(od => od.SellerId == sellerId
+            .Where(od => od.Product.SellerId == sellerId
                          && od.Order.Status == OrderStatus.PAID.ToString()
                          && !od.Order.IsDeleted);
 

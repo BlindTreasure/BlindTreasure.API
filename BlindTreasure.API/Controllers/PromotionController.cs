@@ -206,7 +206,7 @@ public class PromotionController : ControllerBase
     /// </summary>
     [HttpGet("participant")]
     [ProducesResponseType(typeof(ApiResult<List<SellerParticipantDto>>), StatusCodes.Status200OK)]
-    [Authorize(Roles = "Staff")]
+  //  [Authorize(Roles = "Staff")]
     public async Task<IActionResult> GetPromotionParticipants([FromQuery] SellerParticipantPromotionParameter param)
     {
         try
