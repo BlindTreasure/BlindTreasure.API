@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ChatDTOs;
+using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -31,6 +32,79 @@ public class ChatMessageService : IChatMessageService
         _unitOfWork = unitOfWork;
         _hubContext = hubContext;
     }
+
+    public async Task SaveImageMessageAsync(Guid senderId, Guid receiverId,
+        string imageUrl, string fileName, string fileSize, string mimeType)
+    {
+        var receiver = await _unitOfWork.Users.GetByIdAsync(receiverId);
+        if (receiver == null || receiver.IsDeleted)
+            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
+
+        var message = new ChatMessage
+        {
+            SenderId = senderId,
+            SenderType = ChatParticipantType.User,
+            ReceiverId = receiverId,
+            ReceiverType = ChatParticipantType.User,
+            Content = "[Hình ảnh]", // Nội dung mặc định cho ảnh
+            FileUrl = imageUrl,
+            FileName = fileName,
+            FileSize = fileSize,
+            FileMimeType = mimeType,
+            SentAt = DateTime.UtcNow,
+            IsRead = false,
+            MessageType = ChatMessageType.ImageMessage
+        };
+
+        await _unitOfWork.ChatMessages.AddAsync(message);
+        await _unitOfWork.SaveChangesAsync();
+
+        var previewKey = GetLastMessageCacheKey(senderId, receiverId);
+        await _cacheService.SetAsync(previewKey, message, TimeSpan.FromHours(1));
+
+        _logger.Info($"[Chat] {senderId} → {receiverId}: [Image: {imageUrl}]");
+    }
+
+    public async Task SaveInventoryItemMessageAsync(Guid senderId, Guid receiverId, Guid inventoryItemId,
+        string customMessage = "")
+    {
+        var receiver = await _unitOfWork.Users.GetByIdAsync(receiverId);
+        if (receiver == null || receiver.IsDeleted)
+            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
+
+        var inventoryItem = await _unitOfWork.InventoryItems.GetByIdAsync(inventoryItemId);
+        if (inventoryItem == null)
+            throw ErrorHelper.NotFound("Vật phẩm không tồn tại.");
+
+        if (inventoryItem.UserId != senderId)
+            throw ErrorHelper.Forbidden("Bạn không có quyền chia sẻ vật phẩm này.");
+
+        var content = string.IsNullOrEmpty(customMessage)
+            ? $"[Chia sẻ vật phẩm: {inventoryItem.Product?.Name ?? "Không xác định"}]"
+            : customMessage;
+
+        var message = new ChatMessage
+        {
+            SenderId = senderId,
+            SenderType = ChatParticipantType.User,
+            ReceiverId = receiverId,
+            ReceiverType = ChatParticipantType.User,
+            Content = content,
+            InventoryItemId = inventoryItemId,
+            SentAt = DateTime.UtcNow,
+            IsRead = false,
+            MessageType = ChatMessageType.InventoryItemMessage
+        };
+
+        await _unitOfWork.ChatMessages.AddAsync(message);
+        await _unitOfWork.SaveChangesAsync();
+
+        var previewKey = GetLastMessageCacheKey(senderId, receiverId);
+        await _cacheService.SetAsync(previewKey, message, TimeSpan.FromHours(1));
+
+        _logger.Info($"[Chat] {senderId} → {receiverId}: [InventoryItem: {inventoryItemId}]");
+    }
+
 
     public async Task SetUserOffline(string userId)
     {
@@ -153,7 +227,7 @@ public class ChatMessageService : IChatMessageService
 
         // Thêm Include để load thông tin User
         query = query.Include(m => m.Sender).Include(m => m.Receiver)
-            .OrderByDescending(m => m.SentAt)
+            .OrderBy(m => m.SentAt)
             .AsNoTracking();
 
         // Tính tổng số lượng tin nhắn
@@ -179,12 +253,29 @@ public class ChatMessageService : IChatMessageService
                 ? "BlindTreasure AI"
                 : m.Sender?.FullName ?? "Unknown",
             SenderAvatar = m.SenderType == ChatParticipantType.AI
-                ? "/assets/blindy-avatar.png" // Avatar mặc định cho AI
+                ? "/assets/blindy-avatar.png"
                 : m.Sender?.AvatarUrl ?? "",
             Content = m.Content,
             SentAt = m.SentAt,
             IsRead = m.IsRead,
-            IsCurrentUserSender = m.SenderId == currentUserId
+            IsCurrentUserSender = m.SenderId == currentUserId,
+            MessageType = m.MessageType,
+            // Thêm thông tin ảnh
+            FileUrl = m.FileUrl,
+            FileName = m.FileName,
+            FileSize = m.FileSize,
+            FileMimeType = m.FileMimeType,
+            // Thêm thông tin InventoryItem
+            InventoryItemId = m.InventoryItemId,
+            InventoryItem = m.InventoryItem != null ? new InventoryItemDto
+            {
+                Id = m.InventoryItem.Id,
+                ProductName = m.InventoryItem.Product?.Name ?? "Không xác định",
+                Image = m.InventoryItem.Product?.ImageUrls.FirstOrDefault()!,
+                Tier = m.InventoryItem.Tier,
+                Status = m.InventoryItem.Status,
+                Location = m.InventoryItem.Location
+            } : null
         }).ToList();
 
         // Tạo kết quả phân trang
@@ -274,12 +365,19 @@ public class ChatMessageService : IChatMessageService
             else
                 otherUser = lastMessage.Receiver;
 
+            // Xử lý nội dung tin nhắn dựa trên loại tin nhắn
+            string lastMessageContent = lastMessage.Content;
+            if (lastMessage.MessageType == ChatMessageType.ImageMessage)
+                lastMessageContent = "[Hình ảnh]";
+            else if (lastMessage.MessageType == ChatMessageType.InventoryItemMessage)
+                lastMessageContent = "[Chia sẻ vật phẩm]";
+
             var conversation = new ConversationDto
             {
                 OtherUserId = otherUserId.Value,
                 OtherUserName = otherUser?.FullName ?? "Unknown",
                 OtherUserAvatar = otherUser?.AvatarUrl ?? "",
-                LastMessage = lastMessage.Content,
+                LastMessage = lastMessageContent,
                 LastMessageTime = lastMessage.SentAt,
                 UnreadCount = unreadCount,
                 IsOnline = false // Sẽ cập nhật sau
