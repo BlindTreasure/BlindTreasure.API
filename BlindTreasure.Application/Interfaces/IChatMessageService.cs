@@ -19,4 +19,10 @@ public interface IChatMessageService
     Task SetUserOffline(string userId);
     Task<int> GetUnreadMessageCountAsync(Guid userId);
     Task<ChatMessageDto?> GetMessageByIdAsync(Guid messageId);
+    
+    Task SaveImageMessageAsync(Guid senderId, Guid receiverId, 
+        string imageUrl, string fileName, string fileSize, string mimeType);
+        
+    Task SaveInventoryItemMessageAsync(Guid senderId, Guid receiverId, 
+        Guid inventoryItemId, string customMessage = "");
 }

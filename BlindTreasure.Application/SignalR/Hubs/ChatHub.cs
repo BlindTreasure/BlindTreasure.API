@@ -1,5 +1,8 @@
 ﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.SignalR.Hubs;
 
@@ -9,22 +12,21 @@ public class ChatHub : Hub
     private readonly IBlindyService _blindyService;
     private readonly IUserService _userService;
     private readonly ICacheService _cacheService;
+    private readonly IBlobService _blobService;
+    private readonly IUnitOfWork _unitOfWork;
 
-    /// <summary>
-    /// Khởi tạo ChatHub với các dependencies cần thiết
-    /// </summary>
-    /// <param name="chatMessageService">Service xử lý tin nhắn chat</param>
-    /// <param name="blindyService">Service xử lý AI Blindy</param>
-    /// <param name="userService">Service xử lý người dùng</param>
-    /// <param name="cacheService">Service xử lý cache</param>
     public ChatHub(IChatMessageService chatMessageService, IBlindyService blindyService, IUserService userService,
-        ICacheService cacheService)
+        ICacheService cacheService, IBlobService blobService, IUnitOfWork unitOfWork)
     {
         _chatMessageService = chatMessageService;
         _blindyService = blindyService;
         _userService = userService;
         _cacheService = cacheService;
+        _blobService = blobService;
+        _unitOfWork = unitOfWork;
     }
+
+    
 
     /// <summary>
     /// Đánh dấu toàn bộ tin nhắn trong cuộc trò chuyện là đã đọc
