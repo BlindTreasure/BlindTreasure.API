@@ -1,5 +1,8 @@
 ﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.SignalR.Hubs;
 
@@ -9,23 +12,240 @@ public class ChatHub : Hub
     private readonly IBlindyService _blindyService;
     private readonly IUserService _userService;
     private readonly ICacheService _cacheService;
+    private readonly IBlobService _blobService;
+    private readonly IUnitOfWork _unitOfWork;
 
-    /// <summary>
-    /// Khởi tạo ChatHub với các dependencies cần thiết
-    /// </summary>
-    /// <param name="chatMessageService">Service xử lý tin nhắn chat</param>
-    /// <param name="blindyService">Service xử lý AI Blindy</param>
-    /// <param name="userService">Service xử lý người dùng</param>
-    /// <param name="cacheService">Service xử lý cache</param>
     public ChatHub(IChatMessageService chatMessageService, IBlindyService blindyService, IUserService userService,
-        ICacheService cacheService)
+        ICacheService cacheService, IBlobService blobService, IUnitOfWork unitOfWork)
     {
         _chatMessageService = chatMessageService;
         _blindyService = blindyService;
         _userService = userService;
         _cacheService = cacheService;
+        _blobService = blobService;
+        _unitOfWork = unitOfWork;
     }
 
+    public async Task SendImageMessage(string receiverId, string imageFileName, Stream imageStream)
+    {
+        try
+        {
+            var senderId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(senderId))
+            {
+                await Clients.Caller.SendAsync("MessageError", new { error = "Bạn chưa đăng nhập" });
+                return;
+            }
+
+            if (!Guid.TryParse(receiverId, out var receiverGuid))
+            {
+                await Clients.Caller.SendAsync("MessageError", new { error = "ID người nhận không hợp lệ" });
+                return;
+            }
+
+            var senderGuid = Guid.Parse(senderId);
+
+            // Kiểm tra receiver có tồn tại không
+            var receiver = await _userService.GetUserById(receiverGuid);
+            if (receiver == null || receiver.IsDeleted)
+            {
+                await Clients.Caller.SendAsync("MessageError", new { error = "Người nhận không tồn tại" });
+                return;
+            }
+
+            // Tạo tên file duy nhất
+            var fileExtension = Path.GetExtension(imageFileName);
+            var uniqueFileName = $"chat/{senderGuid}/{Guid.NewGuid()}{fileExtension}";
+
+            // Upload ảnh lên blob storage
+            await _blobService.UploadFileAsync(uniqueFileName, imageStream);
+
+            // Lấy URL của ảnh
+            var imageUrl = await _blobService.GetPreviewUrlAsync(uniqueFileName);
+
+            // Tính kích thước file
+            long fileSize = imageStream.Length;
+            string fileSizeStr = FormatFileSize(fileSize);
+
+            // Xác định MIME type dựa vào extension
+            string mimeType = GetMimeType(fileExtension);
+
+            // Lưu tin nhắn ảnh
+            await _chatMessageService.SaveImageMessageAsync(senderGuid, receiverGuid,
+                imageUrl, imageFileName, fileSizeStr, mimeType);
+
+            // Xóa cache liên quan
+            await InvalidateMessageCache(senderGuid, receiverGuid);
+            await InvalidateConversationCache(senderGuid);
+            await InvalidateConversationCache(receiverGuid);
+
+            // Lấy thông tin người gửi để hiển thị
+            var sender = await _userService.GetUserById(senderGuid);
+
+            // Gửi cho cả sender và receiver
+            await Clients.Users(new[] { senderId, receiverId }).SendAsync("ReceiveImageMessage", new
+            {
+                id = Guid.NewGuid().ToString(), // ID tạm thời cho client
+                senderId,
+                receiverId,
+                senderName = sender?.FullName ?? "Unknown",
+                senderAvatar = sender?.AvatarUrl ?? "",
+                content = "[Hình ảnh]",
+                imageUrl,
+                fileName = imageFileName,
+                fileSize = fileSizeStr,
+                mimeType,
+                messageType = ChatMessageType.ImageMessage.ToString(),
+                timestamp = DateTime.UtcNow,
+                isRead = false,
+                isCurrentUserSender = true // Client sẽ cần xử lý trường này
+            });
+
+            // Cập nhật số tin chưa đọc
+            var unreadCount = await _chatMessageService.GetUnreadMessageCountAsync(receiverGuid);
+            await Clients.User(receiverId).SendAsync("UnreadCountUpdated", unreadCount);
+        }
+        catch (Exception ex)
+        {
+            await Clients.Caller.SendAsync("MessageError", new
+            {
+                error = "Không thể gửi hình ảnh",
+                details = ex.Message
+            });
+        }
+    }
+
+    // Phương thức chia sẻ InventoryItem
+public async Task ShareInventoryItem(string receiverId, string inventoryItemId, string customMessage = "")
+{
+    try
+    {
+        var senderId = Context.UserIdentifier;
+        if (string.IsNullOrEmpty(senderId))
+        {
+            await Clients.Caller.SendAsync("MessageError", new { error = "Bạn chưa đăng nhập" });
+            return;
+        }
+
+        if (!Guid.TryParse(receiverId, out var receiverGuid) || !Guid.TryParse(inventoryItemId, out var itemGuid))
+        {
+            await Clients.Caller.SendAsync("MessageError", new { error = "ID không hợp lệ" });
+            return;
+        }
+
+        var senderGuid = Guid.Parse(senderId);
+
+        // Kiểm tra receiver có tồn tại không
+        var receiver = await _userService.GetUserById(receiverGuid);
+        if (receiver == null || receiver.IsDeleted)
+        {
+            await Clients.Caller.SendAsync("MessageError", new { error = "Người nhận không tồn tại" });
+            return;
+        }
+
+        // Lưu tin nhắn chia sẻ InventoryItem
+        await _chatMessageService.SaveInventoryItemMessageAsync(senderGuid, receiverGuid, itemGuid, customMessage);
+        
+        // Xóa cache liên quan
+        await InvalidateMessageCache(senderGuid, receiverGuid);
+        await InvalidateConversationCache(senderGuid);
+        await InvalidateConversationCache(receiverGuid);
+
+        // Lấy thông tin InventoryItem để hiển thị
+        var inventoryItem = await _unitOfWork.InventoryItems
+            .GetQueryable()
+            .Include(i => i.Product)
+            .FirstOrDefaultAsync(i => i.Id == itemGuid);
+
+        if (inventoryItem == null)
+        {
+            await Clients.Caller.SendAsync("MessageError", new { error = "Vật phẩm không tồn tại" });
+            return;
+        }
+
+        // Lấy thông tin người gửi để hiển thị
+        var sender = await _userService.GetUserById(senderGuid);
+        
+        // Chuẩn bị dữ liệu InventoryItem để gửi cho client
+        var itemDto = new
+        {
+            id = inventoryItem.Id,
+            productName = inventoryItem.Product?.Name ?? "Không xác định",
+            productImage = inventoryItem.Product?.ImageUrls.FirstOrDefault(),
+            tier = inventoryItem.Tier?.ToString() ?? "Không xác định",
+            status = inventoryItem.Status.ToString(),
+            location = inventoryItem.Location
+        };
+
+        // Nội dung hiển thị
+        var content = string.IsNullOrEmpty(customMessage)
+            ? $"[Chia sẻ vật phẩm: {inventoryItem.Product?.Name ?? "Không xác định"}]"
+            : customMessage;
+            
+        // Gửi cho cả sender và receiver
+        await Clients.Users(new[] { senderId, receiverId }).SendAsync("ReceiveInventoryItemMessage", new
+        {
+            id = Guid.NewGuid().ToString(), // ID tạm thời cho client
+            senderId,
+            receiverId,
+            senderName = sender?.FullName ?? "Unknown",
+            senderAvatar = sender?.AvatarUrl ?? "",
+            content,
+            inventoryItemId = inventoryItem.Id,
+            inventoryItem = itemDto,
+            messageType = ChatMessageType.InventoryItemMessage.ToString(),
+            timestamp = DateTime.UtcNow,
+            isRead = false,
+            isCurrentUserSender = true // Client sẽ cần xử lý trường này
+        });
+        
+        // Cập nhật số tin chưa đọc
+        var unreadCount = await _chatMessageService.GetUnreadMessageCountAsync(receiverGuid);
+        await Clients.User(receiverId).SendAsync("UnreadCountUpdated", unreadCount);
+    }
+    catch (Exception ex)
+    {
+        await Clients.Caller.SendAsync("MessageError", new
+        {
+            error = "Không thể chia sẻ vật phẩm",
+            details = ex.Message
+        });
+    }
+}
+
+// Phương thức hỗ trợ định dạng kích thước file
+private string FormatFileSize(long bytes)
+{
+    string[] sizes = { "B", "KB", "MB", "GB" };
+    int order = 0;
+    double len = bytes;
+    while (len >= 1024 && order < sizes.Length - 1)
+    {
+        order++;
+        len = len / 1024;
+    }
+    return $"{len:0.##} {sizes[order]}";
+}
+
+// Phương thức xác định MIME type dựa vào extension
+private string GetMimeType(string extension)
+{
+    switch (extension.ToLower())
+    {
+        case ".jpg":
+        case ".jpeg":
+            return "image/jpeg";
+        case ".png":
+            return "image/png";
+        case ".gif":
+            return "image/gif";
+        case ".webp":
+            return "image/webp";
+        default:
+            return "application/octet-stream";
+    }
+}
+    
     /// <summary>
     /// Đánh dấu toàn bộ tin nhắn trong cuộc trò chuyện là đã đọc
     /// </summary>

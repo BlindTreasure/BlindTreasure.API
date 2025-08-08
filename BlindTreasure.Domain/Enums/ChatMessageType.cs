@@ -4,5 +4,7 @@ public enum ChatMessageType
 {
     UserToUser,
     UserToAi,
-    AiToUser
+    AiToUser,
+    ImageMessage,         
+    InventoryItemMessage  
 }
