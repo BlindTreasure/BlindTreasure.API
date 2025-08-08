@@ -39,13 +39,12 @@ public class ReviewService : IReviewService
             throw ErrorHelper.NotFound("Không tìm thấy thông tin tài khoản");
 
         var orderDetail = await _unitOfWork.OrderDetails
-         .GetQueryable()
-         .Include(od => od.Order)
-             .Include(od => od.Product).ThenInclude(p => p.Seller)
-             .Include(od => od.BlindBox)
-         .FirstOrDefaultAsync(
-             od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId
-         );
+            .GetQueryable()
+            .Include(od => od.Order)
+            .Include(od => od.Product).ThenInclude(p => p.Seller)
+            .Include(od => od.BlindBox)
+            .FirstOrDefaultAsync(od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId
+            );
 
         await ValidateOrderDetailForReview(orderDetail!, createDto.OrderDetailId, userId);
 
@@ -578,7 +577,7 @@ public class ReviewService : IReviewService
             // Validate each image file
             if (createDto.Images != null && createDto.Images.Any())
                 foreach (var imageFile in createDto.Images)
-                    if (!IsValidImageFile(imageFile))
+                    if (!IsValidMediaFile(imageFile))
                     {
                         _loggerService.Warn($"Invalid image file: {imageFile.FileName}");
                         throw ErrorHelper.BadRequest($"File {imageFile.FileName} không hợp lệ");
@@ -636,7 +635,7 @@ public class ReviewService : IReviewService
     /// <summary>
     /// Validate individual image file
     /// </summary>
-    private bool IsValidImageFile(IFormFile file)
+    private bool IsValidMediaFile(IFormFile file)
     {
         try
         {
@@ -647,8 +646,8 @@ public class ReviewService : IReviewService
                 return false;
             }
 
-            // Check file size (max 5MB)
-            const int maxSizeBytes = 5 * 1024 * 1024; // 5MB
+            // Check file size (max 50MB)
+            const int maxSizeBytes = 50 * 1024 * 1024; // 50MB
             if (file.Length > maxSizeBytes)
             {
                 _loggerService.Warn(
@@ -657,7 +656,13 @@ public class ReviewService : IReviewService
             }
 
             // Check file extension
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var allowedExtensions = new[]
+            {
+                // Images
+                ".jpg", ".jpeg", ".png", ".gif", ".webp",
+                // Videos
+                ".mp4", ".mov", ".avi", ".wmv", ".mkv"
+            };
             var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
 
             if (string.IsNullOrEmpty(fileExtension) || !allowedExtensions.Contains(fileExtension))
@@ -669,11 +674,18 @@ public class ReviewService : IReviewService
             // Check MIME type
             var allowedMimeTypes = new[]
             {
+                // Images
                 "image/jpeg",
                 "image/jpg",
                 "image/png",
                 "image/gif",
-                "image/webp"
+                "image/webp",
+                // Videos
+                "video/mp4",
+                "video/quicktime",
+                "video/x-msvideo",
+                "video/x-ms-wmv",
+                "video/x-matroska"
             };
 
             if (string.IsNullOrEmpty(file.ContentType) ||
@@ -688,7 +700,7 @@ public class ReviewService : IReviewService
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"Error validating image file {file?.FileName}: {ex.Message}");
+            _loggerService.Error($"Error validating media file {file?.FileName}: {ex.Message}");
             return false;
         }
     }
@@ -735,7 +747,6 @@ public class ReviewService : IReviewService
             {
                 failCount++;
                 _loggerService.Error($"Failed to upload review image {imageFile.FileName}: {ex.Message}");
-                // Continue with other images even if one fails
             }
 
         _loggerService.Info(

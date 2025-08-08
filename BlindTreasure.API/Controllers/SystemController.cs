@@ -484,122 +484,131 @@ public class SystemController : ControllerBase
                 return BadRequest("Not enough valid products found (need at least 3)");
             }
 
-            var now = DateTime.UtcNow;
-            var totalAmount = products.Sum(p => p.Price);
-
-            // 1. Tạo Payment trước
-            var payment = new Payment
-            {
-                Id = Guid.NewGuid(),
-                Amount = totalAmount,
-                Method = "STRIPE",
-                Status = PaymentStatus.Paid,
-                PaidAt = now.AddDays(-5),
-                CreatedAt = now.AddDays(-7),
-                UpdatedAt = now.AddDays(-5),
-                CreatedBy = user.Id,
-                UpdatedBy = user.Id
-            };
-
+            // Tạo order riêng cho từng seller (thay vì một order chung)
             var groupOrderId = Guid.NewGuid();
-            // 2. Tạo Order
-            var order = new Order
-            {
-                Id = Guid.NewGuid(),
-                UserId = user.Id,
-                Status = OrderStatus.PAID.ToString(), // ✅ QUAN TRỌNG: Phải là "PAID"
-                TotalAmount = totalAmount,
-                FinalAmount = totalAmount,
-                TotalShippingFee = 0,
-                PlacedAt = now.AddDays(-7),
-                CompletedAt = now.AddDays(-5),
-                PaymentId = payment.Id,
-                CreatedAt = now.AddDays(-7),
-                UpdatedAt = now.AddDays(-5),
-                CreatedBy = user.Id,
-                UpdatedBy = user.Id,
-                CheckoutGroupId = groupOrderId, // Mới: Group ID để nhóm các order cùng checkout
-            };
-
-            // Link Payment với Order
-            payment.OrderId = order.Id;
-
-            // 3. Tạo Transaction với đầy đủ field bắt buộc
-            var transaction = new Transaction
-            {
-                Id = Guid.NewGuid(),
-                PaymentId = payment.Id,
-                Type = "PAYMENT", // ✅ QUAN TRỌNG: Set Type để tránh null constraint
-                Amount = totalAmount,
-                Currency = "VND",
-                Status = TransactionStatus.Successful.ToString(),
-                OccurredAt = now.AddDays(-5),
-                ExternalRef = $"test_session_{Guid.NewGuid()}", // Stripe session ID giả lập
-                Notes = "Test transaction for review functionality",
-                CompleteAt = now.AddDays(-5),
-                StripeTransactionId =
-                    $"pi_test_{Guid.NewGuid().ToString("N")[..24]}", // Stripe PaymentIntent ID giả lập
-                CreatedAt = now.AddDays(-5),
-                UpdatedAt = now.AddDays(-5),
-                CreatedBy = user.Id,
-                UpdatedBy = user.Id
-            };
-
-            // 4. Tạo OrderDetails và InventoryItems
+            var now = DateTime.UtcNow;
+            var orders = new List<Order>();
+            var payments = new List<Payment>();
+            var transactions = new List<Transaction>();
             var orderDetails = new List<OrderDetail>();
             var inventoryItems = new List<InventoryItem>();
 
-            foreach (var product in products)
-            {
-                if (product.Seller == null)
-                {
-                    _logger.Warn($"[SeedUserOrder] Seller not found for product {product.Id}");
-                    continue;
-                }
+            // Nhóm sản phẩm theo Seller
+            var productsBySeller = products.GroupBy(p => p.Seller.Id);
 
-                // Tạo OrderDetail
-                var orderDetail = new OrderDetail
+            foreach (var sellerGroup in productsBySeller)
+            {
+                var sellerId = sellerGroup.Key;
+                var sellerProducts = sellerGroup.ToList();
+                var sellerTotalAmount = sellerProducts.Sum(p => p.Price);
+
+                // 1. Tạo Payment cho seller này
+                var payment = new Payment
                 {
                     Id = Guid.NewGuid(),
-                    OrderId = order.Id,
-                    ProductId = product.Id,
-                    Quantity = 1,
-                    UnitPrice = product.Price,
-                    TotalPrice = product.Price,
-                    DetailDiscountPromotion = 0,
-                    FinalDetailPrice = product.Price,
-                    Status = OrderDetailItemStatus.DELIVERED, // Đã giao hàng
-                    Logs = $"[{now.AddDays(-7):yyyy-MM-dd HH:mm:ss}] Created {product.Name}, Qty=1\n" +
-                           $"[{now.AddDays(-6):yyyy-MM-dd HH:mm:ss}] Status updated to SHIPPING_REQUESTED\n" +
-                           $"[{now.AddDays(-5):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERING\n" +
-                           $"[{now.AddDays(-4):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERED",
+                    Amount = sellerTotalAmount,
+                    Method = "STRIPE",
+                    Status = PaymentStatus.Paid,
+                    PaidAt = now.AddDays(-5),
                     CreatedAt = now.AddDays(-7),
-                    UpdatedAt = now.AddDays(-4),
+                    UpdatedAt = now.AddDays(-5),
                     CreatedBy = user.Id,
                     UpdatedBy = user.Id
                 };
-                orderDetails.Add(orderDetail);
+                payments.Add(payment);
 
-                // Tạo InventoryItem
-                var inventoryItem = new InventoryItem
+                // 2. Tạo Order cho seller này
+                var order = new Order
                 {
                     Id = Guid.NewGuid(),
                     UserId = user.Id,
-                    ProductId = product.Id,
-                    OrderDetailId = orderDetail.Id,
-                    Status = InventoryItemStatus.Available,
-                    IsFromBlindBox = false,
-                    Location = product.Seller.CompanyAddress ?? "HCM Warehouse",
-                    Tier = RarityName.Common,
-                    CreatedAt = now.AddDays(-4), // Tạo inventory khi delivered
-                    UpdatedAt = now.AddDays(-4),
+                    SellerId = sellerId, // FIX: Thêm SellerId
+                    Status = OrderStatus.PAID.ToString(),
+                    TotalAmount = sellerTotalAmount,
+                    FinalAmount = sellerTotalAmount,
+                    TotalShippingFee = 0,
+                    PlacedAt = now.AddDays(-7),
+                    CompletedAt = now.AddDays(-5),
+                    PaymentId = payment.Id,
+                    CreatedAt = now.AddDays(-7),
+                    UpdatedAt = now.AddDays(-5),
+                    CreatedBy = user.Id,
+                    UpdatedBy = user.Id,
+                    CheckoutGroupId = groupOrderId,
+                };
+                orders.Add(order);
+
+                // Link Payment với Order
+                payment.OrderId = order.Id;
+
+                // 3. Tạo Transaction
+                var transaction = new Transaction
+                {
+                    Id = Guid.NewGuid(),
+                    PaymentId = payment.Id,
+                    Type = "PAYMENT",
+                    Amount = sellerTotalAmount,
+                    Currency = "VND",
+                    Status = TransactionStatus.Successful.ToString(),
+                    OccurredAt = now.AddDays(-5),
+                    ExternalRef = $"test_session_{Guid.NewGuid()}",
+                    Notes = "Test transaction for review functionality",
+                    CompleteAt = now.AddDays(-5),
+                    StripeTransactionId = $"pi_test_{Guid.NewGuid().ToString("N")[..24]}",
+                    CreatedAt = now.AddDays(-5),
+                    UpdatedAt = now.AddDays(-5),
                     CreatedBy = user.Id,
                     UpdatedBy = user.Id
                 };
-                inventoryItems.Add(inventoryItem);
+                transactions.Add(transaction);
 
-                // Giảm stock của product
-                product.Stock -= 1;
+                // 4. Tạo OrderDetails và InventoryItems cho seller này
+                foreach (var product in sellerProducts)
+                {
+                    // Tạo OrderDetail
+                    var orderDetail = new OrderDetail
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = order.Id,
+                        ProductId = product.Id,
+                        Quantity = 1,
+                        UnitPrice = product.Price,
+                        TotalPrice = product.Price,
+                        DetailDiscountPromotion = 0,
+                        FinalDetailPrice = product.Price,
+                        Status = OrderDetailItemStatus.DELIVERED, // Đã giao hàng
+                        Logs = $"[{now.AddDays(-7):yyyy-MM-dd HH:mm:ss}] Created {product.Name}, Qty=1\n" +
+                               $"[{now.AddDays(-6):yyyy-MM-dd HH:mm:ss}] Status updated to SHIPPING_REQUESTED\n" +
+                               $"[{now.AddDays(-5):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERING\n" +
+                               $"[{now.AddDays(-4):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERED",
+                        CreatedAt = now.AddDays(-7),
+                        UpdatedAt = now.AddDays(-4),
+                        CreatedBy = user.Id,
+                        UpdatedBy = user.Id
+                    };
+                    orderDetails.Add(orderDetail);
+
+                    // Tạo InventoryItem
+                    var inventoryItem = new InventoryItem
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = user.Id,
+                        ProductId = product.Id,
+                        OrderDetailId = orderDetail.Id,
+                        Status = InventoryItemStatus.Available,
+                        IsFromBlindBox = false,
+                        Location = product.Seller?.CompanyAddress ?? "HCM Warehouse",
+                        Tier = RarityName.Common,
+                        CreatedAt = now.AddDays(-4),
+                        UpdatedAt = now.AddDays(-4),
+                        CreatedBy = user.Id,
+                        UpdatedBy = user.Id
+                    };
+                    inventoryItems.Add(inventoryItem);
+
+                    // Giảm stock của product
+                    product.Stock -= 1;
+                }
             }
 
             if (!orderDetails.Any())
@@ -609,9 +618,9 @@ public class SystemController : ControllerBase
             }
 
             // 5. Lưu vào database theo đúng thứ tự dependency
-            await _context.Payments.AddAsync(payment);
-            await _context.Orders.AddAsync(order);
-            await _context.Transactions.AddAsync(transaction);
+            await _context.Payments.AddRangeAsync(payments);
+            await _context.Orders.AddRangeAsync(orders);
+            await _context.Transactions.AddRangeAsync(transactions);
             await _context.OrderDetails.AddRangeAsync(orderDetails);
             await _context.InventoryItems.AddRangeAsync(inventoryItems);
 
@@ -625,14 +634,12 @@ public class SystemController : ControllerBase
 
             return Ok(ApiResult<object>.Success(new
             {
-                Message =
-                    $"Successfully seeded {orderDetails.Count} PAID orders with products for user {user.Email}",
-                OrderId = order.Id,
-                OrderStatus = order.Status,
-                PaymentId = payment.Id,
-                PaymentStatus = payment.Status.ToString(),
-                TransactionId = transaction.Id,
-                TransactionStatus = transaction.Status,
+                Message = $"Successfully seeded {orderDetails.Count} PAID orders with products for user {user.Email}",
+                OrderIds = orders.Select(o => o.Id).ToList(),
+                OrderStatus = OrderStatus.PAID.ToString(),
+                PaymentIds = payments.Select(p => p.Id).ToList(),
+                PaymentStatus = PaymentStatus.Paid.ToString(),
+                TransactionIds = transactions.Select(t => t.Id).ToList(),
                 ProductIds = orderDetails.Select(od => od.ProductId).ToList(),
                 InventoryItemIds = inventoryItems.Select(ii => ii.Id).ToList(),
                 CanReviewNow = true // Có thể review ngay vì order đã PAID
