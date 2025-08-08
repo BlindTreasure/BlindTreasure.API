@@ -199,26 +199,14 @@ public class ReviewService : IReviewService
         return MapToReviewResponseDto(review);
     }
 
-    public async Task<bool> CanReviewOrderDetailAsync(Guid orderDetailId)
+    public async Task<bool> HasReviewedOrderDetailAsync(Guid orderDetailId)
     {
         var userId = _claimService.CurrentUserId;
 
-        var orderDetail = await _unitOfWork.OrderDetails.GetQueryable()
-            .Include(od => od.Order)
-            .FirstOrDefaultAsync(od => od.Id == orderDetailId && od.Order.UserId == userId);
-
-        if (orderDetail == null)
-            return false;
-
-        // Phải là PAID
-        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
-            return false;
-
-        // Chưa review
-        var existingReview = await _unitOfWork.Reviews.GetQueryable()
+        var hasReviewed = await _unitOfWork.Reviews.GetQueryable()
             .AnyAsync(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted);
 
-        return !existingReview;
+        return hasReviewed;
     }
 
     public async Task<ReviewResponseDto> DeleteReviewAsync(Guid reviewId)
