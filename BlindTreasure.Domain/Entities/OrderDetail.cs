@@ -19,15 +19,13 @@ public class OrderDetail : BaseEntity
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
-    public decimal? DetailDiscountPromotion { get; set; }
-    public decimal? FinalDetailPrice { get; set; } // TotalPrice - DetailDiscountPromotion ?? 0;
+    public decimal? DetailDiscountPromotion { get; set; } = 0;
+    public decimal? FinalDetailPrice { get; set; } = 0; // TotalPrice - DetailDiscountPromotion ?? 0;
     public OrderDetailItemStatus Status { get; set; }
     public string? Logs { get; set; } = string.Empty; // Lưu trữ nhật ký trạng thái
 
 
-    // Tách rõ SellerId ở đây
-    public Guid SellerId { get; set; }
-    public Seller Seller { get; set; }
+
 
     // Many → Shipments
     public ICollection<Shipment>? Shipments { get; set; } = new List<Shipment>();

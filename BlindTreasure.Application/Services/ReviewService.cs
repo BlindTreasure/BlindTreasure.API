@@ -38,12 +38,14 @@ public class ReviewService : IReviewService
         if (user == null || user.IsDeleted)
             throw ErrorHelper.NotFound("Không tìm thấy thông tin tài khoản");
 
-        var orderDetail = await _unitOfWork.OrderDetails.GetQueryable()
-            .Include(od => od.Order)
-            .Include(od => od.Product)
-            .ThenInclude(p => p!.Category)
-            .Include(od => od.BlindBox)
-            .FirstOrDefaultAsync(od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId);
+        var orderDetail = await _unitOfWork.OrderDetails
+         .GetQueryable()
+         .Include(od => od.Order)
+             .Include(od => od.Product).ThenInclude(p => p.Seller)
+             .Include(od => od.BlindBox)
+         .FirstOrDefaultAsync(
+             od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId
+         );
 
         await ValidateOrderDetailForReview(orderDetail!, createDto.OrderDetailId, userId);
 
@@ -59,7 +61,7 @@ public class ReviewService : IReviewService
             OrderDetailId = createDto.OrderDetailId,
             ProductId = orderDetail!.ProductId,
             BlindBoxId = orderDetail.BlindBoxId,
-            SellerId = orderDetail.SellerId,
+            SellerId = orderDetail.Product.SellerId,
             OverallRating = createDto.Rating,
             Content = createDto.Comment.Trim(),
             ImageUrls = imageUrls,

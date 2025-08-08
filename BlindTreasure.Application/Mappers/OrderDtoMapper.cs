@@ -89,7 +89,8 @@ public static class OrderDtoMapper
                 Details = order.OrderDetails?.Select(ToOrderDetailDtoFullIncluded).ToList() ??
                           new List<OrderDetailDto>(),
                 Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
-                TotalShippingFee = order.TotalShippingFee ?? 0
+                TotalShippingFee = order.TotalShippingFee ?? 0,
+                CheckoutGroupId = order.CheckoutGroupId
             };
         }
         catch (Exception ex)

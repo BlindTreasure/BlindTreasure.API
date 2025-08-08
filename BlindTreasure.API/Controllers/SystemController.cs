@@ -501,6 +501,7 @@ public class SystemController : ControllerBase
                 UpdatedBy = user.Id
             };
 
+            var groupOrderId = Guid.NewGuid();
             // 2. Tạo Order
             var order = new Order
             {
@@ -516,7 +517,8 @@ public class SystemController : ControllerBase
                 CreatedAt = now.AddDays(-7),
                 UpdatedAt = now.AddDays(-5),
                 CreatedBy = user.Id,
-                UpdatedBy = user.Id
+                UpdatedBy = user.Id,
+                CheckoutGroupId = groupOrderId, // Mới: Group ID để nhóm các order cùng checkout
             };
 
             // Link Payment với Order
@@ -567,7 +569,6 @@ public class SystemController : ControllerBase
                     DetailDiscountPromotion = 0,
                     FinalDetailPrice = product.Price,
                     Status = OrderDetailItemStatus.DELIVERED, // Đã giao hàng
-                    SellerId = product.SellerId,
                     Logs = $"[{now.AddDays(-7):yyyy-MM-dd HH:mm:ss}] Created {product.Name}, Qty=1\n" +
                            $"[{now.AddDays(-6):yyyy-MM-dd HH:mm:ss}] Status updated to SHIPPING_REQUESTED\n" +
                            $"[{now.AddDays(-5):yyyy-MM-dd HH:mm:ss}] Status updated to DELIVERING\n" +

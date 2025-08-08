@@ -1,5 +1,7 @@
 ﻿using System.Text.Json;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.EntityConfiguration;
+using BlindTreasure.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Domain;
@@ -49,6 +51,9 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<TradeRequest> TradeRequests { get; set; }
     public DbSet<TradeRequestItem> TradeRequestItems { get; set; }
     public DbSet<TradeHistory> TradeHistories { get; set; }
+    public DbSet<Payout> Payouts { get; set; }
+    public DbSet<PayoutLog> PayoutLogs { get; set; }
+    public DbSet<PayoutDetail> PayoutDetails { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -710,5 +715,10 @@ public class BlindTreasureDbContext : DbContext
             .HasMany(od => od.Shipments)
             .WithMany(s => s.OrderDetails)
             .UsingEntity(j => j.ToTable("OrderDetailShipments"));
+
+        // Thêm payout configurations
+        modelBuilder.ApplyConfiguration(new PayoutConfiguration());
+        modelBuilder.ApplyConfiguration(new PayoutDetailConfiguration());
+        modelBuilder.ApplyConfiguration(new PayoutLogConfiguration());
     }
 }

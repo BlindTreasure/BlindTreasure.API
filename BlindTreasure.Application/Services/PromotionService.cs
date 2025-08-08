@@ -388,7 +388,6 @@ public class PromotionService : IPromotionService
 
         var participants = await _unitOfWork.PromotionParticipants
             .GetQueryable()
-            .Where(pp => pp.PromotionId == param.PromotionId && !pp.IsDeleted)
             .Include(pp => pp.Seller)
             .ThenInclude(s => s.User)
             .ToListAsync(); // ✅ Thêm await và ToListAsync()

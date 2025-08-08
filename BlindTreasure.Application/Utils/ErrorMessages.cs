@@ -46,7 +46,6 @@ public static class ErrorMessages
 
     public const string AccountInvalidEmailFormat = "Invalid email format. Please check and try again.";
     public const string AccountAlreadyVerified = "Email is already verified.";
-    public const string AccountGitHubAccessTokenNotFound = "GitHub access token not found. Please login to GithubFirst";
 
     #endregion
 
@@ -61,16 +60,8 @@ public static class ErrorMessages
     #endregion
 
     #region Transaction Error Message
-
-    public const string TransactionUpgradeCostNegative = "This node upgrades do not need additional fee.";
-    public const string TransactionInvalidRefund = "Transaction state is not complete or cannot be found.";
     public const string Currency_APIFailed = "Currency API failed. Please try again later. Error: {0}";
     public const string Currency_RateNull = "Currency Rate is null, conversion fail. Please try again later.";
-    public const string TransactionPermissionDenied = "You do not have permission to access this transaction.";
-    public const string TransactionRefundOverdue = "You can not refund a transaction after 24 hours.";
-
-    public const string Transacion_RevewActiveNodeDenied =
-        "You can not renew an active node. APIHub are not supporting this feature for now!";
 
     #endregion
 

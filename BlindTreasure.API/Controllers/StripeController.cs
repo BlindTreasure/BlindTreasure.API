@@ -77,7 +77,7 @@ public class StripeController : ControllerBase
         {
             var paymentUrl = await _orderService.CheckoutFromClientCartAsync(cart);
             _logger.Success("[Stripe][CheckoutDirect] Đặt hàng thành công, trả về link thanh toán.");
-            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+            return Ok(ApiResult<MultiOrderCheckoutResultDto>.Success(paymentUrl, "200",
                 "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)
@@ -105,7 +105,7 @@ public class StripeController : ControllerBase
         {
             var paymentUrl = await _orderService.CheckoutAsync(dto);
             _logger.Success("[Stripe][Checkout] Đặt hàng thành công, trả về link thanh toán.");
-            return Ok(ApiResult<string>.Success(paymentUrl, "200",
+            return Ok(ApiResult<MultiOrderCheckoutResultDto>.Success(paymentUrl, "200",
                 "Đặt hàng thành công. Chuyển hướng đến thanh toán."));
         }
         catch (Exception ex)
@@ -216,7 +216,28 @@ public class StripeController : ControllerBase
                     var completedSession = stripeEvent.Data.Object as Session
                                            ?? throw ErrorHelper.NotFound("Stripe session not found.");
                     _logger.Info("[Stripe][Webhook] Thanh toán thành công, Session ID: " + completedSession.Id);
-                    await HandleSuccessfulPayment(completedSession);
+
+                    // Xử lý thanh toán nhiều order
+                    if (completedSession.Metadata != null &&
+                        completedSession.Metadata.TryGetValue("isGeneralPayment", out var isGeneral) &&
+                        isGeneral == "true" &&
+                        completedSession.Metadata.TryGetValue("orderIds", out var orderIdsStr))
+                    {
+                        var orderIds = orderIdsStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(id => Guid.TryParse(id, out var guid) ? guid : Guid.Empty)
+                            .Where(guid => guid != Guid.Empty)
+                            .ToList();
+
+                        foreach (var orderId in orderIds)
+                        {
+                            await HandleSuccessfulPaymentForOrder(orderId, completedSession.Id, completedSession.Metadata);
+                        }
+                    }
+                    else
+                    {
+                        await HandleSuccessfulPayment(completedSession);
+                    }
+
                     await HandleSuccessfulItemShipmentRequestPayment(completedSession);
                     await HandlePaymentIntentCreatedSession(completedSession);
                     break;
@@ -593,6 +614,24 @@ public class StripeController : ControllerBase
         catch (Exception ex)
         {
             _logger.Error("[Stripe][Webhook] Unhandled exception while handling shipment payment: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Xử lý khi thanh toán thành công từ Stripe webhook.
+    /// </summary>
+    private async Task HandleSuccessfulPaymentForOrder(Guid orderId, string sessionId, IDictionary<string, string> metadata)
+    {
+        await _transactionService.HandleSuccessfulPaymentAsync(sessionId, orderId.ToString());
+        _logger.Success($"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {sessionId}");
+
+        if (metadata != null &&
+            metadata.TryGetValue("couponId", out var couponId) &&
+            !string.IsNullOrWhiteSpace(couponId))
+        {
+            _logger.Info($"[Stripe][Webhook] Cleanup Stripe coupon: {couponId}");
+            await _stripeService.CleanupStripeCoupon(couponId);
+            _logger.Success($"[Stripe][Webhook] Đã xóa coupon Stripe: {couponId}");
         }
     }
 

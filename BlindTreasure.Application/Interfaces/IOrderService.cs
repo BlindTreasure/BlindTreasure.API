@@ -9,8 +9,8 @@ namespace BlindTreasure.Application.Interfaces;
 public interface IOrderService
 {
     Task CancelOrderAsync(Guid orderId);
-    Task<string> CheckoutAsync(CreateCheckoutRequestDto dto);
-    Task<string> CheckoutFromClientCartAsync(DirectCartCheckoutDto cartDto);
+    Task<MultiOrderCheckoutResultDto> CheckoutAsync(CreateCheckoutRequestDto dto);
+    Task<MultiOrderCheckoutResultDto> CheckoutFromClientCartAsync(DirectCartCheckoutDto cartDto);
     Task DeleteOrderAsync(Guid orderId);
     Task<Pagination<OrderDetailDto>> GetMyOrderDetailsAsync(OrderDetailQueryParameter param);
     Task<Pagination<OrderDto>> GetMyOrdersAsync(OrderQueryParameter param);
