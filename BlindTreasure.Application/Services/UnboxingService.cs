@@ -2,6 +2,7 @@
 using System.Text.Json;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
@@ -11,6 +12,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
@@ -22,15 +24,18 @@ public class UnboxingService : IUnboxingService
     private readonly ILoggerService _loggerService;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IHubContext<UnboxingHub> _notificationHub;
+
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
-        ICurrentTime currentTime, INotificationService notificationService)
+        ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
         _currentTime = currentTime;
         _notificationService = notificationService;
+        _notificationHub = notificationHub;
     }
 
     public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
@@ -83,6 +88,23 @@ public class UnboxingService : IUnboxingService
 
         // 5. Cập nhật DB (trừ số lượng, cộng Inventory cho user, đánh dấu hộp đã mở)
         await GrantUnboxedItemToUser(selectedItem, customerBox, userId, now);
+
+
+        var unboxLog = new UnboxLogDto
+        {
+            CustomerBlindBoxId = customerBox.Id,
+            CustomerName = (await _unitOfWork.Users.GetByIdAsync(userId))?.FullName ?? "Anonymous",
+            ProductId = selectedItem.ProductId,
+            ProductName = selectedItem.Product?.Name ?? "Unknown",
+            Rarity = selectedItem.RarityConfig?.Name ?? RarityName.Common,
+            DropRate = selectedItem.DropRate,
+            UnboxedAt = now,
+            BlindBoxName = blindBox?.Name ?? "Unknown"
+        };
+
+        // Gửi thông báo real-time
+        await _notificationHub.Clients.All.SendAsync("ReceiveUnboxingNotification", unboxLog);
+
 
         return new UnboxResultDto
         {

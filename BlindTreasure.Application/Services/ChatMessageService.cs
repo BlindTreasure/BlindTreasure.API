@@ -153,7 +153,7 @@ public class ChatMessageService : IChatMessageService
 
         // Thêm Include để load thông tin User
         query = query.Include(m => m.Sender).Include(m => m.Receiver)
-            .OrderByDescending(m => m.SentAt)
+            .OrderBy(m => m.SentAt)
             .AsNoTracking();
 
         // Tính tổng số lượng tin nhắn
