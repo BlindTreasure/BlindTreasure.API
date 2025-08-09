@@ -846,73 +846,78 @@ public class SystemController : ControllerBase
         return users;
     }
 
-    private async Task ClearDatabase(BlindTreasureDbContext context)
+private async Task ClearDatabase(BlindTreasureDbContext context)
+{
+    var strategy = context.Database.CreateExecutionStrategy();
+
+    await strategy.ExecuteAsync(async () =>
     {
-        var strategy = context.Database.CreateExecutionStrategy();
+        await using var transaction = await context.Database.BeginTransactionAsync();
 
-        await strategy.ExecuteAsync(async () =>
+        try
         {
-            await using var transaction = await context.Database.BeginTransactionAsync();
+            _logger.Info("Bắt đầu xóa dữ liệu trong database...");
 
-            try
+            var tablesToDelete = new List<Func<Task>>
             {
-                _logger.Info("Bắt đầu xóa dữ liệu trong database...");
+                () => context.InventoryItems.ExecuteDeleteAsync(),
+                () => context.CustomerFavourites.ExecuteDeleteAsync(),
+                () => context.ChatMessages.ExecuteDeleteAsync(),
+                () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
+                () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
+                () => context.RarityConfigs.ExecuteDeleteAsync(),
+                () => context.BlindBoxItems.ExecuteDeleteAsync(),
+                () => context.CartItems.ExecuteDeleteAsync(),
+                () => context.Reviews.ExecuteDeleteAsync(),
+                () => context.OrderDetails.ExecuteDeleteAsync(),
+                () => context.Shipments.ExecuteDeleteAsync(),
+                () => context.Listings.ExecuteDeleteAsync(),
+                () => context.InventoryItems.ExecuteDeleteAsync(),
+                () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
 
-                var tablesToDelete = new List<Func<Task>>
-                {
-                    () => context.InventoryItems.ExecuteDeleteAsync(),
-                    () => context.CustomerFavourites.ExecuteDeleteAsync(),
-                    () => context.ChatMessages.ExecuteDeleteAsync(),
-                    () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
-                    () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
-                    () => context.RarityConfigs.ExecuteDeleteAsync(),
-                    () => context.BlindBoxItems.ExecuteDeleteAsync(),
-                    () => context.CartItems.ExecuteDeleteAsync(),
-                    () => context.Reviews.ExecuteDeleteAsync(),
-                    () => context.OrderDetails.ExecuteDeleteAsync(),
-                    () => context.Shipments.ExecuteDeleteAsync(),
-                    () => context.Listings.ExecuteDeleteAsync(),
-                    () => context.InventoryItems.ExecuteDeleteAsync(),
-                    () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
+                () => context.TradeHistories.ExecuteDeleteAsync(),
+                () => context.TradeRequests.ExecuteDeleteAsync(),
+                () => context.TradeRequestItems.ExecuteDeleteAsync(), // Bảng mới
+                () => context.SupportTickets.ExecuteDeleteAsync(),
+                () => context.Transactions.ExecuteDeleteAsync(),
+                () => context.Notifications.ExecuteDeleteAsync(),
+                () => context.OtpVerifications.ExecuteDeleteAsync(),
+                () => context.ListingReports.ExecuteDeleteAsync(), // Bảng mới
 
-                    () => context.TradeHistories.ExecuteDeleteAsync(),
-                    () => context.TradeRequests.ExecuteDeleteAsync(),
-                    () => context.SupportTickets.ExecuteDeleteAsync(),
-                    () => context.Transactions.ExecuteDeleteAsync(),
-                    () => context.Notifications.ExecuteDeleteAsync(),
-                    () => context.OtpVerifications.ExecuteDeleteAsync(),
+                () => context.Orders.ExecuteDeleteAsync(),
+                () => context.Payments.ExecuteDeleteAsync(),
+                () => context.Promotions.ExecuteDeleteAsync(),
+                () => context.PromotionParticipants.ExecuteDeleteAsync(),
+                () => context.Addresses.ExecuteDeleteAsync(),
 
-                    () => context.Orders.ExecuteDeleteAsync(),
-                    () => context.Payments.ExecuteDeleteAsync(),
-                    () => context.Promotions.ExecuteDeleteAsync(),
-                    () => context.PromotionParticipants.ExecuteDeleteAsync(),
-                    () => context.Addresses.ExecuteDeleteAsync(),
+                () => context.Products.ExecuteDeleteAsync(),
+                () => context.BlindBoxes.ExecuteDeleteAsync(),
+                () => context.Certificates.ExecuteDeleteAsync(),
+                () => context.Categories.ExecuteDeleteAsync(),
 
-                    () => context.Products.ExecuteDeleteAsync(),
-                    () => context.BlindBoxes.ExecuteDeleteAsync(),
-                    () => context.Certificates.ExecuteDeleteAsync(),
-                    () => context.Categories.ExecuteDeleteAsync(),
+                () => context.Sellers.ExecuteDeleteAsync(),
+                () => context.Users.ExecuteDeleteAsync(),
+                () => context.Roles.ExecuteDeleteAsync(),
+                () => context.Payouts.ExecuteDeleteAsync(), // Bảng mới
+                () => context.PayoutLogs.ExecuteDeleteAsync(), // Bảng mới
+                () => context.PayoutDetails.ExecuteDeleteAsync() // Bảng mới
+            };
 
-                    () => context.Sellers.ExecuteDeleteAsync(),
-                    () => context.Users.ExecuteDeleteAsync(),
-                    () => context.Roles.ExecuteDeleteAsync()
-                };
+            foreach (var deleteFunc in tablesToDelete)
+                await deleteFunc();
 
-                foreach (var deleteFunc in tablesToDelete)
-                    await deleteFunc();
+            await transaction.CommitAsync();
 
-                await transaction.CommitAsync();
-
-                _logger.Success("Xóa sạch dữ liệu trong database thành công.");
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                _logger.Error($"Xóa dữ liệu thất bại: {ex.Message}");
-                throw;
-            }
-        });
-    }
+            _logger.Success("Xóa sạch dữ liệu trong database thành công.");
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.Error($"Xóa dữ liệu thất bại: {ex.Message}");
+            throw;
+        }
+    });
+}
 
     #region data seeding
 
