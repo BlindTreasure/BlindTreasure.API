@@ -42,7 +42,9 @@ public class UnitOfWork : IUnitOfWork
         IGenericRepository<TradeRequest> tradeRequests,
         IGenericRepository<TradeRequestItem> tradeRequestItems,
         IGenericRepository<CustomerFavourite> customerFavourites,
-        IGenericRepository<OrderSellerPromotion> orderSellerPromotion, IGenericRepository<Review> reviews,
+        IGenericRepository<OrderSellerPromotion> orderSellerPromotion, 
+        IGenericRepository<Review> reviews, 
+        IGenericRepository<GroupPaymentSession> groupPaymentSessions,
         IDbContextTransaction? transaction = null
     )
     {
@@ -79,6 +81,7 @@ public class UnitOfWork : IUnitOfWork
         TradeRequestItems = tradeRequestItems;
         OrderSellerPromotions = orderSellerPromotion;
         Reviews = reviews;
+        GroupPaymentSessions = groupPaymentSessions;
     }
 
     public void Dispose()
@@ -167,4 +170,5 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<TradeRequestItem> TradeRequestItems { get; }
     public IGenericRepository<OrderSellerPromotion> OrderSellerPromotions { get; }
     public IGenericRepository<Review> Reviews { get; }
+    public IGenericRepository<GroupPaymentSession> GroupPaymentSessions { get; }
 }

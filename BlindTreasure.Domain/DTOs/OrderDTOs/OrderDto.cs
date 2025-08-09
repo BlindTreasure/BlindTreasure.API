@@ -1,4 +1,6 @@
 ﻿using BlindTreasure.Domain.DTOs.PaymentDTOs;
+using BlindTreasure.Domain.DTOs.SellerDTOs;
+using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Domain.DTOs.OrderDTOs;
 
@@ -15,4 +17,6 @@ public class OrderDto
     public decimal FinalAmount { get; set; }
     public decimal? TotalShippingFee { get; set; } = 0; // Tổng phí vận chuyển của từ shipment của các items thuộc Order
     public Guid? CheckoutGroupId { get; set; } // MỚI: Group ID để nhóm các order cùng checkout
+    public Guid? SellerId { get; set; }
+    public SellerDto? Seller { get; set; }
 }

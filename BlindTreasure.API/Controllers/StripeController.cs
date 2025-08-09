@@ -264,6 +264,24 @@ public class StripeController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+    /// <summary>
+    ///     Tạo hoặc lấy lại link thanh toán bằng cách truyền groupid của nhóm order vào
+    /// </summary>
+    [Authorize]
+    [HttpPost("group-payment-link")]
+    public async Task<IActionResult> GetGroupPaymentLink([FromBody] Guid checkoutGroupId)
+    {
+        try
+        {
+            var url = await _stripeService.GetOrCreateGroupPaymentLink(checkoutGroupId);
+            return Ok(ApiResult<string>.Success(url, "200", "Link thanh toán nhóm đã được tạo hoặc lấy lại."));
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[Stripe][GroupPaymentLink] Lỗi: {ex.Message}");
+            return StatusCode(500, ApiResult<object>.Failure(ex.Message));
+        }
+    }
 
     /// <summary>
     ///     Lấy onboarding link Stripe Express cho seller để hoàn tất xác minh tài khoản Stripe.

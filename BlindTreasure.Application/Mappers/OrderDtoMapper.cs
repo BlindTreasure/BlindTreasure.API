@@ -90,7 +90,10 @@ public static class OrderDtoMapper
                           new List<OrderDetailDto>(),
                 Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
                 TotalShippingFee = order.TotalShippingFee ?? 0,
-                CheckoutGroupId = order.CheckoutGroupId
+                CheckoutGroupId = order.CheckoutGroupId,
+                SellerId = order.SellerId,
+                Seller = order.Seller != null ? SellerMapper.ToSellerDto(order.Seller) : null
+
             };
         }
         catch (Exception ex)
