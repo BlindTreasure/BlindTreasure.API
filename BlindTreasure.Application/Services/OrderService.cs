@@ -194,11 +194,13 @@ public class OrderService : IOrderService
             return cached;
         }
 
-        var order = await _unitOfWork.Orders.GetQueryable()
+        var order = await _unitOfWork.Orders.GetQueryable().AsNoTracking()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
             .Include(o => o.ShippingAddress)
+            .Include(o => o.Seller).ThenInclude(s => s.User)
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
             .OrderByDescending(o => o.PlacedAt)
             .FirstOrDefaultAsync();
