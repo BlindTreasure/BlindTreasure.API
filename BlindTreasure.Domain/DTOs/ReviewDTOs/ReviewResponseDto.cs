@@ -3,7 +3,7 @@ namespace BlindTreasure.Domain.DTOs.ReviewDTOs;
 public class ReviewResponseDto
 {
     public Guid Id { get; set; }
-    public Guid UserId { get; set; }
+    public Guid? UserId { get; set; }
     public string UserName { get; set; } = string.Empty;
     public string? UserAvatar { get; set; }
     public int Rating { get; set; }
@@ -18,10 +18,10 @@ public class ReviewResponseDto
     public SellerReplyDto? SellerReply { get; set; }
 
     // Metadata
-    public Guid OrderDetailId { get; set; }
+    public Guid? OrderDetailId { get; set; }
     public Guid? ProductId { get; set; }
     public Guid? BlindBoxId { get; set; }
-    public Guid SellerId { get; set; }
+    public Guid? SellerId { get; set; }
 }
 
 public class SellerReplyDto

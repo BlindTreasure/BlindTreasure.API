@@ -3,6 +3,7 @@ using System;
 using BlindTreasure.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    partial class BlindTreasureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250809110126_configReview3")]
+    partial class configReview3
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -679,58 +682,6 @@ namespace BlindTreasure.Domain.Migrations
                         {
                             t.HasCheckConstraint("CK_CustomerFavourite_OneTypeOnly", "(\"ProductId\" IS NOT NULL AND \"BlindBoxId\" IS NULL) OR (\"ProductId\" IS NULL AND \"BlindBoxId\" IS NOT NULL)");
                         });
-                });
-
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.GroupPaymentSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("CheckoutGroupId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsCompleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("PaymentUrl")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("StripeSessionId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("GroupPaymentSessions");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.InventoryItem", b =>
