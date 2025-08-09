@@ -110,17 +110,18 @@ public class ReviewController : ControllerBase
     }
 
     /// <summary>
-    /// Kiểm tra xem người dùng có thể đánh giá một chi tiết đơn hàng hay không
+    /// Kiểm tra Customer đã đánh giá chưa
     /// </summary>
     /// <param name="orderDetailId">ID của chi tiết đơn hàng cần kiểm tra</param>
     /// <returns>True nếu có thể đánh giá, False nếu không thể</returns>
-    [HttpGet("can-review/{orderDetailId}")]
-    public async Task<IActionResult> CanReviewOrderDetail(Guid orderDetailId)
+    [HttpGet("review-status/{orderDetailId}")]
+    public async Task<IActionResult> CheckReviewStatus(Guid orderDetailId)
     {
         try
         {
-            var canReview = await _reviewService.CanReviewOrderDetailAsync(orderDetailId);
-            return Ok(ApiResult<bool>.Success(canReview, "200", "Ok bạn có thể để lại đánh giá cho đơn hàng này"));
+            var hasReviewed = await _reviewService.HasReviewedOrderDetailAsync(orderDetailId);
+            return Ok(ApiResult<bool>.Success(hasReviewed, "200",
+                hasReviewed ? "Bạn đã đánh giá sản phẩm này rồi." : "Bạn chưa đánh giá sản phẩm này."));
         }
         catch (Exception ex)
         {

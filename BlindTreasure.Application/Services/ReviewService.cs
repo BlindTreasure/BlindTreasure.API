@@ -39,14 +39,18 @@ public class ReviewService : IReviewService
             throw ErrorHelper.NotFound("Không tìm thấy thông tin tài khoản");
 
         var orderDetail = await _unitOfWork.OrderDetails
-         .GetQueryable()
-         .Include(od => od.Order)
-             .Include(od => od.Product).ThenInclude(p => p.Seller)
-             .Include(od => od.BlindBox)
-         .FirstOrDefaultAsync(
-             od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId
-         );
+            .GetQueryable()
+            .Include(od => od.Order)
+            .Include(od => od.Product).ThenInclude(p => p.Seller)
+            .Include(od => od.BlindBox)
+            .FirstOrDefaultAsync(od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId
+            );
 
+        if (orderDetail != null)
+        {
+            _loggerService.Info($"Found OrderDetail {orderDetail.Id} with Order Status: {orderDetail.Order?.Status}, OrderDetail Status: {orderDetail.Status}");
+        }
+        
         await ValidateOrderDetailForReview(orderDetail!, createDto.OrderDetailId, userId);
 
         // Upload images sử dụng IFormFile
@@ -200,26 +204,32 @@ public class ReviewService : IReviewService
         return MapToReviewResponseDto(review);
     }
 
-    public async Task<bool> CanReviewOrderDetailAsync(Guid orderDetailId)
+    public async Task<bool> HasReviewedOrderDetailAsync(Guid orderDetailId)
     {
         var userId = _claimService.CurrentUserId;
 
-        var orderDetail = await _unitOfWork.OrderDetails.GetQueryable()
-            .Include(od => od.Order)
-            .FirstOrDefaultAsync(od => od.Id == orderDetailId && od.Order.UserId == userId);
+        // Kiểm tra có review nào với orderDetailId này không
+        var reviewsWithOrderDetail = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId)
+            .ToListAsync();
 
-        if (orderDetail == null)
-            return false;
+        Console.WriteLine($"Reviews with OrderDetailId {orderDetailId}: {reviewsWithOrderDetail.Count}");
 
-        // Phải là PAID
-        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
-            return false;
+        // Kiểm tra có review nào của user hiện tại không
+        var reviewsWithUser = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId)
+            .ToListAsync();
 
-        // Chưa review
-        var existingReview = await _unitOfWork.Reviews.GetQueryable()
-            .AnyAsync(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted);
+        Console.WriteLine($"Reviews with UserId {userId}: {reviewsWithUser.Count}");
 
-        return !existingReview;
+        // Kiểm tra có review nào chưa bị xóa không
+        var activeReviews = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
+            .ToListAsync();
+
+        Console.WriteLine($"Active reviews: {activeReviews.Count}");
+
+        return activeReviews.Any();
     }
 
     public async Task<ReviewResponseDto> DeleteReviewAsync(Guid reviewId)
@@ -578,7 +588,7 @@ public class ReviewService : IReviewService
             // Validate each image file
             if (createDto.Images != null && createDto.Images.Any())
                 foreach (var imageFile in createDto.Images)
-                    if (!IsValidImageFile(imageFile))
+                    if (!IsValidMediaFile(imageFile))
                     {
                         _loggerService.Warn($"Invalid image file: {imageFile.FileName}");
                         throw ErrorHelper.BadRequest($"File {imageFile.FileName} không hợp lệ");
@@ -606,37 +616,70 @@ public class ReviewService : IReviewService
 
         try
         {
-            // Check order status
+            // Log thông tin để debug
+            _loggerService.Info(
+                $"Validating OrderDetail {orderDetailId} - Order Status: {orderDetail.Order?.Status}, OrderDetail Status: {orderDetail.Status}");
+
+            // Kiểm tra Order có null không
+            if (orderDetail.Order == null)
+            {
+                _loggerService.Error($"Order is null for OrderDetail {orderDetailId}");
+                throw ErrorHelper.BadRequest("Thông tin đơn hàng không hợp lệ");
+            }
+
+            // Check order status - chỉ cần kiểm tra Order có status là PAID
             if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
             {
                 _loggerService.Warn(
-                    $"Order {orderDetail.OrderId} has invalid status for review: {orderDetail.Order.Status}");
+                    $"Order {orderDetail.OrderId} has invalid status for review: {orderDetail.Order.Status}. Expected: {nameof(OrderStatus.PAID)}");
                 throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
+            }
+
+            // Optional: Log OrderDetail status for debugging (không ảnh hưởng logic)
+            if (!string.IsNullOrEmpty(orderDetail.Status.ToString()))
+            {
+                _loggerService.Info($"OrderDetail {orderDetailId} has status: {orderDetail.Status}");
             }
 
             // Check if already reviewed
             var existingReview = await _unitOfWork.Reviews.GetQueryable()
-                .FirstOrDefaultAsync(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted);
+                .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
+                .FirstOrDefaultAsync();
 
             if (existingReview != null)
             {
-                _loggerService.Warn($"Duplicate review attempt for OrderDetail {orderDetailId} by User {userId}");
+                _loggerService.Warn(
+                    $"Duplicate review attempt for OrderDetail {orderDetailId} by User {userId}. Existing review ID: {existingReview.Id}");
                 throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
             }
 
             _loggerService.Info($"Successfully validated OrderDetail {orderDetailId} for review eligibility");
         }
+        catch (ApplicationException) // ErrorHelper exceptions
+        {
+            // Re-throw application exceptions (đã được handle)
+            throw;
+        }
         catch (Exception ex)
         {
-            _loggerService.Error($"Error validating OrderDetail {orderDetailId} for review: {ex.Message}");
-            throw;
+            // Log detailed error for debugging
+            _loggerService.Error($"Unexpected error validating OrderDetail {orderDetailId} for review. " +
+                                 $"Order ID: {orderDetail?.OrderId}, " +
+                                 $"Order Status: {orderDetail?.Order?.Status}, " +
+                                 $"OrderDetail Status: {orderDetail?.Status}, " +
+                                 $"User ID: {userId}, " +
+                                 $"Error: {ex.Message}, " +
+                                 $"Stack Trace: {ex.StackTrace}");
+
+            // Throw a generic internal server error
+            throw ErrorHelper.Internal("Đã xảy ra lỗi khi kiểm tra thông tin đơn hàng. Vui lòng thử lại sau.");
         }
     }
 
     /// <summary>
     /// Validate individual image file
     /// </summary>
-    private bool IsValidImageFile(IFormFile file)
+    private bool IsValidMediaFile(IFormFile file)
     {
         try
         {
@@ -647,8 +690,8 @@ public class ReviewService : IReviewService
                 return false;
             }
 
-            // Check file size (max 5MB)
-            const int maxSizeBytes = 5 * 1024 * 1024; // 5MB
+            // Check file size (max 50MB)
+            const int maxSizeBytes = 50 * 1024 * 1024; // 50MB
             if (file.Length > maxSizeBytes)
             {
                 _loggerService.Warn(
@@ -657,7 +700,13 @@ public class ReviewService : IReviewService
             }
 
             // Check file extension
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var allowedExtensions = new[]
+            {
+                // Images
+                ".jpg", ".jpeg", ".png", ".gif", ".webp",
+                // Videos
+                ".mp4", ".mov", ".avi", ".wmv", ".mkv"
+            };
             var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
 
             if (string.IsNullOrEmpty(fileExtension) || !allowedExtensions.Contains(fileExtension))
@@ -669,11 +718,18 @@ public class ReviewService : IReviewService
             // Check MIME type
             var allowedMimeTypes = new[]
             {
+                // Images
                 "image/jpeg",
                 "image/jpg",
                 "image/png",
                 "image/gif",
-                "image/webp"
+                "image/webp",
+                // Videos
+                "video/mp4",
+                "video/quicktime",
+                "video/x-msvideo",
+                "video/x-ms-wmv",
+                "video/x-matroska"
             };
 
             if (string.IsNullOrEmpty(file.ContentType) ||
@@ -688,7 +744,7 @@ public class ReviewService : IReviewService
         }
         catch (Exception ex)
         {
-            _loggerService.Error($"Error validating image file {file?.FileName}: {ex.Message}");
+            _loggerService.Error($"Error validating media file {file?.FileName}: {ex.Message}");
             return false;
         }
     }
@@ -735,7 +791,6 @@ public class ReviewService : IReviewService
             {
                 failCount++;
                 _loggerService.Error($"Failed to upload review image {imageFile.FileName}: {ex.Message}");
-                // Continue with other images even if one fails
             }
 
         _loggerService.Info(
