@@ -203,10 +203,28 @@ public class ReviewService : IReviewService
     {
         var userId = _claimService.CurrentUserId;
 
-        var hasReviewed = await _unitOfWork.Reviews.GetQueryable()
-            .AnyAsync(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted);
+        // Kiểm tra có review nào với orderDetailId này không
+        var reviewsWithOrderDetail = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId)
+            .ToListAsync();
+    
+        Console.WriteLine($"Reviews with OrderDetailId {orderDetailId}: {reviewsWithOrderDetail.Count}");
+    
+        // Kiểm tra có review nào của user hiện tại không
+        var reviewsWithUser = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId)
+            .ToListAsync();
+    
+        Console.WriteLine($"Reviews with UserId {userId}: {reviewsWithUser.Count}");
+    
+        // Kiểm tra có review nào chưa bị xóa không
+        var activeReviews = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
+            .ToListAsync();
+    
+        Console.WriteLine($"Active reviews: {activeReviews.Count}");
 
-        return hasReviewed;
+        return activeReviews.Any();
     }
 
     public async Task<ReviewResponseDto> DeleteReviewAsync(Guid reviewId)

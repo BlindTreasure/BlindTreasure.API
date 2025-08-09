@@ -115,7 +115,7 @@ public class ReviewController : ControllerBase
     /// <param name="orderDetailId">ID của chi tiết đơn hàng cần kiểm tra</param>
     /// <returns>True nếu có thể đánh giá, False nếu không thể</returns>
     [HttpGet("review-status/{orderDetailId}")]
-    public async Task<IActionResult> CanReviewOrderDetail(Guid orderDetailId)
+    public async Task<IActionResult> CheckReviewStatus(Guid orderDetailId)
     {
         try
         {
