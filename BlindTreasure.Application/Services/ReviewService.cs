@@ -442,6 +442,7 @@ public class ReviewService : IReviewService
                 : query.Where(r => r.ImageUrls.Count == 0);
             _loggerService.Info($"Filtering by HasImages: {param.HasImages.Value}");
         }
+
         if (param.HasSellerReply.HasValue)
         {
             query = param.HasSellerReply.Value
@@ -449,6 +450,7 @@ public class ReviewService : IReviewService
                 : query.Where(r => string.IsNullOrWhiteSpace(r.SellerResponse) || !r.SellerResponseDate.HasValue);
             _loggerService.Info($"Filtering by HasSellerReply: {param.HasSellerReply.Value}");
         }
+
         query = param.SortBy?.ToLower() switch
         {
             "rating_asc" => query.OrderBy(r => r.OverallRating),
@@ -610,81 +612,178 @@ public class ReviewService : IReviewService
     }
 
     /// <summary>
-    /// Validate OrderDetail for review eligibility
+    /// Validate OrderDetail for review eligibility - Enhanced with detailed logging
     /// </summary>
     private async Task ValidateOrderDetailForReview(OrderDetail orderDetail, Guid orderDetailId, Guid userId)
     {
+        _loggerService.Info("=== START ValidateOrderDetailForReview ===");
+        _loggerService.Info($"Input Parameters:");
+        _loggerService.Info($"- OrderDetailId: {orderDetailId}");
+        _loggerService.Info($"- Current UserId: {userId}");
+        _loggerService.Info($"- OrderDetail is null: {orderDetail == null}");
+
         if (orderDetail == null)
         {
-            _loggerService.Error($"OrderDetail not found for ID: {orderDetailId}");
+            _loggerService.Error($"❌ OrderDetail not found for ID: {orderDetailId}");
+            _loggerService.Error("Possible reasons:");
+            _loggerService.Error("1. OrderDetailId không tồn tại trong database");
+            _loggerService.Error("2. Include() không đủ navigation properties");
+            _loggerService.Error("3. Query condition bị sai");
             throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
         }
 
         try
         {
-            // Log thông tin để debug
-            _loggerService.Info(
-                $"Validating OrderDetail {orderDetailId} - Order Status: {orderDetail.Order?.Status}, OrderDetail Status: {orderDetail.Status}");
+            _loggerService.Info("=== OrderDetail Information ===");
+            _loggerService.Info($"- OrderDetail.Id: {orderDetail.Id}");
+            _loggerService.Info($"- OrderDetail.OrderId: {orderDetail.OrderId}");
+            _loggerService.Info($"- OrderDetail.CreatedBy: {orderDetail.CreatedBy}");
+            _loggerService.Info($"- OrderDetail.CreatedAt: {orderDetail.CreatedAt}");
+            _loggerService.Info($"- OrderDetail.Status: {orderDetail.Status}");
+            _loggerService.Info($"- OrderDetail.ProductId: {orderDetail.ProductId}");
+            _loggerService.Info($"- OrderDetail.BlindBoxId: {orderDetail.BlindBoxId}");
+            _loggerService.Info($"- OrderDetail.Quantity: {orderDetail.Quantity}");
+            _loggerService.Info($"- OrderDetail.UnitPrice: {orderDetail.UnitPrice}");
 
             // Kiểm tra Order có null không
             if (orderDetail.Order == null)
             {
-                _loggerService.Error($"Order is null for OrderDetail {orderDetailId}");
+                _loggerService.Error("❌ Order is null for OrderDetail");
+                _loggerService.Error("Possible reasons:");
+                _loggerService.Error("1. Missing .Include(od => od.Order) trong query");
+                _loggerService.Error("2. Order bị soft delete (IsDeleted = true)");
+                _loggerService.Error("3. Foreign key relationship bị broken");
                 throw ErrorHelper.BadRequest("Thông tin đơn hàng không hợp lệ");
             }
 
-            // Check order status - chỉ cần kiểm tra Order có status là PAID
+            _loggerService.Info("=== Order Information ===");
+            _loggerService.Info($"- Order.Id: {orderDetail.Order.Id}");
+            _loggerService.Info($"- Order.UserId: {orderDetail.Order.UserId}");
+            _loggerService.Info($"- Order.SellerId: {orderDetail.Order.SellerId}");
+            _loggerService.Info($"- Order.Status: {orderDetail.Order.Status}");
+            _loggerService.Info($"- Order.CreatedBy: {orderDetail.Order.CreatedBy}");
+            _loggerService.Info($"- Order.CreatedAt: {orderDetail.Order.CreatedAt}");
+            _loggerService.Info($"- Order.PlacedAt: {orderDetail.Order.PlacedAt}");
+            _loggerService.Info($"- Order.IsDeleted: {orderDetail.Order.IsDeleted}");
+            _loggerService.Info($"- Order.TotalAmount: {orderDetail.Order.TotalAmount}");
+            _loggerService.Info($"- Order.FinalAmount: {orderDetail.Order.FinalAmount}");
+
+            // ===== KIỂM TRA OWNERSHIP =====
+            _loggerService.Info("=== Ownership Validation ===");
+            _loggerService.Info($"- Order.UserId: {orderDetail.Order.UserId}");
+            _loggerService.Info($"- Current UserId: {userId}");
+            _loggerService.Info($"- UserId Match: {orderDetail.Order.UserId == userId}");
+            _loggerService.Info($"- UserId Type: {orderDetail.Order.UserId.GetType().Name}");
+            _loggerService.Info($"- Current UserId Type: {userId.GetType().Name}");
+
+            if (orderDetail.Order.UserId != userId)
+            {
+                _loggerService.Error("❌ Order ownership validation FAILED");
+                _loggerService.Error($"Expected UserId: {userId}");
+                _loggerService.Error($"Actual Order.UserId: {orderDetail.Order.UserId}");
+                _loggerService.Error("Possible reasons:");
+                _loggerService.Error("1. User đang cố gắng access order của người khác");
+                _loggerService.Error("2. JWT token bị sai hoặc expired");
+                _loggerService.Error("3. ClaimsService.CurrentUserId trả về sai giá trị");
+                _loggerService.Error("4. Database có vấn đề về Order.UserId");
+                throw ErrorHelper.NotFound("Đơn hàng không thuộc về bạn");
+            }
+
+            _loggerService.Info("✅ Order ownership validation PASSED");
+
+            // ===== KIỂM TRA ORDER STATUS =====
+            _loggerService.Info("=== Order Status Validation ===");
+            _loggerService.Info($"- Current Order Status: '{orderDetail.Order.Status}'");
+            _loggerService.Info($"- Expected Status: '{nameof(OrderStatus.PAID)}'");
+            _loggerService.Info($"- Status Match: {orderDetail.Order.Status == nameof(OrderStatus.PAID)}");
+            _loggerService.Info($"- Order Status Enum Values: [{string.Join(", ", Enum.GetNames<OrderStatus>())}]");
+
             if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
             {
-                _loggerService.Warn(
-                    $"Order {orderDetail.OrderId} has invalid status for review: {orderDetail.Order.Status}. Expected: {nameof(OrderStatus.PAID)}");
+                _loggerService.Error("❌ Order status validation FAILED");
+                _loggerService.Error($"Current Status: '{orderDetail.Order.Status}'");
+                _loggerService.Error($"Required Status: '{nameof(OrderStatus.PAID)}'");
+                _loggerService.Error("Possible reasons:");
+                _loggerService.Error("1. Order chưa được thanh toán (PENDING)");
+                _loggerService.Error("2. Order bị hủy (CANCELLED)");
+                _loggerService.Error("3. Order đã hết hạn (EXPIRED)");
+                _loggerService.Error("4. Enum conversion có vấn đề");
                 throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
             }
 
-            // Optional: Log OrderDetail status for debugging (không ảnh hưởng logic)
-            if (!string.IsNullOrEmpty(orderDetail.Status.ToString()))
-            {
-                _loggerService.Info($"OrderDetail {orderDetailId} has status: {orderDetail.Status}");
-            }
+            _loggerService.Info("✅ Order status validation PASSED");
 
-            // Check if already reviewed
+            // ===== KIỂM TRA DUPLICATE REVIEW =====
+            _loggerService.Info("=== Duplicate Review Check ===");
+            _loggerService.Info($"Checking existing reviews for:");
+            _loggerService.Info($"- OrderDetailId: {orderDetailId}");
+            _loggerService.Info($"- UserId: {userId}");
+
             var existingReview = await _unitOfWork.Reviews.GetQueryable()
                 .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
                 .FirstOrDefaultAsync();
 
             if (existingReview != null)
             {
-                _loggerService.Warn(
-                    $"Duplicate review attempt for OrderDetail {orderDetailId} by User {userId}. Existing review ID: {existingReview.Id}");
+                _loggerService.Error("❌ Duplicate review validation FAILED");
+                _loggerService.Error($"Existing Review Details:");
+                _loggerService.Error($"- Review.Id: {existingReview.Id}");
+                _loggerService.Error($"- Review.CreatedAt: {existingReview.CreatedAt}");
+                _loggerService.Error($"- Review.Rating: {existingReview.OverallRating}");
+                _loggerService.Error(
+                    $"- Review.Content: {existingReview.Content?.Substring(0, Math.Min(50, existingReview.Content?.Length ?? 0))}...");
+                _loggerService.Error($"- Review.IsDeleted: {existingReview.IsDeleted}");
                 throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
             }
 
-            _loggerService.Info($"Successfully validated OrderDetail {orderDetailId} for review eligibility");
+            _loggerService.Info("✅ Duplicate review check PASSED - No existing review found");
+
+            // ===== OPTIONAL: LOG ADDITIONAL DETAILS =====
+            _loggerService.Info("=== Additional Information ===");
+            if (orderDetail.Product != null)
+            {
+                _loggerService.Info($"- Product.Id: {orderDetail.Product.Id}");
+                _loggerService.Info($"- Product.Name: {orderDetail.Product.Name}");
+                _loggerService.Info($"- Product.SellerId: {orderDetail.Product.SellerId}");
+                _loggerService.Info($"- Product.Status: {orderDetail.Product.Status}");
+            }
+
+            if (orderDetail.BlindBox != null)
+            {
+                _loggerService.Info($"- BlindBox.Id: {orderDetail.BlindBox.Id}");
+                _loggerService.Info($"- BlindBox.Name: {orderDetail.BlindBox.Name}");
+                _loggerService.Info($"- BlindBox.SellerId: {orderDetail.BlindBox.SellerId}");
+                _loggerService.Info($"- BlindBox.Status: {orderDetail.BlindBox.Status}");
+            }
+
+            _loggerService.Info("✅ OrderDetail validation completed successfully");
+            _loggerService.Info($"User {userId} is eligible to review OrderDetail {orderDetailId}");
+            _loggerService.Info("=== END ValidateOrderDetailForReview ===");
         }
         catch (ApplicationException) // ErrorHelper exceptions
         {
-            // Re-throw application exceptions (đã được handle)
+            _loggerService.Error("🚫 Validation failed with application exception - re-throwing");
             throw;
         }
         catch (Exception ex)
         {
-            // Log detailed error for debugging
-            _loggerService.Error($"Unexpected error validating OrderDetail {orderDetailId} for review. " +
-                                 $"Order ID: {orderDetail?.OrderId}, " +
-                                 $"Order Status: {orderDetail?.Order?.Status}, " +
-                                 $"OrderDetail Status: {orderDetail?.Status}, " +
-                                 $"User ID: {userId}, " +
-                                 $"Error: {ex.Message}, " +
-                                 $"Stack Trace: {ex.StackTrace}");
+            _loggerService.Error("💥 Unexpected error during OrderDetail validation");
+            _loggerService.Error($"Exception Type: {ex.GetType().Name}");
+            _loggerService.Error($"Exception Message: {ex.Message}");
+            _loggerService.Error($"Inner Exception: {ex.InnerException?.Message}");
+            _loggerService.Error($"Stack Trace: {ex.StackTrace}");
+            _loggerService.Error($"OrderDetail Debug Info:");
+            _loggerService.Error($"- OrderDetailId: {orderDetailId}");
+            _loggerService.Error($"- OrderId: {orderDetail?.OrderId}");
+            _loggerService.Error($"- Order Status: {orderDetail?.Order?.Status}");
+            _loggerService.Error($"- Order UserId: {orderDetail?.Order?.UserId}");
+            _loggerService.Error($"- Current UserId: {userId}");
+            _loggerService.Error($"- OrderDetail Status: {orderDetail?.Status}");
 
-            // Throw a generic internal server error
             throw ErrorHelper.Internal("Đã xảy ra lỗi khi kiểm tra thông tin đơn hàng. Vui lòng thử lại sau.");
         }
     }
 
-    /// <summary>
-    /// Validate individual image file
-    /// </summary>
     private bool IsValidMediaFile(IFormFile file)
     {
         try
