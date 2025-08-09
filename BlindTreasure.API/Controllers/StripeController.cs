@@ -269,11 +269,11 @@ public class StripeController : ControllerBase
     /// </summary>
     [Authorize]
     [HttpPost("group-payment-link")]
-    public async Task<IActionResult> GetGroupPaymentLink([FromBody] Guid checkoutGroupId)
+    public async Task<IActionResult> GetGroupPaymentLink([FromBody] GetCheckoutGroupLinkDto request)
     {
         try
         {
-            var url = await _stripeService.GetOrCreateGroupPaymentLink(checkoutGroupId);
+            var url = await _stripeService.GetOrCreateGroupPaymentLink(request.CheckoutGroupId);
             return Ok(ApiResult<string>.Success(url, "200", "Link thanh toán nhóm đã được tạo hoặc lấy lại."));
         }
         catch (Exception ex)
