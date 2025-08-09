@@ -199,26 +199,32 @@ public class ReviewService : IReviewService
         return MapToReviewResponseDto(review);
     }
 
-    public async Task<bool> CanReviewOrderDetailAsync(Guid orderDetailId)
+    public async Task<bool> HasReviewedOrderDetailAsync(Guid orderDetailId)
     {
         var userId = _claimService.CurrentUserId;
 
-        var orderDetail = await _unitOfWork.OrderDetails.GetQueryable()
-            .Include(od => od.Order)
-            .FirstOrDefaultAsync(od => od.Id == orderDetailId && od.Order.UserId == userId);
+        // Kiểm tra có review nào với orderDetailId này không
+        var reviewsWithOrderDetail = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId)
+            .ToListAsync();
+    
+        Console.WriteLine($"Reviews with OrderDetailId {orderDetailId}: {reviewsWithOrderDetail.Count}");
+    
+        // Kiểm tra có review nào của user hiện tại không
+        var reviewsWithUser = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId)
+            .ToListAsync();
+    
+        Console.WriteLine($"Reviews with UserId {userId}: {reviewsWithUser.Count}");
+    
+        // Kiểm tra có review nào chưa bị xóa không
+        var activeReviews = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
+            .ToListAsync();
+    
+        Console.WriteLine($"Active reviews: {activeReviews.Count}");
 
-        if (orderDetail == null)
-            return false;
-
-        // Phải là PAID
-        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
-            return false;
-
-        // Chưa review
-        var existingReview = await _unitOfWork.Reviews.GetQueryable()
-            .AnyAsync(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted);
-
-        return !existingReview;
+        return activeReviews.Any();
     }
 
     public async Task<ReviewResponseDto> DeleteReviewAsync(Guid reviewId)
