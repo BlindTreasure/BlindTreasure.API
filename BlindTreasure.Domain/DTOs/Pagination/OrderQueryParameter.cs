@@ -18,4 +18,5 @@ public class OrderQueryParameter : PaginationParameter
     ///     Lọc theo ngày đặt hàng đến...
     /// </summary>
     public DateTime? PlacedTo { get; set; }
+    public Guid? CheckoutGroupId { get; set; } = Guid.Empty;
 }

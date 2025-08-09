@@ -33,6 +33,28 @@ public class StripeService : IStripeService
         _failRedirectUrl = _configuration["STRIPE:FailRedirectUrl"] ?? "http://localhost:4040/fail";
     }
 
+    public async Task<string> GetOrCreateGroupPaymentLink(Guid checkoutGroupId)
+    {
+        var orders = await _unitOfWork.Orders.GetQueryable()
+      .Where(o => o.CheckoutGroupId == checkoutGroupId && !o.IsDeleted)
+      .ToListAsync();
+
+        if (!orders.Any())
+            throw ErrorHelper.BadRequest("Không tìm thấy đơn hàng hợp lệ trong nhóm.");
+
+        var groupSession = await _unitOfWork.GroupPaymentSessions
+            .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
+
+        if (groupSession != null && groupSession.ExpiresAt < DateTime.UtcNow)
+        {
+            // Session still valid
+            return groupSession.PaymentUrl;
+        }
+
+        // If not found or expired, call the session creation method
+        return await CreateGeneralCheckoutSessionForOrders(orders.Select(o => o.Id).ToList());
+    }
+
     public async Task<string> GenerateExpressLoginLink()
     {
         var userId = _claimsService.CurrentUserId; // chỗ này là lấy user id của seller là người đang login
@@ -142,11 +164,12 @@ public class StripeService : IStripeService
                 ["totalDiscount"] = totalDiscount.ToString("F2"),
                 ["finalAmount"] = finalAmount.ToString("F2"),
                 ["couponId"] = couponId ?? "",
-                ["isGeneralPayment"] = "true"
+                ["isGeneralPayment"] = "true",
+                ["checkoutGroupId"] = orders.First().CheckoutGroupId.ToString()
             },
             SuccessUrl = $"{_successRedirectUrl}?checkout_group={orders.First().CheckoutGroupId}&status=success",
             CancelUrl = $"{_failRedirectUrl}?checkout_group={orders.First().CheckoutGroupId}&status=pending",
-            ExpiresAt = DateTime.UtcNow.AddHours(24)
+            ExpiresAt = DateTime.UtcNow.AddHours(1)
         };
 
         var service = new SessionService(_stripeClient);
@@ -156,6 +179,33 @@ public class StripeService : IStripeService
         foreach (var order in orders)
         {
             await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0);
+        }
+
+        // Save GroupPaymentSession
+        var checkoutGroupId = orders.First().CheckoutGroupId;
+        var groupSession = await _unitOfWork.GroupPaymentSessions
+            .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
+
+        if (groupSession == null)
+        {
+            groupSession = new GroupPaymentSession
+            {
+                CheckoutGroupId = checkoutGroupId,
+                StripeSessionId = session.Id,
+                PaymentUrl = session.Url,
+                ExpiresAt = session.ExpiresAt ,
+                Type = PaymentType.Order,
+                IsCompleted = false
+            };
+            await _unitOfWork.GroupPaymentSessions.AddAsync(groupSession);
+        }
+        else
+        {
+            groupSession.StripeSessionId = session.Id;
+            groupSession.PaymentUrl = session.Url;
+            groupSession.ExpiresAt = session.ExpiresAt ;
+            groupSession.IsCompleted = false;
+            await _unitOfWork.GroupPaymentSessions.Update(groupSession);
         }
         await _unitOfWork.SaveChangesAsync();
 

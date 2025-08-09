@@ -13,6 +13,7 @@ public interface IStripeService
     Task<string> CreateShipmentCheckoutSessionAsync(List<Shipment> shipments, Guid userId, int totalShippingFee);
     Task<string> GenerateExpressLoginLink();
     Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId, string redirectUrl);
+    Task<string> GetOrCreateGroupPaymentLink(Guid checkoutGroupId);
     Task<bool> IsSellerStripeAccountVerifiedAsync(string sellerStripeAccountId);
 
     Task<Transfer> PayoutToSellerAsync(string sellerStripeAccountId, decimal amount, string currency = "usd",
