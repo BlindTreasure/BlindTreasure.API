@@ -46,6 +46,11 @@ public class ReviewService : IReviewService
             .FirstOrDefaultAsync(od => od.Id == createDto.OrderDetailId && od.Order.UserId == userId
             );
 
+        if (orderDetail != null)
+        {
+            _loggerService.Info($"Found OrderDetail {orderDetail.Id} with Order Status: {orderDetail.Order?.Status}, OrderDetail Status: {orderDetail.Status}");
+        }
+        
         await ValidateOrderDetailForReview(orderDetail!, createDto.OrderDetailId, userId);
 
         // Upload images sử dụng IFormFile
@@ -207,21 +212,21 @@ public class ReviewService : IReviewService
         var reviewsWithOrderDetail = await _unitOfWork.Reviews.GetQueryable()
             .Where(r => r.OrderDetailId == orderDetailId)
             .ToListAsync();
-    
+
         Console.WriteLine($"Reviews with OrderDetailId {orderDetailId}: {reviewsWithOrderDetail.Count}");
-    
+
         // Kiểm tra có review nào của user hiện tại không
         var reviewsWithUser = await _unitOfWork.Reviews.GetQueryable()
             .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId)
             .ToListAsync();
-    
+
         Console.WriteLine($"Reviews with UserId {userId}: {reviewsWithUser.Count}");
-    
+
         // Kiểm tra có review nào chưa bị xóa không
         var activeReviews = await _unitOfWork.Reviews.GetQueryable()
             .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
             .ToListAsync();
-    
+
         Console.WriteLine($"Active reviews: {activeReviews.Count}");
 
         return activeReviews.Any();
@@ -611,32 +616,66 @@ public class ReviewService : IReviewService
 
         try
         {
+            // Log thông tin để debug
+            _loggerService.Info(
+                $"Validating OrderDetail {orderDetailId} - Order Status: {orderDetail.Order?.Status}, OrderDetail Status: {orderDetail.Status}");
+
+            // Kiểm tra Order có null không
+            if (orderDetail.Order == null)
+            {
+                _loggerService.Error($"Order is null for OrderDetail {orderDetailId}");
+                throw ErrorHelper.BadRequest("Thông tin đơn hàng không hợp lệ");
+            }
+
             // Check order status - chỉ cần kiểm tra Order có status là PAID
             if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
             {
                 _loggerService.Warn(
-                    $"Order {orderDetail.OrderId} has invalid status for review: {orderDetail.Order.Status}");
+                    $"Order {orderDetail.OrderId} has invalid status for review: {orderDetail.Order.Status}. Expected: {nameof(OrderStatus.PAID)}");
                 throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
+            }
+
+            // Optional: Log OrderDetail status for debugging (không ảnh hưởng logic)
+            if (!string.IsNullOrEmpty(orderDetail.Status.ToString()))
+            {
+                _loggerService.Info($"OrderDetail {orderDetailId} has status: {orderDetail.Status}");
             }
 
             // Check if already reviewed
             var existingReview = await _unitOfWork.Reviews.GetQueryable()
-                .FirstOrDefaultAsync(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted);
+                .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
+                .FirstOrDefaultAsync();
 
             if (existingReview != null)
             {
-                _loggerService.Warn($"Duplicate review attempt for OrderDetail {orderDetailId} by User {userId}");
+                _loggerService.Warn(
+                    $"Duplicate review attempt for OrderDetail {orderDetailId} by User {userId}. Existing review ID: {existingReview.Id}");
                 throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
             }
 
             _loggerService.Info($"Successfully validated OrderDetail {orderDetailId} for review eligibility");
         }
-        catch (Exception ex)
+        catch (ApplicationException) // ErrorHelper exceptions
         {
-            _loggerService.Error($"Error validating OrderDetail {orderDetailId} for review: {ex.Message}");
+            // Re-throw application exceptions (đã được handle)
             throw;
         }
+        catch (Exception ex)
+        {
+            // Log detailed error for debugging
+            _loggerService.Error($"Unexpected error validating OrderDetail {orderDetailId} for review. " +
+                                 $"Order ID: {orderDetail?.OrderId}, " +
+                                 $"Order Status: {orderDetail?.Order?.Status}, " +
+                                 $"OrderDetail Status: {orderDetail?.Status}, " +
+                                 $"User ID: {userId}, " +
+                                 $"Error: {ex.Message}, " +
+                                 $"Stack Trace: {ex.StackTrace}");
+
+            // Throw a generic internal server error
+            throw ErrorHelper.Internal("Đã xảy ra lỗi khi kiểm tra thông tin đơn hàng. Vui lòng thử lại sau.");
+        }
     }
+
     /// <summary>
     /// Validate individual image file
     /// </summary>
