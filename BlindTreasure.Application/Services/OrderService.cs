@@ -224,7 +224,7 @@ public class OrderService : IOrderService
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
             .Include(o => o.ShippingAddress)
-            .Include(o => o.Seller)
+            .Include(o => o.Seller).ThenInclude(s => s.User)
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
             .AsNoTracking();
 
@@ -234,6 +234,10 @@ public class OrderService : IOrderService
             query = query.Where(o => o.PlacedAt >= param.PlacedFrom.Value);
         if (param.PlacedTo.HasValue)
             query = query.Where(o => o.PlacedAt <= param.PlacedTo.Value);
+        // Lọc theo CheckoutGroupId nếu truyền vào
+        if (param.CheckoutGroupId.HasValue && param.CheckoutGroupId.Value != Guid.Empty)
+            query = query.Where(o => o.CheckoutGroupId == param.CheckoutGroupId.Value);
+
 
         query = param.Desc
             ? query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt)
