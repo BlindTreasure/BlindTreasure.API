@@ -611,7 +611,7 @@ public class ReviewService : IReviewService
 
         try
         {
-            // Check order status
+            // Check order status - chỉ cần kiểm tra Order có status là PAID
             if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
             {
                 _loggerService.Warn(
@@ -637,7 +637,6 @@ public class ReviewService : IReviewService
             throw;
         }
     }
-
     /// <summary>
     /// Validate individual image file
     /// </summary>
