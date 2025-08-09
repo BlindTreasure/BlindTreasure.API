@@ -48,9 +48,10 @@ public class ReviewService : IReviewService
 
         if (orderDetail != null)
         {
-            _loggerService.Info($"Found OrderDetail {orderDetail.Id} with Order Status: {orderDetail.Order?.Status}, OrderDetail Status: {orderDetail.Status}");
+            _loggerService.Info(
+                $"Found OrderDetail {orderDetail.Id} with Order Status: {orderDetail.Order?.Status}, OrderDetail Status: {orderDetail.Status}");
         }
-        
+
         await ValidateOrderDetailForReview(orderDetail!, createDto.OrderDetailId, userId);
 
         // Upload images sử dụng IFormFile
@@ -441,8 +442,13 @@ public class ReviewService : IReviewService
                 : query.Where(r => r.ImageUrls.Count == 0);
             _loggerService.Info($"Filtering by HasImages: {param.HasImages.Value}");
         }
-
-        // Sắp xếp
+        if (param.HasSellerReply.HasValue)
+        {
+            query = param.HasSellerReply.Value
+                ? query.Where(r => !string.IsNullOrWhiteSpace(r.SellerResponse) && r.SellerResponseDate.HasValue)
+                : query.Where(r => string.IsNullOrWhiteSpace(r.SellerResponse) || !r.SellerResponseDate.HasValue);
+            _loggerService.Info($"Filtering by HasSellerReply: {param.HasSellerReply.Value}");
+        }
         query = param.SortBy?.ToLower() switch
         {
             "rating_asc" => query.OrderBy(r => r.OverallRating),

@@ -13,4 +13,6 @@ public class ReviewQueryParameter : PaginationParameter
     public bool? HasComment { get; set; }
     public bool? HasImages { get; set; }
     public string? SortBy { get; set; } // "rating_asc", "rating_desc", "newest", "oldest"
+    public bool? HasSellerReply { get; set; } 
+
 }

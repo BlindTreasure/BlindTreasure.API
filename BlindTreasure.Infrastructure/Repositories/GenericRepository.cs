@@ -23,10 +23,21 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity> where TEnt
 
     public async Task<TEntity> AddAsync(TEntity entity)
     {
+        var currentUserId = _claimsService.CurrentUserId;
+
+        // Log để debug
+
         // Chuyển tất cả các trường DateTime thành UTC
         entity.CreatedAt = _timeService.GetCurrentTime().ToUniversalTime();
-        entity.UpdatedAt = _timeService.GetCurrentTime().ToUniversalTime(); // Nếu có trường UpdatedAt
-        entity.CreatedBy = _claimsService.CurrentUserId;
+        entity.UpdatedAt = _timeService.GetCurrentTime().ToUniversalTime();
+
+        if (entity.CreatedBy == Guid.Empty)
+        {
+            entity.CreatedBy = currentUserId;
+        }
+
+        entity.UpdatedBy = currentUserId;
+
         var result = await _dbSet.AddAsync(entity);
         return result.Entity;
     }
