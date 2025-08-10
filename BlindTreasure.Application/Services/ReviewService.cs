@@ -732,10 +732,6 @@ private async Task ValidateOrderDetailForReview(OrderDetail orderDetail, Guid or
     if (orderDetail.Order.CreatedAt < DateTime.UtcNow.AddMonths(-6))
         throw ErrorHelper.BadRequest("Không thể đánh giá đơn hàng quá 6 tháng");
 
-    // THÊM: Kiểm tra order quá mới (chưa đủ thời gian để nhận hàng)
-    if (orderDetail.Order.CreatedAt > DateTime.UtcNow.AddDays(-1))
-        throw ErrorHelper.BadRequest("Vui lòng đợi ít nhất 1 ngày sau khi đặt hàng để đánh giá");
-
     // THÊM: Kiểm tra cả Product và BlindBox đều null
     if (!orderDetail.ProductId.HasValue && !orderDetail.BlindBoxId.HasValue)
         throw ErrorHelper.BadRequest("Chi tiết đơn hàng không có sản phẩm hoặc hộp quà bí mật");
