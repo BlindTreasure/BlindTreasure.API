@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
@@ -57,7 +59,6 @@ public class ReviewService : IReviewService
             .Include(od => od.BlindBox)
             .ThenInclude(b => b != null ? b.Seller : null)
             .FirstOrDefaultAsync(od => od.Id == createDto.OrderDetailId
-                                       && od.Order != null
                                        && od.Order.UserId == userId
                                        && !od.IsDeleted);
 
@@ -105,10 +106,10 @@ public class ReviewService : IReviewService
     {
         if (orderDetail.Product?.Seller != null)
             return orderDetail.Product.Seller.Id;
-    
+
         if (orderDetail.BlindBox?.Seller != null)
             return orderDetail.BlindBox.Seller.Id;
-    
+
         // Fallback: tìm seller từ database
         if (orderDetail.ProductId.HasValue)
         {
@@ -118,7 +119,7 @@ public class ReviewService : IReviewService
                 .FirstOrDefaultAsync(p => p.Id == orderDetail.ProductId);
             return product?.SellerId;
         }
-    
+
         if (orderDetail.BlindBoxId.HasValue)
         {
             var blindBox = await _unitOfWork.BlindBoxes
@@ -130,7 +131,7 @@ public class ReviewService : IReviewService
 
         return null;
     }
-    
+
     public async Task<ReviewResponseDto> ReplyToReviewAsync(Guid reviewId, string replyContent)
     {
         // Xác thực nội dung phản hồi
@@ -336,53 +337,45 @@ public class ReviewService : IReviewService
             throw new ArgumentNullException(nameof(review));
         }
 
-        try
+        // Determine category name
+        var categoryName = review.OrderDetail?.Product?.Category?.Name ?? "BlindBox";
+        _loggerService.Info($"Determined category name: {categoryName}");
+
+        // Determine item name for logging/display
+        var itemName = review.OrderDetail?.Product?.Name ?? review.OrderDetail?.BlindBox?.Name ?? "Unknown Item";
+        _loggerService.Info($"Determined item name: {itemName}");
+
+        var responseDto = new ReviewResponseDto
         {
-            // Determine category name
-            var categoryName = review.OrderDetail?.Product?.Category?.Name ?? "BlindBox";
-            _loggerService.Info($"Determined category name: {categoryName}");
+            Id = review.Id,
+            UserId = review.UserId,
+            UserName = review.User?.FullName ?? "Anonymous User",
+            UserAvatar = review.User?.AvatarUrl,
+            Rating = review.OverallRating,
+            Comment = review.Content,
+            CreatedAt = review.CreatedAt,
+            UpdatedAt = review.UpdatedAt,
+            Category = categoryName,
+            ItemName = itemName,
+            Images = review.ImageUrls ?? new List<string>(),
+            IsApproved = review.IsApproved,
+            ApprovedAt = review.ApprovedAt,
+            SellerReply = review.SellerResponseDate.HasValue
+                ? new SellerReplyDto
+                {
+                    Content = review.SellerResponse ?? string.Empty,
+                    CreatedAt = review.SellerResponseDate.Value,
+                    SellerName = review.Seller?.CompanyName ?? "Seller"
+                }
+                : null,
+            OrderDetailId = review.OrderDetailId,
+            ProductId = review.ProductId,
+            BlindBoxId = review.BlindBoxId,
+            SellerId = review.SellerId
+        };
 
-            // Determine item name for logging/display
-            var itemName = review.OrderDetail?.Product?.Name ?? review.OrderDetail?.BlindBox?.Name ?? "Unknown Item";
-            _loggerService.Info($"Determined item name: {itemName}");
-
-            var responseDto = new ReviewResponseDto
-            {
-                Id = review.Id,
-                UserId = review.UserId,
-                UserName = review.User?.FullName ?? "Anonymous User",
-                UserAvatar = review.User?.AvatarUrl,
-                Rating = review.OverallRating,
-                Comment = review.Content,
-                CreatedAt = review.CreatedAt,
-                UpdatedAt = review.UpdatedAt,
-                Category = categoryName,
-                ItemName = itemName,
-                Images = review.ImageUrls ?? new List<string>(),
-                IsApproved = review.IsApproved,
-                ApprovedAt = review.ApprovedAt,
-                SellerReply = review.SellerResponseDate.HasValue
-                    ? new SellerReplyDto
-                    {
-                        Content = review.SellerResponse ?? string.Empty,
-                        CreatedAt = review.SellerResponseDate.Value,
-                        SellerName = review.Seller?.CompanyName ?? "Seller"
-                    }
-                    : null,
-                OrderDetailId = review.OrderDetailId,
-                ProductId = review.ProductId,
-                BlindBoxId = review.BlindBoxId,
-                SellerId = review.SellerId
-            };
-
-            _loggerService.Info($"Successfully mapped review {review.Id} to ReviewResponseDto");
-            return responseDto;
-        }
-        catch (Exception ex)
-        {
-            _loggerService.Error($"Failed to map review {review.Id} to ReviewResponseDto: {ex.Message}");
-            throw;
-        }
+        _loggerService.Info($"Successfully mapped review {review.Id} to ReviewResponseDto");
+        return responseDto;
     }
 
     /// <summary>
@@ -535,56 +528,39 @@ public class ReviewService : IReviewService
     /// </summary>
     private async Task<Guid> ValidateAndGetSellerIdAsync()
     {
-        try
+        // Lấy ID người dùng từ claims
+        var userId = _claimService.CurrentUserId;
+
+        if (userId == Guid.Empty)
         {
-            // Lấy ID người dùng từ claims
-            var userId = _claimService.CurrentUserId;
-
-            if (userId == Guid.Empty)
-            {
-                _loggerService.Error("No user ID found in claims");
-                throw ErrorHelper.Unauthorized("Bạn cần đăng nhập để thực hiện hành động này");
-            }
-
-            // Truy vấn thông tin user để kiểm tra vai trò và trạng thái
-            try
-            {
-                var user = await _userService.GetUserById(userId);
-
-                if (user == null)
-                {
-                    _loggerService.Error($"User with ID {userId} not found or deleted");
-                    throw ErrorHelper.NotFound("Không tìm thấy thông tin người dùng");
-                }
-
-                // Kiểm tra role thủ công
-                if (user.RoleName != RoleType.Seller)
-                {
-                    _loggerService.Error($"User with ID {userId} has role {user.RoleName}, not Seller");
-                    throw ErrorHelper.Forbidden("Bạn không có quyền thực hiện hành động này");
-                }
-
-                if (user.Status != UserStatus.Active)
-                {
-                    _loggerService.Warn($"User with ID {userId} has status {user.Status}");
-                    throw ErrorHelper.Forbidden("Tài khoản đang không ở trạng thái hoạt động");
-                }
-
-                _loggerService.Info($"Successfully validated user {userId} with Seller role");
-                return userId;
-            }
-            catch (Exception dbEx) when (!(dbEx is ApplicationException))
-            {
-                _loggerService.Error($"Database error when fetching user: {dbEx.Message}");
-                throw ErrorHelper.Internal("Lỗi khi truy vấn thông tin người dùng");
-            }
+            _loggerService.Error("No user ID found in claims");
+            throw ErrorHelper.Unauthorized("Bạn cần đăng nhập để thực hiện hành động này");
         }
-        catch (Exception ex) when
-            (!(ex is ApplicationException)) // Bắt tất cả ngoại lệ không phải do ErrorHelper tạo ra
+
+        // Truy vấn thông tin user để kiểm tra vai trò và trạng thái
+        var user = await _userService.GetUserById(userId);
+
+        if (user == null)
         {
-            _loggerService.Error($"Unexpected error validating seller role: {ex.Message}");
-            throw ErrorHelper.Internal("Đã xảy ra lỗi khi xác thực quyền người bán");
+            _loggerService.Error($"User with ID {userId} not found or deleted");
+            throw ErrorHelper.NotFound("Không tìm thấy thông tin người dùng");
         }
+
+        // Kiểm tra role thủ công
+        if (user.RoleName != RoleType.Seller)
+        {
+            _loggerService.Error($"User with ID {userId} has role {user.RoleName}, not Seller");
+            throw ErrorHelper.Forbidden("Bạn không có quyền thực hiện hành động này");
+        }
+
+        if (user.Status != UserStatus.Active)
+        {
+            _loggerService.Warn($"User with ID {userId} has status {user.Status}");
+            throw ErrorHelper.Forbidden("Tài khoản đang không ở trạng thái hoạt động");
+        }
+
+        _loggerService.Info($"Successfully validated user {userId} with Seller role");
+        return userId;
     }
 
     /// <summary>
@@ -598,156 +574,263 @@ public class ReviewService : IReviewService
             throw ErrorHelper.BadRequest("Dữ liệu đánh giá không hợp lệ");
         }
 
-        try
+        // Validate OrderDetailId
+        if (createDto.OrderDetailId == Guid.Empty)
         {
-            // Validate OrderDetailId
-            if (createDto.OrderDetailId == Guid.Empty)
-            {
-                _loggerService.Warn("Empty OrderDetailId in CreateReviewDto");
-                throw ErrorHelper.BadRequest("ID chi tiết đơn hàng là bắt buộc");
-            }
+            _loggerService.Warn("Empty OrderDetailId in CreateReviewDto");
+            throw ErrorHelper.BadRequest("ID chi tiết đơn hàng là bắt buộc");
+        }
 
-            // Validate Rating
-            if (createDto.Rating < 1 || createDto.Rating > 5)
-            {
-                _loggerService.Warn($"Invalid rating value: {createDto.Rating}");
-                throw ErrorHelper.BadRequest("Điểm đánh giá phải từ 1 đến 5 sao");
-            }
+        // Validate Rating
+        if (createDto.Rating < 1 || createDto.Rating > 5)
+        {
+            _loggerService.Warn($"Invalid rating value: {createDto.Rating}");
+            throw ErrorHelper.BadRequest("Điểm đánh giá phải từ 1 đến 5 sao");
+        }
 
-            // Validate Comment
-            if (string.IsNullOrWhiteSpace(createDto.Comment))
-            {
-                _loggerService.Warn("Empty comment in CreateReviewDto");
-                throw ErrorHelper.BadRequest("Nội dung đánh giá là bắt buộc");
-            }
+        // Validate Comment - THÊM NHIỀU CASE HỞN
+        if (string.IsNullOrWhiteSpace(createDto.Comment))
+        {
+            _loggerService.Warn("Empty comment in CreateReviewDto");
+            throw ErrorHelper.BadRequest("Nội dung đánh giá là bắt buộc");
+        }
 
-            if (createDto.Comment.Length < 10)
-            {
-                _loggerService.Warn($"Comment too short: {createDto.Comment.Length} characters");
-                throw ErrorHelper.BadRequest("Nội dung đánh giá phải có ít nhất 10 ký tự");
-            }
+        // THÊM: Kiểm tra comment chỉ toàn ký tự đặc biệt
+        if (createDto.Comment.Trim().All(c => !char.IsLetterOrDigit(c)))
+        {
+            _loggerService.Warn($"Comment contains only special characters: {createDto.Comment}");
+            throw ErrorHelper.BadRequest("Nội dung đánh giá phải chứa ít nhất một chữ cái hoặc số");
+        }
+        // THÊM: Kiểm tra từ ngữ không phù hợp (có thể dùng list từ cấm)
+        if (ContainsInappropriateContent(createDto.Comment))
+        {
+            _loggerService.Warn($"Comment contains inappropriate content");
+            throw ErrorHelper.BadRequest("Nội dung đánh giá chứa từ ngữ không phù hợp");
+        }
 
-            if (createDto.Comment.Length > 2000)
-            {
-                _loggerService.Warn($"Comment too long: {createDto.Comment.Length} characters");
-                throw ErrorHelper.BadRequest("Nội dung đánh giá không được vượt quá 2000 ký tự");
-            }
+        if (createDto.Comment.Length < 10)
+        {
+            _loggerService.Warn($"Comment too short: {createDto.Comment.Length} characters");
+            throw ErrorHelper.BadRequest("Nội dung đánh giá phải có ít nhất 10 ký tự");
+        }
 
-            // Validate Images
-            if (createDto.Images != null && createDto.Images.Count > 5)
+        if (createDto.Comment.Length > 2000)
+        {
+            _loggerService.Warn($"Comment too long: {createDto.Comment.Length} characters");
+            throw ErrorHelper.BadRequest("Nội dung đánh giá không được vượt quá 2000 ký tự");
+        }
+
+        // THÊM: Kiểm tra encoding
+        if (!IsValidUtf8(createDto.Comment))
+        {
+            _loggerService.Warn("Comment contains invalid UTF-8 characters");
+            throw ErrorHelper.BadRequest("Nội dung đánh giá chứa ký tự không hợp lệ");
+        }
+
+        // Validate Images - THÊM NHIỀU CASE
+        if (createDto.Images != null)
+        {
+            if (createDto.Images.Count > 5)
             {
                 _loggerService.Warn($"Too many images: {createDto.Images.Count} files");
                 throw ErrorHelper.BadRequest("Chỉ được tải lên tối đa 5 hình ảnh");
             }
 
+            // THÊM: Kiểm tra tổng dung lượng tất cả file
+            var totalSize = createDto.Images.Sum(f => f?.Length ?? 0);
+            const long maxTotalSize = 100 * 1024 * 1024; // 100MB
+            if (totalSize > maxTotalSize)
+            {
+                _loggerService.Warn($"Total file size too large: {totalSize} bytes");
+                throw ErrorHelper.BadRequest("Tổng dung lượng tất cả hình ảnh không được vượt quá 100MB");
+            }
+
+            // THÊM: Kiểm tra file trùng lặp
+            var fileHashes = new HashSet<string>();
+            foreach (var file in createDto.Images.Where(f => f != null))
+            {
+                var hash = CalculateFileHash(file);
+                if (!fileHashes.Add(hash))
+                {
+                    _loggerService.Warn($"Duplicate file detected: {file.FileName}");
+                    throw ErrorHelper.BadRequest("Không được tải lên các file hình ảnh giống nhau");
+                }
+            }
+
             // Validate each image file
-            if (createDto.Images != null && createDto.Images.Any())
-                foreach (var imageFile in createDto.Images)
-                    if (!IsValidMediaFile(imageFile))
-                    {
-                        _loggerService.Warn($"Invalid image file: {imageFile.FileName}");
-                        throw ErrorHelper.BadRequest($"File {imageFile.FileName} không hợp lệ");
-                    }
+            foreach (var imageFile in createDto.Images)
+            {
+                if (imageFile == null)
+                {
+                    _loggerService.Warn("Null image file in list");
+                    throw ErrorHelper.BadRequest("Danh sách hình ảnh chứa file không hợp lệ");
+                }
 
-            _loggerService.Info("Successfully validated CreateReviewDto input");
+                if (!IsValidMediaFile(imageFile))
+                {
+                    _loggerService.Warn($"Invalid image file: {imageFile.FileName}");
+                    throw ErrorHelper.BadRequest($"File {imageFile.FileName} không hợp lệ");
+                }
+            }
         }
-        catch (Exception ex)
-        {
-            _loggerService.Error($"Error validating CreateReviewDto: {ex.Message}");
-            throw;
-        }
+
+        _loggerService.Info("Successfully validated CreateReviewDto input");
     }
 
-    private async Task ValidateOrderDetailForReview(OrderDetail orderDetail, Guid orderDetailId, Guid userId)
+    private bool ContainsInappropriateContent(string text)
     {
-        if (orderDetail?.Order == null)
-            throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
-
-        if (orderDetail.Order.UserId != userId)
-            throw ErrorHelper.Forbidden("Đơn hàng không thuộc về bạn");
-
-        if (string.IsNullOrEmpty(orderDetail.Order.Status))
-            throw ErrorHelper.BadRequest("Trạng thái đơn hàng không hợp lệ");
-
-        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
-            throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
-
-        var existingReview = await _unitOfWork.Reviews.GetQueryable()
-            .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
-            .FirstOrDefaultAsync();
-
-        if (existingReview != null)
-            throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
+        var bannedWords = new[] { "spam", "fake", "scam" }; // Danh sách từ cấm
+        return bannedWords.Any(word =>
+            text.Contains(word, StringComparison.OrdinalIgnoreCase));
     }
-    
-    private bool IsValidMediaFile(IFormFile file)
+
+    private bool IsValidUtf8(string text)
     {
         try
         {
-            // Check if file is null or empty
-            if (file.Length == 0)
-            {
-                _loggerService.Warn("Empty file detected");
-                return false;
-            }
-
-            // Check file size (max 50MB)
-            const int maxSizeBytes = 50 * 1024 * 1024; // 50MB
-            if (file.Length > maxSizeBytes)
-            {
-                _loggerService.Warn(
-                    $"File {file.FileName} exceeds size limit: {file.Length} bytes (max: {maxSizeBytes})");
-                return false;
-            }
-
-            // Check file extension
-            var allowedExtensions = new[]
-            {
-                // Images
-                ".jpg", ".jpeg", ".png", ".gif", ".webp",
-                // Videos
-                ".mp4", ".mov", ".avi", ".wmv", ".mkv"
-            };
-            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
-
-            if (string.IsNullOrEmpty(fileExtension) || !allowedExtensions.Contains(fileExtension))
-            {
-                _loggerService.Warn($"File {file.FileName} has invalid extension: {fileExtension}");
-                return false;
-            }
-
-            // Check MIME type
-            var allowedMimeTypes = new[]
-            {
-                // Images
-                "image/jpeg",
-                "image/jpg",
-                "image/png",
-                "image/gif",
-                "image/webp",
-                // Videos
-                "video/mp4",
-                "video/quicktime",
-                "video/x-msvideo",
-                "video/x-ms-wmv",
-                "video/x-matroska"
-            };
-
-            if (string.IsNullOrEmpty(file.ContentType) ||
-                !allowedMimeTypes.Contains(file.ContentType.ToLowerInvariant()))
-            {
-                _loggerService.Warn($"File {file.FileName} has invalid MIME type: {file.ContentType}");
-                return false;
-            }
-
-            _loggerService.Info($"File {file.FileName} passed validation");
-            return true;
+            var bytes = Encoding.UTF8.GetBytes(text);
+            var decoded = Encoding.UTF8.GetString(bytes);
+            return decoded == text;
         }
-        catch (Exception ex)
+        catch
         {
-            _loggerService.Error($"Error validating media file {file?.FileName}: {ex.Message}");
             return false;
         }
+    }
+
+    private string CalculateFileHash(IFormFile file)
+    {
+        using var stream = file.OpenReadStream();
+        using var sha256 = SHA256.Create();
+        var hash = sha256.ComputeHash(stream);
+        return Convert.ToBase64String(hash);
+    }
+
+private async Task ValidateOrderDetailForReview(OrderDetail orderDetail, Guid orderDetailId, Guid userId)
+{
+    // THÊM: Kiểm tra orderDetail bị soft delete
+    if (orderDetail == null || orderDetail.IsDeleted)
+        throw ErrorHelper.NotFound("Chi tiết đơn hàng không tồn tại hoặc đã bị xóa");
+
+    if (orderDetail.Order == null)
+        throw ErrorHelper.NotFound("Không tìm thấy thông tin đơn hàng");
+
+    // THÊM: Kiểm tra Order bị soft delete
+    if (orderDetail.Order.IsDeleted)
+        throw ErrorHelper.NotFound("Đơn hàng đã bị xóa");
+
+    if (orderDetail.Order.UserId != userId)
+        throw ErrorHelper.Forbidden("Đơn hàng không thuộc về bạn");
+
+    if (string.IsNullOrEmpty(orderDetail.Order.Status))
+        throw ErrorHelper.BadRequest("Trạng thái đơn hàng không hợp lệ");
+
+    if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
+        throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
+
+    // THÊM: Kiểm tra thời gian order (không được quá cũ)
+    if (orderDetail.Order.CreatedAt < DateTime.UtcNow.AddMonths(-6))
+        throw ErrorHelper.BadRequest("Không thể đánh giá đơn hàng quá 6 tháng");
+
+    // THÊM: Kiểm tra order quá mới (chưa đủ thời gian để nhận hàng)
+    if (orderDetail.Order.CreatedAt > DateTime.UtcNow.AddDays(-1))
+        throw ErrorHelper.BadRequest("Vui lòng đợi ít nhất 1 ngày sau khi đặt hàng để đánh giá");
+
+    // THÊM: Kiểm tra cả Product và BlindBox đều null
+    if (!orderDetail.ProductId.HasValue && !orderDetail.BlindBoxId.HasValue)
+        throw ErrorHelper.BadRequest("Chi tiết đơn hàng không có sản phẩm hoặc hộp quà bí mật");
+
+    // THÊM: Kiểm tra có cả Product và BlindBox (invalid case)
+    if (orderDetail.ProductId.HasValue && orderDetail.BlindBoxId.HasValue)
+        throw ErrorHelper.BadRequest("Chi tiết đơn hàng không thể có cả sản phẩm và hộp quà bí mật");
+
+    // THÊM: Kiểm tra Product/BlindBox có bị xóa không
+    if (orderDetail.ProductId.HasValue && orderDetail.Product?.IsDeleted == true)
+        throw ErrorHelper.BadRequest("Sản phẩm trong đơn hàng đã bị xóa, không thể đánh giá");
+
+    if (orderDetail.BlindBoxId.HasValue && orderDetail.BlindBox?.IsDeleted == true)
+        throw ErrorHelper.BadRequest("Hộp quà bí mật trong đơn hàng đã bị xóa, không thể đánh giá");
+
+    // Kiểm tra duplicate review
+    var existingReview = await _unitOfWork.Reviews.GetQueryable()
+        .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
+        .FirstOrDefaultAsync();
+
+    if (existingReview != null)
+    {
+        // THÊM: Thông tin chi tiết về review đã tồn tại
+        _loggerService.Warn($"User {userId} already reviewed OrderDetail {orderDetailId} with Review {existingReview.Id}");
+        throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
+    }
+
+    // THÊM: Kiểm tra user có bị ban không
+    var user = await _unitOfWork.Users.GetByIdAsync(userId);
+    if (user?.Status == UserStatus.Suspended)
+        throw ErrorHelper.Forbidden("Tài khoản của bạn đã bị cấm, không thể tạo đánh giá");
+
+    if (user?.Status != UserStatus.Active)
+        throw ErrorHelper.Forbidden("Tài khoản không ở trạng thái hoạt động");
+}
+    private bool IsValidMediaFile(IFormFile file)
+    {
+        // Check if file is null or empty
+        if (file.Length == 0)
+        {
+            _loggerService.Warn("Empty file detected");
+            return false;
+        }
+
+        // Check file size (max 50MB)
+        const int maxSizeBytes = 50 * 1024 * 1024; // 50MB
+        if (file.Length > maxSizeBytes)
+        {
+            _loggerService.Warn(
+                $"File {file.FileName} exceeds size limit: {file.Length} bytes (max: {maxSizeBytes})");
+            return false;
+        }
+
+        // Check file extension
+        var allowedExtensions = new[]
+        {
+            // Images
+            ".jpg", ".jpeg", ".png", ".gif", ".webp",
+            // Videos
+            ".mp4", ".mov", ".avi", ".wmv", ".mkv"
+        };
+        var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+        if (string.IsNullOrEmpty(fileExtension) || !allowedExtensions.Contains(fileExtension))
+        {
+            _loggerService.Warn($"File {file.FileName} has invalid extension: {fileExtension}");
+            return false;
+        }
+
+        // Check MIME type
+        var allowedMimeTypes = new[]
+        {
+            // Images
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            // Videos
+            "video/mp4",
+            "video/quicktime",
+            "video/x-msvideo",
+            "video/x-ms-wmv",
+            "video/x-matroska"
+        };
+
+        if (string.IsNullOrEmpty(file.ContentType) ||
+            !allowedMimeTypes.Contains(file.ContentType.ToLowerInvariant()))
+        {
+            _loggerService.Warn($"File {file.FileName} has invalid MIME type: {file.ContentType}");
+            return false;
+        }
+
+        _loggerService.Info($"File {file.FileName} passed validation");
+        return true;
     }
 
     /// <summary>
@@ -756,67 +839,49 @@ public class ReviewService : IReviewService
     private async Task<List<string>> UploadReviewImages(List<IFormFile>? images, Guid userId)
     {
         var imageUrls = new List<string>();
-
-        try
+        if (images == null || !images.Any())
         {
-            if (images == null || !images.Any())
-            {
-                _loggerService.Info("No images to upload");
-                return imageUrls;
-            }
-
-            _loggerService.Info($"Starting upload of {images.Count} images for user {userId}");
-
-            foreach (var imageFile in images)
-            {
-                try
-                {
-                    if (imageFile == null || imageFile.Length == 0)
-                    {
-                        _loggerService.Warn("Skipping null or empty image file");
-                        continue;
-                    }
-
-                    // Generate unique filename
-                    var fileExtension = Path.GetExtension(imageFile.FileName)?.ToLowerInvariant() ?? ".jpg";
-                    var fileName = $"reviews/{userId}/{Guid.NewGuid()}{fileExtension}";
-
-                    _loggerService.Info($"Uploading image {fileName}");
-
-                    // Upload file to MinIO via BlobService
-                    using var stream = imageFile.OpenReadStream();
-                    await _blobService.UploadFileAsync(fileName, stream);
-
-                    // Get public URL
-                    var imageUrl = await _blobService.GetPreviewUrlAsync(fileName);
-                    if (!string.IsNullOrEmpty(imageUrl))
-                    {
-                        imageUrls.Add(imageUrl);
-                        _loggerService.Info($"Successfully uploaded review image: {fileName}");
-                    }
-                    else
-                    {
-                        _loggerService.Warn($"Failed to get URL for uploaded image: {fileName}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _loggerService.Error($"Failed to upload individual image {imageFile?.FileName}: {ex.Message}");
-                    // Tiếp tục với ảnh tiếp theo, không throw exception
-                }
-            }
-
-            _loggerService.Info(
-                $"Upload completed. Successfully uploaded {imageUrls.Count} out of {images.Count} images");
+            _loggerService.Info("No images to upload");
             return imageUrls;
         }
-        catch (Exception ex)
-        {
-            _loggerService.Error($"Unexpected error in UploadReviewImages: {ex.Message}");
-            // Trả về danh sách rỗng thay vì throw exception
-            return new List<string>();
-        }
-    }
 
-    #endregion
+        _loggerService.Info($"Starting upload of {images.Count} images for user {userId}");
+
+        foreach (var imageFile in images)
+        {
+            if (imageFile == null || imageFile.Length == 0)
+            {
+                _loggerService.Warn("Skipping null or empty image file");
+                continue;
+            }
+
+            // Generate unique filename
+            var fileExtension = Path.GetExtension(imageFile.FileName)?.ToLowerInvariant() ?? ".jpg";
+            var fileName = $"reviews/{userId}/{Guid.NewGuid()}{fileExtension}";
+
+            _loggerService.Info($"Uploading image {fileName}");
+
+            // Upload file to MinIO via BlobService
+            using var stream = imageFile.OpenReadStream();
+            await _blobService.UploadFileAsync(fileName, stream);
+
+            // Get public URL
+            var imageUrl = await _blobService.GetPreviewUrlAsync(fileName);
+            if (!string.IsNullOrEmpty(imageUrl))
+            {
+                imageUrls.Add(imageUrl);
+                _loggerService.Info($"Successfully uploaded review image: {fileName}");
+            }
+            else
+            {
+                _loggerService.Warn($"Failed to get URL for uploaded image: {fileName}");
+            }
+        }
+
+        _loggerService.Info(
+            $"Upload completed. Successfully uploaded {imageUrls.Count} out of {images.Count} images");
+        return imageUrls;
+    }
 }
+
+#endregion
