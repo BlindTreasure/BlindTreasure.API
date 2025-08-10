@@ -31,205 +31,106 @@ public class ReviewService : IReviewService
 
     public async Task<ReviewResponseDto> CreateReviewAsync(CreateReviewDto createDto)
     {
-        try
+        // 1. Validate input
+        ValidateCreateReviewInput(createDto);
+
+        var userId = _claimService.CurrentUserId;
+        if (userId == Guid.Empty)
         {
-            // 1. Validate input using private methods
-            ValidateCreateReviewInput(createDto);
-
-            var userId = _claimService.CurrentUserId;
-            if (userId == Guid.Empty)
-            {
-                _loggerService.Error("CurrentUserId is empty in CreateReviewAsync");
-                throw ErrorHelper.Unauthorized("Bạn cần đăng nhập để thực hiện hành động này");
-            }
-
-            var user = await _unitOfWork.Users.GetByIdAsync(userId);
-            if (user == null || user.IsDeleted)
-            {
-                _loggerService.Error($"User not found or deleted: {userId}");
-                throw ErrorHelper.NotFound("Không tìm thấy thông tin tài khoản");
-            }
-
-            // 2. Tìm OrderDetail với error handling tốt hơn
-            OrderDetail? orderDetail = null;
-            try
-            {
-                orderDetail = await _unitOfWork.OrderDetails
-                    .GetQueryable()
-                    .Include(od => od.Order)
-                    .Include(od => od.Product)
-                    .ThenInclude(p => p != null ? p.Seller : null)
-                    .Include(od => od.BlindBox)
-                    .ThenInclude(b => b != null ? b.Seller : null)
-                    .FirstOrDefaultAsync(od => od.Id == createDto.OrderDetailId
-                                               && od.Order != null
-                                               && od.Order.UserId == userId
-                                               && !od.IsDeleted);
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Error(
-                    $"Database error when fetching OrderDetail {createDto.OrderDetailId}: {ex.Message}");
-                throw ErrorHelper.Internal("Lỗi khi truy vấn thông tin đơn hàng");
-            }
-
-            if (orderDetail?.Order == null)
-            {
-                _loggerService.Error($"OrderDetail not found or Order is null: {createDto.OrderDetailId}");
-                throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
-            }
-
-            _loggerService.Info($"Found OrderDetail {orderDetail.Id} with Order Status: {orderDetail.Order.Status}");
-
-            // 3. Validate OrderDetail với try-catch
-            try
-            {
-                await ValidateOrderDetailForReview(orderDetail, createDto.OrderDetailId, userId);
-            }
-            catch (ApplicationException)
-            {
-                // Re-throw application exceptions (từ ErrorHelper)
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Error($"Unexpected error in ValidateOrderDetailForReview: {ex.Message}");
-                throw ErrorHelper.Internal("Lỗi khi kiểm tra tính hợp lệ của đơn hàng");
-            }
-
-            // 4. Upload images với error handling
-            List<string> imageUrls = new List<string>();
-            try
-            {
-                imageUrls = await UploadReviewImages(createDto.Images, userId);
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Error($"Error uploading review images: {ex.Message}");
-                // Không throw exception cho upload ảnh, chỉ log và tiếp tục
-                imageUrls = new List<string>();
-            }
-
-            // 5. Xác định SellerId an toàn
-            Guid? sellerId = null;
-            try
-            {
-                if (orderDetail.Product?.Seller != null)
-                {
-                    sellerId = orderDetail.Product.Seller.Id;
-                }
-                else if (orderDetail.BlindBox?.Seller != null)
-                {
-                    sellerId = orderDetail.BlindBox.Seller.Id;
-                }
-                else
-                {
-                    // Fallback: tìm seller từ database
-                    if (orderDetail.ProductId.HasValue)
-                    {
-                        var product = await _unitOfWork.Products
-                            .GetQueryable()
-                            .Include(p => p.Seller)
-                            .FirstOrDefaultAsync(p => p.Id == orderDetail.ProductId);
-                        sellerId = product?.SellerId;
-                    }
-                    else if (orderDetail.BlindBoxId.HasValue)
-                    {
-                        var blindBox = await _unitOfWork.BlindBoxes
-                            .GetQueryable()
-                            .Include(b => b.Seller)
-                            .FirstOrDefaultAsync(b => b.Id == orderDetail.BlindBoxId);
-                        sellerId = blindBox?.SellerId;
-                    }
-                }
-
-                if (!sellerId.HasValue)
-                {
-                    _loggerService.Warn($"Could not determine SellerId for OrderDetail {orderDetail.Id}");
-                    // Không throw exception, chỉ để null
-                }
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Error($"Error determining SellerId: {ex.Message}");
-                // Không throw, để sellerId = null
-            }
-
-            var isContentApproved = true;
-
-            // 6. Create review với error handling
-            Review review;
-            try
-            {
-                review = new Review
-                {
-                    UserId = userId,
-                    OrderDetailId = createDto.OrderDetailId,
-                    ProductId = orderDetail.ProductId,
-                    BlindBoxId = orderDetail.BlindBoxId,
-                    SellerId = sellerId, // Có thể null
-                    OverallRating = createDto.Rating,
-                    Content = createDto.Comment?.Trim() ?? string.Empty,
-                    ImageUrls = imageUrls ?? new List<string>(),
-                    IsApproved = isContentApproved,
-                    ApprovedAt = isContentApproved ? DateTime.UtcNow : null,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                await _unitOfWork.Reviews.AddAsync(review);
-                await _unitOfWork.SaveChangesAsync();
-
-                _loggerService.Success(
-                    $"Review created successfully for OrderDetail {createDto.OrderDetailId} by user {userId}");
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Error($"Database error when creating review: {ex.Message}");
-                throw ErrorHelper.Internal("Lỗi khi lưu đánh giá vào cơ sở dữ liệu");
-            }
-
-            // 7. Return result với error handling
-            try
-            {
-                return await GetByIdAsync(review.Id);
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Error($"Error getting created review {review.Id}: {ex.Message}");
-                // Fallback: tạo response đơn giản
-                return new ReviewResponseDto
-                {
-                    Id = review.Id,
-                    UserId = review.UserId,
-                    UserName = user.FullName ?? "Unknown User",
-                    Rating = review.OverallRating,
-                    Comment = review.Content,
-                    CreatedAt = review.CreatedAt,
-                    Category = "Unknown",
-                    ItemName = "Unknown Item",
-                    Images = review.ImageUrls ?? new List<string>(),
-                    IsApproved = review.IsApproved,
-                    ApprovedAt = review.ApprovedAt,
-                    OrderDetailId = review.OrderDetailId,
-                    ProductId = review.ProductId,
-                    BlindBoxId = review.BlindBoxId,
-                    SellerId = review.SellerId
-                };
-            }
+            _loggerService.Error("CurrentUserId is empty in CreateReviewAsync");
+            throw ErrorHelper.Unauthorized("Bạn cần đăng nhập để thực hiện hành động này");
         }
-        catch (ApplicationException)
+
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user == null || user.IsDeleted)
         {
-            // Re-throw application exceptions (từ ErrorHelper)
-            throw;
+            _loggerService.Error($"User not found or deleted: {userId}");
+            throw ErrorHelper.NotFound("Không tìm thấy thông tin tài khoản");
         }
-        catch (Exception ex)
+
+        // 2. Get OrderDetail
+        var orderDetail = await _unitOfWork.OrderDetails
+            .GetQueryable()
+            .Include(od => od.Order)
+            .Include(od => od.Product)
+            .ThenInclude(p => p != null ? p.Seller : null)
+            .Include(od => od.BlindBox)
+            .ThenInclude(b => b != null ? b.Seller : null)
+            .FirstOrDefaultAsync(od => od.Id == createDto.OrderDetailId
+                                       && od.Order != null
+                                       && od.Order.UserId == userId
+                                       && !od.IsDeleted);
+
+        if (orderDetail?.Order == null)
         {
-            _loggerService.Error($"Unexpected error in CreateReviewAsync: {ex.Message}");
-            _loggerService.Error($"Stack trace: {ex.StackTrace}");
-            throw ErrorHelper.Internal("Đã xảy ra lỗi không mong muốn khi tạo đánh giá");
+            _loggerService.Error($"OrderDetail not found or Order is null: {createDto.OrderDetailId}");
+            throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
         }
+
+        // 3. Validate OrderDetail
+        await ValidateOrderDetailForReview(orderDetail, createDto.OrderDetailId, userId);
+
+        // 4. Upload images
+        var imageUrls = await UploadReviewImages(createDto.Images, userId);
+
+        // 5. Determine SellerId
+        var sellerId = await DetermineSellerId(orderDetail);
+
+        // 6. Create review
+        var review = new Review
+        {
+            UserId = userId,
+            OrderDetailId = createDto.OrderDetailId,
+            ProductId = orderDetail.ProductId,
+            BlindBoxId = orderDetail.BlindBoxId,
+            SellerId = sellerId,
+            OverallRating = createDto.Rating,
+            Content = createDto.Comment?.Trim() ?? string.Empty,
+            ImageUrls = imageUrls ?? new List<string>(),
+            IsApproved = true,
+            ApprovedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _unitOfWork.Reviews.AddAsync(review);
+        await _unitOfWork.SaveChangesAsync();
+
+        _loggerService.Success(
+            $"Review created successfully for OrderDetail {createDto.OrderDetailId} by user {userId}");
+
+        return await GetByIdAsync(review.Id);
     }
 
+    private async Task<Guid?> DetermineSellerId(OrderDetail orderDetail)
+    {
+        if (orderDetail.Product?.Seller != null)
+            return orderDetail.Product.Seller.Id;
+    
+        if (orderDetail.BlindBox?.Seller != null)
+            return orderDetail.BlindBox.Seller.Id;
+    
+        // Fallback: tìm seller từ database
+        if (orderDetail.ProductId.HasValue)
+        {
+            var product = await _unitOfWork.Products
+                .GetQueryable()
+                .Include(p => p.Seller)
+                .FirstOrDefaultAsync(p => p.Id == orderDetail.ProductId);
+            return product?.SellerId;
+        }
+    
+        if (orderDetail.BlindBoxId.HasValue)
+        {
+            var blindBox = await _unitOfWork.BlindBoxes
+                .GetQueryable()
+                .Include(b => b.Seller)
+                .FirstOrDefaultAsync(b => b.Id == orderDetail.BlindBoxId);
+            return blindBox?.SellerId;
+        }
+
+        return null;
+    }
+    
     public async Task<ReviewResponseDto> ReplyToReviewAsync(Guid reviewId, string replyContent)
     {
         // Xác thực nội dung phản hồi
@@ -757,79 +658,28 @@ public class ReviewService : IReviewService
         }
     }
 
-    /// <summary>
-    /// Validate OrderDetail for review eligibility - Enhanced with detailed logging
-    /// </summary>
     private async Task ValidateOrderDetailForReview(OrderDetail orderDetail, Guid orderDetailId, Guid userId)
     {
-        try
-        {
-            _loggerService.Info("=== START ValidateOrderDetailForReview ===");
+        if (orderDetail?.Order == null)
+            throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
 
-            if (orderDetail?.Order == null)
-            {
-                _loggerService.Error($"OrderDetail or Order is null for ID: {orderDetailId}");
-                throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn");
-            }
+        if (orderDetail.Order.UserId != userId)
+            throw ErrorHelper.Forbidden("Đơn hàng không thuộc về bạn");
 
-            // Kiểm tra ownership
-            if (orderDetail.Order.UserId != userId)
-            {
-                _loggerService.Error(
-                    $"Order ownership validation failed. Expected: {userId}, Actual: {orderDetail.Order.UserId}");
-                throw ErrorHelper.Forbidden("Đơn hàng không thuộc về bạn");
-            }
+        if (string.IsNullOrEmpty(orderDetail.Order.Status))
+            throw ErrorHelper.BadRequest("Trạng thái đơn hàng không hợp lệ");
 
-            // Kiểm tra order status - thêm null check
-            var orderStatus = orderDetail.Order.Status;
-            if (string.IsNullOrEmpty(orderStatus))
-            {
-                _loggerService.Error("Order status is null or empty");
-                throw ErrorHelper.BadRequest("Trạng thái đơn hàng không hợp lệ");
-            }
+        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
+            throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
 
-            if (orderStatus != nameof(OrderStatus.PAID))
-            {
-                _loggerService.Error($"Invalid order status: {orderStatus}. Required: {nameof(OrderStatus.PAID)}");
-                throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
-            }
+        var existingReview = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
+            .FirstOrDefaultAsync();
 
-            // Kiểm tra duplicate review với error handling
-            try
-            {
-                var existingReview = await _unitOfWork.Reviews.GetQueryable()
-                    .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
-                    .FirstOrDefaultAsync();
-
-                if (existingReview != null)
-                {
-                    _loggerService.Error($"Duplicate review found: {existingReview.Id}");
-                    throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
-                }
-            }
-            catch (ApplicationException)
-            {
-                throw; // Re-throw ErrorHelper exceptions
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Error($"Database error checking duplicate review: {ex.Message}");
-                throw ErrorHelper.Internal("Lỗi khi kiểm tra đánh giá trùng lặp");
-            }
-
-            _loggerService.Info("✅ OrderDetail validation completed successfully");
-        }
-        catch (ApplicationException)
-        {
-            throw; // Re-throw ErrorHelper exceptions
-        }
-        catch (Exception ex)
-        {
-            _loggerService.Error($"Unexpected error in ValidateOrderDetailForReview: {ex.Message}");
-            throw ErrorHelper.Internal("Đã xảy ra lỗi khi kiểm tra thông tin đơn hàng");
-        }
+        if (existingReview != null)
+            throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
     }
-
+    
     private bool IsValidMediaFile(IFormFile file)
     {
         try
