@@ -638,22 +638,30 @@ public class TransactionService : ITransactionService
 
         try
         {
-            var transaction = await _unitOfWork.Transactions.GetQueryable()
-                .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
+            var transactions = await _unitOfWork.Transactions.GetQueryable()
+                .Where(t => t.ExternalRef == sessionId).ToListAsync();
 
-            if (transaction == null)
-                throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
-
-            transaction.Payment.PaymentIntentId = paymentIntentId;
-            if(couponId != null)
+            if (transactions.Any())
             {
-                transaction.Payment.CouponId = couponId; // Lưu couponId nếu có
+                foreach (var transaction in transactions)
+                {
+                    if (transaction == null)
+                        throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
+
+                    transaction.Payment.PaymentIntentId = paymentIntentId;
+                    if (couponId != null)
+                    {
+                        transaction.Payment.CouponId = couponId; // Lưu couponId nếu có
+                    }
+
+                    await _unitOfWork.Transactions.Update(transaction);
+                    _logger.Info(
+                        $"[HandlePaymentIntentCreatedAsync] Đã cập nhật PaymentIntentId cho transaction {transaction.Id}.");
+                }
             }
-                
-            await _unitOfWork.Transactions.Update(transaction);
+
             await _unitOfWork.SaveChangesAsync();
-            _logger.Info(
-                $"[HandlePaymentIntentCreatedAsync] Đã cập nhật PaymentIntentId cho transaction {transaction.Id}.");
+
         }
         catch (Exception ex)
         {
