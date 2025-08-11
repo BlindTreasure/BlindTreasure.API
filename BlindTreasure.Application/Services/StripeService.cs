@@ -178,7 +178,7 @@ public class StripeService : IStripeService
         // Ghi lại transaction cho từng order
         foreach (var order in orders)
         {
-            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0);
+            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0, couponId ?? null, session.PaymentIntentId);
         }
 
         // Save GroupPaymentSession
@@ -195,7 +195,9 @@ public class StripeService : IStripeService
                 PaymentUrl = session.Url,
                 ExpiresAt = session.ExpiresAt ,
                 Type = PaymentType.Order,
-                IsCompleted = false
+                IsCompleted = false,
+                CouponId = couponId,
+                PaymentIntentId = session.PaymentIntentId
             };
             await _unitOfWork.GroupPaymentSessions.AddAsync(groupSession);
         }
@@ -386,8 +388,8 @@ public class StripeService : IStripeService
             var service = new SessionService(_stripeClient);
             var session = await service.CreateAsync(options);
 
-            // 8. Ghi vào Payment & Transaction
-            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew, finalAmount);
+            // 8. Ghi vào Payment & Transaction??nu
+            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew, finalAmount , couponId ?? null, session.PaymentIntentId);
             await _unitOfWork.SaveChangesAsync();
 
             return session.Url;
@@ -446,6 +448,76 @@ public class StripeService : IStripeService
     }
 
     /// <summary>
+    /// Vô hiệu hóa session thanh toán Stripe (hủy PaymentIntent và xóa coupon nếu còn hiệu lực)
+    /// </summary>
+    public async Task DisableStripeGroupPaymentSessionAsync(Guid checkoutGroupId)
+    {
+        var groupSession = await _unitOfWork.GroupPaymentSessions
+            .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
+
+        if (groupSession == null)
+            return;
+
+        // Hủy PaymentIntent nếu còn hiệu lực
+        if (!string.IsNullOrWhiteSpace(groupSession.PaymentIntentId))
+        {
+            try
+            {
+                var paymentIntentService = new PaymentIntentService(_stripeClient);
+                var paymentIntent = await paymentIntentService.GetAsync(groupSession.PaymentIntentId);
+                if (paymentIntent != null && paymentIntent.Status == "requires_payment_method")
+                {
+                    await paymentIntentService.CancelAsync(groupSession.PaymentIntentId);
+                }
+            }
+            catch (StripeException)
+            {
+                // Log error nhưng không throw
+            }
+        }
+
+        // Xóa coupon nếu có
+        if (!string.IsNullOrWhiteSpace(groupSession.CouponId))
+        {
+            await CleanupStripeCoupon(groupSession.CouponId);
+        }
+    }
+
+    /// <summary>
+    /// Vô hiệu hóa session thanh toán Stripe cho đơn lẻ (hủy PaymentIntent và xóa coupon nếu còn hiệu lực)
+    /// </summary>
+    public async Task DisableStripeOrderPaymentSessionAsync(Guid orderId)
+    {
+        var order = await _unitOfWork.Orders.GetByIdAsync(orderId);
+        if (order?.Payment == null)
+            return;
+
+        // Hủy PaymentIntent nếu còn hiệu lực
+        if (!string.IsNullOrWhiteSpace(order.Payment.PaymentIntentId))
+        {
+            try
+            {
+                var paymentIntentService = new PaymentIntentService(_stripeClient);
+                var paymentIntent = await paymentIntentService.GetAsync(order.Payment.PaymentIntentId);
+                if (paymentIntent != null && paymentIntent.Status == "requires_payment_method")
+                {
+                    await paymentIntentService.CancelAsync(order.Payment.PaymentIntentId);
+                }
+            }
+            catch (StripeException)
+            {
+                // Log error nhưng không throw
+            }
+        }
+
+        // Xóa coupon nếu có
+        if (!string.IsNullOrWhiteSpace(order.Payment.CouponId))
+        {
+            await CleanupStripeCoupon(order.Payment.CouponId);
+        }
+    }
+
+    /// <summary>
     /// Xóa coupon sau khi sử dụng (gọi trong webhook hoặc sau khi thanh toán thành công)
     /// </summary>
     public async Task CleanupStripeCoupon(string couponId)
@@ -468,7 +540,9 @@ public class StripeService : IStripeService
         string sessionId,
         Guid userId,
         bool isRenew,
-        decimal netAmount)
+        decimal netAmount,
+        string? couponId,
+        string? paymentIntentId)
     {
         var now = DateTime.UtcNow;
         var type = isRenew ? "Renew" : "Checkout";
@@ -483,12 +557,13 @@ public class StripeService : IStripeService
                 NetAmount = netAmount,
                 Method = "Stripe",
                 Status = PaymentStatus.Pending,
-                PaymentIntentId = "", // this field is nowhere ???
+                PaymentIntentId = paymentIntentId,
                 PaidAt = now,
                 RefundedAmount = 0,
                 CreatedAt = now,
                 CreatedBy = userId,
-                Transactions = new List<Transaction>()
+                Transactions = new List<Transaction>(),
+                CouponId= couponId
             };
 
             payment.Transactions.Add(new Transaction

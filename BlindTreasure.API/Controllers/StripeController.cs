@@ -654,4 +654,39 @@ public class StripeController : ControllerBase
     }
 
     #endregion
+
+    /// <summary>
+    ///     Hủy thanh toán đơn hàng theo yêu cầu chủ động của user.
+    /// </summary>
+    [Authorize]
+    [HttpPost("cancel-payment")]
+    public async Task<IActionResult> CancelPayment([FromBody] CancelPaymentRequestDto request)
+    {
+        _logger.Info($"[Stripe][CancelPayment] Yêu cầu hủy thanh toán cho order/group: {request.OrderId} / {request.CheckoutGroupId}");
+        try
+        {
+            // Nếu truyền vào groupId thì hủy cả nhóm, còn truyền orderId thì hủy đơn lẻ
+            if (request.CheckoutGroupId.HasValue && request.CheckoutGroupId.Value != Guid.Empty)
+            {
+                await _orderService.CancelGroupOrderPaymentAsync(request.CheckoutGroupId.Value);
+                return Ok(ApiResult<object>.Success(null, "200", "Đã hủy thanh toán cho nhóm đơn hàng."));
+            }
+            else if (request.OrderId.HasValue && request.OrderId.Value != Guid.Empty)
+            {
+                await _orderService.CancelOrderPaymentAsync(request.OrderId.Value);
+                return Ok(ApiResult<object>.Success(null, "200", "Đã hủy thanh toán cho đơn hàng."));
+            }
+            else
+            {
+                return BadRequest(ApiResult<object>.Failure("Thiếu thông tin orderId hoặc checkoutGroupId."));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[Stripe][CancelPayment] Lỗi: {ex.Message}");
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 }

@@ -11,6 +11,8 @@ public interface IStripeService
     Task<List<OrderPaymentInfo>> CreateCheckoutSessionsForOrders(List<Guid> orderIds);
     Task<string> CreateGeneralCheckoutSessionForOrders(List<Guid> orderIds);
     Task<string> CreateShipmentCheckoutSessionAsync(List<Shipment> shipments, Guid userId, int totalShippingFee);
+    Task DisableStripeGroupPaymentSessionAsync(Guid checkoutGroupId);
+    Task DisableStripeOrderPaymentSessionAsync(Guid orderId);
     Task<string> GenerateExpressLoginLink();
     Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId, string redirectUrl);
     Task<string> GetOrCreateGroupPaymentLink(Guid checkoutGroupId);
