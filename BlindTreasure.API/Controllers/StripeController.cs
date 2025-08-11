@@ -571,9 +571,14 @@ public class StripeController : ControllerBase
         {
             if (!string.IsNullOrEmpty(session.PaymentIntentId))
             {
+                var couponId = session.Metadata != null &&
+                           session.Metadata.TryGetValue("couponId", out var CouponIdStr)
+              ? CouponIdStr
+              : null;
+
                 _logger.Info(
                     $"[Stripe][Webhook] PaymentIntent created: {session.PaymentIntentId}, sessionId: {session.Id}");
-                await _transactionService.HandlePaymentIntentCreatedAsync(session.PaymentIntentId, session.Id);
+                await _transactionService.HandlePaymentIntentCreatedAsync(session.PaymentIntentId, session.Id, couponId );
             }
         }
         catch (StripeException e)

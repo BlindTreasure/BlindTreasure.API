@@ -631,7 +631,7 @@ public class TransactionService : ITransactionService
     /// <summary>
     ///     Xác nhận khi PaymentIntent được tạo (Stripe webhook).
     /// </summary>
-    public async Task HandlePaymentIntentCreatedAsync(string paymentIntentId, string sessionId)
+    public async Task HandlePaymentIntentCreatedAsync(string paymentIntentId, string sessionId, string? couponId)
     {
         if (string.IsNullOrWhiteSpace(paymentIntentId) || string.IsNullOrWhiteSpace(sessionId))
             throw ErrorHelper.BadRequest("PaymentIntentId và SessionId là bắt buộc.");
@@ -645,6 +645,11 @@ public class TransactionService : ITransactionService
                 throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
 
             transaction.Payment.PaymentIntentId = paymentIntentId;
+            if(couponId != null)
+            {
+                transaction.Payment.CouponId = couponId; // Lưu couponId nếu có
+            }
+                
             await _unitOfWork.Transactions.Update(transaction);
             await _unitOfWork.SaveChangesAsync();
             _logger.Info(
