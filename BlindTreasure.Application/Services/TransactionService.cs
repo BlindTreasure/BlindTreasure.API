@@ -23,6 +23,7 @@ public class TransactionService : ITransactionService
     private readonly IOrderService _orderService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
+    private readonly IEmailService _emailService;
 
     public TransactionService(
         ICacheService cacheService,
@@ -33,7 +34,8 @@ public class TransactionService : ITransactionService
         IUnitOfWork unitOfWork,
         IInventoryItemService inventoryItemService,
         ICustomerBlindBoxService customerBlindBoxService,
-        IGhnShippingService ghnShippingService)
+        IGhnShippingService ghnShippingService,
+        IEmailService emailService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -44,6 +46,7 @@ public class TransactionService : ITransactionService
         _inventoryItemService = inventoryItemService;
         _customerBlindBoxService = customerBlindBoxService;
         _ghnShippingService = ghnShippingService;
+        _emailService = emailService;
     }
 
 
@@ -171,6 +174,8 @@ public class TransactionService : ITransactionService
             await _unitOfWork.Payments.Update(transaction.Payment);
             await _unitOfWork.Orders.Update(order);
             await _unitOfWork.SaveChangesAsync();
+
+            await _emailService.SendOrderPaymentSuccessToBuyerAsync(order);
 
             _logger.Success($"[HandleSuccessfulPaymentAsync] Đã xác nhận thanh toán thành công cho order {orderId}.");
             _logger.Success($"[HandleSuccessfulPaymentAsync] Đã cập nhật trạng thái PAID thành công cho {orderId}.");
@@ -457,6 +462,10 @@ public class TransactionService : ITransactionService
                             }
                         }
                     }
+
+                    // Gửi email thông báo hết hạn/hủy cho user
+                    if (order.User != null)
+                        await _emailService.SendOrderExpiredOrCancelledToBuyerAsync(order, "Đơn hàng đã hết hạn do không thanh toán thành công.");
                 }
 
                 await _unitOfWork.SaveChangesAsync();
@@ -504,6 +513,10 @@ public class TransactionService : ITransactionService
                 await _unitOfWork.Payments.Update(transaction.Payment);
             if (transaction.Payment?.Order != null)
                 await _unitOfWork.Orders.Update(transaction.Payment.Order);
+
+            // Gửi email thông báo hết hạn/hủy cho user
+            if (transaction.Payment?.Order?.User != null)
+                await _emailService.SendOrderExpiredOrCancelledToBuyerAsync(transaction.Payment.Order, "Đơn hàng đã hết hạn do không thanh toán thành công.");
 
             await _unitOfWork.SaveChangesAsync();
             _logger.Warn($"[HandleFailedPaymentAsync] Đã xử lý thất bại thanh toán cho session {sessionId}.");
