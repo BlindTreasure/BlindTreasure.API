@@ -14,6 +14,7 @@ using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using OpenAI.ObjectModels.ResponseModels;
+using System.Linq.Expressions;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using static OpenAI.ObjectModels.SharedModels.IOpenAiModels;
