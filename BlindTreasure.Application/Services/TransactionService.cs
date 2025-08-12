@@ -188,7 +188,7 @@ public class TransactionService : ITransactionService
             // Notify user (buyer)
             if (order.User != null)
             {
-                await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
+                await _notificationService.PushNotificationToUser(order.UserId, new NotificationDto
                 {
                     Title = $"Thanh toán thành công đơn hàng #{order.Id}",
                     Message = "Đơn hàng của bạn đã được xác nhận. Nếu có giao hàng, hệ thống sẽ tiến hành xử lý vận chuyển.",
@@ -509,7 +509,7 @@ public class TransactionService : ITransactionService
                     // Thông báo realtime cho user
                     if (order.User != null)
                     {
-                        await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
+                        await _notificationService.PushNotificationToUser(order.UserId, new NotificationDto
                         {
                             Title = $"Link thanh toán cho đơn hàng #{order.Id} đã hết hạn",
                             Message = "Đơn hàng của bạn đã bị hủy hoặc hết hạn do không hoàn tất thanh toán. Vui lòng đặt lại nếu muốn tiếp tục mua.",
@@ -593,9 +593,9 @@ public class TransactionService : ITransactionService
             // Thông báo realtime cho user
             if (transaction.Payment?.Order?.User != null)
             {
-                await _notificationService.PushNotificationToUser(transaction.Payment.Order.User.Id, new NotificationDto
+                await _notificationService.PushNotificationToUser(transaction.Payment.Order.UserId, new NotificationDto
                 {
-                    Title = $"Link thanh toán cho đơn hàng #{transaction.Payment.Order.Id} đã hết hạn",
+                    Title = $"Link thanh toán cho đơn hàng #{transaction.Payment.OrderId} đã hết hạn",
                     Message = "Đơn hàng của bạn đã bị hủy hoặc hết hạn do không hoàn tất thanh toán. Vui lòng đặt lại nếu muốn tiếp tục mua.",
                     Type = NotificationType.Order,
                     SourceUrl = null

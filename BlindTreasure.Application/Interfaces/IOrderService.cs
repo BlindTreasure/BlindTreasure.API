@@ -16,6 +16,7 @@ public interface IOrderService
     Task DeleteOrderAsync(Guid orderId);
     Task<Pagination<OrderDetailDto>> GetMyOrderDetailsAsync(OrderDetailQueryParameter param);
     Task<Pagination<OrderDto>> GetMyOrdersAsync(OrderQueryParameter param);
+    Task<List<OrderDto>> GetOrderByCheckoutGroupId(Guid groupId);
     Task<OrderDto> GetOrderByIdAsync(Guid orderId);
 
     Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(List<CartSellerItemDto> items,

@@ -11,8 +11,10 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using OpenAI.ObjectModels.ResponseModels;
+using System.Linq.Expressions;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using static OpenAI.ObjectModels.SharedModels.IOpenAiModels;
@@ -490,7 +492,7 @@ public class OrderService : IOrderService
             order = await _unitOfWork.Orders.AddAsync(order);
             await _unitOfWork.SaveChangesAsync();
 
-
+            createdOrderIds.Add(order.Id);
 
 
             // Shipments for this seller
@@ -568,29 +570,74 @@ public class OrderService : IOrderService
         return result;
     }
 
+    //private async Task SendPaymentNotificationToUser(User user, MultiOrderCheckoutResultDto result)
+    //{
+    //    try
+    //    {
+    //        if (user != null)
+    //        {
+    //            var totalAmount = result.Orders.Sum(o => o.FinalAmount);
+    //            // Thông báo ngắn gọn: chỉ số lượng đơn và tổng tiền, không liệt kê từng đơn
+    //            var notificationMsg = $"Đã tạo {result.Orders.Count} đơn hàng mới. Tổng tiền cần thanh toán: {totalAmount:N0}đ.";
+
+    //            // Nếu có link thanh toán tổng, thêm vào cuối (rút gọn)
+    //            if (!string.IsNullOrEmpty(result.GeneralPaymentUrl))
+    //                notificationMsg += $" Xem link thanh toán tổng trong chi tiết đơn.";
+
+    //            // Đảm bảo không vượt quá 500 ký tự
+    //            if (notificationMsg.Length > 500)
+    //                notificationMsg = notificationMsg.Substring(0, 497) + "...";
+
+    //            await _notificationService.PushNotificationToUser(user.Id, new NotificationDto
+    //            {
+    //                Title = $"Đã tạo nhóm đơn hàng mới ({result.Orders.Count} đơn)",
+    //                Message = notificationMsg,
+    //                Type = NotificationType.Order,
+    //                SourceUrl = result.GeneralPaymentUrl
+    //            });
+    //        }
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        throw ErrorHelper.BadRequest("[SendPaymentNotificationToUser] error:" + ex.Message);
+    //    }
+    //}
+
     private async Task SendPaymentNotificationToUser(User user, MultiOrderCheckoutResultDto result)
     {
-        // Thông báo cho user về nhóm đơn hàng vừa tạo
-        if (user != null)
+        try
         {
-            var totalAmount = result.Orders.Sum(o => o.FinalAmount);
-            var orderList = string.Join("<br/>", result.Orders.Select(o =>
-                $"- Đơn #{o.OrderId} của seller {o.SellerName}: {o.FinalAmount:N0}đ <a href='{o.PaymentUrl}'>Thanh toán</a>"));
+            // Thông báo cho user về nhóm đơn hàng vừa tạo
+            if (user != null)
+            {
+                var totalAmount = result.Orders.Sum(o => o.FinalAmount);
+                var orderList = string.Join("<br/>", result.Orders.Select(o =>
+                    $"- Đơn #{o.OrderId} của seller {o.SellerName}: {o.FinalAmount:N0}đ <a href='{o.PaymentUrl}'>Thanh toán</a>"));
 
-            var notificationMsg = $@"
+                var notificationMsg = $@"
             <b>Đã tạo {result.Orders.Count} đơn hàng mới từ giỏ hàng.</b><br/>
             Tổng số tiền cần thanh toán: <b>{totalAmount:N0}đ</b><br/>
             {orderList}<br/>
             {(result.GeneralPaymentUrl != null && result.GeneralPaymentUrl != "" ? $"<a href='{result.GeneralPaymentUrl}'>Thanh toán tất cả</a>" : "")}
         ";
 
-            await _notificationService.PushNotificationToUser(user.Id, new NotificationDto
-            {
-                Title = $"Đã tạo nhóm đơn hàng mới ({result.Orders.Count} đơn)",
-                Message = notificationMsg,
-                Type = NotificationType.Order,
-                SourceUrl = result.GeneralPaymentUrl // Có thể dùng để redirect
-            });
+                // Truncate message to 500 characters to avoid SQL error
+                if (notificationMsg.Length > 500)
+                    notificationMsg = notificationMsg.Substring(0, 497) + "...";
+
+                await _notificationService.PushNotificationToUser(user.Id, new NotificationDto
+                {
+                    Title = $"Đã tạo nhóm đơn hàng mới ({result.Orders.Count} đơn)",
+                    Message = notificationMsg,
+                    Type = NotificationType.Order,
+                    SourceUrl = result.GeneralPaymentUrl
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+
+            throw ErrorHelper.BadRequest("[SendPaymentNotificationToUser] error:" + ex.Message);
         }
     }
 
@@ -888,5 +935,22 @@ public class OrderService : IOrderService
         _loggerService.Info($"Cancelled succesfully payment for group order {checkoutGroupId}.");
 
         await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task<List<OrderDto>> GetOrderByCheckoutGroupId(Guid groupId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var orders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.UserId == userId && !o.IsDeleted && o.CheckoutGroupId == groupId)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
+            .Include(o => o.ShippingAddress)
+            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+            .OrderByDescending(o => o.PlacedAt)
+            .ToListAsync();
+
+        return orders.Select(OrderDtoMapper.ToOrderDto).ToList();
     }
 }

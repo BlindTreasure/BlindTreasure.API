@@ -203,4 +203,27 @@ public class OrderController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
+    /// <summary>
+    ///     Lấy danh sách đơn hàng theo groupId (không phân trang).
+    /// </summary>
+    /// <param name="groupId">Id của nhóm đơn hàng (CheckoutGroupId)</param>
+    /// <returns>Danh sách đơn hàng thuộc group</returns>
+    [Authorize]
+    [HttpGet("group/{groupId}")]
+    [ProducesResponseType(typeof(ApiResult<List<OrderDto>>), 200)]
+    public async Task<IActionResult> GetOrdersByGroupId(Guid groupId)
+    {
+        try
+        {
+            var result = await _orderService.GetOrderByCheckoutGroupId(groupId);
+            return Ok(ApiResult<List<OrderDto>>.Success(result, "200", "Lấy danh sách đơn hàng theo group thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDto>>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 }
