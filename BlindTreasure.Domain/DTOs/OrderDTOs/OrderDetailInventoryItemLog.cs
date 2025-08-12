@@ -1,14 +1,16 @@
-﻿using System;
+﻿using BlindTreasure.Domain.Entities;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Domain.Entities
+namespace BlindTreasure.Domain.DTOs.OrderDTOs
 {
-    public class OrderDetailInventoryItemLog : BaseEntity
+    public class OrderDetailInventoryItemLogDto
     {
+        public Guid Id { get; set; }
         public Guid? OrderDetailId { get; set; }
         public OrderDetail? OrderDetail { get; set; }
 
@@ -21,16 +23,6 @@ namespace BlindTreasure.Domain.Entities
         public ActionType? ActionType { get; set; }
         public string? OldValue { get; set; } // Trạng thái trước thay đổi
         public string? NewValue { get; set; } // Trạng thái mới
-        public Guid? ActorId { get; set; } // User/System thực hiện hành động
-
-
+        public Guid? ActorId { get; set; }
     }
-
-    public enum ActionType
-    {
-        StatusUpdate,
-        ShipmentUpdate,
-        PaymentUpdate
-    }
-
 }

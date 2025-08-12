@@ -433,6 +433,17 @@ public class OrderService : IOrderService
                     FinalDetailPrice = unitPrice * item.Quantity
                 };
                 order.OrderDetails.Add(detail);
+
+                var creationLog = new OrderDetailInventoryItemLog
+                {
+                    OrderDetailId = detail.Id,
+                    LogContent = $"Created {itemName}, Qty={item.Quantity}",
+                    ActionType = ActionType.StatusUpdate,
+                    OldValue = null,
+                    NewValue = OrderDetailItemStatus.PENDING.ToString(),
+                    ActorId = userId
+                };
+                await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(creationLog);
             }
 
             // Apply promotion for this seller
@@ -513,9 +524,9 @@ public class OrderService : IOrderService
                         TotalFee = (int?)ghnResp?.TotalFee ?? 0,
                         MainServiceFee = (int?)ghnResp?.Fee?.MainService ?? 0,
                         TrackingNumber = ghnResp?.OrderCode ?? string.Empty,
-                        EstimatedDelivery = ghnResp?.ExpectedDeliveryTime ?? DateTime.UtcNow.AddDays(3),
+                        EstimatedDelivery = ghnResp?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3),
                         Status = ShipmentStatus.WAITING_PAYMENT,
-                        EstimatedPickupTime = DateTime.UtcNow.AddDays(1),
+                      //  EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8,18)).AddMinutes(new Random().Next(60)) chưa thanh toán nên chưa có 
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
 
