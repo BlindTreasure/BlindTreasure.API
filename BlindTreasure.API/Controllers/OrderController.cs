@@ -212,7 +212,7 @@ public class OrderController : ControllerBase
     /// <param name="groupId">Id của nhóm đơn hàng (CheckoutGroupId)</param>
     /// <returns>Danh sách đơn hàng thuộc group</returns>
     [Authorize]
-    [HttpGet("group/{groupId}")]
+    [HttpGet("group/{groupid}")]
     [ProducesResponseType(typeof(ApiResult<List<OrderDto>>), 200)]
     public async Task<IActionResult> GetOrdersByGroupId(Guid groupId)
     {
@@ -233,7 +233,7 @@ public class OrderController : ControllerBase
     /// Lấy danh sách log của OrderDetail theo Id.
     /// </summary>
     [Authorize]
-    [HttpGet("order-detail/{orderDetailId}/logs")]
+    [HttpGet("order-details/{id}/logs")]
     [ProducesResponseType(typeof(ApiResult<List<OrderDetailInventoryItemLogDto>>), 200)]
     public async Task<IActionResult> GetOrderDetailLogs(Guid orderDetailId)
     {
@@ -254,7 +254,7 @@ public class OrderController : ControllerBase
     /// Lấy danh sách log của InventoryItem theo Id.
     /// </summary>
     [Authorize]
-    [HttpGet("inventory-item/{inventoryItemId}/logs")]
+    [HttpGet("inventory-items/{id}/logs")]
     [ProducesResponseType(typeof(ApiResult<List<OrderDetailInventoryItemLogDto>>), 200)]
     public async Task<IActionResult> GetInventoryItemLogs(Guid inventoryItemId)
     {
