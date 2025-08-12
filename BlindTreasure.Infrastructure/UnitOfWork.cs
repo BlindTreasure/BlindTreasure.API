@@ -45,6 +45,7 @@ public class UnitOfWork : IUnitOfWork
         IGenericRepository<OrderSellerPromotion> orderSellerPromotion, 
         IGenericRepository<Review> reviews, 
         IGenericRepository<GroupPaymentSession> groupPaymentSessions,
+        IGenericRepository<OrderDetailInventoryItemLog> orderDetailInventoryItemLogs,
         IDbContextTransaction? transaction = null
     )
     {
@@ -82,6 +83,7 @@ public class UnitOfWork : IUnitOfWork
         OrderSellerPromotions = orderSellerPromotion;
         Reviews = reviews;
         GroupPaymentSessions = groupPaymentSessions;
+        OrderDetailInventoryItemLogs = orderDetailInventoryItemLogs;
     }
 
     public void Dispose()
@@ -171,4 +173,5 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<OrderSellerPromotion> OrderSellerPromotions { get; }
     public IGenericRepository<Review> Reviews { get; }
     public IGenericRepository<GroupPaymentSession> GroupPaymentSessions { get; }
+    public IGenericRepository<OrderDetailInventoryItemLog> OrderDetailInventoryItemLogs { get; }
 }

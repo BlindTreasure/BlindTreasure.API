@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Application.Mappers;
@@ -35,5 +36,20 @@ public static class InventoryItemMapper
         result.Product = item.Product != null ? ProductDtoMapper.ToProducDetailDto(item.Product) : null;
 
         return result;
+    }
+
+    public static OrderDetailInventoryItemLogDto ToOrderDetailInventoryItemLogDto(OrderDetailInventoryItemLog log)
+    {
+        return new OrderDetailInventoryItemLogDto
+        {
+            Id = log.Id,
+            OrderDetailId = log.OrderDetailId,
+            ActionType = log.ActionType,
+            LogContent = log.LogContent,
+            OldValue = log.OldValue,
+            NewValue = log.NewValue,
+            ActorId = log.ActorId,
+            LogTime = log.CreatedAt
+        };
     }
 }

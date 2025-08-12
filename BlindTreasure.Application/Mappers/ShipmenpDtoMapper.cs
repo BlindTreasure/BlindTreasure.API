@@ -22,16 +22,16 @@ public static class ShipmentDtoMapper
         return new ShipmentDto
         {
             Id = shipment.Id,
-            //OrderDetail = shipment.,
             OrderCode = shipment.OrderCode,
             TotalFee = shipment.TotalFee,
             MainServiceFee = shipment.MainServiceFee,
             Provider = shipment.Provider,
             TrackingNumber = shipment.TrackingNumber,
-            ShippedAt = shipment.ShippedAt,
-            EstimatedDelivery = shipment.EstimatedDelivery,
-            DeliveredAt = shipment.DeliveredAt,
-            Status = shipment.Status
+            Status = shipment.Status,
+            EstimatedPickupTime = shipment.EstimatedPickupTime,
+            PickedUpAt = shipment.PickedUpAt,
+            EstimatedDelivery = shipment.EstimatedDelivery,// Ngày dự kiến giao hàng
+            ShippedAt = shipment.ShippedAt, // Ngày giao hàng
         };
     }
 

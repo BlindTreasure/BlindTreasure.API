@@ -14,7 +14,7 @@ public class Payment : BaseEntity
     public string Method { get; set; }
     public PaymentStatus Status { get; set; }
     public string? PaymentIntentId { get; set; }
-    public DateTime PaidAt { get; set; }
+    public DateTime PaidAt { get; set; } // thời gian thanh toán 
     public decimal RefundedAmount { get; set; } = 0;
     //Suggested
     //// Quan hệ 1-n với Order (cho thanh toán nhóm)

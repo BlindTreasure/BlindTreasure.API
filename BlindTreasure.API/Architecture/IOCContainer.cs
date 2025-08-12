@@ -166,6 +166,8 @@ public static class IocContainer
         services.AddScoped<ISellerStatisticsService, SellerStatisticsService>();
         services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
+        services.AddScoped<IOrderDetailInventoryItemLogService, OrderDetailInventoryItemLogService>();
+
 
 
         //cron-jobs
@@ -179,14 +181,14 @@ public static class IocContainer
         services.AddScoped<IGeminiService, GeminiService>();
         services.AddScoped<IBlindyService, BlindyService>();
         services.AddSignalR(options =>
-            {
-                options.EnableDetailedErrors = true;
-                options.MaximumReceiveMessageSize = 102400; // 100 KB
-                options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
-                options.KeepAliveInterval = TimeSpan.FromSeconds(15);
-                options.HandshakeTimeout = TimeSpan.FromSeconds(15);
-                options.StreamBufferCapacity = 10;
-            })
+        {
+            options.EnableDetailedErrors = true;
+            options.MaximumReceiveMessageSize = 102400; // 100 KB
+            options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+            options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+            options.StreamBufferCapacity = 10;
+        })
             .AddJsonProtocol(options => { options.PayloadSerializerOptions.PropertyNamingPolicy = null; });
 
 

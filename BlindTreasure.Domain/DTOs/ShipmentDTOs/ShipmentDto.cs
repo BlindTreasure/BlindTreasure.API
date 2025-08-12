@@ -29,8 +29,9 @@ public class ShipmentDto
     public string? TrackingNumber { get; set; }
     public DateTime? ShippedAt { get; set; }
     public DateTime? EstimatedDelivery { get; set; } //expected delivery date
-    public DateTime? DeliveredAt { get; set; }
     public ShipmentStatus? Status { get; set; }
+    public DateTime? EstimatedPickupTime { get; set; } // Thời gian dự kiến lấy hàng
+    public DateTime? PickedUpAt { get; set; }
 
     public ICollection<InventoryItemDto>? InventoryItems { get; set; }
 }

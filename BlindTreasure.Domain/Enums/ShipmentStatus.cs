@@ -10,6 +10,9 @@ public enum ShipmentStatus
 {
     WAITING_PAYMENT,
     PROCESSING,
+    PICKED_UP,
+    IN_TRANSIT,
+    DELIVERED,
     COMPLETED,
     CANCELLED
 }
