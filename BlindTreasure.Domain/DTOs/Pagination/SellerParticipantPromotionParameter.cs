@@ -3,5 +3,5 @@
 public class SellerParticipantPromotionParameter : PaginationParameter
 {
     public Guid? PromotionId { get; set; }
-    public Guid? SellerId { get; set; }  
+    public Guid? SellerId { get; set; }
 }

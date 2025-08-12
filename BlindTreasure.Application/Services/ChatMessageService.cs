@@ -267,15 +267,17 @@ public class ChatMessageService : IChatMessageService
             FileMimeType = m.FileMimeType,
             // Thêm thông tin InventoryItem
             InventoryItemId = m.InventoryItemId,
-            InventoryItem = m.InventoryItem != null ? new InventoryItemDto
-            {
-                Id = m.InventoryItem.Id,
-                ProductName = m.InventoryItem.Product?.Name ?? "Không xác định",
-                Image = m.InventoryItem.Product?.ImageUrls.FirstOrDefault()!,
-                Tier = m.InventoryItem.Tier,
-                Status = m.InventoryItem.Status,
-                Location = m.InventoryItem.Location
-            } : null
+            InventoryItem = m.InventoryItem != null
+                ? new InventoryItemDto
+                {
+                    Id = m.InventoryItem.Id,
+                    ProductName = m.InventoryItem.Product?.Name ?? "Không xác định",
+                    Image = m.InventoryItem.Product?.ImageUrls.FirstOrDefault()!,
+                    Tier = m.InventoryItem.Tier,
+                    Status = m.InventoryItem.Status,
+                    Location = m.InventoryItem.Location
+                }
+                : null
         }).ToList();
 
         // Tạo kết quả phân trang
@@ -366,7 +368,7 @@ public class ChatMessageService : IChatMessageService
                 otherUser = lastMessage.Receiver;
 
             // Xử lý nội dung tin nhắn dựa trên loại tin nhắn
-            string lastMessageContent = lastMessage.Content;
+            var lastMessageContent = lastMessage.Content;
             if (lastMessage.MessageType == ChatMessageType.ImageMessage)
                 lastMessageContent = "[Hình ảnh]";
             else if (lastMessage.MessageType == ChatMessageType.InventoryItemMessage)

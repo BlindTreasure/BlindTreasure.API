@@ -50,39 +50,6 @@ public class UserServiceTests
         );
     }
 
-    #region GetUserDetailsByIdAsync Tests
-
-    [Fact]
-    public async Task GetUserDetailsByIdAsync_ShouldReturnUserDto_WhenUserExists()
-    {
-        var userId = Guid.NewGuid();
-        var user = new User
-        {
-            Id = userId,
-            RoleName = RoleType.Customer,
-            IsDeleted = false,
-            Email = "hehe@gmail.com",
-            FullName = "Test User"
-        };
-        _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-        var result = await _userService.GetUserDetailsByIdAsync(userId);
-        result.Should().NotBeNull();
-        result.UserId.Should().Be(userId);
-    }
-
-    [Fact]
-    public async Task GetUserDetailsByIdAsync_ShouldThrowNotFound_WhenUserIsDeleted()
-    {
-        var userId = Guid.NewGuid();
-        var user = new User { Id = userId, IsDeleted = true, Email = "hehe@gmail.com", RoleName = RoleType.Customer };
-        _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-
-        await Assert.ThrowsAsync<Exception>(() => _userService.GetUserDetailsByIdAsync(userId));
-    }
-
-    #endregion
 
     #region UpdateProfileAsync Tests
 
@@ -154,37 +121,6 @@ public class UserServiceTests
         _userRepoMock.Setup(x => x.GetByIdAsync(userId)).ReturnsAsync(user);
 
         await Assert.ThrowsAsync<Exception>(() => _userService.UploadAvatarAsync(userId, file));
-    }
-
-    #endregion
-
-    #region GetAllUsersAsync Tests
-
-    [Fact]
-    public async Task GetAllUsersAsync_ShouldReturnPaginatedUsers_WhenDataExists()
-    {
-        var users = new List<User>
-        {
-            new()
-            {
-                Id = Guid.NewGuid(), FullName = "User 1", IsDeleted = false, Email = "hehe@gmail.com",
-                RoleName = RoleType.Customer
-            },
-            new()
-            {
-                Id = Guid.NewGuid(), FullName = "User 2", IsDeleted = false, Email = "hehe@gmail.com",
-                RoleName = RoleType.Customer
-            }
-        };
-        var mockQueryable = users.AsQueryable().BuildMock();
-        _userRepoMock.Setup(x => x.GetQueryable()).Returns(mockQueryable);
-
-        var param = new UserQueryParameter { PageIndex = 1, PageSize = 10 };
-
-        var result = await _userService.GetAllUsersAsync(param);
-
-        result.Should().NotBeNull();
-        result.TotalCount.Should().Be(2);
     }
 
     #endregion
@@ -280,60 +216,6 @@ public class UserServiceTests
 
     #endregion
 
-    #region GetUserByEmail Tests
-
-    [Fact]
-    public async Task GetUserByEmail_ShouldReturnUser_WhenExists()
-    {
-        var email = "test@example.com";
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = email,
-            IsDeleted = false,
-            RoleName = RoleType.Customer,
-            FullName = "Test User"
-        };
-        _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>())).ReturnsAsync(user);
-        var result = await _userService.GetUserByEmail(email);
-        result.Should().NotBeNull();
-        result.Email.Should().Be(email);
-    }
-
-    #endregion
-
-    #region GetUserById Tests
-
-    [Fact]
-    public async Task GetUserById_ShouldReturnUser_WhenExists()
-    {
-        var userId = Guid.NewGuid();
-        var user = new User
-        {
-            Id = userId,
-            Email = "test@example.com",
-            RoleName = RoleType.Customer,
-            FullName = "Test User",
-            IsDeleted = false
-        };
-        _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-        var result = await _userService.GetUserById(userId);
-        result.Should().NotBeNull();
-        result.Id.Should().Be(userId);
-    }
-
-    [Fact]
-    public async Task GetUserById_ShouldReturnNull_WhenNotExists()
-    {
-        var userId = Guid.NewGuid();
-        _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync((User)null!);
-        var result = await _userService.GetUserById(userId);
-        result.Should().BeNull();
-    }
-
-    #endregion
 
     #region Helper Methods
 

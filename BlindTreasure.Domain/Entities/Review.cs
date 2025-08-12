@@ -26,7 +26,7 @@ public class Review : BaseEntity
     public bool IsApproved { get; set; }
     public DateTime? ApprovedAt { get; set; }
 
-    public List<string> ImageUrls { get; set; } = new List<string>();
+    public List<string> ImageUrls { get; set; } = new();
 
     // Phản hồi từ seller
     public string? SellerResponse { get; set; }

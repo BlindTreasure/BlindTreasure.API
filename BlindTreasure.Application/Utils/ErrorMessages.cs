@@ -60,6 +60,7 @@ public static class ErrorMessages
     #endregion
 
     #region Transaction Error Message
+
     public const string Currency_APIFailed = "Currency API failed. Please try again later. Error: {0}";
     public const string Currency_RateNull = "Currency Rate is null, conversion fail. Please try again later.";
 

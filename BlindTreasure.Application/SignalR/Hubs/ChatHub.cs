@@ -26,7 +26,6 @@ public class ChatHub : Hub
         _unitOfWork = unitOfWork;
     }
 
-    
 
     /// <summary>
     /// Đánh dấu toàn bộ tin nhắn trong cuộc trò chuyện là đã đọc
