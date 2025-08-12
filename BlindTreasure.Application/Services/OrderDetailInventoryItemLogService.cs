@@ -1,10 +1,12 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
+using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -111,28 +113,36 @@ namespace BlindTreasure.Application.Services
             InventoryItem? inventoryItem,
             CustomerBlindBox? blindBox, string? msg)
         {
-            var log = new OrderDetailInventoryItemLog
+            try
             {
-                OrderDetailId = orderDetail.Id,
-                InventoryItemId = inventoryItem?.Id,
-                ActionType = inventoryItem != null ? ActionType.INVENTORY_ITEM_ADDED : ActionType.BLIND_BOX_ADDED,
-                LogContent = msg ?? (inventoryItem != null
+                var log = new OrderDetailInventoryItemLog
+                {
+                    OrderDetailId = orderDetail.Id,
+                    InventoryItemId = inventoryItem?.Id,
+                    ActionType = inventoryItem != null ? ActionType.INVENTORY_ITEM_ADDED : ActionType.BLIND_BOX_ADDED,
+                    LogContent = msg ?? (inventoryItem != null
                     ? $"Inventory item created: {inventoryItem.Id}"
                     : $"Blind box added: {blindBox?.BlindBoxId}"),
-                OldValue = null,
-                NewValue = inventoryItem != null ? inventoryItem.Status.ToString() : "UNOPENED",
-                ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
-            };
+                    OldValue = null,
+                    NewValue = inventoryItem != null ? inventoryItem.Status.ToString() : "UNOPENED",
+                    ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
+                };
 
-            if (log.ActorId == null)
-            {
-                _logger.Warn("This update made by system");
-                log.LogContent += " (System action)";
+                if (log.ActorId == null)
+                {
+                    _logger.Warn("This update made by system");
+                    log.LogContent += " (System action)";
+                }
+
+                var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
+                //await _unitOfWork.SaveChangesAsync();
+                return result;
             }
-
-            var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-            //await _unitOfWork.SaveChangesAsync();
-            return result;
+            catch (Exception ex) 
+            {
+                _logger.Error("Error: " + ex.Message);
+                throw ErrorHelper.BadRequest(ex.Message);
+            }
         }
 
         public async Task<OrderDetailInventoryItemLog> LogShipmentTrackingInventoryItemUpdateAsync(

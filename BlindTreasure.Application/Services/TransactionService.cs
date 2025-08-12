@@ -26,10 +26,11 @@ public class TransactionService : ITransactionService
     private readonly IGhnShippingService _ghnShippingService;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService; // Thêm dòng này
+    private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
 
     public TransactionService(
         ICacheService cacheService,
-        IClaimsService claimsService,
+        IClaimsService claimsService,f
         ILoggerService logger,
         IMapperService mapper,
         IOrderService orderService,
@@ -38,7 +39,8 @@ public class TransactionService : ITransactionService
         ICustomerBlindBoxService customerBlindBoxService,
         IGhnShippingService ghnShippingService,
         IEmailService emailService,
-        INotificationService notificationService) // Thêm vào constructor
+        INotificationService notificationService,
+        IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -51,6 +53,7 @@ public class TransactionService : ITransactionService
         _ghnShippingService = ghnShippingService;
         _emailService = emailService;
         _notificationService = notificationService; // Gán vào field
+        _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService;
     }
 
 
@@ -396,6 +399,12 @@ public class TransactionService : ITransactionService
                 if (od.InventoryItems == null)
                     od.InventoryItems = new List<InventoryItem>();
                 od.InventoryItems.Add(dto);
+
+                // Log: InventoryItem vừa được tạo cho OrderDetail
+                await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
+                    od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
+                );
+
             }
         }
         if (inventoryItems.Any())
