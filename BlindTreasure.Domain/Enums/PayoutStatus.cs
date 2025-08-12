@@ -5,31 +5,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Domain.Enums
+namespace BlindTreasure.Domain.Enums;
+
+public enum PayoutStatus
 {
-    public enum PayoutStatus
-    {
+    [Description("Đang xử lý")] PROCESSING,
 
-        [Description("Đang xử lý")]
-        PROCESSING,
+    [Description("Hoàn thành")] COMPLETED,
 
-        [Description("Hoàn thành")]
-        COMPLETED,
+    [Description("Thất bại")] FAILED,
 
-        [Description("Thất bại")]
-        FAILED,
+    [Description("Đã hủy")] CANCELLED
+}
 
-        [Description("Đã hủy")]
-        CANCELLED,
+public enum PayoutPeriodType
+{
+    [Description("Hàng tuần")] WEEKLY,
 
-    }
-
-    public enum PayoutPeriodType
-    {
-        [Description("Hàng tuần")]
-        WEEKLY,
-
-        [Description("Hàng tháng")]
-        MONTHLY
-    }
+    [Description("Hàng tháng")] MONTHLY
 }

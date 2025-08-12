@@ -4,10 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Application.Interfaces
+namespace BlindTreasure.Application.Interfaces;
+
+public interface ICurrencyConversionService
 {
-    public interface ICurrencyConversionService
-    {
-        Task<decimal?> GetVNDToUSDRate();
-    }
+    Task<decimal?> GetVNDToUSDRate();
 }

@@ -25,8 +25,6 @@ public class OrderDetail : BaseEntity
     public string? Logs { get; set; } = string.Empty; // Lưu trữ nhật ký trạng thái
 
 
-
-
     // Many → Shipments
     public ICollection<Shipment>? Shipments { get; set; } = new List<Shipment>();
     public ICollection<InventoryItem> InventoryItems { get; set; } = new List<InventoryItem>();
