@@ -30,7 +30,7 @@ public class TransactionService : ITransactionService
 
     public TransactionService(
         ICacheService cacheService,
-        IClaimsService claimsService,f
+        IClaimsService claimsService,
         ILoggerService logger,
         IMapperService mapper,
         IOrderService orderService,
@@ -369,10 +369,11 @@ public class TransactionService : ITransactionService
             {
                 Guid? shipmentId = null;
                 var status = InventoryItemStatus.Available;
+                Shipment? selectedShipment = null;
 
                 if (shipmentList != null && shipmentList.Count > 0)
                 {
-                    var selectedShipment = shipmentList[0];
+                    selectedShipment = shipmentList[0];
                     shipmentId = selectedShipment.Id;
                     status = selectedShipment.Status switch
                     {
@@ -399,16 +400,38 @@ public class TransactionService : ITransactionService
                 if (od.InventoryItems == null)
                     od.InventoryItems = new List<InventoryItem>();
                 od.InventoryItems.Add(dto);
+                // Track new inventory item creation for logging
+                dto = await _unitOfWork.InventoryItems.AddAsync(dto);
 
-                // Log: InventoryItem vừa được tạo cho OrderDetail
-                await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
+                // Log: InventoryItem vừa được tạo cho OrderDetail sử dụng TEntity
+                var log = await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
                     od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
                 );
 
+                // Nếu có shipment, log trạng thái shipment cho inventory item
+                if (selectedShipment != null)
+                {
+                    var oldItemStatus = InventoryItemStatus.Available;
+                    var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
+                        selectedShipment,
+                        ShipmentStatus.WAITING_PAYMENT,
+                        selectedShipment.Status,
+                        order.Seller,
+                        shippingAddress
+                    );
+
+                    await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                        dto,
+                        oldItemStatus,
+                        dto,
+                        trackingMessage
+                    );
+                }
+
             }
         }
-        if (inventoryItems.Any())
-            await _unitOfWork.InventoryItems.AddRangeAsync(inventoryItems);
+        //if (inventoryItems.Any())
+        //    await _unitOfWork.InventoryItems.AddRangeAsync(inventoryItems);
     }
 
     /// <summary>
@@ -421,18 +444,29 @@ public class TransactionService : ITransactionService
         {
             for (var i = 0; i < detail.Quantity; i++)
             {
-                blindBoxes.Add(new CustomerBlindBox
+                var cbBox = new CustomerBlindBox
                 {
                     BlindBoxId = detail.BlindBoxId.Value,
                     OrderDetailId = detail.Id,
                     UserId = order.UserId,
                     IsOpened = false
-                });
+                };
+                blindBoxes.Add(cbBox);
+                cbBox = await _unitOfWork.CustomerBlindBoxes.AddAsync(cbBox);
+                // Log: CustomerBlindBox vừa được tạo cho OrderDetail sử dụng TEntity
+                var log = await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
+                    detail, null, cbBox, $"CustomerBlindBox created for OrderDetail {detail.Id} after payment."
+                );
             }
+            var oldStatus = detail.Status;
             detail.Status = OrderDetailItemStatus.IN_INVENTORY;
+            if (oldStatus != detail.Status)
+            {
+                await _orderDetailInventoryItemLogService.LogOrderDetailStatusChangeAsync(detail, oldStatus, detail.Status, "Chuyển sang IN_INVENTORY sau khi tạo Customer BlindBox.");
+            }
         }
-        if (blindBoxes.Any())
-            await _unitOfWork.CustomerBlindBoxes.AddRangeAsync(blindBoxes);
+        //if (blindBoxes.Any())
+        //    await _unitOfWork.CustomerBlindBoxes.AddRangeAsync(blindBoxes);
     }
 
 
