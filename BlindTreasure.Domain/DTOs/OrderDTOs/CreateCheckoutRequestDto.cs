@@ -8,3 +8,9 @@ public class CreateCheckoutRequestDto
 public class GetCheckoutGroupLinkDto {     
     public Guid CheckoutGroupId { get; set; }
 }
+
+public class CancelPaymentRequestDto
+{
+    public Guid? OrderId { get; set; }
+    public Guid? CheckoutGroupId { get; set; }
+}

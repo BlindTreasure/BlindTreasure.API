@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
@@ -23,6 +24,8 @@ public class TransactionService : ITransactionService
     private readonly IOrderService _orderService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
+    private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService; // Thêm dòng này
 
     public TransactionService(
         ICacheService cacheService,
@@ -33,7 +36,9 @@ public class TransactionService : ITransactionService
         IUnitOfWork unitOfWork,
         IInventoryItemService inventoryItemService,
         ICustomerBlindBoxService customerBlindBoxService,
-        IGhnShippingService ghnShippingService)
+        IGhnShippingService ghnShippingService,
+        IEmailService emailService,
+        INotificationService notificationService) // Thêm vào constructor
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -44,6 +49,8 @@ public class TransactionService : ITransactionService
         _inventoryItemService = inventoryItemService;
         _customerBlindBoxService = customerBlindBoxService;
         _ghnShippingService = ghnShippingService;
+        _emailService = emailService;
+        _notificationService = notificationService; // Gán vào field
     }
 
 
@@ -128,6 +135,10 @@ public class TransactionService : ITransactionService
                 .Include(t => t.Payment)
                     .ThenInclude(p => p.Order)
                         .ThenInclude(o => o.Seller)
+                        .ThenInclude(s => s.User) // Ensure Seller.User is loaded
+                .Include(t => t.Payment)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.User) // Ensure Order.User is loaded
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
             if (transaction?.Payment?.Order == null)
@@ -171,6 +182,37 @@ public class TransactionService : ITransactionService
             await _unitOfWork.Payments.Update(transaction.Payment);
             await _unitOfWork.Orders.Update(order);
             await _unitOfWork.SaveChangesAsync();
+
+            await _emailService.SendOrderPaymentSuccessToBuyerAsync(order);
+
+            // Notify user (buyer)
+            if (order.User != null)
+            {
+                await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
+                {
+                    Title = $"Thanh toán thành công đơn hàng #{order.Id}",
+                    Message = "Đơn hàng của bạn đã được xác nhận. Nếu có giao hàng, hệ thống sẽ tiến hành xử lý vận chuyển.",
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
+
+            // Notify seller
+            if (order.Seller?.User != null)
+            {
+                var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
+                var sellerMsg = $@"
+                    Sản phẩm của bạn vừa được khách hàng <b>{buyerName}</b> thanh toán thành công.<br/>
+                    Đơn hàng #{order.Id} - Tổng tiền: <b>{order.FinalAmount:N0}đ</b>.<br/>
+                    Vui lòng kiểm tra trạng thái đơn hàng và chuẩn bị giao hàng nếu có.";
+                await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
+                {
+                    Title = $"Đơn hàng mới đã được thanh toán",
+                    Message = sellerMsg,
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
 
             _logger.Success($"[HandleSuccessfulPaymentAsync] Đã xác nhận thanh toán thành công cho order {orderId}.");
             _logger.Success($"[HandleSuccessfulPaymentAsync] Đã cập nhật trạng thái PAID thành công cho {orderId}.");
@@ -410,6 +452,8 @@ public class TransactionService : ITransactionService
                     .Include(o => o.OrderDetails)
                         .ThenInclude(od => od.Shipments)
                     .Include(o => o.Payment)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.User)
                     .ToListAsync();
 
                 foreach (var order in orders)
@@ -457,6 +501,38 @@ public class TransactionService : ITransactionService
                             }
                         }
                     }
+
+                    // Gửi email thông báo hết hạn/hủy cho user
+                    if (order.User != null)
+                        await _emailService.SendOrderExpiredOrCancelledToBuyerAsync(order, "Đơn hàng đã hết hạn do không thanh toán thành công.");
+
+                    // Thông báo realtime cho user
+                    if (order.User != null)
+                    {
+                        await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
+                        {
+                            Title = $"Link thanh toán cho đơn hàng #{order.Id} đã hết hạn",
+                            Message = "Đơn hàng của bạn đã bị hủy hoặc hết hạn do không hoàn tất thanh toán. Vui lòng đặt lại nếu muốn tiếp tục mua.",
+                            Type = NotificationType.Order,
+                            SourceUrl = null
+                        });
+                    }
+
+                    // Thông báo cho seller
+                    if (order.Seller?.User != null)
+                    {
+                        var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
+                        var sellerMsg = $@"
+                            Đơn hàng #{order.Id} của khách <b>{buyerName}</b> đã hết hạn do không thanh toán thành công.<br/>
+                            Bạn có thể kiểm tra lại trạng thái đơn hàng trong hệ thống.";
+                        await _notificationService.PushNotificationToUser(order.Seller.UserId, new NotificationDto
+                        {
+                            Title = $"Đơn hàng #{order.Id} đã hết hạn",
+                            Message = sellerMsg,
+                            Type = NotificationType.Order,
+                            SourceUrl = null
+                        });
+                    }
                 }
 
                 await _unitOfWork.SaveChangesAsync();
@@ -470,6 +546,11 @@ public class TransactionService : ITransactionService
                 .ThenInclude(p => p.Order)
                 .ThenInclude(o => o.OrderDetails)
                 .ThenInclude(od => od.Shipments)
+                .Include(t => t.Payment)
+                .ThenInclude(p => p.Order)
+                .ThenInclude(o => o.Seller)
+                .Include(t => t.Payment)
+                .ThenInclude(p => p.Order).ThenInclude(o => o.User)
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
             if (transaction == null)
@@ -505,6 +586,38 @@ public class TransactionService : ITransactionService
             if (transaction.Payment?.Order != null)
                 await _unitOfWork.Orders.Update(transaction.Payment.Order);
 
+            // Gửi email thông báo hết hạn/hủy cho user
+            if (transaction.Payment?.Order?.User != null)
+                await _emailService.SendOrderExpiredOrCancelledToBuyerAsync(transaction.Payment.Order, "Đơn hàng đã hết hạn do không thanh toán thành công.");
+
+            // Thông báo realtime cho user
+            if (transaction.Payment?.Order?.User != null)
+            {
+                await _notificationService.PushNotificationToUser(transaction.Payment.Order.User.Id, new NotificationDto
+                {
+                    Title = $"Link thanh toán cho đơn hàng #{transaction.Payment.Order.Id} đã hết hạn",
+                    Message = "Đơn hàng của bạn đã bị hủy hoặc hết hạn do không hoàn tất thanh toán. Vui lòng đặt lại nếu muốn tiếp tục mua.",
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
+
+            // Thông báo cho seller
+            if (transaction.Payment?.Order?.Seller != null)
+            {
+                var buyerName = transaction.Payment.Order.User?.FullName ?? transaction.Payment.Order.User?.Email ?? "Khách hàng";
+                var sellerMsg = $@"
+                    Đơn hàng #{transaction.Payment.Order.Id} của khách <b>{buyerName}</b> đã hết hạn do không thanh toán thành công.<br/>
+                    Bạn có thể kiểm tra lại trạng thái đơn hàng trong hệ thống.";
+                await _notificationService.PushNotificationToUser(transaction.Payment.Order.Seller.UserId, new NotificationDto
+                {
+                    Title = $"Đơn hàng #{transaction.Payment.Order.Id} đã hết hạn",
+                    Message = sellerMsg,
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
+
             await _unitOfWork.SaveChangesAsync();
             _logger.Warn($"[HandleFailedPaymentAsync] Đã xử lý thất bại thanh toán cho session {sessionId}.");
         }
@@ -518,24 +631,37 @@ public class TransactionService : ITransactionService
     /// <summary>
     ///     Xác nhận khi PaymentIntent được tạo (Stripe webhook).
     /// </summary>
-    public async Task HandlePaymentIntentCreatedAsync(string paymentIntentId, string sessionId)
+    public async Task HandlePaymentIntentCreatedAsync(string paymentIntentId, string sessionId, string? couponId)
     {
         if (string.IsNullOrWhiteSpace(paymentIntentId) || string.IsNullOrWhiteSpace(sessionId))
             throw ErrorHelper.BadRequest("PaymentIntentId và SessionId là bắt buộc.");
 
         try
         {
-            var transaction = await _unitOfWork.Transactions.GetQueryable()
-                .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
+            var transactions = await _unitOfWork.Transactions.GetQueryable()
+                .Where(t => t.ExternalRef == sessionId).ToListAsync();
 
-            if (transaction == null)
-                throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
+            if (transactions.Any())
+            {
+                foreach (var transaction in transactions)
+                {
+                    if (transaction == null)
+                        throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
 
-            transaction.Payment.PaymentIntentId = paymentIntentId;
-            await _unitOfWork.Transactions.Update(transaction);
+                    transaction.Payment.PaymentIntentId = paymentIntentId;
+                    if (couponId != null)
+                    {
+                        transaction.Payment.CouponId = couponId; // Lưu couponId nếu có
+                    }
+
+                    await _unitOfWork.Transactions.Update(transaction);
+                    _logger.Info(
+                        $"[HandlePaymentIntentCreatedAsync] Đã cập nhật PaymentIntentId cho transaction {transaction.Id}.");
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync();
-            _logger.Info(
-                $"[HandlePaymentIntentCreatedAsync] Đã cập nhật PaymentIntentId cho transaction {transaction.Id}.");
+
         }
         catch (Exception ex)
         {

@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
@@ -11,8 +12,10 @@ using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using OpenAI.ObjectModels.ResponseModels;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
+using static OpenAI.ObjectModels.SharedModels.IOpenAiModels;
 
 namespace BlindTreasure.Application.Services;
 
@@ -27,6 +30,7 @@ public class OrderService : IOrderService
     private readonly IStripeService _stripeService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
+    private readonly INotificationService _notificationService; // Thêm dòng này
 
     public OrderService(
         ICacheService cacheService,
@@ -37,7 +41,8 @@ public class OrderService : IOrderService
         ICartItemService cartItemService,
         IStripeService stripeService,
         IPromotionService promotionService,
-        IGhnShippingService ghnShippingService)
+        IGhnShippingService ghnShippingService,
+        INotificationService notificationService) // Thêm vào constructor
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -48,6 +53,7 @@ public class OrderService : IOrderService
         _stripeService = stripeService;
         _promotionService = promotionService;
         _ghnShippingService = ghnShippingService;
+        _notificationService = notificationService; // Gán vào field
     }
 
     public async Task<MultiOrderCheckoutResultDto> CheckoutAsync(CreateCheckoutRequestDto dto)
@@ -483,7 +489,8 @@ public class OrderService : IOrderService
 
             order = await _unitOfWork.Orders.AddAsync(order);
             await _unitOfWork.SaveChangesAsync();
-            createdOrderIds.Add(order.Id);
+
+
 
 
             // Shipments for this seller
@@ -545,7 +552,7 @@ public class OrderService : IOrderService
         await _cartItemService.UpdateCartAfterCheckoutAsync(userId, groups.SelectMany(g => g.Items).ToList());
 
         // Tạo link thanh toán tổng cho tất cả order
-        if(createdOrderIds.Count == 1)
+        if (createdOrderIds.Count == 1)
         {
             // If only one order, use its payment URL
             result.GeneralPaymentUrl = result.Orders.First().PaymentUrl;
@@ -555,9 +562,37 @@ public class OrderService : IOrderService
             result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
 
         result.Message = $"Đã tạo {result.Orders.Count} đơn hàng, mỗi đơn một link thanh toán riêng.";
+
+        await SendPaymentNotificationToUser(user, result);
+
         return result;
     }
 
+    private async Task SendPaymentNotificationToUser(User user, MultiOrderCheckoutResultDto result)
+    {
+        // Thông báo cho user về nhóm đơn hàng vừa tạo
+        if (user != null)
+        {
+            var totalAmount = result.Orders.Sum(o => o.FinalAmount);
+            var orderList = string.Join("<br/>", result.Orders.Select(o =>
+                $"- Đơn #{o.OrderId} của seller {o.SellerName}: {o.FinalAmount:N0}đ <a href='{o.PaymentUrl}'>Thanh toán</a>"));
+
+            var notificationMsg = $@"
+            <b>Đã tạo {result.Orders.Count} đơn hàng mới từ giỏ hàng.</b><br/>
+            Tổng số tiền cần thanh toán: <b>{totalAmount:N0}đ</b><br/>
+            {orderList}<br/>
+            {(result.GeneralPaymentUrl != null && result.GeneralPaymentUrl != "" ? $"<a href='{result.GeneralPaymentUrl}'>Thanh toán tất cả</a>" : "")}
+        ";
+
+            await _notificationService.PushNotificationToUser(user.Id, new NotificationDto
+            {
+                Title = $"Đã tạo nhóm đơn hàng mới ({result.Orders.Count} đơn)",
+                Message = notificationMsg,
+                Type = NotificationType.Order,
+                SourceUrl = result.GeneralPaymentUrl // Có thể dùng để redirect
+            });
+        }
+    }
 
     /// <summary>
     /// Apply promotion discount to individual OrderDetails
@@ -611,7 +646,7 @@ public class OrderService : IOrderService
                 $"\n [{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Applied promotion {promotion.Id}: - Discount amount: {detail.DetailDiscountPromotion:C}";
     }
 
-  
+
     public struct CheckoutItem
     {
         public Guid SellerId { get; set; }
@@ -691,4 +726,167 @@ public class OrderService : IOrderService
         return result;
     }
 
+    /// <summary>
+    /// Hủy thanh toán cho một đơn hàng (chủ động từ user).
+    /// </summary>
+    public async Task CancelOrderPaymentAsync(Guid orderId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var order = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.Payment)
+            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .FirstOrDefaultAsync();
+
+        if (order == null)
+            throw ErrorHelper.NotFound("Không tìm thấy đơn hàng.");
+
+        if (order.Status == OrderStatus.PAID.ToString())
+            throw ErrorHelper.BadRequest("Đơn hàng đã thanh toán, không thể hủy.");
+
+        order.Status = OrderStatus.CANCELLED.ToString();
+        order.UpdatedAt = DateTime.UtcNow;
+
+        if (order.Payment != null)
+        {
+            order.Payment.Status = PaymentStatus.Cancelled;
+            order.Payment.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.Payments.Update(order.Payment);
+        }
+
+        foreach (var detail in order.OrderDetails)
+        {
+            detail.Status = OrderDetailItemStatus.CANCELLED;
+            detail.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.OrderDetails.Update(detail);
+
+            if (detail.Shipments != null)
+            {
+                foreach (var shipment in detail.Shipments)
+                {
+                    shipment.Status = ShipmentStatus.CANCELLED;
+                    shipment.UpdatedAt = DateTime.UtcNow;
+                    await _unitOfWork.Shipments.Update(shipment);
+                }
+            }
+        }
+
+        await _unitOfWork.Orders.Update(order);
+
+        // Vô hiệu hóa link/session thanh toán Stripe cho đơn lẻ
+        await _stripeService.DisableStripeOrderPaymentSessionAsync(order.Id);
+
+        await _unitOfWork.SaveChangesAsync();
+
+        // Thông báo cho user và seller
+        if (order.User != null)
+        {
+            await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
+            {
+                Title = $"Đơn hàng #{order.Id} đã được hủy",
+                Message = "Bạn đã chủ động hủy thanh toán cho đơn hàng này.",
+                Type = NotificationType.Order,
+                SourceUrl = null
+            });
+        }
+        if (order.Seller?.User != null)
+        {
+            var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
+            var sellerMsg = $@"
+            Đơn hàng #{order.Id} của khách <b>{buyerName}</b> đã bị hủy bởi khách hàng.<br/>
+            Vui lòng kiểm tra lại trạng thái đơn hàng trong hệ thống.";
+            await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
+            {
+                Title = $"Đơn hàng #{order.Id} đã bị hủy",
+                Message = sellerMsg,
+                Type = NotificationType.Order,
+                SourceUrl = null
+            });
+        }
+    }
+
+    /// <summary>
+    /// Hủy thanh toán cho nhóm đơn hàng (chủ động từ user).
+    /// </summary>
+    public async Task CancelGroupOrderPaymentAsync(Guid checkoutGroupId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var orders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.CheckoutGroupId == checkoutGroupId && o.UserId == userId && !o.IsDeleted)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.Payment)
+            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .ToListAsync();
+
+        if (!orders.Any())
+            throw ErrorHelper.NotFound("Không tìm thấy đơn hàng hợp lệ trong nhóm.");
+
+        foreach (var order in orders)
+        {
+            if (order.Status == OrderStatus.PAID.ToString())
+                continue;
+
+            order.Status = OrderStatus.CANCELLED.ToString();
+            order.UpdatedAt = DateTime.UtcNow;
+
+            if (order.Payment != null)
+            {
+                order.Payment.Status = PaymentStatus.Cancelled;
+                order.Payment.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.Payments.Update(order.Payment);
+            }
+
+            foreach (var detail in order.OrderDetails)
+            {
+                detail.Status = OrderDetailItemStatus.CANCELLED;
+                detail.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.OrderDetails.Update(detail);
+
+                if (detail.Shipments != null)
+                {
+                    foreach (var shipment in detail.Shipments)
+                    {
+                        shipment.Status = ShipmentStatus.CANCELLED;
+                        shipment.UpdatedAt = DateTime.UtcNow;
+                        await _unitOfWork.Shipments.Update(shipment);
+                    }
+                }
+            }
+
+            await _unitOfWork.Orders.Update(order);
+
+            // Thông báo cho user và seller
+            if (order.User != null)
+            {
+                await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
+                {
+                    Title = $"Đơn hàng #{order.Id} đã được hủy",
+                    Message = "Bạn đã chủ động hủy thanh toán cho đơn hàng này.",
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
+            if (order.Seller?.User != null)
+            {
+                var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
+                var sellerMsg = $@"
+                Đơn hàng #{order.Id} của khách <b>{buyerName}</b> đã bị hủy bởi khách hàng.<br/>
+                Vui lòng kiểm tra lại trạng thái đơn hàng trong hệ thống.";
+                await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
+                {
+                    Title = $"Đơn hàng #{order.Id} đã bị hủy",
+                    Message = sellerMsg,
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
+        }
+
+        // Vô hiệu hóa link/session thanh toán Stripe cho nhóm
+        await _stripeService.DisableStripeGroupPaymentSessionAsync(checkoutGroupId);
+        _loggerService.Info($"Cancelled succesfully payment for group order {checkoutGroupId}.");
+
+        await _unitOfWork.SaveChangesAsync();
+    }
 }
