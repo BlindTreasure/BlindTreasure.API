@@ -860,6 +860,7 @@ public class SystemController : ControllerBase
 
                 var tablesToDelete = new List<Func<Task>>
                 {
+                    () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),
                     () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerFavourites.ExecuteDeleteAsync(),
                     () => context.ChatMessages.ExecuteDeleteAsync(),
