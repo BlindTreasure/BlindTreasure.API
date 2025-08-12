@@ -28,6 +28,7 @@ public class OrderService : IOrderService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
     private readonly INotificationService _notificationService; // Thêm dòng này
+    private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
 
     public OrderService(
         ICacheService cacheService,
@@ -39,7 +40,8 @@ public class OrderService : IOrderService
         IStripeService stripeService,
         IPromotionService promotionService,
         IGhnShippingService ghnShippingService,
-        INotificationService notificationService) // Thêm vào constructor
+        INotificationService notificationService,
+        IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -51,6 +53,7 @@ public class OrderService : IOrderService
         _promotionService = promotionService;
         _ghnShippingService = ghnShippingService;
         _notificationService = notificationService; // Gán vào field
+        _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService;
     }
 
     public async Task<MultiOrderCheckoutResultDto> CheckoutAsync(CreateCheckoutRequestDto dto)
@@ -373,6 +376,8 @@ public class OrderService : IOrderService
         result.CheckoutGroupId = orderGroupId;
         var createdOrderIds = new List<Guid>();
 
+        // Inject log service
+        var logService = _orderDetailInventoryItemLogService;
 
         foreach (var group in groups)
         {
@@ -432,18 +437,13 @@ public class OrderService : IOrderService
                     DetailDiscountPromotion = null,
                     FinalDetailPrice = unitPrice * item.Quantity
                 };
+
+                // Log OrderDetail creation
+                var log = await logService.LogOrderDetailCreationAsync(detail, $"Created {itemName}, Qty={item.Quantity}");
+                detail.OrderDetailInventoryItemLogs.Add(log);
+
                 order.OrderDetails.Add(detail);
 
-                var creationLog = new OrderDetailInventoryItemLog
-                {
-                    OrderDetailId = detail.Id,
-                    LogContent = $"Created {itemName}, Qty={item.Quantity}",
-                    ActionType = ActionType.StatusUpdate,
-                    OldValue = null,
-                    NewValue = OrderDetailItemStatus.PENDING.ToString(),
-                    ActorId = userId
-                };
-                await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(creationLog);
             }
 
             // Apply promotion for this seller
@@ -534,7 +534,9 @@ public class OrderService : IOrderService
                     {
                         od.Status = OrderDetailItemStatus.PENDING;
                         od.Shipments.Add(shipment);
-                        await _unitOfWork.OrderDetails.Update(od);
+                        // Log shipment added to OrderDetail
+                        var log = await logService.LogShipmentAddedAsync(od, shipment, $"Added shipment for GHN: {shipment.OrderCode}, Fee: {shipment.TotalFee:C}");
+                        od.OrderDetailInventoryItemLogs.Add(log);
                     }
                 }
 

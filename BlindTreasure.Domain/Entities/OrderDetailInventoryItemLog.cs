@@ -28,9 +28,13 @@ namespace BlindTreasure.Domain.Entities
 
     public enum ActionType
     {
-        StatusUpdate,
-        ShipmentUpdate,
-        PaymentUpdate
+        ORDER_DETAIL_CREATED,
+        SHIPMENT_ADDED,
+        INVENTORY_ITEM_ADDED,
+        SHIPMENT_STATUS_CHANGED,
+        ORDER_DETAIL_STATUS_CHANGED,
+        BLIND_BOX_ADDED,
+        PAYMENT_STATUS_CHANGED
     }
 
 }
