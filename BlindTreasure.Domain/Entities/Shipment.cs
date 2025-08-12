@@ -17,10 +17,15 @@ public class Shipment : BaseEntity
 
     public string Provider { get; set; }
     public string TrackingNumber { get; set; }
-    public DateTime ShippedAt { get; set; }
+
+
+    public DateTime? ShippedAt { get; set; }
     public DateTime EstimatedDelivery { get; set; } //expected delivery date
-    public DateTime? DeliveredAt { get; set; }
     public ShipmentStatus Status { get; set; }
+
+    public DateTime? EstimatedPickupTime { get; set; } // Thời gian dự kiến lấy hàng
+    public DateTime? PickedUpAt { get; set; }
+
 
     // 1-n → InventoryItems
     public ICollection<InventoryItem>? InventoryItems { get; set; }

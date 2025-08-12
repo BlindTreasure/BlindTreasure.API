@@ -11,13 +11,8 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using OpenAI.ObjectModels.ResponseModels;
-using System.Linq.Expressions;
-using System.Security.Cryptography.X509Certificates;
-using System.Text.RegularExpressions;
-using static OpenAI.ObjectModels.SharedModels.IOpenAiModels;
+
 
 namespace BlindTreasure.Application.Services;
 
@@ -518,9 +513,9 @@ public class OrderService : IOrderService
                         TotalFee = (int?)ghnResp?.TotalFee ?? 0,
                         MainServiceFee = (int?)ghnResp?.Fee?.MainService ?? 0,
                         TrackingNumber = ghnResp?.OrderCode ?? string.Empty,
-                        ShippedAt = DateTime.UtcNow,
                         EstimatedDelivery = ghnResp?.ExpectedDeliveryTime ?? DateTime.UtcNow.AddDays(3),
-                        Status = ShipmentStatus.WAITING_PAYMENT
+                        Status = ShipmentStatus.WAITING_PAYMENT,
+                        EstimatedPickupTime = DateTime.UtcNow.AddDays(1),
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
 
