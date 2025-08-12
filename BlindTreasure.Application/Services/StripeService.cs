@@ -97,7 +97,6 @@ public class StripeService : IStripeService
         }
 
         if (totalShipping > 0)
-        {
             lineItems.Add(new SessionLineItemOptions
             {
                 PriceData = new SessionLineItemPriceDataOptions
@@ -112,14 +111,11 @@ public class StripeService : IStripeService
                 },
                 Quantity = 1
             });
-        }
 
         string? couponId = null;
         if (totalDiscount > 0)
-        {
             // Tạo coupon cho toàn bộ discount
             couponId = await CreateStripeCouponForOrder(orderIds.First(), totalDiscount);
-        }
 
         var finalAmount = totalGoods + totalShipping - totalDiscount;
         if (finalAmount < 1) finalAmount = 1m;
@@ -154,9 +150,7 @@ public class StripeService : IStripeService
 
         // Ghi lại transaction cho từng order
         foreach (var order in orders)
-        {
             await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0);
-        }
         await _unitOfWork.SaveChangesAsync();
 
         return session.Url;
@@ -178,6 +172,7 @@ public class StripeService : IStripeService
                 FinalAmount = order.FinalAmount ?? 0
             });
         }
+
         return result;
     }
 

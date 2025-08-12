@@ -31,10 +31,7 @@ public class GenericRepository<TEntity> : IGenericRepository<TEntity> where TEnt
         entity.CreatedAt = _timeService.GetCurrentTime().ToUniversalTime();
         entity.UpdatedAt = _timeService.GetCurrentTime().ToUniversalTime();
 
-        if (entity.CreatedBy == Guid.Empty)
-        {
-            entity.CreatedBy = currentUserId;
-        }
+        if (entity.CreatedBy == Guid.Empty) entity.CreatedBy = currentUserId;
 
         entity.UpdatedBy = currentUserId;
 

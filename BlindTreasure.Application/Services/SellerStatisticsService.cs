@@ -428,7 +428,8 @@ public class SellerStatisticsService : ISellerStatisticsService
     {
         _loggerService.Info(
             $"[SellerStatistics] Querying OrderDetails for seller {sellerId} from {start:O} to {end:O}");
-        var orderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable().Include(x => x.Product).ThenInclude(x => x.Seller)
+        var orderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable().Include(x => x.Product)
+            .ThenInclude(x => x.Seller)
             .AsNoTracking()
             .Where(od =>
                 od.Product.SellerId == sellerId &&

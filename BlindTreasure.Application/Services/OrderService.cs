@@ -310,8 +310,8 @@ public class OrderService : IOrderService
     }
 
     private async Task<MultiOrderCheckoutResultDto> CheckoutCore(
-    List<SellerCheckoutGroup> groups,
-    Guid? shippingAddressId)
+        List<SellerCheckoutGroup> groups,
+        Guid? shippingAddressId)
     {
         _loggerService.Info("Start multi-seller checkout logic.");
 
@@ -367,7 +367,7 @@ public class OrderService : IOrderService
         foreach (var group in groups)
         {
             var seller = products.FirstOrDefault(p => p.SellerId == group.SellerId)?.Seller
-                ?? blindBoxes.FirstOrDefault(b => b.SellerId == group.SellerId)?.Seller;
+                         ?? blindBoxes.FirstOrDefault(b => b.SellerId == group.SellerId)?.Seller;
 
             var order = new Order
             {
@@ -538,11 +538,9 @@ public class OrderService : IOrderService
         await _cartItemService.UpdateCartAfterCheckoutAsync(userId, groups.SelectMany(g => g.Items).ToList());
 
         // Tạo link thanh toán tổng cho tất cả order
-        if(createdOrderIds.Count == 1)
-        {
+        if (createdOrderIds.Count == 1)
             // If only one order, use its payment URL
             result.GeneralPaymentUrl = result.Orders.First().PaymentUrl;
-        }
         else
             // Multiple orders, create a general checkout session
             result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
@@ -604,7 +602,7 @@ public class OrderService : IOrderService
                 $"\n [{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Applied promotion {promotion.Id}: - Discount amount: {detail.DetailDiscountPromotion:C}";
     }
 
-  
+
     public struct CheckoutItem
     {
         public Guid SellerId { get; set; }
@@ -623,7 +621,7 @@ public class OrderService : IOrderService
     }
 
     public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(
-    List<CartSellerItemDto> sellerItems, bool? isPreview = false)
+        List<CartSellerItemDto> sellerItems, bool? isPreview = false)
     {
         _loggerService.Info("Preview shipping checkout (by seller items) started.");
         var userId = _claimsService.CurrentUserId;
@@ -683,5 +681,4 @@ public class OrderService : IOrderService
         _loggerService.Info("Preview shipping checkout (by seller items) completed.");
         return result;
     }
-
 }

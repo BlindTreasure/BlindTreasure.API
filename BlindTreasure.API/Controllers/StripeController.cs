@@ -229,9 +229,8 @@ public class StripeController : ControllerBase
                             .ToList();
 
                         foreach (var orderId in orderIds)
-                        {
-                            await HandleSuccessfulPaymentForOrder(orderId, completedSession.Id, completedSession.Metadata);
-                        }
+                            await HandleSuccessfulPaymentForOrder(orderId, completedSession.Id,
+                                completedSession.Metadata);
                     }
                     else
                     {
@@ -620,7 +619,8 @@ public class StripeController : ControllerBase
     /// <summary>
     ///     Xử lý khi thanh toán thành công từ Stripe webhook.
     /// </summary>
-    private async Task HandleSuccessfulPaymentForOrder(Guid orderId, string sessionId, IDictionary<string, string> metadata)
+    private async Task HandleSuccessfulPaymentForOrder(Guid orderId, string sessionId,
+        IDictionary<string, string> metadata)
     {
         await _transactionService.HandleSuccessfulPaymentAsync(sessionId, orderId.ToString());
         _logger.Success($"[Stripe][Webhook] Thanh toán thành công cho orderId: {orderId}, sessionId: {sessionId}");
