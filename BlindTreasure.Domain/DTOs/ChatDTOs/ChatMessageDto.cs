@@ -15,14 +15,14 @@ public class ChatMessageDto
     public bool IsRead { get; set; }
     public bool IsCurrentUserSender { get; set; }
     public ChatMessageType MessageType { get; set; }
-    
+
     // Thêm trường cho tin nhắn ảnh
     public string? FileUrl { get; set; }
     public string? FileName { get; set; }
     public string? FileSize { get; set; }
     public string? FileMimeType { get; set; }
     public bool IsImage => MessageType == ChatMessageType.ImageMessage;
-    
+
     // Thêm trường cho tin nhắn InventoryItem
     public Guid? InventoryItemId { get; set; }
     public InventoryItemDto? InventoryItem { get; set; }

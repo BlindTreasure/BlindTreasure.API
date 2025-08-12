@@ -222,7 +222,7 @@ public class ChatController : ControllerBase
             var imageUrl = await _blobService.GetPreviewUrlAsync(uniqueFileName);
 
             // Tính kích thước file
-            string fileSizeStr = FormatFileSize(imageFile.Length);
+            var fileSizeStr = FormatFileSize(imageFile.Length);
 
             // Lưu tin nhắn ảnh vào database
             await _chatMessageService.SaveImageMessageAsync(senderId, receiverId,
@@ -410,7 +410,7 @@ public class ChatController : ControllerBase
     private string FormatFileSize(long bytes)
     {
         string[] sizes = { "B", "KB", "MB", "GB" };
-        int order = 0;
+        var order = 0;
         double len = bytes;
         while (len >= 1024 && order < sizes.Length - 1)
         {

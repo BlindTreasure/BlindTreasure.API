@@ -601,6 +601,7 @@ public class ReviewService : IReviewService
             _loggerService.Warn($"Comment contains only special characters: {createDto.Comment}");
             throw ErrorHelper.BadRequest("Nội dung đánh giá phải chứa ít nhất một chữ cái hoặc số");
         }
+
         // THÊM: Kiểm tra từ ngữ không phù hợp (có thể dùng list từ cấm)
         if (ContainsInappropriateContent(createDto.Comment))
         {
@@ -706,67 +707,69 @@ public class ReviewService : IReviewService
         return Convert.ToBase64String(hash);
     }
 
-private async Task ValidateOrderDetailForReview(OrderDetail orderDetail, Guid orderDetailId, Guid userId)
-{
-    // THÊM: Kiểm tra orderDetail bị soft delete
-    if (orderDetail == null || orderDetail.IsDeleted)
-        throw ErrorHelper.NotFound("Chi tiết đơn hàng không tồn tại hoặc đã bị xóa");
-
-    if (orderDetail.Order == null)
-        throw ErrorHelper.NotFound("Không tìm thấy thông tin đơn hàng");
-
-    // THÊM: Kiểm tra Order bị soft delete
-    if (orderDetail.Order.IsDeleted)
-        throw ErrorHelper.NotFound("Đơn hàng đã bị xóa");
-
-    if (orderDetail.Order.UserId != userId)
-        throw ErrorHelper.Forbidden("Đơn hàng không thuộc về bạn");
-
-    if (string.IsNullOrEmpty(orderDetail.Order.Status))
-        throw ErrorHelper.BadRequest("Trạng thái đơn hàng không hợp lệ");
-
-    if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
-        throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
-
-    // THÊM: Kiểm tra thời gian order (không được quá cũ)
-    if (orderDetail.Order.CreatedAt < DateTime.UtcNow.AddMonths(-6))
-        throw ErrorHelper.BadRequest("Không thể đánh giá đơn hàng quá 6 tháng");
-
-    // THÊM: Kiểm tra cả Product và BlindBox đều null
-    if (!orderDetail.ProductId.HasValue && !orderDetail.BlindBoxId.HasValue)
-        throw ErrorHelper.BadRequest("Chi tiết đơn hàng không có sản phẩm hoặc hộp quà bí mật");
-
-    // THÊM: Kiểm tra có cả Product và BlindBox (invalid case)
-    if (orderDetail.ProductId.HasValue && orderDetail.BlindBoxId.HasValue)
-        throw ErrorHelper.BadRequest("Chi tiết đơn hàng không thể có cả sản phẩm và hộp quà bí mật");
-
-    // THÊM: Kiểm tra Product/BlindBox có bị xóa không
-    if (orderDetail.ProductId.HasValue && orderDetail.Product?.IsDeleted == true)
-        throw ErrorHelper.BadRequest("Sản phẩm trong đơn hàng đã bị xóa, không thể đánh giá");
-
-    if (orderDetail.BlindBoxId.HasValue && orderDetail.BlindBox?.IsDeleted == true)
-        throw ErrorHelper.BadRequest("Hộp quà bí mật trong đơn hàng đã bị xóa, không thể đánh giá");
-
-    // Kiểm tra duplicate review
-    var existingReview = await _unitOfWork.Reviews.GetQueryable()
-        .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
-        .FirstOrDefaultAsync();
-
-    if (existingReview != null)
+    private async Task ValidateOrderDetailForReview(OrderDetail orderDetail, Guid orderDetailId, Guid userId)
     {
-        // THÊM: Thông tin chi tiết về review đã tồn tại
-        _loggerService.Warn($"User {userId} already reviewed OrderDetail {orderDetailId} with Review {existingReview.Id}");
-        throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
+        // THÊM: Kiểm tra orderDetail bị soft delete
+        if (orderDetail == null || orderDetail.IsDeleted)
+            throw ErrorHelper.NotFound("Chi tiết đơn hàng không tồn tại hoặc đã bị xóa");
+
+        if (orderDetail.Order == null)
+            throw ErrorHelper.NotFound("Không tìm thấy thông tin đơn hàng");
+
+        // THÊM: Kiểm tra Order bị soft delete
+        if (orderDetail.Order.IsDeleted)
+            throw ErrorHelper.NotFound("Đơn hàng đã bị xóa");
+
+        if (orderDetail.Order.UserId != userId)
+            throw ErrorHelper.Forbidden("Đơn hàng không thuộc về bạn");
+
+        if (string.IsNullOrEmpty(orderDetail.Order.Status))
+            throw ErrorHelper.BadRequest("Trạng thái đơn hàng không hợp lệ");
+
+        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
+            throw ErrorHelper.BadRequest("Chỉ có thể đánh giá sau khi đơn hàng đã được thanh toán thành công");
+
+        // THÊM: Kiểm tra thời gian order (không được quá cũ)
+        if (orderDetail.Order.CreatedAt < DateTime.UtcNow.AddMonths(-6))
+            throw ErrorHelper.BadRequest("Không thể đánh giá đơn hàng quá 6 tháng");
+
+        // THÊM: Kiểm tra cả Product và BlindBox đều null
+        if (!orderDetail.ProductId.HasValue && !orderDetail.BlindBoxId.HasValue)
+            throw ErrorHelper.BadRequest("Chi tiết đơn hàng không có sản phẩm hoặc hộp quà bí mật");
+
+        // THÊM: Kiểm tra có cả Product và BlindBox (invalid case)
+        if (orderDetail.ProductId.HasValue && orderDetail.BlindBoxId.HasValue)
+            throw ErrorHelper.BadRequest("Chi tiết đơn hàng không thể có cả sản phẩm và hộp quà bí mật");
+
+        // THÊM: Kiểm tra Product/BlindBox có bị xóa không
+        if (orderDetail.ProductId.HasValue && orderDetail.Product?.IsDeleted == true)
+            throw ErrorHelper.BadRequest("Sản phẩm trong đơn hàng đã bị xóa, không thể đánh giá");
+
+        if (orderDetail.BlindBoxId.HasValue && orderDetail.BlindBox?.IsDeleted == true)
+            throw ErrorHelper.BadRequest("Hộp quà bí mật trong đơn hàng đã bị xóa, không thể đánh giá");
+
+        // Kiểm tra duplicate review
+        var existingReview = await _unitOfWork.Reviews.GetQueryable()
+            .Where(r => r.OrderDetailId == orderDetailId && r.UserId == userId && !r.IsDeleted)
+            .FirstOrDefaultAsync();
+
+        if (existingReview != null)
+        {
+            // THÊM: Thông tin chi tiết về review đã tồn tại
+            _loggerService.Warn(
+                $"User {userId} already reviewed OrderDetail {orderDetailId} with Review {existingReview.Id}");
+            throw ErrorHelper.Conflict("Bạn đã đánh giá sản phẩm này trong đơn hàng này rồi");
+        }
+
+        // THÊM: Kiểm tra user có bị ban không
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        if (user?.Status == UserStatus.Suspended)
+            throw ErrorHelper.Forbidden("Tài khoản của bạn đã bị cấm, không thể tạo đánh giá");
+
+        if (user?.Status != UserStatus.Active)
+            throw ErrorHelper.Forbidden("Tài khoản không ở trạng thái hoạt động");
     }
 
-    // THÊM: Kiểm tra user có bị ban không
-    var user = await _unitOfWork.Users.GetByIdAsync(userId);
-    if (user?.Status == UserStatus.Suspended)
-        throw ErrorHelper.Forbidden("Tài khoản của bạn đã bị cấm, không thể tạo đánh giá");
-
-    if (user?.Status != UserStatus.Active)
-        throw ErrorHelper.Forbidden("Tài khoản không ở trạng thái hoạt động");
-}
     private bool IsValidMediaFile(IFormFile file)
     {
         // Check if file is null or empty
