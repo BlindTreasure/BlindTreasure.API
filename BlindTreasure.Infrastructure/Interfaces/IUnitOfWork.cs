@@ -36,6 +36,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<TradeHistory> TradeHistories { get; }
     IGenericRepository<OrderSellerPromotion> OrderSellerPromotions { get; }
     IGenericRepository<Review> Reviews { get; }
+    IGenericRepository<GroupPaymentSession> GroupPaymentSessions { get; }
 
     Task<int> SaveChangesAsync();
 }

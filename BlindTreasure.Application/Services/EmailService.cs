@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Domain.DTOs.EmailDTOs;
+using BlindTreasure.Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using Resend;
 
@@ -237,6 +238,110 @@ public class EmailService : IEmailService
         await SendEmailAsync(toEmail, $"Voucher {promotionCode} bị từ chối", html);
     }
 
+    /// <summary>
+    /// Gửi email thông báo giao dịch thành công cho người mua hàng.
+    /// Nếu đơn hàng có shipment, thông báo trạng thái giao hàng.
+    /// Nếu không có shipment, thông báo sản phẩm đã được thêm vào kho hoặc BlindBox đã được mở.
+    /// </summary>
+    public async Task SendOrderPaymentSuccessToBuyerAsync(Order order)
+    {
+        if (order == null || order.User == null)
+            throw new ArgumentNullException(nameof(order), "Order hoặc User không hợp lệ.");
+
+        var toEmail = order.User.Email;
+        var userName = order.User.FullName ?? order.User.Email;
+        var orderId = order.Id.ToString();
+
+        // Kiểm tra có shipment hay không
+        var hasShipment = order.OrderDetails.Any(od => od.Shipments != null && od.Shipments.Any());
+
+        string subject;
+        string htmlContent;
+
+        if (hasShipment)
+        {
+            // Trường hợp có shipment
+            subject = $"BlindTreasure - Đơn hàng #{orderId} đã được xác nhận & đang xử lý giao hàng";
+            var shipmentDetails = order.OrderDetails
+                .SelectMany(od => od.Shipments ?? new List<Shipment>())
+                .Select(s => $"- {s.Provider}: Mã đơn {s.OrderCode ?? "N/A"}, phí {s.TotalFee:N0}đ, trạng thái {s.Status}")
+                .ToList();
+
+            htmlContent = $@"
+                <h2 style='color:#d02a2a;'>Cảm ơn bạn đã thanh toán đơn hàng #{orderId}!</h2>
+                <p>Đơn hàng của bạn đã được xác nhận và đang được xử lý giao hàng.</p>
+                <h3>Thông tin giao hàng:</h3>
+                <ul>
+                    {string.Join("", shipmentDetails.Select(d => $"<li>{d}</li>"))}
+                </ul>
+                <p>Bạn có thể kiểm tra trạng thái giao hàng trong mục 'Đơn hàng của tôi' trên BlindTreasure.</p>
+                <p style='color:#252424;'>Nếu có thắc mắc, hãy liên hệ hỗ trợ.</p>
+            ";
+        }
+        else
+        {
+            // Trường hợp không có shipment
+            subject = $"BlindTreasure - Đơn hàng #{orderId} đã được xác nhận & sản phẩm đã vào kho";
+            var inventoryItems = order.OrderDetails
+                .SelectMany(od => od.InventoryItems ?? new List<InventoryItem>())
+                .Select(ii => $"- {ii.Product?.Name ?? "Sản phẩm"} tại vị trí {ii.Location}")
+                .ToList();
+
+            var blindBoxes = order.OrderDetails
+                .SelectMany(od => od.CustomerBlindBoxes ?? new List<CustomerBlindBox>())
+                .Select(cb => $"- BlindBox: {cb.BlindBox?.Name ?? "BlindBox"} {(cb.IsOpened ? "(đã mở)" : "(chưa mở)")}")
+                .ToList();
+
+            htmlContent = $@"
+                <h2 style='color:#d02a2a;'>Cảm ơn bạn đã thanh toán đơn hàng #{orderId}!</h2>
+                <p>Đơn hàng của bạn đã được xác nhận.</p>
+                <h3>Sản phẩm đã được thêm vào kho của bạn:</h3>
+                <ul>
+                    {string.Join("", inventoryItems.Select(i => $"<li>{i}</li>"))}
+                </ul>
+                {(blindBoxes.Any() ? $@"
+                <h3>BlindBox của bạn:</h3>
+                <ul>
+                    {string.Join("", blindBoxes.Select(b => $"<li>{b}</li>"))}
+                </ul>
+                " : "")}
+                <p>Bạn có thể kiểm tra sản phẩm trong mục 'Kho hàng của tôi' trên BlindTreasure.</p>
+                <p style='color:#252424;'>Nếu có thắc mắc, hãy liên hệ hỗ trợ.</p>
+            ";
+        }
+
+        await SendEmailAsync(toEmail, subject, htmlContent);
+    }
+
+    /// <summary>
+    /// Gửi email thông báo đơn hàng đã hết hạn hoặc bị hủy cho người mua hàng.
+    /// </summary>
+    public async Task SendOrderExpiredOrCancelledToBuyerAsync(Order order, string reason = "Đơn hàng đã hết hạn hoặc bị hủy do không thanh toán thành công.")
+    {
+        if (order == null || order.User == null)
+            throw new ArgumentNullException(nameof(order), "Order hoặc User không hợp lệ.");
+
+        var toEmail = order.User.Email;
+        var userName = order.User.FullName ?? order.User.Email;
+        var orderId = order.Id.ToString();
+
+        string subject = $"BlindTreasure - Đơn hàng #{orderId} đã hết hạn hoặc bị hủy";
+        string htmlContent = $@"
+        <html style='background-color:#ebeaea;margin:0;padding:0;'>
+            <body style='font-family:Arial,sans-serif;color:#252424;padding:20px;background-color:#ebeaea;'>
+                <div style='max-width:600px;margin:auto;background:#fff;border:1px solid #d02a2a;border-radius:6px;padding:20px;'>
+                    <h2 style='color:#d02a2a;'>Đơn hàng #{orderId} đã hết hạn hoặc bị hủy</h2>
+                    <p>Chào {userName},</p>
+                    <p>Đơn hàng của bạn đã bị hủy hoặc hết hạn do không hoàn tất thanh toán thành công.</p>
+                    <p><strong>Lý do:</strong> {reason}</p>
+                    <p>Nếu bạn vẫn muốn mua sản phẩm, vui lòng đặt lại đơn hàng trên BlindTreasure.</p>
+                    <p style='margin-top:30px;'>Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+                </div>
+            </body>
+        </html>";
+
+        await SendEmailAsync(toEmail, subject, htmlContent);
+    }
 
     private async Task SendEmailAsync(string to, string subject, string htmlContent)
     {

@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
@@ -23,6 +24,8 @@ public class TransactionService : ITransactionService
     private readonly IOrderService _orderService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
+    private readonly IEmailService _emailService;
+    private readonly INotificationService _notificationService; // Thêm dòng này
 
     public TransactionService(
         ICacheService cacheService,
@@ -33,7 +36,9 @@ public class TransactionService : ITransactionService
         IUnitOfWork unitOfWork,
         IInventoryItemService inventoryItemService,
         ICustomerBlindBoxService customerBlindBoxService,
-        IGhnShippingService ghnShippingService)
+        IGhnShippingService ghnShippingService,
+        IEmailService emailService,
+        INotificationService notificationService) // Thêm vào constructor
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -44,6 +49,8 @@ public class TransactionService : ITransactionService
         _inventoryItemService = inventoryItemService;
         _customerBlindBoxService = customerBlindBoxService;
         _ghnShippingService = ghnShippingService;
+        _emailService = emailService;
+        _notificationService = notificationService; // Gán vào field
     }
 
 
@@ -97,11 +104,10 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    ///     Xử lý khi thanh toán Stripe thành công (webhook).
+    /// Handles successful Stripe payment (webhook).
     /// </summary>
     public async Task HandleSuccessfulPaymentAsync(string sessionId, string orderId)
     {
-        // Validate input
         if (string.IsNullOrWhiteSpace(sessionId))
             throw ErrorHelper.BadRequest("SessionId is required.");
         if (string.IsNullOrWhiteSpace(orderId))
@@ -109,82 +115,104 @@ public class TransactionService : ITransactionService
 
         try
         {
-            // Tìm transaction theo sessionId
+            // Load transaction and all necessary navigation properties in one query
             var transaction = await _unitOfWork.Transactions.GetQueryable()
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order).ThenInclude(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
-                .ThenInclude(p => p.Seller)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.OrderDetails)
+                            .ThenInclude(od => od.Product)
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order).ThenInclude(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.OrderDetails)
+                            .ThenInclude(od => od.BlindBox)
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order).ThenInclude(o => o.ShippingAddress)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.OrderDetails)
+                            .ThenInclude(od => od.Shipments)
+                .Include(t => t.Payment)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.ShippingAddress)
+                .Include(t => t.Payment)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.Seller)
+                        .ThenInclude(s => s.User) // Ensure Seller.User is loaded
+                .Include(t => t.Payment)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.User) // Ensure Order.User is loaded
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
-            if (transaction == null)
-                throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
+            if (transaction?.Payment?.Order == null)
+                throw ErrorHelper.NotFound("Không tìm thấy transaction hoặc order cho session Stripe này.");
 
-            var order = transaction.Payment?.Order;
-            if (order == null)
-                throw ErrorHelper.NotFound("Không tìm thấy order cho transaction này.");
+            var order = transaction.Payment.Order;
 
-            // Idempotency: Nếu đã PAID thì bỏ qua
+            // Idempotency: skip if already paid
             if (order.Status == OrderStatus.PAID.ToString())
             {
                 _logger.Warn($"[HandleSuccessfulPaymentAsync] Order {orderId} đã ở trạng thái PAID, bỏ qua xử lý.");
                 return;
             }
 
-            _logger.Info($"[HandleSuccessfulPaymentAsync] OrderDetails count = {order.OrderDetails?.Count ?? 0}");
-
-            // Cập nhật trạng thái transaction, payment, order
+            // Update transaction, payment, and order status
             UpdatePaymentAndOrderStatus(transaction, order);
 
-            var orderDetails = await GetOrderDetails(order.Id);
+            // 1. Create GHN shipments and update shipment info
+            await CreateGhnOrdersAndUpdateShipments(order);
 
-            if (!orderDetails.Any())
+            // 2. Create inventory for physical products
+            await CreateInventoryForOrderDetailsAsync(order);
+
+            // 3. Update status and logs for order details with inventory
+            foreach (var od in order.OrderDetails.Where(od => od.ProductId.HasValue))
             {
-                _logger.Warn($"[HandleSuccessfulPaymentAsync] Không tìm thấy order details cho order {orderId}.");
-                return;
-            }
-
-            // 1. Tạo đơn GHN chính thức và cập nhật shipment
-            await CreateGhnOrdersAndUpdateShipments(order, orderDetails);
-
-            // 2. Tạo inventory cho sản phẩm vật lý
-            await CreateInventoryForOrderDetailsAsync(order, orderDetails);
-
-            var orderDetailIds = order.OrderDetails.Where(od => od.ProductId.HasValue).Select(od => od.Id).ToList();
-            var orderDetailsWithInventory = await _unitOfWork.OrderDetails.GetQueryable()
-                .Where(od => orderDetailIds.Contains(od.Id))
-                .Include(od => od.InventoryItems)
-                .ToListAsync();
-
-
-            foreach (var od in orderDetailsWithInventory)
-            {
-                if (od.InventoryItems == null || !od.InventoryItems.Any() || !od.ProductId.HasValue)
+                if (od.InventoryItems == null || !od.InventoryItems.Any())
                 {
                     _logger.Warn($"[HandleSuccessfulPaymentAsync] OrderDetail {od.Id} không có InventoryItems.");
                     continue;
                 }
-
-                // Cập nhật trạng thái và log cho từng OrderDetail
-                _logger.Info($"[HandleSuccessfulPaymentAsync] {od.InventoryItems}");
-
                 OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
-                await _unitOfWork.OrderDetails.Update(od);
             }
+            await _unitOfWork.OrderDetails.UpdateRange(order.OrderDetails.ToList());
 
-            // 3. Tạo customer inventory cho BlindBox
-            await CreateCustomerBlindBoxForOrderDetails(order, orderDetails);
+            // 4. Create customer blind boxes for blind box order details
+            await CreateCustomerBlindBoxForOrderDetails(order);
 
-            // 4. Lưu thay đổi cuối cùng
+            // 5. Save all changes in one batch
             await _unitOfWork.Transactions.Update(transaction);
             await _unitOfWork.Payments.Update(transaction.Payment);
             await _unitOfWork.Orders.Update(order);
             await _unitOfWork.SaveChangesAsync();
+
+            await _emailService.SendOrderPaymentSuccessToBuyerAsync(order);
+
+            // Notify user (buyer)
+            if (order.User != null)
+            {
+                await _notificationService.PushNotificationToUser(order.UserId, new NotificationDto
+                {
+                    Title = $"Thanh toán thành công đơn hàng #{order.Id}",
+                    Message = "Đơn hàng của bạn đã được xác nhận. Nếu có giao hàng, hệ thống sẽ tiến hành xử lý vận chuyển.",
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
+
+            // Notify seller
+            if (order.Seller?.User != null)
+            {
+                var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
+                var sellerMsg = $@"
+                    Sản phẩm của bạn vừa được khách hàng <b>{buyerName}</b> thanh toán thành công.<br/>
+                    Đơn hàng #{order.Id} - Tổng tiền: <b>{order.FinalAmount:N0}đ</b>.<br/>
+                    Vui lòng kiểm tra trạng thái đơn hàng và chuẩn bị giao hàng nếu có.";
+                await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
+                {
+                    Title = $"Đơn hàng mới đã được thanh toán",
+                    Message = sellerMsg,
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
 
             _logger.Success($"[HandleSuccessfulPaymentAsync] Đã xác nhận thanh toán thành công cho order {orderId}.");
             _logger.Success($"[HandleSuccessfulPaymentAsync] Đã cập nhật trạng thái PAID thành công cho {orderId}.");
@@ -196,6 +224,9 @@ public class TransactionService : ITransactionService
         }
     }
 
+    /// <summary>
+    /// Updates transaction, payment, and order status for successful payment.
+    /// </summary>
     private void UpdatePaymentAndOrderStatus(Transaction transaction, Order order)
     {
         transaction.Status = TransactionStatus.Successful.ToString();
@@ -205,51 +236,46 @@ public class TransactionService : ITransactionService
         order.CompletedAt = DateTime.UtcNow;
     }
 
-    private async Task<List<OrderDetail>> GetOrderDetails(Guid orderId)
+    /// <summary>
+    /// Creates GHN shipment orders and updates shipment info.
+    /// </summary>
+    private async Task CreateGhnOrdersAndUpdateShipments(Order order)
     {
-        return await _unitOfWork.OrderDetails.GetAllAsync(od => od.OrderId == orderId, x => x.Shipments)
-               ?? new List<OrderDetail>();
-    }
-
-    private async Task CreateGhnOrdersAndUpdateShipments(Order order, List<OrderDetail> orderDetails)
-    {
-        // Lấy tất cả shipment của các order detail liên quan, status WAITING_PAYMENT
-        var shipmentIds = orderDetails
-            .SelectMany(od => od.Shipments)
+        var shipmentIds = order.OrderDetails
+            .SelectMany(od => od.Shipments ?? Enumerable.Empty<Shipment>())
             .Where(s => s.Status == ShipmentStatus.WAITING_PAYMENT)
             .Select(s => s.Id)
             .Distinct()
             .ToList();
 
+        if (!shipmentIds.Any()) return;
+
         var shipments = await _unitOfWork.Shipments.GetQueryable()
             .Where(s => shipmentIds.Contains(s.Id))
             .Include(s => s.OrderDetails)
-            .ThenInclude(od => od.Product)
-            .ThenInclude(p => p.Seller)
             .ToListAsync();
 
         foreach (var shipment in shipments)
         {
-            // Lấy seller từ order detail đầu tiên (vì shipment theo seller)
-            var seller = shipment.OrderDetails.First().Product.Seller;
+            var seller = order.Seller;
             var address = order.ShippingAddress;
-            var orderDetailsInGroup = shipment.OrderDetails.ToList();
+            var orderDetailsInGroup = shipment.OrderDetails?.ToList() ?? new List<OrderDetail>();
 
             var ghnOrderRequest = BuildGhnOrderRequestFromOrderDetails(orderDetailsInGroup, seller, address);
-
             var ghnCreateResponse = await _ghnShippingService.CreateOrderAsync(ghnOrderRequest);
 
             UpdateShipmentWithGhnResponse(shipment, ghnCreateResponse);
-            await _unitOfWork.Shipments.Update(shipment);
         }
-
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.Shipments.UpdateRange(shipments);
     }
 
+    /// <summary>
+    /// Builds GHN order request from order details, seller, and address.
+    /// </summary>
     private GhnOrderRequest BuildGhnOrderRequestFromOrderDetails(
         List<OrderDetail> orderDetails, Seller seller, Address address)
     {
-        var items = orderDetails.Select(od => new GhnOrderItemDto
+        var items = orderDetails.Where(od => od.Product != null).Select(od => new GhnOrderItemDto
         {
             Name = od.Product.Name,
             Code = od.Product.Id.ToString(),
@@ -296,6 +322,9 @@ public class TransactionService : ITransactionService
         };
     }
 
+    /// <summary>
+    /// Updates shipment entity with GHN response.
+    /// </summary>
     private void UpdateShipmentWithGhnResponse(Shipment shipment, GhnCreateResponse? ghnCreateResponse)
     {
         shipment.OrderCode = ghnCreateResponse?.OrderCode;
@@ -308,90 +337,53 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Tạo InventoryItem cho từng sản phẩm vật lý trong order sau khi thanh toán thành công.
-    /// Mỗi OrderDetail có thể có nhiều shipment (nếu chia theo seller hoặc điều kiện khác).
-    /// Mỗi InventoryItem đại diện cho một vật phẩm duy nhất, gắn với đúng OrderDetail và Shipment.
+    /// Creates inventory items for each physical product in the order after successful payment.
     /// </summary>
-    private async Task CreateInventoryForOrderDetailsAsync(
-        Order order, List<OrderDetail> orderDetails
-    )
+    private async Task CreateInventoryForOrderDetailsAsync(Order order)
     {
-        // 1) Lấy và validate shippingAddress (1 lần)
         Address? shippingAddress = null;
         if (order.ShippingAddressId.HasValue)
         {
-            shippingAddress = await _unitOfWork.Addresses
-                .GetByIdAsync(order.ShippingAddressId.Value);
-            if (shippingAddress == null
-                || shippingAddress.IsDeleted
-                || shippingAddress.UserId != order.UserId)
+            shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(order.ShippingAddressId.Value);
+            if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != order.UserId)
             {
                 _logger.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
-                throw ErrorHelper.BadRequest(
-                    ErrorMessages.OrderShippingAddressInvalid);
+                throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
             }
         }
 
-        //// Đảm bảo lấy đầy đủ các shipment cho từng order detail
-        // orderDetails = await _unitOfWork.OrderDetails
-        //    .GetQueryable()
-        //    .Where(od => od.OrderId == order.Id)
-        //    .Include(od => od.Shipments)
-        //    .Include(od => od.Seller)
-        //    .ToListAsync();
-
-
-        // 2) Build map: OrderDetailId → List<Shipment>
-        var shipmentsByDetail = orderDetails
+        var shipmentsByDetail = order.OrderDetails
             .Where(od => od.Shipments != null && od.Shipments.Any())
-            .ToDictionary(
-                od => od.Id,
-                od => od.Shipments!.ToList()
-            );
+            .ToDictionary(od => od.Id, od => od.Shipments!.ToList());
 
-        // 3) Tạo từng InventoryItem
-        var createdCount = 0;
-        foreach (var od in orderDetails.Where(od => od.ProductId.HasValue))
+        var inventoryItems = new List<InventoryItem>();
+        foreach (var od in order.OrderDetails.Where(od => od.ProductId.HasValue))
         {
             shipmentsByDetail.TryGetValue(od.Id, out var shipmentList);
-            _logger.Info($"[CreateInventory] OrderDetail {od.Id} có {shipmentList?.Count ?? 0} shipment.");
 
-            // ✅ FIXED: Logic xác định status cho InventoryItem
             for (var i = 0; i < od.Quantity; i++)
             {
                 Guid? shipmentId = null;
-                var status = InventoryItemStatus.Available; // Default
+                var status = InventoryItemStatus.Available;
 
                 if (shipmentList != null && shipmentList.Count > 0)
                 {
                     var selectedShipment = shipmentList[0];
                     shipmentId = selectedShipment.Id;
-
-                    // ✅ SỬA LẠI: Logic rõ ràng hơn
                     status = selectedShipment.Status switch
                     {
                         ShipmentStatus.PROCESSING => InventoryItemStatus.Delivering,
-                        //ShipmentStatus.DELIVERED => InventoryItemStatus.Available, // Đã giao, về kho
-                        ShipmentStatus.WAITING_PAYMENT => InventoryItemStatus.Available, // Chưa thanh toán
-                        ShipmentStatus.CANCELLED => InventoryItemStatus.Available, // Hủy, về kho
-                        _ => InventoryItemStatus.Available // Default fallback
+                        ShipmentStatus.WAITING_PAYMENT => InventoryItemStatus.Available,
+                        ShipmentStatus.CANCELLED => InventoryItemStatus.Available,
+                        _ => InventoryItemStatus.Available
                     };
-
-                    _logger.Info(
-                        $"[CreateInventory] Shipment {selectedShipment.Id} status: {selectedShipment.Status} → InventoryItem status: {status}");
-                }
-                else
-                {
-                    // ✅ Không có shipment = không cần giao hàng = Available ngay
-                    _logger.Info(
-                        $"[CreateInventory] No shipment for OrderDetail {od.Id} → InventoryItem status: Available");
                 }
 
                 var dto = new InventoryItem
                 {
                     ProductId = od.ProductId!.Value,
-                    Location = od.Product.Seller.CompanyAddress,
-                    Status = status, // ✅ Status đã được xác định chính xác
+                    Location = order.Seller.CompanyAddress,
+                    Status = status,
                     ShipmentId = shipmentId,
                     IsFromBlindBox = false,
                     OrderDetailId = od.Id,
@@ -399,42 +391,40 @@ public class TransactionService : ITransactionService
                     UserId = order.UserId
                 };
 
-                var newInventoryItem = await _unitOfWork.InventoryItems.AddAsync(dto);
-
+                inventoryItems.Add(dto);
                 if (od.InventoryItems == null)
                     od.InventoryItems = new List<InventoryItem>();
-                od.InventoryItems.Add(newInventoryItem);
-
-                _logger.Info($"[CreateInventory] Summary for OrderDetail {od.Id}: " +
-                             $"Created {od.Quantity} InventoryItems, " +
-                             $"Shipment: {(shipmentId.HasValue ? "Yes" : "No")}");
+                od.InventoryItems.Add(dto);
             }
         }
+        if (inventoryItems.Any())
+            await _unitOfWork.InventoryItems.AddRangeAsync(inventoryItems);
     }
 
-    private async Task CreateCustomerBlindBoxForOrderDetails(Order order, List<OrderDetail> orderDetails)
+    /// <summary>
+    /// Creates customer blind boxes for blind box order details.
+    /// </summary>
+    private async Task CreateCustomerBlindBoxForOrderDetails(Order order)
     {
-        var blindBoxCount = 0;
-        foreach (var od in orderDetails.Where(od => od.BlindBoxId.HasValue))
+        var blindBoxes = new List<CustomerBlindBox>();
+        foreach (var detail in order.OrderDetails.Where(od => od.BlindBoxId.HasValue))
         {
-            _logger.Info(
-                $"[HandleSuccessfulPaymentAsync] Tạo customer inventory cho BlindBox {od.BlindBoxId.Value} trong order {order.Id}.");
-            for (var i = 0; i < od.Quantity; i++)
+            for (var i = 0; i < detail.Quantity; i++)
             {
-                var createBlindBoxDto = new CreateCustomerInventoryDto
+                blindBoxes.Add(new CustomerBlindBox
                 {
-                    BlindBoxId = od.BlindBoxId.Value,
-                    OrderDetailId = od.Id,
+                    BlindBoxId = detail.BlindBoxId.Value,
+                    OrderDetailId = detail.Id,
+                    UserId = order.UserId,
                     IsOpened = false
-                };
-                od.Status = OrderDetailItemStatus.IN_INVENTORY;
-
-                await _customerBlindBoxService.CreateAsync(createBlindBoxDto, order.UserId);
-                _logger.Success(
-                    $"[HandleSuccessfulPaymentAsync] Đã tạo customer inventory thứ {++blindBoxCount} cho BlindBox {od.BlindBoxId.Value} trong order {order.Id}.");
+                });
             }
+            detail.Status = OrderDetailItemStatus.IN_INVENTORY;
         }
+        if (blindBoxes.Any())
+            await _unitOfWork.CustomerBlindBoxes.AddRangeAsync(blindBoxes);
     }
+
 
     /// <summary>
     ///     Xử lý khi thanh toán Stripe thất bại hoặc session hết hạn.
@@ -446,9 +436,121 @@ public class TransactionService : ITransactionService
 
         try
         {
+            // 1. Check for group payment session
+            var groupSession = await _unitOfWork.GroupPaymentSessions
+                .FirstOrDefaultAsync(s => s.StripeSessionId == sessionId && !s.IsCompleted);
+
+            if (groupSession != null)
+            {
+                groupSession.IsCompleted = true;
+                groupSession.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.GroupPaymentSessions.Update(groupSession);
+
+                // Get all orders in the group
+                var orders = await _unitOfWork.Orders.GetQueryable()
+                    .Where(o => o.CheckoutGroupId == groupSession.CheckoutGroupId && !o.IsDeleted)
+                    .Include(o => o.OrderDetails)
+                        .ThenInclude(od => od.Shipments)
+                    .Include(o => o.Payment)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.User)
+                    .ToListAsync();
+
+                foreach (var order in orders)
+                {
+                    // Mark order as expired
+                    order.Status = OrderStatus.EXPIRED.ToString();
+                    order.UpdatedAt = DateTime.UtcNow;
+                    await _unitOfWork.Orders.Update(order);
+
+                    // Mark payment as failed
+                    if (order.Payment != null)
+                    {
+                        order.Payment.Status = PaymentStatus.Failed;
+                        order.Payment.UpdatedAt = DateTime.UtcNow;
+                        await _unitOfWork.Payments.Update(order.Payment);
+
+                        // Mark all transactions for this session as failed
+                        var transactions = await _unitOfWork.Transactions.GetQueryable()
+                            .Where(t => t.PaymentId == order.Payment.Id && t.ExternalRef == sessionId)
+                            .ToListAsync();
+
+                        foreach (var tx in transactions)
+                        {
+                            tx.Status = TransactionStatus.Failed.ToString();
+                            tx.UpdatedAt = DateTime.UtcNow;
+                            await _unitOfWork.Transactions.Update(tx);
+                        }
+                    }
+
+                    // Mark all order details as cancelled
+                    foreach (var detail in order.OrderDetails)
+                    {
+                        detail.Status = OrderDetailItemStatus.CANCELLED;
+                        detail.UpdatedAt = DateTime.UtcNow;
+                        await _unitOfWork.OrderDetails.Update(detail);
+
+                        // Mark all related shipments as cancelled
+                        if (detail.Shipments != null)
+                        {
+                            foreach (var shipment in detail.Shipments)
+                            {
+                                shipment.Status = ShipmentStatus.CANCELLED;
+                                shipment.UpdatedAt = DateTime.UtcNow;
+                                await _unitOfWork.Shipments.Update(shipment);
+                            }
+                        }
+                    }
+
+                    // Gửi email thông báo hết hạn/hủy cho user
+                    if (order.User != null)
+                        await _emailService.SendOrderExpiredOrCancelledToBuyerAsync(order, "Đơn hàng đã hết hạn do không thanh toán thành công.");
+
+                    // Thông báo realtime cho user
+                    if (order.User != null)
+                    {
+                        await _notificationService.PushNotificationToUser(order.UserId, new NotificationDto
+                        {
+                            Title = $"Link thanh toán cho đơn hàng #{order.Id} đã hết hạn",
+                            Message = "Đơn hàng của bạn đã bị hủy hoặc hết hạn do không hoàn tất thanh toán. Vui lòng đặt lại nếu muốn tiếp tục mua.",
+                            Type = NotificationType.Order,
+                            SourceUrl = null
+                        });
+                    }
+
+                    // Thông báo cho seller
+                    if (order.Seller?.User != null)
+                    {
+                        var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
+                        var sellerMsg = $@"
+                            Đơn hàng #{order.Id} của khách <b>{buyerName}</b> đã hết hạn do không thanh toán thành công.<br/>
+                            Bạn có thể kiểm tra lại trạng thái đơn hàng trong hệ thống.";
+                        await _notificationService.PushNotificationToUser(order.Seller.UserId, new NotificationDto
+                        {
+                            Title = $"Đơn hàng #{order.Id} đã hết hạn",
+                            Message = sellerMsg,
+                            Type = NotificationType.Order,
+                            SourceUrl = null
+                        });
+                    }
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+                _logger.Warn($"[HandleFailedPaymentAsync] Đã xử lý thất bại thanh toán cho group session {sessionId}.");
+                return;
+            }
+
+            // 2. Fallback: Single order session (old logic)
             var transaction = await _unitOfWork.Transactions.GetQueryable()
                 .Include(t => t.Payment)
                 .ThenInclude(p => p.Order)
+                .ThenInclude(o => o.OrderDetails)
+                .ThenInclude(od => od.Shipments)
+                .Include(t => t.Payment)
+                .ThenInclude(p => p.Order)
+                .ThenInclude(o => o.Seller)
+                .Include(t => t.Payment)
+                .ThenInclude(p => p.Order).ThenInclude(o => o.User)
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
             if (transaction == null)
@@ -458,7 +560,25 @@ public class TransactionService : ITransactionService
             if (transaction.Payment != null)
                 transaction.Payment.Status = PaymentStatus.Failed;
             if (transaction.Payment?.Order != null)
+            {
                 transaction.Payment.Order.Status = OrderStatus.EXPIRED.ToString();
+                foreach (var detail in transaction.Payment.Order.OrderDetails)
+                {
+                    detail.Status = OrderDetailItemStatus.CANCELLED;
+                    detail.UpdatedAt = DateTime.UtcNow;
+                    await _unitOfWork.OrderDetails.Update(detail);
+
+                    if (detail.Shipments != null)
+                    {
+                        foreach (var shipment in detail.Shipments)
+                        {
+                            shipment.Status = ShipmentStatus.CANCELLED;
+                            shipment.UpdatedAt = DateTime.UtcNow;
+                            await _unitOfWork.Shipments.Update(shipment);
+                        }
+                    }
+                }
+            }
 
             await _unitOfWork.Transactions.Update(transaction);
             if (transaction.Payment != null)
@@ -466,37 +586,82 @@ public class TransactionService : ITransactionService
             if (transaction.Payment?.Order != null)
                 await _unitOfWork.Orders.Update(transaction.Payment.Order);
 
+            // Gửi email thông báo hết hạn/hủy cho user
+            if (transaction.Payment?.Order?.User != null)
+                await _emailService.SendOrderExpiredOrCancelledToBuyerAsync(transaction.Payment.Order, "Đơn hàng đã hết hạn do không thanh toán thành công.");
+
+            // Thông báo realtime cho user
+            if (transaction.Payment?.Order?.User != null)
+            {
+                await _notificationService.PushNotificationToUser(transaction.Payment.Order.UserId, new NotificationDto
+                {
+                    Title = $"Link thanh toán cho đơn hàng #{transaction.Payment.OrderId} đã hết hạn",
+                    Message = "Đơn hàng của bạn đã bị hủy hoặc hết hạn do không hoàn tất thanh toán. Vui lòng đặt lại nếu muốn tiếp tục mua.",
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
+
+            // Thông báo cho seller
+            if (transaction.Payment?.Order?.Seller != null)
+            {
+                var buyerName = transaction.Payment.Order.User?.FullName ?? transaction.Payment.Order.User?.Email ?? "Khách hàng";
+                var sellerMsg = $@"
+                    Đơn hàng #{transaction.Payment.Order.Id} của khách <b>{buyerName}</b> đã hết hạn do không thanh toán thành công.<br/>
+                    Bạn có thể kiểm tra lại trạng thái đơn hàng trong hệ thống.";
+                await _notificationService.PushNotificationToUser(transaction.Payment.Order.Seller.UserId, new NotificationDto
+                {
+                    Title = $"Đơn hàng #{transaction.Payment.Order.Id} đã hết hạn",
+                    Message = sellerMsg,
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
+
             await _unitOfWork.SaveChangesAsync();
             _logger.Warn($"[HandleFailedPaymentAsync] Đã xử lý thất bại thanh toán cho session {sessionId}.");
         }
         catch (Exception ex)
         {
             _logger.Error($"[HandleFailedPaymentAsync] {ex}");
-            throw;
+            throw ErrorHelper.BadRequest($"[HandleFailedPaymentAsync] {ex}");
         }
     }
 
     /// <summary>
     ///     Xác nhận khi PaymentIntent được tạo (Stripe webhook).
     /// </summary>
-    public async Task HandlePaymentIntentCreatedAsync(string paymentIntentId, string sessionId)
+    public async Task HandlePaymentIntentCreatedAsync(string paymentIntentId, string sessionId, string? couponId)
     {
         if (string.IsNullOrWhiteSpace(paymentIntentId) || string.IsNullOrWhiteSpace(sessionId))
             throw ErrorHelper.BadRequest("PaymentIntentId và SessionId là bắt buộc.");
 
         try
         {
-            var transaction = await _unitOfWork.Transactions.GetQueryable()
-                .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
+            var transactions = await _unitOfWork.Transactions.GetQueryable()
+                .Where(t => t.ExternalRef == sessionId).ToListAsync();
 
-            if (transaction == null)
-                throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
+            if (transactions.Any())
+            {
+                foreach (var transaction in transactions)
+                {
+                    if (transaction == null)
+                        throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
 
-            transaction.Payment.PaymentIntentId = paymentIntentId;
-            await _unitOfWork.Transactions.Update(transaction);
+                    transaction.Payment.PaymentIntentId = paymentIntentId;
+                    if (couponId != null)
+                    {
+                        transaction.Payment.CouponId = couponId; // Lưu couponId nếu có
+                    }
+
+                    await _unitOfWork.Transactions.Update(transaction);
+                    _logger.Info(
+                        $"[HandlePaymentIntentCreatedAsync] Đã cập nhật PaymentIntentId cho transaction {transaction.Id}.");
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync();
-            _logger.Info(
-                $"[HandlePaymentIntentCreatedAsync] Đã cập nhật PaymentIntentId cho transaction {transaction.Id}.");
+
         }
         catch (Exception ex)
         {

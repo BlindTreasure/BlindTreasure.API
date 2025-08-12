@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Domain.DTOs.EmailDTOs;
+using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Application.Interfaces;
 
@@ -46,4 +47,6 @@ public interface IEmailService
 
     Task SendPromotionApprovedAsync(string toEmail, string? userName, string promotionCode);
     Task SendPromotionRejectedAsync(string toEmail, string? userName, string promotionCode, string reason);
+    Task SendOrderPaymentSuccessToBuyerAsync(Order order);
+    Task SendOrderExpiredOrCancelledToBuyerAsync(Order order, string reason = "Đơn hàng đã hết hạn hoặc bị hủy do không thanh toán thành công.");
 }

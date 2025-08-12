@@ -1,10 +1,12 @@
-﻿using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+﻿using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.PaymentDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.TransactionDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.IdentityModel.Tokens;
 
 namespace BlindTreasure.Application.Mappers;
@@ -90,12 +92,15 @@ public static class OrderDtoMapper
                           new List<OrderDetailDto>(),
                 Payment = order.Payment != null ? ToPaymentDto(order.Payment) : null,
                 TotalShippingFee = order.TotalShippingFee ?? 0,
-                CheckoutGroupId = order.CheckoutGroupId
+                CheckoutGroupId = order.CheckoutGroupId,
+                SellerId = order.SellerId,
+               Seller = order.Seller != null ? SellerMapper.ToSellerProfileDto(order.Seller) : null
+
             };
         }
         catch (Exception ex)
         {
-            throw new Exception(ex.Message);
+            throw ErrorHelper.BadRequest(ex.Message);
         }
     }
 

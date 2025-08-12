@@ -33,6 +33,28 @@ public class StripeService : IStripeService
         _failRedirectUrl = _configuration["STRIPE:FailRedirectUrl"] ?? "http://localhost:4040/fail";
     }
 
+    public async Task<string> GetOrCreateGroupPaymentLink(Guid checkoutGroupId)
+    {
+        var orders = await _unitOfWork.Orders.GetQueryable()
+      .Where(o => o.CheckoutGroupId == checkoutGroupId && !o.IsDeleted)
+      .ToListAsync();
+
+        if (!orders.Any())
+            throw ErrorHelper.BadRequest("Không tìm thấy đơn hàng hợp lệ trong nhóm.");
+
+        var groupSession = await _unitOfWork.GroupPaymentSessions
+            .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
+
+        if (groupSession != null && groupSession.ExpiresAt < DateTime.UtcNow)
+        {
+            // Session still valid
+            return groupSession.PaymentUrl;
+        }
+
+        // If not found or expired, call the session creation method
+        return await CreateGeneralCheckoutSessionForOrders(orders.Select(o => o.Id).ToList());
+    }
+
     public async Task<string> GenerateExpressLoginLink()
     {
         var userId = _claimsService.CurrentUserId; // chỗ này là lấy user id của seller là người đang login
@@ -142,11 +164,12 @@ public class StripeService : IStripeService
                 ["totalDiscount"] = totalDiscount.ToString("F2"),
                 ["finalAmount"] = finalAmount.ToString("F2"),
                 ["couponId"] = couponId ?? "",
-                ["isGeneralPayment"] = "true"
+                ["isGeneralPayment"] = "true",
+                ["checkoutGroupId"] = orders.First().CheckoutGroupId.ToString()
             },
             SuccessUrl = $"{_successRedirectUrl}?checkout_group={orders.First().CheckoutGroupId}&status=success",
             CancelUrl = $"{_failRedirectUrl}?checkout_group={orders.First().CheckoutGroupId}&status=pending",
-            ExpiresAt = DateTime.UtcNow.AddHours(24)
+            ExpiresAt = DateTime.UtcNow.AddHours(1)
         };
 
         var service = new SessionService(_stripeClient);
@@ -155,7 +178,36 @@ public class StripeService : IStripeService
         // Ghi lại transaction cho từng order
         foreach (var order in orders)
         {
-            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0);
+            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0, couponId ?? null, session.PaymentIntentId);
+        }
+
+        // Save GroupPaymentSession
+        var checkoutGroupId = orders.First().CheckoutGroupId;
+        var groupSession = await _unitOfWork.GroupPaymentSessions
+            .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
+
+        if (groupSession == null)
+        {
+            groupSession = new GroupPaymentSession
+            {
+                CheckoutGroupId = checkoutGroupId,
+                StripeSessionId = session.Id,
+                PaymentUrl = session.Url,
+                ExpiresAt = session.ExpiresAt ,
+                Type = PaymentType.Order,
+                IsCompleted = false,
+                CouponId = couponId,
+                PaymentIntentId = session.PaymentIntentId
+            };
+            await _unitOfWork.GroupPaymentSessions.AddAsync(groupSession);
+        }
+        else
+        {
+            groupSession.StripeSessionId = session.Id;
+            groupSession.PaymentUrl = session.Url;
+            groupSession.ExpiresAt = session.ExpiresAt ;
+            groupSession.IsCompleted = false;
+            await _unitOfWork.GroupPaymentSessions.Update(groupSession);
         }
         await _unitOfWork.SaveChangesAsync();
 
@@ -336,8 +388,8 @@ public class StripeService : IStripeService
             var service = new SessionService(_stripeClient);
             var session = await service.CreateAsync(options);
 
-            // 8. Ghi vào Payment & Transaction
-            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew, finalAmount);
+            // 8. Ghi vào Payment & Transaction??nu
+            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew, finalAmount , couponId ?? null, session.PaymentIntentId);
             await _unitOfWork.SaveChangesAsync();
 
             return session.Url;
@@ -396,6 +448,76 @@ public class StripeService : IStripeService
     }
 
     /// <summary>
+    /// Vô hiệu hóa session thanh toán Stripe (hủy PaymentIntent và xóa coupon nếu còn hiệu lực)
+    /// </summary>
+    public async Task DisableStripeGroupPaymentSessionAsync(Guid checkoutGroupId)
+    {
+        var groupSession = await _unitOfWork.GroupPaymentSessions
+            .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
+
+        if (groupSession == null)
+            return;
+
+        // Hủy PaymentIntent nếu còn hiệu lực
+        if (!string.IsNullOrWhiteSpace(groupSession.PaymentIntentId))
+        {
+            try
+            {
+                var paymentIntentService = new PaymentIntentService(_stripeClient);
+                var paymentIntent = await paymentIntentService.GetAsync(groupSession.PaymentIntentId);
+                if (paymentIntent != null && paymentIntent.Status == "requires_payment_method")
+                {
+                    await paymentIntentService.CancelAsync(groupSession.PaymentIntentId);
+                }
+            }
+            catch (StripeException)
+            {
+                // Log error nhưng không throw
+            }
+        }
+
+        // Xóa coupon nếu có
+        if (!string.IsNullOrWhiteSpace(groupSession.CouponId))
+        {
+            await CleanupStripeCoupon(groupSession.CouponId);
+        }
+    }
+
+    /// <summary>
+    /// Vô hiệu hóa session thanh toán Stripe cho đơn lẻ (hủy PaymentIntent và xóa coupon nếu còn hiệu lực)
+    /// </summary>
+    public async Task DisableStripeOrderPaymentSessionAsync(Guid orderId)
+    {
+        var order = await _unitOfWork.Orders.GetByIdAsync(orderId);
+        if (order?.Payment == null)
+            return;
+
+        // Hủy PaymentIntent nếu còn hiệu lực
+        if (!string.IsNullOrWhiteSpace(order.Payment.PaymentIntentId))
+        {
+            try
+            {
+                var paymentIntentService = new PaymentIntentService(_stripeClient);
+                var paymentIntent = await paymentIntentService.GetAsync(order.Payment.PaymentIntentId);
+                if (paymentIntent != null && paymentIntent.Status == "requires_payment_method")
+                {
+                    await paymentIntentService.CancelAsync(order.Payment.PaymentIntentId);
+                }
+            }
+            catch (StripeException)
+            {
+                // Log error nhưng không throw
+            }
+        }
+
+        // Xóa coupon nếu có
+        if (!string.IsNullOrWhiteSpace(order.Payment.CouponId))
+        {
+            await CleanupStripeCoupon(order.Payment.CouponId);
+        }
+    }
+
+    /// <summary>
     /// Xóa coupon sau khi sử dụng (gọi trong webhook hoặc sau khi thanh toán thành công)
     /// </summary>
     public async Task CleanupStripeCoupon(string couponId)
@@ -418,7 +540,9 @@ public class StripeService : IStripeService
         string sessionId,
         Guid userId,
         bool isRenew,
-        decimal netAmount)
+        decimal netAmount,
+        string? couponId,
+        string? paymentIntentId)
     {
         var now = DateTime.UtcNow;
         var type = isRenew ? "Renew" : "Checkout";
@@ -433,12 +557,13 @@ public class StripeService : IStripeService
                 NetAmount = netAmount,
                 Method = "Stripe",
                 Status = PaymentStatus.Pending,
-                PaymentIntentId = "", // this field is nowhere ???
+                PaymentIntentId = paymentIntentId,
                 PaidAt = now,
                 RefundedAmount = 0,
                 CreatedAt = now,
                 CreatedBy = userId,
-                Transactions = new List<Transaction>()
+                Transactions = new List<Transaction>(),
+                CouponId= couponId
             };
 
             payment.Transactions.Add(new Transaction
