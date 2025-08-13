@@ -146,7 +146,7 @@ namespace BlindTreasure.Application.Services
         }
 
         public async Task<OrderDetailInventoryItemLog> LogShipmentTrackingInventoryItemUpdateAsync(
-            InventoryItem inventoryItem,
+            OrderDetail orderDetail,
             InventoryItemStatus oldStatus,
             InventoryItem shipmentWithNewStatus,
             string trackingMessage)
@@ -159,7 +159,7 @@ namespace BlindTreasure.Application.Services
 
             var log = new OrderDetailInventoryItemLog
             {
-                OrderDetailId = inventoryItem.OrderDetailId.Value,
+                OrderDetailId = orderDetail.Id,
                 InventoryItemId = inventoryItem.Id,
                 ActionType = ActionType.SHIPMENT_STATUS_CHANGED,
                 LogContent = trackingMessage,

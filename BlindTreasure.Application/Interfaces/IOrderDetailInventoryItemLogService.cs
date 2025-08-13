@@ -18,6 +18,6 @@ namespace BlindTreasure.Application.Interfaces
         Task<OrderDetailInventoryItemLog> LogOrderDetailCreationAsync(OrderDetail orderDetail, string? msg);
         Task<OrderDetailInventoryItemLog> LogOrderDetailStatusChangeAsync(OrderDetail orderDetail, OrderDetailItemStatus oldStatus, OrderDetailItemStatus newStatus, string? msg);
         Task<OrderDetailInventoryItemLog> LogShipmentAddedAsync(OrderDetail orderDetail, Shipment shipment, string? msg);
-        Task<OrderDetailInventoryItemLog> LogShipmentTrackingInventoryItemUpdateAsync(InventoryItem inventoryItem, InventoryItemStatus oldStatus, InventoryItem InventoryWithNewStatus, string trackingMessage);
+        Task<OrderDetailInventoryItemLog> LogShipmentTrackingInventoryItemUpdateAsync(OrderDetail orderDetail, InventoryItemStatus oldStatus, InventoryItem InventoryWithNewStatus, string trackingMessage);
     }
 }
