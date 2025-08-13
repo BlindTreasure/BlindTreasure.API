@@ -60,53 +60,124 @@ public class TransactionService : ITransactionService
     /// <summary>
     ///     Xử lý khi thanh toán Stripe shipment thành công (webhook).
     /// </summary>
+    /// <summary>
+    ///     Xử lý khi thanh toán Stripe shipment thành công (webhook).
+    ///     Đảm bảo cập nhật đúng trạng thái InventoryItem, OrderDetail, ghi log đầy đủ.
+    /// </summary>
+    /// <summary>
+    /// Xử lý khi thanh toán Stripe shipment thành công (webhook).
+    /// Đảm bảo cập nhật đúng trạng thái InventoryItem, OrderDetail, ghi log đầy đủ.
+    /// </summary>
     public async Task HandleSuccessfulShipmentPaymentAsync(IEnumerable<Guid> shipmentIds)
     {
         if (shipmentIds == null || !shipmentIds.Any())
             throw ErrorHelper.BadRequest("Danh sách shipmentId rỗng.");
 
-        // 1. Lấy shipment và inventory item liên quan, đã include OrderDetail và InventoryItems
+        // 1. Lấy shipment và inventory item liên quan, include đầy đủ OrderDetail và InventoryItems
         var shipments = await _unitOfWork.Shipments.GetQueryable()
             .Where(s => shipmentIds.Contains(s.Id) && s.Status == ShipmentStatus.WAITING_PAYMENT)
             .Include(s => s.InventoryItems)
-            .ThenInclude(ii => ii.OrderDetail)
-            .ThenInclude(od => od.InventoryItems)
+            .Include(s => s.OrderDetails)
+                .ThenInclude(od => od.InventoryItems)
+            .Include(s => s.OrderDetails)
+                .ThenInclude(od => od.Order)
+                    .ThenInclude(o => o.Seller)
             .ToListAsync();
 
-        // 2. Tập hợp các OrderDetail cần cập nhật
+        // 2. Tập hợp các OrderDetail cần cập nhật (dùng HashSet để tránh trùng lặp)
         var orderDetailsToUpdate = new HashSet<OrderDetail>();
 
         // 3. Cập nhật trạng thái InventoryItem và collect OrderDetail
         foreach (var shipment in shipments)
         {
+            var oldShipmentStatus = shipment.Status;
+            shipment.Status = ShipmentStatus.PROCESSING;
+            shipment.EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3))
+                .AddHours(new Random().Next(8, 18))
+                .AddMinutes(new Random().Next(60));
+
+            // Lấy seller và address để truyền vào log tracking
+            var firstOrderDetail = shipment.OrderDetails?.FirstOrDefault();
+            Seller seller = null;
+            Address customerAddress = null;
+            if (firstOrderDetail != null)
+            {
+                seller = firstOrderDetail.Order?.Seller;
+                var userId = firstOrderDetail.Order?.UserId;
+                if (userId.HasValue)
+                {
+                    customerAddress = await _unitOfWork.Addresses.GetQueryable()
+                        .FirstOrDefaultAsync(a => a.UserId == userId.Value && a.IsDefault);
+                }
+            }
+
+            // Cập nhật InventoryItem status và collect OrderDetail
             foreach (var item in shipment.InventoryItems)
             {
+                var oldItemStatus = item.Status;
                 item.Status = InventoryItemStatus.Delivering;
                 item.ShipmentId = shipment.Id;
                 await _unitOfWork.InventoryItems.Update(item);
 
+                // Đảm bảo OrderDetail đã include InventoryItems
                 if (item.OrderDetail != null)
+                {
+                    // Nếu chưa có trong set thì add vào
                     orderDetailsToUpdate.Add(item.OrderDetail);
+                }
+
+                // Tạo tracking message cho log
+                var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
+                    shipment,
+                    oldShipmentStatus,
+                    shipment.Status,
+                    seller,
+                    customerAddress
+                );
+
+                // Tạo log cho mỗi InventoryItem
+                await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                    item.OrderDetail,
+                    oldItemStatus,
+                    item,
+                    trackingMessage
+                );
             }
 
-            shipment.Status = ShipmentStatus.PROCESSING;
-            shipment.EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8, 18)).AddMinutes(new Random().Next(60));
-            //shipment.ShippedAt = DateTime.UtcNow.AddDays(4);
             await _unitOfWork.Shipments.Update(shipment);
         }
 
-        // 4. Cập nhật trạng thái và log cho từng OrderDetail (dùng method static)
+        // 4. Đảm bảo mỗi OrderDetail có đầy đủ InventoryItems trước khi cập nhật status
         foreach (var orderDetail in orderDetailsToUpdate)
         {
-            // Đảm bảo InventoryItems đã được include và trạng thái mới nhất
-            // Nếu cần, có thể reload lại từ DB, nhưng nếu đã include thì không cần
+            // Nếu InventoryItems chưa đầy đủ (do lazy loading), reload lại từ DB
+            if (orderDetail.InventoryItems == null || !orderDetail.InventoryItems.Any())
+            {
+                var odWithItems = await _unitOfWork.OrderDetails.GetQueryable()
+                    .Include(od => od.InventoryItems)
+                    .FirstOrDefaultAsync(od => od.Id == orderDetail.Id);
+
+                if (odWithItems != null)
+                {
+                    // Gán lại navigation property
+                    orderDetail.InventoryItems = odWithItems.InventoryItems;
+                }
+            }
+
+            var oldStatus = orderDetail.Status;
             OrderDtoMapper.UpdateOrderDetailStatusAndLogs(orderDetail);
+
+            await _orderDetailInventoryItemLogService.LogOrderDetailStatusChangeAsync(
+                orderDetail,
+                oldStatus,
+                orderDetail.Status,
+                $"Cập nhật trạng thái sau khi thanh toán shipment thành công"
+            );
             await _unitOfWork.OrderDetails.Update(orderDetail);
         }
 
         await _unitOfWork.SaveChangesAsync();
     }
-
     /// <summary>
     /// Handles successful Stripe payment (webhook).
     /// </summary>
