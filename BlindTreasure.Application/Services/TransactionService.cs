@@ -404,7 +404,7 @@ public class TransactionService : ITransactionService
                 dto = await _unitOfWork.InventoryItems.AddAsync(dto);
 
                 // Log: InventoryItem vừa được tạo cho OrderDetail sử dụng TEntity
-                var log = await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
+                var orderDetaillog = await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
                     od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
                 );
 
@@ -420,12 +420,18 @@ public class TransactionService : ITransactionService
                         shippingAddress
                     );
 
-                    await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                    _logger.Info($"Generate tracking message succesfully: {trackingMessage}");
+
+                    var itemInventoryLog = await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
                         od,
                         oldItemStatus,
                         dto,
                         trackingMessage
                     );
+                    _logger.Info($"[CreateInventoryForOrderDetailsAsync] Đã log trạng thái shipment cho inventory item {dto.Id}.");
+
+                    dto.OrderDetailInventoryItemLogs.Add(itemInventoryLog);
+
                 }
 
             }
