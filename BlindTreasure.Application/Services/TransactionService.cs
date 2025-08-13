@@ -404,30 +404,35 @@ public class TransactionService : ITransactionService
                 dto = await _unitOfWork.InventoryItems.AddAsync(dto);
 
                 // Log: InventoryItem vừa được tạo cho OrderDetail sử dụng TEntity
-                var log = await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
+                var orderDetaillog = await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
                     od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
                 );
 
-                od.OrderDetailInventoryItemLogs.Add(log);
                 // Nếu có shipment, log trạng thái shipment cho inventory item
-                //if (selectedShipment != null)
-                //{
-                //    var oldItemStatus = InventoryItemStatus.Available;
-                //    var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
-                //        selectedShipment,
-                //        ShipmentStatus.WAITING_PAYMENT,
-                //        selectedShipment.Status,
-                //        order.Seller,
-                //        shippingAddress
-                //    );
+                if (selectedShipment != null)
+                {
+                    var oldItemStatus = InventoryItemStatus.Available;
+                    var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
+                        selectedShipment,
+                        ShipmentStatus.WAITING_PAYMENT,
+                        selectedShipment.Status,
+                        order.Seller,
+                        shippingAddress
+                    );
 
-                //    await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
-                //        dto,
-                //        oldItemStatus,
-                //        dto,
-                //        trackingMessage
-                //    );
-                //}
+                    _logger.Info($"Generate tracking message succesfully: {trackingMessage}");
+
+                    var itemInventoryLog = await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                        od,
+                        oldItemStatus,
+                        dto,
+                        trackingMessage
+                    );
+                    _logger.Info($"[CreateInventoryForOrderDetailsAsync] Đã log trạng thái shipment cho inventory item {dto.Id}.");
+
+                    dto.OrderDetailInventoryItemLogs.Add(itemInventoryLog);
+
+                }
 
             }
         }
