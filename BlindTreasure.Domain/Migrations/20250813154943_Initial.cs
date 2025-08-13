@@ -40,6 +40,32 @@ namespace BlindTreasure.Domain.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "GroupPaymentSessions",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CheckoutGroupId = table.Column<Guid>(type: "uuid", nullable: true),
+                    StripeSessionId = table.Column<string>(type: "text", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsCompleted = table.Column<bool>(type: "boolean", nullable: false),
+                    PaymentUrl = table.Column<string>(type: "text", nullable: false),
+                    Type = table.Column<int>(type: "integer", nullable: false),
+                    CouponId = table.Column<string>(type: "text", nullable: true),
+                    PaymentIntentId = table.Column<string>(type: "text", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DeletedBy = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_GroupPaymentSessions", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "OtpVerifications",
                 columns: table => new
                 {
@@ -76,6 +102,7 @@ namespace BlindTreasure.Domain.Migrations
                     PaymentIntentId = table.Column<string>(type: "text", nullable: true),
                     PaidAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     RefundedAmount = table.Column<decimal>(type: "numeric", nullable: false),
+                    CouponId = table.Column<string>(type: "text", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
@@ -120,10 +147,11 @@ namespace BlindTreasure.Domain.Migrations
                     MainServiceFee = table.Column<int>(type: "integer", nullable: true),
                     Provider = table.Column<string>(type: "text", nullable: false),
                     TrackingNumber = table.Column<string>(type: "text", nullable: false),
-                    ShippedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ShippedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     EstimatedDelivery = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    DeliveredAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     Status = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    EstimatedPickupTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    PickedUpAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
@@ -275,45 +303,6 @@ namespace BlindTreasure.Domain.Migrations
                     table.ForeignKey(
                         name: "FK_BlindBoxUnboxLogs_Users_UserId",
                         column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ChatMessages",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    SenderId = table.Column<Guid>(type: "uuid", nullable: true),
-                    SenderType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    ReceiverId = table.Column<Guid>(type: "uuid", nullable: true),
-                    ReceiverType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    Content = table.Column<string>(type: "text", nullable: false),
-                    SentAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ReadAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    IsRead = table.Column<bool>(type: "boolean", nullable: false),
-                    MessageType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true),
-                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    DeletedBy = table.Column<Guid>(type: "uuid", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ChatMessages", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ChatMessages_Users_ReceiverId",
-                        column: x => x.ReceiverId,
-                        principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_ChatMessages_Users_SenderId",
-                        column: x => x.SenderId,
                         principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
@@ -473,6 +462,47 @@ namespace BlindTreasure.Domain.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Payouts",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    SellerId = table.Column<Guid>(type: "uuid", nullable: false),
+                    PeriodStart = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    PeriodEnd = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    PeriodType = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    GrossAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    PlatformFeeRate = table.Column<decimal>(type: "numeric(5,2)", nullable: false),
+                    PlatformFeeAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    NetAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    StripeTransferId = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    StripeDestinationAccount = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
+                    Status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    ProcessedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Notes = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    FailureReason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    RetryCount = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
+                    NextRetryAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DeletedBy = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Payouts", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Payouts_Sellers_SellerId",
+                        column: x => x.SellerId,
+                        principalTable: "Sellers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Products",
                 columns: table => new
                 {
@@ -549,6 +579,44 @@ namespace BlindTreasure.Domain.Migrations
                         column: x => x.SellerId,
                         principalTable: "Sellers",
                         principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PayoutLogs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PayoutId = table.Column<Guid>(type: "uuid", nullable: false),
+                    FromStatus = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    ToStatus = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Action = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Details = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    ErrorMessage = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    TriggeredByUserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    LoggedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DeletedBy = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PayoutLogs", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PayoutLogs_Payouts_PayoutId",
+                        column: x => x.PayoutId,
+                        principalTable: "Payouts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PayoutLogs_Users_TriggeredByUserId",
+                        column: x => x.TriggeredByUserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -728,6 +796,8 @@ namespace BlindTreasure.Domain.Migrations
                     FinalAmount = table.Column<decimal>(type: "numeric", nullable: true),
                     PlacedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    SellerId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CheckoutGroupId = table.Column<Guid>(type: "uuid", nullable: true),
                     PromotionId = table.Column<Guid>(type: "uuid", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -757,6 +827,12 @@ namespace BlindTreasure.Domain.Migrations
                         column: x => x.PromotionId,
                         principalTable: "Promotions",
                         principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Orders_Sellers_SellerId",
+                        column: x => x.SellerId,
+                        principalTable: "Sellers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_Orders_Users_UserId",
                         column: x => x.UserId,
@@ -877,7 +953,6 @@ namespace BlindTreasure.Domain.Migrations
                     FinalDetailPrice = table.Column<decimal>(type: "numeric", nullable: true),
                     Status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Logs = table.Column<string>(type: "text", nullable: true),
-                    SellerId = table.Column<Guid>(type: "uuid", nullable: false),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
@@ -907,12 +982,6 @@ namespace BlindTreasure.Domain.Migrations
                         principalTable: "Products",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
-                        name: "FK_OrderDetails_Sellers_SellerId",
-                        column: x => x.SellerId,
-                        principalTable: "Sellers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -1022,15 +1091,53 @@ namespace BlindTreasure.Domain.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PayoutDetails",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PayoutId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrderDetailId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OriginalAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    DiscountAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    FinalAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    RefundAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false, defaultValue: 0m),
+                    ContributedAmount = table.Column<decimal>(type: "numeric(18,2)", nullable: false),
+                    CalculatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DeletedBy = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PayoutDetails", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PayoutDetails_OrderDetails_OrderDetailId",
+                        column: x => x.OrderDetailId,
+                        principalTable: "OrderDetails",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_PayoutDetails_Payouts_PayoutId",
+                        column: x => x.PayoutId,
+                        principalTable: "Payouts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Reviews",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    OrderDetailId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: true),
+                    OrderDetailId = table.Column<Guid>(type: "uuid", nullable: true),
                     ProductId = table.Column<Guid>(type: "uuid", nullable: true),
                     BlindBoxId = table.Column<Guid>(type: "uuid", nullable: true),
-                    SellerId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SellerId = table.Column<Guid>(type: "uuid", nullable: true),
                     OverallRating = table.Column<int>(type: "integer", nullable: false, defaultValue: 1),
                     Content = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     IsApproved = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
@@ -1076,6 +1183,50 @@ namespace BlindTreasure.Domain.Migrations
                     table.ForeignKey(
                         name: "FK_Reviews_Users_UserId",
                         column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ChatMessages",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    SenderId = table.Column<Guid>(type: "uuid", nullable: true),
+                    SenderType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ReceiverId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ReceiverType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    Content = table.Column<string>(type: "text", nullable: false),
+                    SentAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ReadAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    IsRead = table.Column<bool>(type: "boolean", nullable: false),
+                    MessageType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    FileUrl = table.Column<string>(type: "text", nullable: true),
+                    FileName = table.Column<string>(type: "text", nullable: true),
+                    FileSize = table.Column<string>(type: "text", nullable: true),
+                    FileMimeType = table.Column<string>(type: "text", nullable: true),
+                    InventoryItemId = table.Column<Guid>(type: "uuid", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DeletedBy = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ChatMessages", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ChatMessages_Users_ReceiverId",
+                        column: x => x.ReceiverId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_ChatMessages_Users_SenderId",
+                        column: x => x.SenderId,
                         principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
@@ -1173,6 +1324,43 @@ namespace BlindTreasure.Domain.Migrations
                         principalTable: "InventoryItems",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "OrderDetailInventoryItemLogs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrderDetailId = table.Column<Guid>(type: "uuid", nullable: true),
+                    InventoryItemId = table.Column<Guid>(type: "uuid", nullable: true),
+                    LogContent = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    LogTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ActionType = table.Column<int>(type: "integer", nullable: true),
+                    ValueStatusType = table.Column<int>(type: "integer", nullable: true),
+                    OldValue = table.Column<string>(type: "text", nullable: true),
+                    NewValue = table.Column<string>(type: "text", nullable: true),
+                    ActorId = table.Column<Guid>(type: "uuid", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DeletedBy = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OrderDetailInventoryItemLogs", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_OrderDetailInventoryItemLogs_InventoryItems_InventoryItemId",
+                        column: x => x.InventoryItemId,
+                        principalTable: "InventoryItems",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_OrderDetailInventoryItemLogs_OrderDetails_OrderDetailId",
+                        column: x => x.OrderDetailId,
+                        principalTable: "OrderDetails",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -1387,6 +1575,11 @@ namespace BlindTreasure.Domain.Migrations
                 column: "VerifiedBy");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ChatMessages_InventoryItemId",
+                table: "ChatMessages",
+                column: "InventoryItemId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ChatMessages_ReceiverId",
                 table: "ChatMessages",
                 column: "ReceiverId");
@@ -1490,6 +1683,16 @@ namespace BlindTreasure.Domain.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_OrderDetailInventoryItemLogs_InventoryItemId",
+                table: "OrderDetailInventoryItemLogs",
+                column: "InventoryItemId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OrderDetailInventoryItemLogs_OrderDetailId",
+                table: "OrderDetailInventoryItemLogs",
+                column: "OrderDetailId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OrderDetails_BlindBoxId",
                 table: "OrderDetails",
                 column: "BlindBoxId");
@@ -1503,11 +1706,6 @@ namespace BlindTreasure.Domain.Migrations
                 name: "IX_OrderDetails_ProductId",
                 table: "OrderDetails",
                 column: "ProductId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_OrderDetails_SellerId",
-                table: "OrderDetails",
-                column: "SellerId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrderDetailShipments_ShipmentsId",
@@ -1524,6 +1722,11 @@ namespace BlindTreasure.Domain.Migrations
                 name: "IX_Orders_PromotionId",
                 table: "Orders",
                 column: "PromotionId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Orders_SellerId",
+                table: "Orders",
+                column: "SellerId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Orders_ShippingAddressId",
@@ -1549,6 +1752,53 @@ namespace BlindTreasure.Domain.Migrations
                 name: "IX_OrderSellerPromotion_SellerId",
                 table: "OrderSellerPromotion",
                 column: "SellerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PayoutDetails_PayoutId",
+                table: "PayoutDetails",
+                column: "PayoutId");
+
+            migrationBuilder.CreateIndex(
+                name: "UK_PayoutDetails_OrderDetailId",
+                table: "PayoutDetails",
+                column: "OrderDetailId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PayoutLogs_LoggedAt",
+                table: "PayoutLogs",
+                column: "LoggedAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PayoutLogs_PayoutId",
+                table: "PayoutLogs",
+                column: "PayoutId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PayoutLogs_TriggeredByUserId",
+                table: "PayoutLogs",
+                column: "TriggeredByUserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Payouts_Seller_Period",
+                table: "Payouts",
+                columns: new[] { "SellerId", "PeriodStart", "PeriodEnd" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Payouts_SellerId",
+                table: "Payouts",
+                column: "SellerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Payouts_Status",
+                table: "Payouts",
+                column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Payouts_StripeTransferId",
+                table: "Payouts",
+                column: "StripeTransferId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ProbabilityConfigs_ApprovedBy",
@@ -1689,6 +1939,13 @@ namespace BlindTreasure.Domain.Migrations
                 column: "RoleName");
 
             migrationBuilder.AddForeignKey(
+                name: "FK_ChatMessages_InventoryItems_InventoryItemId",
+                table: "ChatMessages",
+                column: "InventoryItemId",
+                principalTable: "InventoryItems",
+                principalColumn: "Id");
+
+            migrationBuilder.AddForeignKey(
                 name: "FK_InventoryItems_TradeHistories_LastTradeHistoryId",
                 table: "InventoryItems",
                 column: "LastTradeHistoryId",
@@ -1747,8 +2004,8 @@ namespace BlindTreasure.Domain.Migrations
                 table: "BlindBoxes");
 
             migrationBuilder.DropForeignKey(
-                name: "FK_OrderDetails_Sellers_SellerId",
-                table: "OrderDetails");
+                name: "FK_Orders_Sellers_SellerId",
+                table: "Orders");
 
             migrationBuilder.DropForeignKey(
                 name: "FK_Products_Sellers_SellerId",
@@ -1775,32 +2032,12 @@ namespace BlindTreasure.Domain.Migrations
                 table: "OrderDetails");
 
             migrationBuilder.DropForeignKey(
-                name: "FK_CustomerBlindBoxes_OrderDetails_OrderDetailId",
-                table: "CustomerBlindBoxes");
+                name: "FK_Listings_InventoryItems_InventoryId",
+                table: "Listings");
 
             migrationBuilder.DropForeignKey(
-                name: "FK_InventoryItems_OrderDetails_OrderDetailId",
-                table: "InventoryItems");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_InventoryItems_Addresses_AddressId",
-                table: "InventoryItems");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_InventoryItems_CustomerBlindBoxes_SourceCustomerBlindBoxId",
-                table: "InventoryItems");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_InventoryItems_Shipments_ShipmentId",
-                table: "InventoryItems");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_InventoryItems_TradeHistories_LastTradeHistoryId",
-                table: "InventoryItems");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_InventoryItems_TradeRequests_LockedByRequestId",
-                table: "InventoryItems");
+                name: "FK_TradeHistories_InventoryItems_OfferedInventoryId",
+                table: "TradeHistories");
 
             migrationBuilder.DropTable(
                 name: "BlindBoxUnboxLogs");
@@ -1818,10 +2055,16 @@ namespace BlindTreasure.Domain.Migrations
                 name: "CustomerFavourites");
 
             migrationBuilder.DropTable(
+                name: "GroupPaymentSessions");
+
+            migrationBuilder.DropTable(
                 name: "ListingReports");
 
             migrationBuilder.DropTable(
                 name: "Notifications");
+
+            migrationBuilder.DropTable(
+                name: "OrderDetailInventoryItemLogs");
 
             migrationBuilder.DropTable(
                 name: "OrderDetailShipments");
@@ -1831,6 +2074,12 @@ namespace BlindTreasure.Domain.Migrations
 
             migrationBuilder.DropTable(
                 name: "OtpVerifications");
+
+            migrationBuilder.DropTable(
+                name: "PayoutDetails");
+
+            migrationBuilder.DropTable(
+                name: "PayoutLogs");
 
             migrationBuilder.DropTable(
                 name: "ProbabilityConfigs");
@@ -1854,6 +2103,9 @@ namespace BlindTreasure.Domain.Migrations
                 name: "Transactions");
 
             migrationBuilder.DropTable(
+                name: "Payouts");
+
+            migrationBuilder.DropTable(
                 name: "BlindBoxItems");
 
             migrationBuilder.DropTable(
@@ -1875,19 +2127,7 @@ namespace BlindTreasure.Domain.Migrations
                 name: "Products");
 
             migrationBuilder.DropTable(
-                name: "OrderDetails");
-
-            migrationBuilder.DropTable(
-                name: "Orders");
-
-            migrationBuilder.DropTable(
-                name: "Payments");
-
-            migrationBuilder.DropTable(
-                name: "Promotions");
-
-            migrationBuilder.DropTable(
-                name: "Addresses");
+                name: "InventoryItems");
 
             migrationBuilder.DropTable(
                 name: "CustomerBlindBoxes");
@@ -1902,10 +2142,22 @@ namespace BlindTreasure.Domain.Migrations
                 name: "TradeRequests");
 
             migrationBuilder.DropTable(
+                name: "OrderDetails");
+
+            migrationBuilder.DropTable(
                 name: "Listings");
 
             migrationBuilder.DropTable(
-                name: "InventoryItems");
+                name: "Orders");
+
+            migrationBuilder.DropTable(
+                name: "Addresses");
+
+            migrationBuilder.DropTable(
+                name: "Payments");
+
+            migrationBuilder.DropTable(
+                name: "Promotions");
         }
     }
 }
