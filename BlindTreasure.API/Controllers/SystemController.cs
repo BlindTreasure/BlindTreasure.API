@@ -2471,7 +2471,6 @@ public class SystemController : ControllerBase
         await _context.Promotions.AddRangeAsync(promotions);
         await _context.SaveChangesAsync();
     }
-
     private async Task SeedPromotionParticipants()
     {
         if (_context.PromotionParticipants.Any()) return;
@@ -2538,7 +2537,6 @@ public class SystemController : ControllerBase
             await _context.SaveChangesAsync();
         }
     }
-
     private async Task SeedSellerForUser(string sellerEmail)
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == sellerEmail);
@@ -2594,7 +2592,6 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Info($"Seller seeded successfully for {sellerEmail}.");
     }
-
     private async Task SeedRoles()
     {
         var roles = new List<Role>
@@ -2630,7 +2627,6 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Success("Roles seeded successfully.");
     }
-
     #endregion
 }
 
