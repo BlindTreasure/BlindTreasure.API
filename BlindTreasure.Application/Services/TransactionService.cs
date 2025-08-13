@@ -408,25 +408,26 @@ public class TransactionService : ITransactionService
                     od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
                 );
 
+                od.OrderDetailInventoryItemLogs.Add(log);
                 // Nếu có shipment, log trạng thái shipment cho inventory item
-                if (selectedShipment != null)
-                {
-                    var oldItemStatus = InventoryItemStatus.Available;
-                    var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
-                        selectedShipment,
-                        ShipmentStatus.WAITING_PAYMENT,
-                        selectedShipment.Status,
-                        order.Seller,
-                        shippingAddress
-                    );
+                //if (selectedShipment != null)
+                //{
+                //    var oldItemStatus = InventoryItemStatus.Available;
+                //    var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
+                //        selectedShipment,
+                //        ShipmentStatus.WAITING_PAYMENT,
+                //        selectedShipment.Status,
+                //        order.Seller,
+                //        shippingAddress
+                //    );
 
-                    await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
-                        dto,
-                        oldItemStatus,
-                        dto,
-                        trackingMessage
-                    );
-                }
+                //    await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                //        dto,
+                //        oldItemStatus,
+                //        dto,
+                //        trackingMessage
+                //    );
+                //}
 
             }
         }

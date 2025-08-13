@@ -141,7 +141,7 @@ namespace BlindTreasure.Application.Services
             catch (Exception ex) 
             {
                 _logger.Error("Error: " + ex.Message);
-                throw ErrorHelper.BadRequest(ex.Message);
+                throw;
             }
         }
 
