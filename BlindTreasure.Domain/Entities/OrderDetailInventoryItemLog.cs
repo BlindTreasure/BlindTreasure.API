@@ -35,7 +35,7 @@ namespace BlindTreasure.Domain.Entities
         ORDER_DETAIL,
         SHIPMENT,
         INVENTORY_ITEM,
-        BLIND_BOX,
+        CUSTOM_BLINDBOX,
         PAYMENT
     }
 }

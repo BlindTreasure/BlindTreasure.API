@@ -127,20 +127,26 @@ public class InventoryItemService : IInventoryItemService
 
     public async Task<InventoryItemDto?> GetByIdAsync(Guid id)
     {
-        var cacheKey = GetCacheKey(id);
-        var cached = await _cacheService.GetAsync<InventoryItem>(cacheKey);
-        if (cached != null && !cached.IsDeleted)
-        {
-            _loggerService.Info($"[GetByIdAsync] Cache hit for inventory item {id}");
-            return InventoryItemMapper.ToInventoryItemDto(cached);
-        }
+        //var cacheKey = GetCacheKey(id);
+        //var cached = await _cacheService.GetAsync<InventoryItem>(cacheKey);
+        //if (cached != null && !cached.IsDeleted)
+        //{
+        //    _loggerService.Info($"[GetByIdAsync] Cache hit for inventory item {id}");
+        //    return InventoryItemMapper.ToInventoryItemDto(cached);
+        //}
 
-        var item = await _unitOfWork.InventoryItems.GetByIdAsync(id, i => i.Product, i => i.Shipment,
-            i => i.OrderDetail);
+        var item = await _unitOfWork.InventoryItems.GetQueryable()
+            .Where(i => i.Id == id && !i.IsDeleted)
+            .Include(i => i.Product).ThenInclude(p => p.Category)
+            .Include(i => i.Product).ThenInclude(p => p.Seller)
+            .Include(i => i.OrderDetail)
+            .Include(i => i.Shipment)
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
         if (item == null || item.IsDeleted)
             return null;
 
-        await _cacheService.SetAsync(cacheKey, item, TimeSpan.FromMinutes(30));
+       // await _cacheService.SetAsync(cacheKey, item, TimeSpan.FromMinutes(30));
         _loggerService.Info($"[GetByIdAsync] Inventory item {id} loaded from DB and cached.");
         return InventoryItemMapper.ToInventoryItemDtoFullIncluded(item);
     }
