@@ -849,7 +849,7 @@ public class OrderService : IOrderService
         {
             var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
             var sellerMsg = $@"
-            Đơn hàng #{order.Id} của khách <b>{buyerName}</b> đã bị hủy bởi khách hàng.<br/>
+            Đơn hàng #{order.Id} của khách {buyerName} đã bị hủy bởi khách hàng.
             Vui lòng kiểm tra lại trạng thái đơn hàng trong hệ thống.";
             await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
             {
