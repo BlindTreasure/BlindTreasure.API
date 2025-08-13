@@ -21,13 +21,15 @@ public class OrderController : ControllerBase
     private readonly ILoggerService _logger;
     private readonly IOrderService _orderService;
     private readonly ITransactionService _transactionService;
+    private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
 
 
-    public OrderController(IOrderService orderService, ILoggerService logger, ITransactionService transactionService)
+    public OrderController(IOrderService orderService, ILoggerService logger, ITransactionService transactionService, IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _orderService = orderService;
         _transactionService = transactionService ?? throw new ArgumentNullException(nameof(transactionService));
+        _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService ?? throw new ArgumentNullException(nameof(orderDetailInventoryItemLogService));
     }
 
     [Authorize]
@@ -210,7 +212,7 @@ public class OrderController : ControllerBase
     /// <param name="groupId">Id của nhóm đơn hàng (CheckoutGroupId)</param>
     /// <returns>Danh sách đơn hàng thuộc group</returns>
     [Authorize]
-    [HttpGet("group/{groupId}")]
+    [HttpGet("group/{groupid}")]
     [ProducesResponseType(typeof(ApiResult<List<OrderDto>>), 200)]
     public async Task<IActionResult> GetOrdersByGroupId(Guid groupId)
     {
@@ -223,6 +225,48 @@ public class OrderController : ControllerBase
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDto>>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    /// <summary>
+    /// Lấy danh sách log của OrderDetail theo Id.
+    /// </summary>
+    [Authorize]
+    [HttpGet("order-details/{id}/logs")]
+    [ProducesResponseType(typeof(ApiResult<List<OrderDetailInventoryItemLogDto>>), 200)]
+    public async Task<IActionResult> GetOrderDetailLogs(Guid id)
+    {
+        try
+        {
+            var logs = await _orderDetailInventoryItemLogService.GetLogByOrderDetailIdAsync(id);
+            return Ok(ApiResult<List<OrderDetailInventoryItemLogDto>>.Success(logs, "200", "Lấy log của OrderDetail thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDetailInventoryItemLogDto>>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    /// <summary>
+    /// Lấy danh sách log của InventoryItem theo Id.
+    /// </summary>
+    [Authorize]
+    [HttpGet("inventory-items/{id}/logs")]
+    [ProducesResponseType(typeof(ApiResult<List<OrderDetailInventoryItemLogDto>>), 200)]
+    public async Task<IActionResult> GetInventoryItemLogs(Guid id)
+    {
+        try
+        {
+            var logs = await _orderDetailInventoryItemLogService.GetLogByInventoryItemIdAsync(id);
+            return Ok(ApiResult<List<OrderDetailInventoryItemLogDto>>.Success(logs, "200", "Lấy log của InventoryItem thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDetailInventoryItemLogDto>>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }

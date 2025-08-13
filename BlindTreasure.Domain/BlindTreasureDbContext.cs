@@ -55,6 +55,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<PayoutLog> PayoutLogs { get; set; }
     public DbSet<PayoutDetail> PayoutDetails { get; set; }
     public DbSet<GroupPaymentSession> GroupPaymentSessions { get; set; }
+    public DbSet<OrderDetailInventoryItemLog> OrderDetailInventoryItemLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

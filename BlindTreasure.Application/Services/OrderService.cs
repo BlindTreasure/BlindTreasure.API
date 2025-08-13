@@ -11,13 +11,8 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
-using OpenAI.ObjectModels.ResponseModels;
-using System.Linq.Expressions;
-using System.Security.Cryptography.X509Certificates;
-using System.Text.RegularExpressions;
-using static OpenAI.ObjectModels.SharedModels.IOpenAiModels;
+
 
 namespace BlindTreasure.Application.Services;
 
@@ -33,6 +28,7 @@ public class OrderService : IOrderService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
     private readonly INotificationService _notificationService; // Thêm dòng này
+    private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
 
     public OrderService(
         ICacheService cacheService,
@@ -44,7 +40,8 @@ public class OrderService : IOrderService
         IStripeService stripeService,
         IPromotionService promotionService,
         IGhnShippingService ghnShippingService,
-        INotificationService notificationService) // Thêm vào constructor
+        INotificationService notificationService,
+        IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -56,6 +53,7 @@ public class OrderService : IOrderService
         _promotionService = promotionService;
         _ghnShippingService = ghnShippingService;
         _notificationService = notificationService; // Gán vào field
+        _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService;
     }
 
     public async Task<MultiOrderCheckoutResultDto> CheckoutAsync(CreateCheckoutRequestDto dto)
@@ -378,6 +376,8 @@ public class OrderService : IOrderService
         result.CheckoutGroupId = orderGroupId;
         var createdOrderIds = new List<Guid>();
 
+        // Inject log service
+        var logService = _orderDetailInventoryItemLogService;
 
         foreach (var group in groups)
         {
@@ -437,7 +437,13 @@ public class OrderService : IOrderService
                     DetailDiscountPromotion = null,
                     FinalDetailPrice = unitPrice * item.Quantity
                 };
+
+                // Log OrderDetail creation
+                var log = await logService.LogOrderDetailCreationAsync(detail, $"Created {itemName}, Qty={item.Quantity}");
+                detail.OrderDetailInventoryItemLogs.Add(log);
+
                 order.OrderDetails.Add(detail);
+
             }
 
             // Apply promotion for this seller
@@ -518,9 +524,9 @@ public class OrderService : IOrderService
                         TotalFee = (int?)ghnResp?.TotalFee ?? 0,
                         MainServiceFee = (int?)ghnResp?.Fee?.MainService ?? 0,
                         TrackingNumber = ghnResp?.OrderCode ?? string.Empty,
-                        ShippedAt = DateTime.UtcNow,
-                        EstimatedDelivery = ghnResp?.ExpectedDeliveryTime ?? DateTime.UtcNow.AddDays(3),
-                        Status = ShipmentStatus.WAITING_PAYMENT
+                        EstimatedDelivery = ghnResp?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3),
+                        Status = ShipmentStatus.WAITING_PAYMENT,
+                      //  EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8,18)).AddMinutes(new Random().Next(60)) chưa thanh toán nên chưa có 
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
 
@@ -528,7 +534,9 @@ public class OrderService : IOrderService
                     {
                         od.Status = OrderDetailItemStatus.PENDING;
                         od.Shipments.Add(shipment);
-                        await _unitOfWork.OrderDetails.Update(od);
+                        // Log shipment added to OrderDetail
+                        var log = await logService.LogShipmentAddedAsync(od, shipment, $"Added shipment for GHN: {shipment.OrderCode}, Fee: {shipment.TotalFee:C}");
+                        od.OrderDetailInventoryItemLogs.Add(log);
                     }
                 }
 

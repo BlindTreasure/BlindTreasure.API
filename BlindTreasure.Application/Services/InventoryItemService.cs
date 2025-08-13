@@ -19,8 +19,6 @@ public class InventoryItemService : IInventoryItemService
     private readonly ICategoryService _categoryService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _loggerService;
-    private readonly IOrderService _orderService;
-    private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
     private readonly IStripeService _stripeService;
@@ -30,9 +28,7 @@ public class InventoryItemService : IInventoryItemService
         ICacheService cacheService,
         IClaimsService claimsService,
         ILoggerService loggerService,
-        IProductService productService,
         IUnitOfWork unitOfWork,
-        IOrderService orderService,
         ICategoryService categoryService,
         IGhnShippingService ghnShippingService,
         IStripeService stripeService)
@@ -40,9 +36,7 @@ public class InventoryItemService : IInventoryItemService
         _cacheService = cacheService;
         _claimsService = claimsService;
         _loggerService = loggerService;
-        _productService = productService;
         _unitOfWork = unitOfWork;
-        _orderService = orderService;
         _categoryService = categoryService; // initialize categoryService
         _ghnShippingService = ghnShippingService; // initialize ghnShippingService
         _stripeService = stripeService; // initialize stripeService
@@ -363,9 +357,9 @@ public class InventoryItemService : IInventoryItemService
                 TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0,
                 MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0),
                 TrackingNumber = ghnCreateResponse?.OrderCode ?? "",
-                ShippedAt = DateTime.UtcNow,
-                EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime != default
-                    ? ghnCreateResponse.ExpectedDeliveryTime
+                //ShippedAt = DateTime.UtcNow,
+                EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime.AddDays(1) != default
+                    ? ghnCreateResponse.ExpectedDeliveryTime.AddDays(1)
                     : DateTime.UtcNow.AddDays(3),
                 Status = ShipmentStatus.WAITING_PAYMENT
             };
