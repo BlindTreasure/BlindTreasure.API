@@ -90,7 +90,8 @@ public class TransactionService : ITransactionService
             }
 
             shipment.Status = ShipmentStatus.PROCESSING;
-            shipment.ShippedAt = DateTime.UtcNow.AddDays(4);
+            shipment.EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8, 18)).AddMinutes(new Random().Next(60));
+            //shipment.ShippedAt = DateTime.UtcNow.AddDays(4);
             await _unitOfWork.Shipments.Update(shipment);
         }
 
@@ -334,7 +335,7 @@ public class TransactionService : ITransactionService
         shipment.TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0;
         shipment.MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0);
         shipment.TrackingNumber = ghnCreateResponse?.OrderCode ?? "";
-        shipment.ShippedAt = DateTime.UtcNow.AddDays(4);
+        //shipment.ShippedAt = DateTime.UtcNow.AddDays(4);
         shipment.EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8, 18)).AddMinutes(new Random().Next(60));
         shipment.EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3);
         shipment.Status = ShipmentStatus.PROCESSING;
