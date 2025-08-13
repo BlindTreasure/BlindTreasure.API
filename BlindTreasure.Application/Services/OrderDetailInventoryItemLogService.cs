@@ -151,16 +151,16 @@ namespace BlindTreasure.Application.Services
             InventoryItem shipmentWithNewStatus,
             string trackingMessage)
         {
-            if (inventoryItem.OrderDetailId == null)
+            if (orderDetail == null)
             {
-                _logger.Warn($"InventoryItem {inventoryItem.Id} is not linked to any OrderDetail. Cannot log tracking update.");
+                _logger.Warn($"OrderDetail is not linked to any InventoryItem. Cannot log tracking update.");
                 return null!;
             }
 
             var log = new OrderDetailInventoryItemLog
             {
                 OrderDetailId = orderDetail.Id,
-                InventoryItemId = inventoryItem.Id,
+                InventoryItemId = shipmentWithNewStatus.Id,
                 ActionType = ActionType.SHIPMENT_STATUS_CHANGED,
                 LogContent = trackingMessage,
                 OldValue = oldStatus.ToString(),

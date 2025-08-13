@@ -21,15 +21,18 @@ public class SystemController : ControllerBase
     private readonly ICacheService _cacheService;
     private readonly IUnboxingService _unboxService;
     private readonly BlindTreasureDbContext _context;
-    private readonly ILoggerService _logger;
+    private readonly ILoggerService _logger; 
+    private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
+
 
     public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService,
-        IUnboxingService unboxService)
+        IUnboxingService unboxService, IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
     {
         _context = context;
         _logger = logger;
         _cacheService = cacheService;
         _unboxService = unboxService;
+        _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService;
     }
 
     [HttpPost("seed-all-data")]
@@ -715,6 +718,198 @@ public class SystemController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
+    /// <summary>
+    /// Giả lập thay đổi trạng thái Shipment (test luồng GHN thực tế).
+    /// </summary>
+    [HttpPost("dev/simulate-shipment-status")]
+    public async Task<IActionResult> SimulateShipmentStatus([FromBody] SimulateShipmentStatusRequest req)
+    {
+        var shipment = await _context.Shipments
+            .Include(s => s.OrderDetails)
+                .ThenInclude(od => od.Order)
+                    .ThenInclude(o => o.Seller)
+            .Include(s => s.OrderDetails)
+                .ThenInclude(od => od.Order)
+                    .ThenInclude(o => o.User)
+                        .ThenInclude(u => u.Addresses)
+            .Include(s => s.InventoryItems)
+            .FirstOrDefaultAsync(s => s.Id == req.ShipmentId);
+
+        if (shipment == null)
+            return NotFound("Shipment not found.");
+
+        var oldStatus = shipment.Status;
+        shipment.Status = req.NewStatus;
+        shipment.UpdatedAt = DateTime.UtcNow;
+
+        // Lấy Seller và Address từ OrderDetail đầu tiên (giả định shipment có ít nhất một OrderDetail)
+        Seller? seller = null;
+        Address? customerAddress = null;
+        if (shipment.OrderDetails != null && shipment.OrderDetails.Any())
+        {
+            var firstOrderDetail = shipment.OrderDetails.First();
+            seller = firstOrderDetail.Order?.Seller;
+            // Lấy địa chỉ mặc định của user đặt hàng
+            customerAddress = firstOrderDetail.Order?.User?.Addresses?.FirstOrDefault(a => a.IsDefault)
+                              ?? firstOrderDetail.Order?.User?.Addresses?.FirstOrDefault();
+        }
+
+        // Sinh tracking message thực tế
+        var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
+            shipment, oldStatus, req.NewStatus, seller!, customerAddress!);
+
+        // Log cho từng OrderDetail
+        foreach (var od in shipment.OrderDetails ?? new List<OrderDetail>())
+        {
+            await _orderDetailInventoryItemLogService.LogShipmentAddedAsync(od, shipment, trackingMessage);
+        }
+
+        // Log cho từng InventoryItem
+        foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
+        {
+            var oldItemStatus = item.Status;
+            // Optionally, update InventoryItem status based on shipment status
+            if (req.NewStatus == ShipmentStatus.DELIVERED)
+                item.Status = InventoryItemStatus.Delivering; // Or another status as per your flow
+
+            await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                item.OrderDetail,
+                oldItemStatus,
+                item,
+                trackingMessage
+            );
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new
+        {
+            shipment.Id,
+            shipment.Status,
+            TrackingMessage = trackingMessage,
+            Message = "Shipment status updated and logged with realistic tracking message."
+        });
+    }
+
+   
+
+    // Request DTOs
+    public class SimulateShipmentStatusRequest
+    {
+        public Guid ShipmentId { get; set; }
+        public ShipmentStatus NewStatus { get; set; }
+    }
+
+    [HttpPost("dev/simulate-shipment-full-flow")]
+    public async Task<IActionResult> SimulateShipmentFullFlow([FromBody] SimulateShipmentFullFlowRequest req)
+    {
+        var shipment = await _context.Shipments
+            .Include(s => s.OrderDetails)
+                .ThenInclude(od => od.Order)
+                    .ThenInclude(o => o.Seller)
+            .Include(s => s.OrderDetails)
+                .ThenInclude(od => od.Order)
+                    .ThenInclude(o => o.User)
+                        .ThenInclude(u => u.Addresses)
+            .Include(s => s.InventoryItems)
+            .FirstOrDefaultAsync(s => s.Id == req.ShipmentId);
+
+        if (shipment == null)
+            return NotFound("Shipment not found.");
+
+        // Define the full status flow
+        var statusFlow = new List<ShipmentStatus>
+    {
+        ShipmentStatus.WAITING_PAYMENT,
+        ShipmentStatus.PROCESSING,
+        ShipmentStatus.PICKED_UP,
+        ShipmentStatus.IN_TRANSIT,
+        ShipmentStatus.DELIVERED
+    };
+        if (req.Complete)
+            statusFlow.Add(ShipmentStatus.COMPLETED);
+
+        // Find the starting index
+        var startIndex = statusFlow.IndexOf(shipment.Status);
+        if (req.StartFrom != null)
+            startIndex = statusFlow.IndexOf(req.StartFrom.Value);
+        if (startIndex < 0) startIndex = 0;
+
+        // Simulate time intervals (e.g., 1 hour between each status)
+        var now = DateTime.UtcNow;
+        var timeStep = TimeSpan.FromHours(1);
+
+        var logs = new List<object>();
+        for (int i = startIndex + 1; i < statusFlow.Count; i++)
+        {
+            var oldStatus = shipment.Status;
+            var newStatus = statusFlow[i];
+            shipment.Status = newStatus;
+            shipment.UpdatedAt = now + timeStep * i;
+
+            // Seller & Address
+            Seller? seller = null;
+            Address? customerAddress = null;
+            if (shipment.OrderDetails != null && shipment.OrderDetails.Any())
+            {
+                var firstOrderDetail = shipment.OrderDetails.First();
+                seller = firstOrderDetail.Order?.Seller;
+                customerAddress = firstOrderDetail.Order?.User?.Addresses?.FirstOrDefault(a => a.IsDefault)
+                                  ?? firstOrderDetail.Order?.User?.Addresses?.FirstOrDefault();
+            }
+
+            // Generate tracking message
+            var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
+                shipment, oldStatus, newStatus, seller!, customerAddress!);
+
+            // Log for each OrderDetail
+            foreach (var od in shipment.OrderDetails ?? new List<OrderDetail>())
+            {
+                await _orderDetailInventoryItemLogService.LogShipmentAddedAsync(od, shipment, trackingMessage);
+            }
+
+            // Log for each InventoryItem
+            foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
+            {
+                var oldItemStatus = item.Status;
+                if (newStatus == ShipmentStatus.DELIVERED)
+                    item.Status = InventoryItemStatus.Delivering;
+
+                await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                    item.OrderDetail,
+                    oldItemStatus,
+                    item,
+                    trackingMessage
+                );
+            }
+
+            logs.Add(new
+            {
+                Status = newStatus,
+                Time = shipment.UpdatedAt,
+                TrackingMessage = trackingMessage
+            });
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            shipment.Id,
+            shipment.Status,
+            Message = "Shipment status flow simulated and logged.",
+            FlowLogs = logs
+        });
+    }
+
+    // DTO for request
+    public class SimulateShipmentFullFlowRequest
+    {
+        public Guid ShipmentId { get; set; }
+        public ShipmentStatus? StartFrom { get; set; }
+        public bool Complete { get; set; } = true;
+    }
+
 
     private List<User> GetPredefinedUsers()
     {
