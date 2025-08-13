@@ -212,7 +212,7 @@ public class OrderController : ControllerBase
     /// <param name="groupId">Id của nhóm đơn hàng (CheckoutGroupId)</param>
     /// <returns>Danh sách đơn hàng thuộc group</returns>
     [Authorize]
-    [HttpGet("{groupId}")]
+    [HttpGet("group/{groupId}")]
     [ProducesResponseType(typeof(ApiResult<List<OrderDto>>), 200)]
     public async Task<IActionResult> GetOrdersByGroupId(Guid groupId)
     {
