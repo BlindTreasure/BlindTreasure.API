@@ -148,7 +148,7 @@ namespace BlindTreasure.Application.Services
         public async Task<OrderDetailInventoryItemLog> LogShipmentTrackingInventoryItemUpdateAsync(
             OrderDetail orderDetail,
             InventoryItemStatus oldStatus,
-            InventoryItem shipmentWithNewStatus,
+            InventoryItem InventoryItemWithNewStatus,
             string trackingMessage)
         {
             if (orderDetail == null)
@@ -160,11 +160,11 @@ namespace BlindTreasure.Application.Services
             var log = new OrderDetailInventoryItemLog
             {
                 OrderDetailId = orderDetail.Id,
-                InventoryItemId = shipmentWithNewStatus.Id,
+                InventoryItemId = InventoryItemWithNewStatus.Id,
                 ActionType = ActionType.SHIPMENT_STATUS_CHANGED,
                 LogContent = trackingMessage,
                 OldValue = oldStatus.ToString(),
-                NewValue = shipmentWithNewStatus.Status.ToString(),
+                NewValue = InventoryItemWithNewStatus.Status.ToString(),
                 ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null,
                 LogTime = DateTime.UtcNow
             };
@@ -190,7 +190,7 @@ namespace BlindTreasure.Application.Services
         try
         {
             var message = new StringBuilder();
-            message.Append($"Shipment {shipment.OrderCode}: ");
+            message.Append($"Shipment {shipment.OrderCode}: Shipment Changed from {oldStatus} to {newStatus}");
 
             switch (newStatus)
             {

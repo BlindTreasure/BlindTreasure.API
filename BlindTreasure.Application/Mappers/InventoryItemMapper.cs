@@ -44,6 +44,7 @@ public static class InventoryItemMapper
         {
             Id = log.Id,
             OrderDetailId = log.OrderDetailId,
+            InventoryItemId = log.InventoryItemId,
             ActionType = log.ActionType,
             LogContent = log.LogContent,
             OldValue = log.OldValue,
