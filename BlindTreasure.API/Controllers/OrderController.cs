@@ -24,20 +24,23 @@ public class OrderController : ControllerBase
     private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
 
 
-    public OrderController(IOrderService orderService, ILoggerService logger, ITransactionService transactionService, IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
+    public OrderController(IOrderService orderService, ILoggerService logger, ITransactionService transactionService,
+        IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _orderService = orderService;
         _transactionService = transactionService ?? throw new ArgumentNullException(nameof(transactionService));
-        _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService ?? throw new ArgumentNullException(nameof(orderDetailInventoryItemLogService));
+        _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService ??
+                                              throw new ArgumentNullException(
+                                                  nameof(orderDetailInventoryItemLogService));
     }
 
-    [Authorize]
     /// <summary>
-    ///     Đặt hàng (checkout) từ cart truyền lên từ client, trả về link thanh toán Stripe.
+    /// Đặt hàng (checkout) từ cart truyền lên từ client, trả về link thanh toán Stripe.
     /// </summary>
     /// <param name="cart">Cart truyền từ FE (danh sách sản phẩm, số lượng, giá, ...)</param>
     /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
+    [Authorize]
     [HttpPost("checkout-direct")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
@@ -56,13 +59,12 @@ public class OrderController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-
-    [Authorize]
     /// <summary>
     ///     Đặt hàng (checkout) từ giỏ hàng hiện tại, trả về link thanh toán Stripe.
     /// </summary>
     /// <param name="dto">Thông tin đặt hàng (địa chỉ giao hàng, ...)</param>
     /// <returns>Link thanh toán Stripe cho đơn hàng vừa tạo</returns>
+    [Authorize]
     [HttpPost("checkout")]
     [ProducesResponseType(typeof(ApiResult<string>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
@@ -85,7 +87,7 @@ public class OrderController : ControllerBase
     /// <summary>
     ///     Lấy chi tiết một đơn hàng của user hiện tại.
     /// </summary>
-    /// <param name="orderId">Id đơn hàng</param>
+    /// <param name="id">Id đơn hàng</param>
     /// <returns>Chi tiết đơn hàng</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResult<OrderDto>), 200)]
@@ -219,7 +221,8 @@ public class OrderController : ControllerBase
         try
         {
             var result = await _orderService.GetOrderByCheckoutGroupId(groupId);
-            return Ok(ApiResult<List<OrderDto>>.Success(result, "200", "Lấy danh sách đơn hàng theo group thành công."));
+            return Ok(ApiResult<List<OrderDto>>.Success(result, "200",
+                "Lấy danh sách đơn hàng theo group thành công."));
         }
         catch (Exception ex)
         {
@@ -240,7 +243,8 @@ public class OrderController : ControllerBase
         try
         {
             var logs = await _orderDetailInventoryItemLogService.GetLogByOrderDetailIdAsync(id);
-            return Ok(ApiResult<List<OrderDetailInventoryItemLogDto>>.Success(logs, "200", "Lấy log của OrderDetail thành công."));
+            return Ok(ApiResult<List<OrderDetailInventoryItemLogDto>>.Success(logs, "200",
+                "Lấy log của OrderDetail thành công."));
         }
         catch (Exception ex)
         {
@@ -261,7 +265,8 @@ public class OrderController : ControllerBase
         try
         {
             var logs = await _orderDetailInventoryItemLogService.GetLogByInventoryItemIdAsync(id);
-            return Ok(ApiResult<List<OrderDetailInventoryItemLogDto>>.Success(logs, "200", "Lấy log của InventoryItem thành công."));
+            return Ok(ApiResult<List<OrderDetailInventoryItemLogDto>>.Success(logs, "200",
+                "Lấy log của InventoryItem thành công."));
         }
         catch (Exception ex)
         {
