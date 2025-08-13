@@ -42,8 +42,8 @@ public class UnitOfWork : IUnitOfWork
         IGenericRepository<TradeRequest> tradeRequests,
         IGenericRepository<TradeRequestItem> tradeRequestItems,
         IGenericRepository<CustomerFavourite> customerFavourites,
-        IGenericRepository<OrderSellerPromotion> orderSellerPromotion, 
-        IGenericRepository<Review> reviews, 
+        IGenericRepository<OrderSellerPromotion> orderSellerPromotion,
+        IGenericRepository<Review> reviews,
         IGenericRepository<GroupPaymentSession> groupPaymentSessions,
         IGenericRepository<OrderDetailInventoryItemLog> orderDetailInventoryItemLogs,
         IDbContextTransaction? transaction = null

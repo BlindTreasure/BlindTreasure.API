@@ -94,8 +94,7 @@ public static class OrderDtoMapper
                 TotalShippingFee = order.TotalShippingFee ?? 0,
                 CheckoutGroupId = order.CheckoutGroupId,
                 SellerId = order.SellerId,
-               Seller = order.Seller != null ? SellerMapper.ToSellerProfileDto(order.Seller) : null
-
+                Seller = order.Seller != null ? SellerMapper.ToSellerProfileDto(order.Seller) : null
             };
         }
         catch (Exception ex)

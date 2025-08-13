@@ -30,8 +30,8 @@ public static class ShipmentDtoMapper
             Status = shipment.Status,
             EstimatedPickupTime = shipment.EstimatedPickupTime,
             PickedUpAt = shipment.PickedUpAt,
-            EstimatedDelivery = shipment.EstimatedDelivery,// Ngày dự kiến giao hàng
-            ShippedAt = shipment.ShippedAt, // Ngày giao hàng
+            EstimatedDelivery = shipment.EstimatedDelivery, // Ngày dự kiến giao hàng
+            ShippedAt = shipment.ShippedAt // Ngày giao hàng
         };
     }
 

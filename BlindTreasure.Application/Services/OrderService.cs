@@ -323,8 +323,8 @@ public class OrderService : IOrderService
     }
 
     private async Task<MultiOrderCheckoutResultDto> CheckoutCore(
-    List<SellerCheckoutGroup> groups,
-    Guid? shippingAddressId)
+        List<SellerCheckoutGroup> groups,
+        Guid? shippingAddressId)
     {
         _loggerService.Info("Start multi-seller checkout logic.");
 
@@ -382,7 +382,7 @@ public class OrderService : IOrderService
         foreach (var group in groups)
         {
             var seller = products.FirstOrDefault(p => p.SellerId == group.SellerId)?.Seller
-                ?? blindBoxes.FirstOrDefault(b => b.SellerId == group.SellerId)?.Seller;
+                         ?? blindBoxes.FirstOrDefault(b => b.SellerId == group.SellerId)?.Seller;
 
             var order = new Order
             {
@@ -439,11 +439,11 @@ public class OrderService : IOrderService
                 };
 
                 // Log OrderDetail creation
-                var log = await logService.LogOrderDetailCreationAsync(detail, $"Created {itemName}, Qty={item.Quantity}");
+                var log = await logService.LogOrderDetailCreationAsync(detail,
+                    $"Created {itemName}, Qty={item.Quantity}");
                 detail.OrderDetailInventoryItemLogs.Add(log);
 
                 order.OrderDetails.Add(detail);
-
             }
 
             // Apply promotion for this seller
@@ -525,8 +525,8 @@ public class OrderService : IOrderService
                         MainServiceFee = (int?)ghnResp?.Fee?.MainService ?? 0,
                         TrackingNumber = ghnResp?.OrderCode ?? string.Empty,
                         EstimatedDelivery = ghnResp?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3),
-                        Status = ShipmentStatus.WAITING_PAYMENT,
-                      //  EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8,18)).AddMinutes(new Random().Next(60)) chưa thanh toán nên chưa có 
+                        Status = ShipmentStatus.WAITING_PAYMENT
+                        //  EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8,18)).AddMinutes(new Random().Next(60)) chưa thanh toán nên chưa có 
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);
 
@@ -535,7 +535,8 @@ public class OrderService : IOrderService
                         od.Status = OrderDetailItemStatus.PENDING;
                         od.Shipments.Add(shipment);
                         // Log shipment added to OrderDetail
-                        var log = await logService.LogShipmentAddedAsync(od, shipment, $"Added shipment for GHN: {shipment.OrderCode}, Fee: {shipment.TotalFee:C}");
+                        var log = await logService.LogShipmentAddedAsync(od, shipment,
+                            $"Added shipment for GHN: {shipment.OrderCode}, Fee: {shipment.TotalFee:C}");
                         od.OrderDetailInventoryItemLogs.Add(log);
                     }
                 }
@@ -563,10 +564,8 @@ public class OrderService : IOrderService
 
         // Tạo link thanh toán tổng cho tất cả order
         if (createdOrderIds.Count == 1)
-        {
             // If only one order, use its payment URL
             result.GeneralPaymentUrl = result.Orders.First().PaymentUrl;
-        }
         else
             // Multiple orders, create a general checkout session
             result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
@@ -644,7 +643,6 @@ public class OrderService : IOrderService
         }
         catch (Exception ex)
         {
-
             throw ErrorHelper.BadRequest("[SendPaymentNotificationToUser] error:" + ex.Message);
         }
     }
@@ -720,7 +718,7 @@ public class OrderService : IOrderService
     }
 
     public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(
-    List<CartSellerItemDto> sellerItems, bool? isPreview = false)
+        List<CartSellerItemDto> sellerItems, bool? isPreview = false)
     {
         _loggerService.Info("Preview shipping checkout (by seller items) started.");
         var userId = _claimsService.CurrentUserId;
@@ -817,14 +815,12 @@ public class OrderService : IOrderService
             await _unitOfWork.OrderDetails.Update(detail);
 
             if (detail.Shipments != null)
-            {
                 foreach (var shipment in detail.Shipments)
                 {
                     shipment.Status = ShipmentStatus.CANCELLED;
                     shipment.UpdatedAt = DateTime.UtcNow;
                     await _unitOfWork.Shipments.Update(shipment);
                 }
-            }
         }
 
         await _unitOfWork.Orders.Update(order);
@@ -836,7 +832,6 @@ public class OrderService : IOrderService
 
         // Thông báo cho user và seller
         if (order.User != null)
-        {
             await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
             {
                 Title = $"Đơn hàng #{order.Id} đã được hủy",
@@ -844,7 +839,6 @@ public class OrderService : IOrderService
                 Type = NotificationType.Order,
                 SourceUrl = null
             });
-        }
         if (order.Seller?.User != null)
         {
             var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
@@ -899,21 +893,18 @@ public class OrderService : IOrderService
                 await _unitOfWork.OrderDetails.Update(detail);
 
                 if (detail.Shipments != null)
-                {
                     foreach (var shipment in detail.Shipments)
                     {
                         shipment.Status = ShipmentStatus.CANCELLED;
                         shipment.UpdatedAt = DateTime.UtcNow;
                         await _unitOfWork.Shipments.Update(shipment);
                     }
-                }
             }
 
             await _unitOfWork.Orders.Update(order);
 
             // Thông báo cho user và seller
             if (order.User != null)
-            {
                 await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
                 {
                     Title = $"Đơn hàng #{order.Id} đã được hủy",
@@ -921,7 +912,6 @@ public class OrderService : IOrderService
                     Type = NotificationType.Order,
                     SourceUrl = null
                 });
-            }
             if (order.Seller?.User != null)
             {
                 var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";

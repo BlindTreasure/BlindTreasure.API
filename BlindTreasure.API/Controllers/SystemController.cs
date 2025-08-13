@@ -21,7 +21,7 @@ public class SystemController : ControllerBase
     private readonly ICacheService _cacheService;
     private readonly IUnboxingService _unboxService;
     private readonly BlindTreasureDbContext _context;
-    private readonly ILoggerService _logger; 
+    private readonly ILoggerService _logger;
     private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
 
 
@@ -727,12 +727,12 @@ public class SystemController : ControllerBase
     {
         var shipment = await _context.Shipments
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.Order)
-                    .ThenInclude(o => o.Seller)
+            .ThenInclude(od => od.Order)
+            .ThenInclude(o => o.Seller)
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.Order)
-                    .ThenInclude(o => o.User)
-                        .ThenInclude(u => u.Addresses)
+            .ThenInclude(od => od.Order)
+            .ThenInclude(o => o.User)
+            .ThenInclude(u => u.Addresses)
             .Include(s => s.InventoryItems)
             .FirstOrDefaultAsync(s => s.Id == req.ShipmentId);
 
@@ -761,9 +761,7 @@ public class SystemController : ControllerBase
 
         // Log cho từng OrderDetail
         foreach (var od in shipment.OrderDetails ?? new List<OrderDetail>())
-        {
             await _orderDetailInventoryItemLogService.LogShipmentAddedAsync(od, shipment, trackingMessage);
-        }
 
         // Log cho từng InventoryItem
         foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
@@ -791,7 +789,6 @@ public class SystemController : ControllerBase
         });
     }
 
-   
 
     // Request DTOs
     public class SimulateShipmentStatusRequest
@@ -805,12 +802,12 @@ public class SystemController : ControllerBase
     {
         var shipment = await _context.Shipments
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.Order)
-                    .ThenInclude(o => o.Seller)
+            .ThenInclude(od => od.Order)
+            .ThenInclude(o => o.Seller)
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.Order)
-                    .ThenInclude(o => o.User)
-                        .ThenInclude(u => u.Addresses)
+            .ThenInclude(od => od.Order)
+            .ThenInclude(o => o.User)
+            .ThenInclude(u => u.Addresses)
             .Include(s => s.InventoryItems)
             .FirstOrDefaultAsync(s => s.Id == req.ShipmentId);
 
@@ -819,13 +816,13 @@ public class SystemController : ControllerBase
 
         // Define the full status flow
         var statusFlow = new List<ShipmentStatus>
-    {
-        ShipmentStatus.WAITING_PAYMENT,
-        ShipmentStatus.PROCESSING,
-        ShipmentStatus.PICKED_UP,
-        ShipmentStatus.IN_TRANSIT,
-        ShipmentStatus.DELIVERED
-    };
+        {
+            ShipmentStatus.WAITING_PAYMENT,
+            ShipmentStatus.PROCESSING,
+            ShipmentStatus.PICKED_UP,
+            ShipmentStatus.IN_TRANSIT,
+            ShipmentStatus.DELIVERED
+        };
         if (req.Complete)
             statusFlow.Add(ShipmentStatus.COMPLETED);
 
@@ -840,7 +837,7 @@ public class SystemController : ControllerBase
         var timeStep = TimeSpan.FromHours(1);
 
         var logs = new List<object>();
-        for (int i = startIndex + 1; i < statusFlow.Count; i++)
+        for (var i = startIndex + 1; i < statusFlow.Count; i++)
         {
             var oldStatus = shipment.Status;
             var newStatus = statusFlow[i];
@@ -864,9 +861,7 @@ public class SystemController : ControllerBase
 
             // Log for each OrderDetail
             foreach (var od in shipment.OrderDetails ?? new List<OrderDetail>())
-            {
                 await _orderDetailInventoryItemLogService.LogShipmentAddedAsync(od, shipment, trackingMessage);
-            }
 
             // Log for each InventoryItem
             foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
@@ -2471,6 +2466,7 @@ public class SystemController : ControllerBase
         await _context.Promotions.AddRangeAsync(promotions);
         await _context.SaveChangesAsync();
     }
+
     private async Task SeedPromotionParticipants()
     {
         if (_context.PromotionParticipants.Any()) return;
@@ -2537,6 +2533,7 @@ public class SystemController : ControllerBase
             await _context.SaveChangesAsync();
         }
     }
+
     private async Task SeedSellerForUser(string sellerEmail)
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == sellerEmail);
@@ -2592,6 +2589,7 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Info($"Seller seeded successfully for {sellerEmail}.");
     }
+
     private async Task SeedRoles()
     {
         var roles = new List<Role>
@@ -2627,6 +2625,7 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Success("Roles seeded successfully.");
     }
+
     #endregion
 }
 

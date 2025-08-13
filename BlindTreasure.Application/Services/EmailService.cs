@@ -374,8 +374,8 @@ public class EmailService : IEmailService
         var userName = order.User.FullName ?? order.User.Email;
         var orderId = order.Id.ToString();
 
-        string subject = $"Đơn hàng #{orderId} đã bị hủy - BlindTreasure";
-        string htmlContent = $@"
+        var subject = $"Đơn hàng #{orderId} đã bị hủy - BlindTreasure";
+        var htmlContent = $@"
         <html style=""background-color:#ebeaea;margin:0;padding:0;"">
             <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
                 <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #d02a2a;border-radius:8px;overflow:hidden;"">
