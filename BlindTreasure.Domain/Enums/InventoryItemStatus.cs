@@ -6,5 +6,6 @@ public enum InventoryItemStatus
     Shipment_requested,
     Delivering,
     Listed,
-    OnHold
+    OnHold,
+    Delivered
 }

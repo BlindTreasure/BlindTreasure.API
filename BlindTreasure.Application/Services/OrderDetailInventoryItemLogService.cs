@@ -14,118 +14,35 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Application.Services;
-
-public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogService
+namespace BlindTreasure.Application.Services
 {
-    private readonly ICacheService _cacheService;
-    private readonly IClaimsService _claimsService;
-    private readonly IInventoryItemService _inventoryItemService;
-    private readonly ILoggerService _logger;
-    private readonly IUnitOfWork _unitOfWork;
-
-    public OrderDetailInventoryItemLogService(ICacheService cacheService, IClaimsService claimsService,
-        IInventoryItemService inventoryItemService, ILoggerService logger, IUnitOfWork unitOfWork)
+    public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogService
     {
-        _cacheService = cacheService;
-        _claimsService = claimsService;
-        _inventoryItemService = inventoryItemService;
-        _logger = logger;
-        _unitOfWork = unitOfWork;
-    }
+        private readonly ICacheService _cacheService;
+        private readonly IClaimsService _claimsService;
+        private readonly IInventoryItemService _inventoryItemService;
+        private readonly ILoggerService _logger;
+        private readonly IUnitOfWork _unitOfWork;
 
-    // Implement methods for OrderDetailInventoryItemLogService here
-    public async Task<OrderDetailInventoryItemLog> LogOrderDetailCreationAsync(OrderDetail orderDetail, string? msg)
-    {
-        var log = new OrderDetailInventoryItemLog
+        public OrderDetailInventoryItemLogService(ICacheService cacheService, IClaimsService claimsService,  IInventoryItemService inventoryItemService, ILoggerService logger, IUnitOfWork unitOfWork)
         {
-            OrderDetailId = orderDetail.Id,
-            ActionType = ActionType.ORDER_DETAIL_CREATED,
-            LogContent = msg ?? $"Order detail created for {(orderDetail.ProductId.HasValue ? "product" : "blindbox")}",
-            OldValue = null,
-            NewValue = orderDetail.Status.ToString(),
-            ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
-        };
-
-        if (log.ActorId == null)
-        {
-            _logger.Warn("This update made by system");
-            log.LogContent += " (System action)";
+            _cacheService = cacheService;
+            _claimsService = claimsService;
+            _inventoryItemService = inventoryItemService;
+            _logger = logger;
+            _unitOfWork = unitOfWork;
         }
 
-        var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-        //await _unitOfWork.SaveChangesAsync();
-        return result;
-    }
-
-    public async Task<OrderDetailInventoryItemLog> LogShipmentAddedAsync(
-        OrderDetail orderDetail,
-        Shipment shipment, string? msg)
-    {
-        var log = new OrderDetailInventoryItemLog
-        {
-            OrderDetailId = orderDetail.Id,
-            ActionType = ActionType.SHIPMENT_ADDED,
-            LogContent = msg ?? $"Shipment added: {shipment.Id} for this order-detail",
-            OldValue = null,
-            NewValue = shipment.Status.ToString(),
-            ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
-        };
-
-        if (log.ActorId == null)
-        {
-            _logger.Warn("This update made by system");
-            log.LogContent += " (System action)";
-        }
-
-        var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-        //await _unitOfWork.SaveChangesAsync();
-        return result;
-    }
-
-    public async Task<OrderDetailInventoryItemLog> LogOrderDetailStatusChangeAsync(
-        OrderDetail orderDetail,
-        OrderDetailItemStatus oldStatus,
-        OrderDetailItemStatus newStatus, string? msg)
-    {
-        var log = new OrderDetailInventoryItemLog
-        {
-            OrderDetailId = orderDetail.Id,
-            ActionType = ActionType.ORDER_DETAIL_STATUS_CHANGED,
-            LogContent = msg ?? $"Order detail status updated, become to: {newStatus}",
-            OldValue = oldStatus.ToString(),
-            NewValue = newStatus.ToString(),
-            ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
-        };
-
-        if (log.ActorId == null)
-        {
-            _logger.Warn("This update made by system");
-            log.LogContent += " (System action)";
-        }
-
-        var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-        //await _unitOfWork.SaveChangesAsync();
-        return result;
-    }
-
-    public async Task<OrderDetailInventoryItemLog> LogInventoryItemOrCustomerBlindboxAddedAsync(
-        OrderDetail orderDetail,
-        InventoryItem? inventoryItem,
-        CustomerBlindBox? blindBox, string? msg)
-    {
-        try
+        // Implement methods for OrderDetailInventoryItemLogService here
+        public async Task<OrderDetailInventoryItemLog> LogOrderDetailCreationAsync(OrderDetail orderDetail, string? msg)
         {
             var log = new OrderDetailInventoryItemLog
             {
                 OrderDetailId = orderDetail.Id,
-                InventoryItemId = inventoryItem?.Id,
-                ActionType = inventoryItem != null ? ActionType.INVENTORY_ITEM_ADDED : ActionType.BLIND_BOX_ADDED,
-                LogContent = msg ?? (inventoryItem != null
-                    ? $"Inventory item created: {inventoryItem.Id}"
-                    : $"Blind box added: {blindBox?.BlindBoxId}"),
+                ActionType = ActionType.ORDER_DETAIL_CREATED,
+                LogContent = msg ?? $"Order detail created for {(orderDetail.ProductId.HasValue ? "product" : "blindbox")}",
                 OldValue = null,
-                NewValue = inventoryItem != null ? inventoryItem.Status.ToString() : "UNOPENED",
+                NewValue = orderDetail.Status.ToString(),
                 ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
             };
 
@@ -139,49 +56,131 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
             //await _unitOfWork.SaveChangesAsync();
             return result;
         }
-        catch (Exception ex)
-        {
-            _logger.Error("Error: " + ex.Message);
-            throw;
-        }
-    }
 
-    public async Task<OrderDetailInventoryItemLog> LogShipmentTrackingInventoryItemUpdateAsync(
-        OrderDetail orderDetail,
-        InventoryItemStatus oldStatus,
-        InventoryItem shipmentWithNewStatus,
-        string trackingMessage)
-    {
-        if (orderDetail == null)
+        public async Task<OrderDetailInventoryItemLog> LogShipmentAddedAsync(
+            OrderDetail orderDetail,
+            Shipment shipment, string? msg)
         {
-            _logger.Warn($"OrderDetail is not linked to any InventoryItem. Cannot log tracking update.");
-            return null!;
-        }
+            var log = new OrderDetailInventoryItemLog
+            {
+                OrderDetailId = orderDetail.Id,
+                ActionType = ActionType.SHIPMENT_ADDED,
+                LogContent = msg ?? $"Shipment added: {shipment.Id} for this order-detail",
+                OldValue = null,
+                NewValue = shipment.Status.ToString(),
+                ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
+            };
 
-        var log = new OrderDetailInventoryItemLog
-        {
-            OrderDetailId = orderDetail.Id,
-            InventoryItemId = shipmentWithNewStatus.Id,
-            ActionType = ActionType.SHIPMENT_STATUS_CHANGED,
-            LogContent = trackingMessage,
-            OldValue = oldStatus.ToString(),
-            NewValue = shipmentWithNewStatus.Status.ToString(),
-            ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null,
-            LogTime = DateTime.UtcNow
-        };
+            if (log.ActorId == null)
+            {
+                _logger.Warn("This update made by system");
+                log.LogContent += " (System action)";
+            }
 
-        if (log.ActorId == null)
-        {
-            _logger.Warn("This update made by system");
-            log.LogContent += " (System action)";
+            var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
+            //await _unitOfWork.SaveChangesAsync();
+            return result;
         }
 
-        var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-        //await _unitOfWork.SaveChangesAsync();
-        return result;
-    }
+        public async Task<OrderDetailInventoryItemLog> LogOrderDetailStatusChangeAsync(
+            OrderDetail orderDetail,
+            OrderDetailItemStatus oldStatus,
+            OrderDetailItemStatus newStatus, string? msg)
+        {
+            var log = new OrderDetailInventoryItemLog
+            {
+                OrderDetailId = orderDetail.Id,
+                ActionType = ActionType.ORDER_DETAIL_STATUS_CHANGED,
+                LogContent = msg ?? $"Order detail status updated, become to: {newStatus}",
+                OldValue = oldStatus.ToString(),
+                NewValue = newStatus.ToString(),
+                ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
+            };
 
-    public async Task<string> GenerateTrackingMessageAsync(
+            if (log.ActorId == null)
+            {
+                _logger.Warn("This update made by system");
+                log.LogContent += " (System action)";
+            }
+
+            var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
+            //await _unitOfWork.SaveChangesAsync();
+            return result;
+        }
+
+        public async Task<OrderDetailInventoryItemLog> LogInventoryItemOrCustomerBlindboxAddedAsync(
+            OrderDetail orderDetail,
+            InventoryItem? inventoryItem,
+            CustomerBlindBox? blindBox, string? msg)
+        {
+            try
+            {
+                var log = new OrderDetailInventoryItemLog
+                {
+                    OrderDetailId = orderDetail.Id,
+                    InventoryItemId = inventoryItem?.Id,
+                    ActionType = inventoryItem != null ? ActionType.INVENTORY_ITEM_ADDED : ActionType.BLIND_BOX_ADDED,
+                    LogContent = msg ?? (inventoryItem != null
+                    ? $"Inventory item created: {inventoryItem.Id}"
+                    : $"Blind box added: {blindBox?.BlindBoxId}"),
+                    OldValue = null,
+                    NewValue = inventoryItem != null ? inventoryItem.Status.ToString() : "UNOPENED",
+                    ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
+                };
+
+                if (log.ActorId == null)
+                {
+                    _logger.Warn("This update made by system");
+                    log.LogContent += " (System action)";
+                }
+
+                var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
+                //await _unitOfWork.SaveChangesAsync();
+                return result;
+            }
+            catch (Exception ex) 
+            {
+                _logger.Error("Error: " + ex.Message);
+                throw;
+            }
+        }
+
+        public async Task<OrderDetailInventoryItemLog> LogShipmentTrackingInventoryItemUpdateAsync(
+            OrderDetail orderDetail,
+            InventoryItemStatus oldStatus,
+            InventoryItem InventoryItemWithNewStatus,
+            string trackingMessage)
+        {
+            if (orderDetail == null)
+            {
+                _logger.Warn($"OrderDetail is not linked to any InventoryItem. Cannot log tracking update.");
+                return null!;
+            }
+
+            var log = new OrderDetailInventoryItemLog
+            {
+                OrderDetailId = orderDetail.Id,
+                InventoryItemId = InventoryItemWithNewStatus.Id,
+                ActionType = ActionType.SHIPMENT_STATUS_CHANGED,
+                LogContent = trackingMessage,
+                OldValue = oldStatus.ToString(),
+                NewValue = InventoryItemWithNewStatus.Status.ToString(),
+                ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null,
+                LogTime = DateTime.UtcNow
+            };
+
+            if (log.ActorId == null)
+            {
+                _logger.Warn("This update made by system");
+                log.LogContent += " (System action)";
+            }
+
+            var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
+            //await _unitOfWork.SaveChangesAsync();
+            return result;
+        }
+
+        public async Task<string> GenerateTrackingMessageAsync(
         Shipment shipment,
         ShipmentStatus oldStatus,
         ShipmentStatus newStatus,
@@ -191,13 +190,12 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         try
         {
             var message = new StringBuilder();
-            message.Append($"Shipment {shipment.OrderCode}: ");
+            message.Append($"Shipment {shipment.OrderCode}: Shipment Changed from {oldStatus} to {newStatus}");
 
             switch (newStatus)
             {
                 case ShipmentStatus.PROCESSING:
-                    message.Append(
-                        $"Shipment requested. Pickup scheduled at {shipment.EstimatedPickupTime:yyyy-MM-dd HH:mm} ");
+                    message.Append($"Shipment requested. Pickup scheduled at {shipment.EstimatedPickupTime:yyyy-MM-dd HH:mm} ");
                     message.Append($"from {seller?.CompanyAddress}.");
                     break;
 
@@ -207,8 +205,7 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
                     break;
 
                 case ShipmentStatus.IN_TRANSIT:
-                    message.Append(
-                        $"Item in transit by GHN, estimated Delivery {shipment.EstimatedDelivery:yyyy-MM-dd}.");
+                    message.Append($"Item in transit by GHN, estimated Delivery {shipment.EstimatedDelivery:yyyy-MM-dd}.");
                     break;
 
                 case ShipmentStatus.DELIVERED:
@@ -227,32 +224,35 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         {
             _logger.Error($"GenerateTrackingMessage error: {ex.Message}");
             return $"Shipment update: {oldStatus} → {newStatus}";
+    }
+    
+}
+        /// <summary>
+        /// Lấy danh sách log theo OrderDetailId.
+        /// </summary>
+        public async Task<List<OrderDetailInventoryItemLogDto>> GetLogByOrderDetailIdAsync(Guid orderDetailId)
+        {
+            var logs = await _unitOfWork.OrderDetailInventoryItemLogs.GetQueryable()
+                .Where(l => l.OrderDetailId == orderDetailId)
+                .OrderByDescending(l => l.CreatedAt)
+                .ToListAsync();
+
+            return logs.Select(InventoryItemMapper.ToOrderDetailInventoryItemLogDto).ToList();
+        }
+
+        /// <summary>
+        /// Lấy danh sách log theo InventoryItemId.
+        /// </summary>
+        public async Task<List<OrderDetailInventoryItemLogDto>> GetLogByInventoryItemIdAsync(Guid inventoryItemId)
+        {
+            var logs = await _unitOfWork.OrderDetailInventoryItemLogs.GetQueryable()
+                .Where(l => l.InventoryItemId == inventoryItemId)
+                .OrderByDescending(l => l.CreatedAt)
+                .ToListAsync();
+
+            return logs.Select(InventoryItemMapper.ToOrderDetailInventoryItemLogDto).ToList();
         }
     }
 
-    /// <summary>
-    /// Lấy danh sách log theo OrderDetailId.
-    /// </summary>
-    public async Task<List<OrderDetailInventoryItemLogDto>> GetLogByOrderDetailIdAsync(Guid orderDetailId)
-    {
-        var logs = await _unitOfWork.OrderDetailInventoryItemLogs.GetQueryable()
-            .Where(l => l.OrderDetailId == orderDetailId)
-            .OrderByDescending(l => l.CreatedAt)
-            .ToListAsync();
 
-        return logs.Select(InventoryItemMapper.ToOrderDetailInventoryItemLogDto).ToList();
-    }
-
-    /// <summary>
-    /// Lấy danh sách log theo InventoryItemId.
-    /// </summary>
-    public async Task<List<OrderDetailInventoryItemLogDto>> GetLogByInventoryItemIdAsync(Guid inventoryItemId)
-    {
-        var logs = await _unitOfWork.OrderDetailInventoryItemLogs.GetQueryable()
-            .Where(l => l.InventoryItemId == inventoryItemId)
-            .OrderByDescending(l => l.CreatedAt)
-            .ToListAsync();
-
-        return logs.Select(InventoryItemMapper.ToOrderDetailInventoryItemLogDto).ToList();
-    }
 }

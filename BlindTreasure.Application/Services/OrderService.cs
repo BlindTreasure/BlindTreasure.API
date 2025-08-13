@@ -192,13 +192,13 @@ public class OrderService : IOrderService
     public async Task<OrderDto> GetOrderByIdAsync(Guid orderId)
     {
         var userId = _claimsService.CurrentUserId;
-        var cacheKey = $"order:user:{userId}:order:{orderId}";
-        var cached = await _cacheService.GetAsync<OrderDto>(cacheKey);
-        if (cached != null)
-        {
-            _loggerService.Info($"Order {orderId} loaded from cache.");
-            return cached;
-        }
+        //var cacheKey = $"order:user:{userId}:order:{orderId}";
+        //var cached = await _cacheService.GetAsync<OrderDto>(cacheKey);
+        //if (cached != null)
+        //{
+        //    _loggerService.Info($"Order {orderId} loaded from cache.");
+        //    return cached;
+        //}
 
         var order = await _unitOfWork.Orders.GetQueryable().AsNoTracking()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
@@ -218,7 +218,7 @@ public class OrderService : IOrderService
         }
 
         var dto = OrderDtoMapper.ToOrderDto(order);
-        await _cacheService.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(10));
+        //await _cacheService.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(10));
         _loggerService.Info($"Order {orderId} loaded and cached.");
         return dto;
     }
