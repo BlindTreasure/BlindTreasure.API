@@ -480,6 +480,8 @@ public class TransactionService : ITransactionService
                     od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
                 );
 
+                od.OrderDetailInventoryItemLogs.Add(orderDetaillog);
+
                 // Nếu có shipment, log trạng thái shipment cho inventory item
                 if (selectedShipment != null)
                 {
