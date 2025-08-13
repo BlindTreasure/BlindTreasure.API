@@ -234,7 +234,6 @@ public class OrderController : ControllerBase
     /// </summary>
     [Authorize]
     [HttpGet("order-details/{id}/logs")]
-    [ProducesResponseType(typeof(ApiResult<List<OrderDetailInventoryItemLogDto>>), 200)]
     public async Task<IActionResult> GetOrderDetailLogs(Guid id)
     {
         try
