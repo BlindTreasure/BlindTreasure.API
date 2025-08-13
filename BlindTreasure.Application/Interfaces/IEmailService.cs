@@ -44,7 +44,6 @@ public interface IEmailService
 
     Task SendBlindBoxApprovedAsync(string toEmail, string userName, string boxName);
     Task SendBlindBoxRejectedAsync(string toEmail, string userName, string boxName, string reason);
-
     Task SendPromotionApprovedAsync(string toEmail, string? userName, string promotionCode);
     Task SendPromotionRejectedAsync(string toEmail, string? userName, string promotionCode, string reason);
     Task SendOrderPaymentSuccessToBuyerAsync(Order order);

@@ -261,53 +261,101 @@ public class EmailService : IEmailService
         if (hasShipment)
         {
             // Trường hợp có shipment
-            subject = $"BlindTreasure - Đơn hàng #{orderId} đã được xác nhận & đang xử lý giao hàng";
+            subject = $"Đơn hàng #{orderId} đã được xác nhận - BlindTreasure";
             var shipmentDetails = order.OrderDetails
                 .SelectMany(od => od.Shipments ?? new List<Shipment>())
-                .Select(s => $"- {s.Provider}: Mã đơn {s.OrderCode ?? "N/A"}, phí {s.TotalFee:N0}đ, trạng thái {s.Status}")
+                .Select(s => $@"
+                <div style=""background-color:#f8f9fa;padding:12px;border-left:3px solid #d02a2a;margin:8px 0;"">
+                    <strong>{s.Provider}:</strong> Mã đơn {s.OrderCode ?? "N/A"}<br/>
+                    <span style=""color:#666;"">Phí giao hàng: {s.TotalFee:N0}đ - Trạng thái: {s.Status}</span>
+                </div>")
                 .ToList();
 
             htmlContent = $@"
-                <h2 style='color:#d02a2a;'>Cảm ơn bạn đã thanh toán đơn hàng #{orderId}!</h2>
-                <p>Đơn hàng của bạn đã được xác nhận và đang được xử lý giao hàng.</p>
-                <h3>Thông tin giao hàng:</h3>
-                <ul>
-                    {string.Join("", shipmentDetails.Select(d => $"<li>{d}</li>"))}
-                </ul>
-                <p>Bạn có thể kiểm tra trạng thái giao hàng trong mục 'Đơn hàng của tôi' trên BlindTreasure.</p>
-                <p style='color:#252424;'>Nếu có thắc mắc, hãy liên hệ hỗ trợ.</p>
-            ";
+            <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+                <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
+                    <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #d02a2a;border-radius:8px;overflow:hidden;"">
+                        <div style=""background-color:#d02a2a;padding:20px 24px;text-align:center;"">
+                            <h1 style=""margin:0;color:#ffffff;font-size:24px;"">✅ Thanh toán thành công</h1>
+                        </div>
+                        <div style=""padding:24px;"">
+                            <p style=""margin:0 0 16px 0;font-size:16px;"">Chào <strong>{userName}</strong>,</p>
+                            <p style=""margin:0 0 20px 0;"">Cảm ơn bạn đã thanh toán thành công đơn hàng <strong>#{orderId}</strong>!</p>
+                            
+                            <div style=""background-color:#f0f9ff;padding:16px;border-radius:6px;margin:20px 0;"">
+                                <h3 style=""margin:0 0 12px 0;color:#d02a2a;font-size:18px;"">🚚 Thông tin giao hàng</h3>
+                                <p style=""margin:0 0 12px 0;"">Đơn hàng của bạn đang được xử lý và chuẩn bị giao hàng:</p>
+                                {string.Join("", shipmentDetails)}
+                            </div>
+                            
+                            <div style=""background-color:#fff3cd;padding:16px;border-radius:6px;border-left:4px solid #ffc107;"">
+                                <p style=""margin:0;font-size:14px;"">💡 <strong>Lưu ý:</strong> Bạn có thể theo dõi trạng thái giao hàng trong mục ""Đơn hàng của tôi"" trên BlindTreasure.</p>
+                            </div>
+                            
+                            <p style=""margin:24px 0 0 0;"">Nếu có thắc mắc, vui lòng liên hệ đội ngũ hỗ trợ của chúng tôi.</p>
+                            <p style=""margin:16px 0 0 0;"">Trân trọng,<br/><strong>Đội ngũ BlindTreasure</strong></p>
+                        </div>
+                    </div>
+                </body>
+            </html>";
         }
         else
         {
             // Trường hợp không có shipment
-            subject = $"BlindTreasure - Đơn hàng #{orderId} đã được xác nhận & sản phẩm đã vào kho";
+            subject = $"Đơn hàng #{orderId} đã hoàn tất - Sản phẩm đã vào kho";
             var inventoryItems = order.OrderDetails
                 .SelectMany(od => od.InventoryItems ?? new List<InventoryItem>())
-                .Select(ii => $"- {ii.Product?.Name ?? "Sản phẩm"} tại vị trí {ii.Location}")
+                .Select(ii => $@"
+                <div style=""background-color:#f8f9fa;padding:12px;border-left:3px solid #28a745;margin:8px 0;"">
+                    <strong>{ii.Product?.Name ?? "Sản phẩm"}</strong><br/>
+                    <span style=""color:#666;"">Vị trí: {ii.Location}</span>
+                </div>")
                 .ToList();
 
             var blindBoxes = order.OrderDetails
                 .SelectMany(od => od.CustomerBlindBoxes ?? new List<CustomerBlindBox>())
-                .Select(cb => $"- BlindBox: {cb.BlindBox?.Name ?? "BlindBox"} {(cb.IsOpened ? "(đã mở)" : "(chưa mở)")}")
+                .Select(cb => $@"
+                <div style=""background-color:#f8f9fa;padding:12px;border-left:3px solid #6f42c1;margin:8px 0;"">
+                    <strong>{cb.BlindBox?.Name ?? "BlindBox"}</strong><br/>
+                    <span style=""color:{(cb.IsOpened ? "#28a745" : "#ffc107")};"">
+                        {(cb.IsOpened ? "✅ Đã mở" : "📦 Chưa mở")}
+                    </span>
+                </div>")
                 .ToList();
 
             htmlContent = $@"
-                <h2 style='color:#d02a2a;'>Cảm ơn bạn đã thanh toán đơn hàng #{orderId}!</h2>
-                <p>Đơn hàng của bạn đã được xác nhận.</p>
-                <h3>Sản phẩm đã được thêm vào kho của bạn:</h3>
-                <ul>
-                    {string.Join("", inventoryItems.Select(i => $"<li>{i}</li>"))}
-                </ul>
-                {(blindBoxes.Any() ? $@"
-                <h3>BlindBox của bạn:</h3>
-                <ul>
-                    {string.Join("", blindBoxes.Select(b => $"<li>{b}</li>"))}
-                </ul>
-                " : "")}
-                <p>Bạn có thể kiểm tra sản phẩm trong mục 'Kho hàng của tôi' trên BlindTreasure.</p>
-                <p style='color:#252424;'>Nếu có thắc mắc, hãy liên hệ hỗ trợ.</p>
-            ";
+            <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+                <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
+                    <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #d02a2a;border-radius:8px;overflow:hidden;"">
+                        <div style=""background-color:#d02a2a;padding:20px 24px;text-align:center;"">
+                            <h1 style=""margin:0;color:#ffffff;font-size:24px;"">🎉 Thanh toán thành công</h1>
+                        </div>
+                        <div style=""padding:24px;"">
+                            <p style=""margin:0 0 16px 0;font-size:16px;"">Chào <strong>{userName}</strong>,</p>
+                            <p style=""margin:0 0 20px 0;"">Cảm ơn bạn đã thanh toán thành công đơn hàng <strong>#{orderId}</strong>!</p>
+                            
+                            {(inventoryItems.Any() ? $@"
+                            <div style=""background-color:#f0f9ff;padding:16px;border-radius:6px;margin:20px 0;"">
+                                <h3 style=""margin:0 0 12px 0;color:#d02a2a;font-size:18px;"">📦 Sản phẩm đã vào kho</h3>
+                                {string.Join("", inventoryItems)}
+                            </div>" : "")}
+                            
+                            {(blindBoxes.Any() ? $@"
+                            <div style=""background-color:#fdf2f8;padding:16px;border-radius:6px;margin:20px 0;"">
+                                <h3 style=""margin:0 0 12px 0;color:#d02a2a;font-size:18px;"">🎁 BlindBox của bạn</h3>
+                                {string.Join("", blindBoxes)}
+                            </div>" : "")}
+                            
+                            <div style=""background-color:#d4edda;padding:16px;border-radius:6px;border-left:4px solid #28a745;"">
+                                <p style=""margin:0;font-size:14px;"">💡 <strong>Lưu ý:</strong> Bạn có thể kiểm tra sản phẩm trong mục ""Kho hàng của tôi"" trên BlindTreasure.</p>
+                            </div>
+                            
+                            <p style=""margin:24px 0 0 0;"">Nếu có thắc mắc, vui lòng liên hệ đội ngũ hỗ trợ của chúng tôi.</p>
+                            <p style=""margin:16px 0 0 0;"">Trân trọng,<br/><strong>Đội ngũ BlindTreasure</strong></p>
+                        </div>
+                    </div>
+                </body>
+            </html>";
         }
 
         await SendEmailAsync(toEmail, subject, htmlContent);
@@ -316,7 +364,8 @@ public class EmailService : IEmailService
     /// <summary>
     /// Gửi email thông báo đơn hàng đã hết hạn hoặc bị hủy cho người mua hàng.
     /// </summary>
-    public async Task SendOrderExpiredOrCancelledToBuyerAsync(Order order, string reason = "Đơn hàng đã hết hạn hoặc bị hủy do không thanh toán thành công.")
+    public async Task SendOrderExpiredOrCancelledToBuyerAsync(Order order,
+        string reason = "Đơn hàng đã hết hạn hoặc bị hủy do không thanh toán thành công.")
     {
         if (order == null || order.User == null)
             throw new ArgumentNullException(nameof(order), "Order hoặc User không hợp lệ.");
@@ -325,17 +374,35 @@ public class EmailService : IEmailService
         var userName = order.User.FullName ?? order.User.Email;
         var orderId = order.Id.ToString();
 
-        string subject = $"BlindTreasure - Đơn hàng #{orderId} đã hết hạn hoặc bị hủy";
+        string subject = $"Đơn hàng #{orderId} đã bị hủy - BlindTreasure";
         string htmlContent = $@"
-        <html style='background-color:#ebeaea;margin:0;padding:0;'>
-            <body style='font-family:Arial,sans-serif;color:#252424;padding:20px;background-color:#ebeaea;'>
-                <div style='max-width:600px;margin:auto;background:#fff;border:1px solid #d02a2a;border-radius:6px;padding:20px;'>
-                    <h2 style='color:#d02a2a;'>Đơn hàng #{orderId} đã hết hạn hoặc bị hủy</h2>
-                    <p>Chào {userName},</p>
-                    <p>Đơn hàng của bạn đã bị hủy hoặc hết hạn do không hoàn tất thanh toán thành công.</p>
-                    <p><strong>Lý do:</strong> {reason}</p>
-                    <p>Nếu bạn vẫn muốn mua sản phẩm, vui lòng đặt lại đơn hàng trên BlindTreasure.</p>
-                    <p style='margin-top:30px;'>Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+        <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+            <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
+                <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #d02a2a;border-radius:8px;overflow:hidden;"">
+                    <div style=""background-color:#dc3545;padding:20px 24px;text-align:center;"">
+                        <h1 style=""margin:0;color:#ffffff;font-size:24px;"">❌ Đơn hàng đã bị hủy</h1>
+                    </div>
+                    <div style=""padding:24px;"">
+                        <p style=""margin:0 0 16px 0;font-size:16px;"">Chào <strong>{userName}</strong>,</p>
+                        <p style=""margin:0 0 20px 0;"">Rất tiếc, đơn hàng <strong>#{orderId}</strong> của bạn đã bị hủy.</p>
+                        
+                        <div style=""background-color:#f8d7da;padding:16px;border-radius:6px;border-left:4px solid #dc3545;margin:20px 0;"">
+                            <h3 style=""margin:0 0 8px 0;color:#721c24;font-size:16px;"">📋 Lý do hủy đơn hàng:</h3>
+                            <p style=""margin:0;color:#721c24;"">{reason}</p>
+                        </div>
+                        
+                        <div style=""background-color:#fff3cd;padding:16px;border-radius:6px;border-left:4px solid #ffc107;margin:20px 0;"">
+                            <p style=""margin:0 0 8px 0;font-weight:bold;color:#856404;"">🛒 Bạn vẫn muốn mua sản phẩm này?</p>
+                            <p style=""margin:0;color:#856404;"">Vui lòng truy cập lại BlindTreasure và đặt đơn hàng mới. Các sản phẩm có thể vẫn còn hàng!</p>
+                        </div>
+                        
+                        <div style=""text-align:center;margin:24px 0;"">
+                            <p style=""margin:0 0 12px 0;"">Nếu bạn có thắc mắc về việc hủy đơn hàng,</p>
+                            <p style=""margin:0;"">vui lòng liên hệ đội ngũ hỗ trợ của chúng tôi.</p>
+                        </div>
+                        
+                        <p style=""margin:24px 0 0 0;"">Trân trọng,<br/><strong>Đội ngũ BlindTreasure</strong></p>
+                    </div>
                 </div>
             </body>
         </html>";
