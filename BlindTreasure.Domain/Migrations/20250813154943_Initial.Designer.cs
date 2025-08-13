@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250812142813_orderDetail_log")]
-    partial class orderDetail_log
+    [Migration("20250813154943_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1177,7 +1177,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("InventoryItemId")
+                    b.Property<Guid?>("InventoryItemId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
@@ -1196,7 +1196,7 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("OldValue")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("OrderDetailId")
+                    b.Property<Guid?>("OrderDetailId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -1204,6 +1204,9 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("ValueStatusType")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -2974,16 +2977,12 @@ namespace BlindTreasure.Domain.Migrations
             modelBuilder.Entity("BlindTreasure.Domain.Entities.OrderDetailInventoryItemLog", b =>
                 {
                     b.HasOne("BlindTreasure.Domain.Entities.InventoryItem", "InventoryItem")
-                        .WithMany()
-                        .HasForeignKey("InventoryItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .WithMany("OrderDetailInventoryItemLogs")
+                        .HasForeignKey("InventoryItemId");
 
                     b.HasOne("BlindTreasure.Domain.Entities.OrderDetail", "OrderDetail")
-                        .WithMany()
-                        .HasForeignKey("OrderDetailId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .WithMany("OrderDetailInventoryItemLogs")
+                        .HasForeignKey("OrderDetailId");
 
                     b.Navigation("InventoryItem");
 
@@ -3350,6 +3349,8 @@ namespace BlindTreasure.Domain.Migrations
             modelBuilder.Entity("BlindTreasure.Domain.Entities.InventoryItem", b =>
                 {
                     b.Navigation("Listings");
+
+                    b.Navigation("OrderDetailInventoryItemLogs");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Order", b =>
@@ -3364,6 +3365,8 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("CustomerBlindBoxes");
 
                     b.Navigation("InventoryItems");
+
+                    b.Navigation("OrderDetailInventoryItemLogs");
 
                     b.Navigation("Reviews");
                 });
