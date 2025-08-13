@@ -86,9 +86,7 @@ public class UnboxingService : IUnboxingService
         if (selectedItem == null)
             throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
 
-        // 5. Cập nhật DB (trừ số lượng, cộng Inventory cho user, đánh dấu hộp đã mở)
         await GrantUnboxedItemToUser(selectedItem, customerBox, userId, now);
-
 
         var unboxLog = new UnboxLogDto
         {
