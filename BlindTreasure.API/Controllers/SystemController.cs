@@ -969,15 +969,16 @@ public class SystemController : ControllerBase
         public bool Complete { get; set; } = true;
     }
 
-
     private List<User> GetPredefinedUsers()
     {
         var passwordHasher = new PasswordHasher();
         var now = DateTime.UtcNow;
         var defaultAvatar = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg";
+        var staffAvatar = "https://cdn4.iconfinder.com/data/icons/taxi-service-flat/90/support__services__employee__avatar_-512.png";
 
         var users = new List<User>
         {
+            // customer 1
             new()
             {
                 Email = "trangiaphuc362003181@gmail.com",
@@ -992,21 +993,49 @@ public class SystemController : ControllerBase
                 {
                     new()
                     {
-                        FullName = "Trần Gia Phúc",
-                        Phone = "0354343507",
-                        AddressLine = "181 Nguyễn Văn Nghi, Phường 7, Quận Gò Vấp",
-                        City = "Ho Chi Minh City",
-                        Ward = "Phường 7",
-                        District = "Quận Gò Vấp",
-                        Province = "Ho Chi Minh City",
-                        PostalCode = "700000",
-                        Country = "Vietnam",
-                        IsDefault = true,
+                        FullName = "Trần Gia Phúc", 
+                        Phone = "0987570351", 
+                        AddressLine = "Bưng Ông Thoàn, Phường Phú Hữu, TP.Thủ Đức, HCM", 
+                        City = "Thành Phố Thủ Đức", 
+                        Province = "Hồ Chí Minh", 
+                        Ward = "Phường Phú Hữu", 
+                        District = "Thành Phố Thủ Đức", 
+                        PostalCode = "90763", 
+                        Country = "Vietnam", 
+                        IsDefault = false,
                         CreatedAt = now
                     }
                 }
             },
-            // Các user khác không có address
+            //customer 2
+            new()
+            {
+                Email = "honhatquang1@gmail.com",
+                Password = passwordHasher.HashPassword("1@"),
+                FullName = "Hồ Nhật Quang",
+                Phone = "0900000001",
+                Status = UserStatus.Active,
+                RoleName = RoleType.Customer,
+                CreatedAt = now,
+                AvatarUrl = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQIf4R5qPKHPNMyAqV-FjS_OTBB8pfUV29Phg&s",
+                Addresses = new List<Address>
+                {
+                    new()
+                    {
+                        FullName = "Hồ Nhật Quang", 
+                        Phone = "0987570351", 
+                        AddressLine = "Bưng Ông Thoàn, Phường Phú Hữu, TP.Thủ Đức, HCM", 
+                        City = "Thành Phố Thủ Đức", 
+                        Province = "Hồ Chí Minh", 
+                        Ward = "Phường Phú Hữu", 
+                        District = "Thành Phố Thủ Đức", 
+                        PostalCode = "90763", 
+                        Country = "Vietnam", 
+                        IsDefault = false,
+                        CreatedAt = now
+                    }
+                }
+            },
             new()
             {
                 Email = "quanghnse170229@fpt.edu.vn",
@@ -1027,7 +1056,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Staff,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar
+                AvatarUrl = staffAvatar
             },
             new()
             {
@@ -1038,7 +1067,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Admin,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar
+                AvatarUrl = staffAvatar
             },
             new()
             {
@@ -1049,7 +1078,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar
+                AvatarUrl = "https://images-platform.99static.com//j3lFsXdVOtsovHgOHMt2TIOnevU=/279x0:1622x1343/fit-in/500x500/99designs-contests-attachments/23/23600/attachment_23600424"
             },
             new()
             {
@@ -1062,17 +1091,7 @@ public class SystemController : ControllerBase
                 CreatedAt = now,
                 AvatarUrl = defaultAvatar
             },
-            new()
-            {
-                Email = "honhatquang1@gmail.com",
-                Password = passwordHasher.HashPassword("1@"),
-                FullName = "Hồ Nhật Quang",
-                Phone = "0900000001",
-                Status = UserStatus.Active,
-                RoleName = RoleType.Customer,
-                CreatedAt = now,
-                AvatarUrl = defaultAvatar
-            },
+            
             new()
             {
                 Email = "smiskiofficial@gmail.com",
@@ -1132,12 +1151,12 @@ public class SystemController : ControllerBase
 
                     () => context.TradeHistories.ExecuteDeleteAsync(),
                     () => context.TradeRequests.ExecuteDeleteAsync(),
-                    () => context.TradeRequestItems.ExecuteDeleteAsync(), // Bảng mới
+                    () => context.TradeRequestItems.ExecuteDeleteAsync(), 
                     () => context.SupportTickets.ExecuteDeleteAsync(),
                     () => context.Transactions.ExecuteDeleteAsync(),
                     () => context.Notifications.ExecuteDeleteAsync(),
                     () => context.OtpVerifications.ExecuteDeleteAsync(),
-                    () => context.ListingReports.ExecuteDeleteAsync(), // Bảng mới
+                    () => context.ListingReports.ExecuteDeleteAsync(), 
 
                     () => context.Orders.ExecuteDeleteAsync(),
                     () => context.Payments.ExecuteDeleteAsync(),
@@ -1153,9 +1172,9 @@ public class SystemController : ControllerBase
                     () => context.Sellers.ExecuteDeleteAsync(),
                     () => context.Users.ExecuteDeleteAsync(),
                     () => context.Roles.ExecuteDeleteAsync(),
-                    () => context.Payouts.ExecuteDeleteAsync(), // Bảng mới
-                    () => context.PayoutLogs.ExecuteDeleteAsync(), // Bảng mới
-                    () => context.PayoutDetails.ExecuteDeleteAsync() // Bảng mới
+                    () => context.Payouts.ExecuteDeleteAsync(), 
+                    () => context.PayoutLogs.ExecuteDeleteAsync(),
+                    () => context.PayoutDetails.ExecuteDeleteAsync() 
                 };
 
                 foreach (var deleteFunc in tablesToDelete)

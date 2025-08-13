@@ -36,8 +36,8 @@ public class StripeService : IStripeService
     public async Task<string> GetOrCreateGroupPaymentLink(Guid checkoutGroupId)
     {
         var orders = await _unitOfWork.Orders.GetQueryable()
-      .Where(o => o.CheckoutGroupId == checkoutGroupId && !o.IsDeleted)
-      .ToListAsync();
+            .Where(o => o.CheckoutGroupId == checkoutGroupId && !o.IsDeleted)
+            .ToListAsync();
 
         if (!orders.Any())
             throw ErrorHelper.BadRequest("Không tìm thấy đơn hàng hợp lệ trong nhóm.");
@@ -46,10 +46,8 @@ public class StripeService : IStripeService
             .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
 
         if (groupSession != null && groupSession.ExpiresAt < DateTime.UtcNow)
-        {
             // Session still valid
             return groupSession.PaymentUrl;
-        }
 
         // If not found or expired, call the session creation method
         return await CreateGeneralCheckoutSessionForOrders(orders.Select(o => o.Id).ToList());
@@ -119,7 +117,6 @@ public class StripeService : IStripeService
         }
 
         if (totalShipping > 0)
-        {
             lineItems.Add(new SessionLineItemOptions
             {
                 PriceData = new SessionLineItemPriceDataOptions
@@ -134,14 +131,11 @@ public class StripeService : IStripeService
                 },
                 Quantity = 1
             });
-        }
 
         string? couponId = null;
         if (totalDiscount > 0)
-        {
             // Tạo coupon cho toàn bộ discount
             couponId = await CreateStripeCouponForOrder(orderIds.First(), totalDiscount);
-        }
 
         var finalAmount = totalGoods + totalShipping - totalDiscount;
         if (finalAmount < 1) finalAmount = 1m;
@@ -177,9 +171,8 @@ public class StripeService : IStripeService
 
         // Ghi lại transaction cho từng order
         foreach (var order in orders)
-        {
-            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0, couponId ?? null, session.PaymentIntentId);
-        }
+            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0,
+                couponId ?? null, session.PaymentIntentId);
 
         // Save GroupPaymentSession
         var checkoutGroupId = orders.First().CheckoutGroupId;
@@ -193,7 +186,7 @@ public class StripeService : IStripeService
                 CheckoutGroupId = checkoutGroupId,
                 StripeSessionId = session.Id,
                 PaymentUrl = session.Url,
-                ExpiresAt = session.ExpiresAt ,
+                ExpiresAt = session.ExpiresAt,
                 Type = PaymentType.Order,
                 IsCompleted = false,
                 CouponId = couponId,
@@ -205,10 +198,11 @@ public class StripeService : IStripeService
         {
             groupSession.StripeSessionId = session.Id;
             groupSession.PaymentUrl = session.Url;
-            groupSession.ExpiresAt = session.ExpiresAt ;
+            groupSession.ExpiresAt = session.ExpiresAt;
             groupSession.IsCompleted = false;
             await _unitOfWork.GroupPaymentSessions.Update(groupSession);
         }
+
         await _unitOfWork.SaveChangesAsync();
 
         return session.Url;
@@ -230,6 +224,7 @@ public class StripeService : IStripeService
                 FinalAmount = order.FinalAmount ?? 0
             });
         }
+
         return result;
     }
 
@@ -389,7 +384,8 @@ public class StripeService : IStripeService
             var session = await service.CreateAsync(options);
 
             // 8. Ghi vào Payment & Transaction??nu
-            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew, finalAmount , couponId ?? null, session.PaymentIntentId);
+            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew, finalAmount, couponId ?? null,
+                session.PaymentIntentId);
             await _unitOfWork.SaveChangesAsync();
 
             return session.Url;
@@ -460,27 +456,20 @@ public class StripeService : IStripeService
 
         // Hủy PaymentIntent nếu còn hiệu lực
         if (!string.IsNullOrWhiteSpace(groupSession.PaymentIntentId))
-        {
             try
             {
                 var paymentIntentService = new PaymentIntentService(_stripeClient);
                 var paymentIntent = await paymentIntentService.GetAsync(groupSession.PaymentIntentId);
                 if (paymentIntent != null && paymentIntent.Status == "requires_payment_method")
-                {
                     await paymentIntentService.CancelAsync(groupSession.PaymentIntentId);
-                }
             }
             catch (StripeException)
             {
                 // Log error nhưng không throw
             }
-        }
 
         // Xóa coupon nếu có
-        if (!string.IsNullOrWhiteSpace(groupSession.CouponId))
-        {
-            await CleanupStripeCoupon(groupSession.CouponId);
-        }
+        if (!string.IsNullOrWhiteSpace(groupSession.CouponId)) await CleanupStripeCoupon(groupSession.CouponId);
     }
 
     /// <summary>
@@ -494,27 +483,20 @@ public class StripeService : IStripeService
 
         // Hủy PaymentIntent nếu còn hiệu lực
         if (!string.IsNullOrWhiteSpace(order.Payment.PaymentIntentId))
-        {
             try
             {
                 var paymentIntentService = new PaymentIntentService(_stripeClient);
                 var paymentIntent = await paymentIntentService.GetAsync(order.Payment.PaymentIntentId);
                 if (paymentIntent != null && paymentIntent.Status == "requires_payment_method")
-                {
                     await paymentIntentService.CancelAsync(order.Payment.PaymentIntentId);
-                }
             }
             catch (StripeException)
             {
                 // Log error nhưng không throw
             }
-        }
 
         // Xóa coupon nếu có
-        if (!string.IsNullOrWhiteSpace(order.Payment.CouponId))
-        {
-            await CleanupStripeCoupon(order.Payment.CouponId);
-        }
+        if (!string.IsNullOrWhiteSpace(order.Payment.CouponId)) await CleanupStripeCoupon(order.Payment.CouponId);
     }
 
     /// <summary>
@@ -563,7 +545,7 @@ public class StripeService : IStripeService
                 CreatedAt = now,
                 CreatedBy = userId,
                 Transactions = new List<Transaction>(),
-                CouponId= couponId
+                CouponId = couponId
             };
 
             payment.Transactions.Add(new Transaction
