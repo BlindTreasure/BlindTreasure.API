@@ -45,10 +45,10 @@ public class ShipmentService : IShipmentService
         if (shipment == null)
             throw ErrorHelper.NotFound("Shipment không tồn tại.");
 
-        // Chỉ cho phép user là chủ đơn hàng xem shipment
-        var userId = _claimsService.CurrentUserId;
-        if (!shipment.OrderDetails.Any(od => od.Order.UserId == userId))
-            throw ErrorHelper.Forbidden("Bạn không có quyền xem shipment này.");
+        //// Chỉ cho phép user là chủ đơn hàng xem shipment
+        //var userId = _claimsService.CurrentUserId;
+        //if (!shipment.OrderDetails.Any(od => od.Order.UserId == userId))
+        //    throw ErrorHelper.Forbidden("Bạn không có quyền xem shipment này.");
 
         return ShipmentDtoMapper.ToShipmentDtoWithFullIncluded(shipment);
     }
