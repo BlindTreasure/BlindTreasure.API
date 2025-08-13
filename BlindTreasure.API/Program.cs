@@ -49,7 +49,7 @@ builder.Services.AddControllers()
     .AddNewtonsoftJson(options =>
     {
         options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
-        options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
+        options.SerializerSettings.NullValueHandling = NullValueHandling.Include;
         options.SerializerSettings.Converters.Add(new StringEnumConverter());
     });
 

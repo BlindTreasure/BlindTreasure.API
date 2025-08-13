@@ -8,5 +8,6 @@ public enum NotificationType
     Support,
     Voucher,
     Chat,
-    Promotion
+    Promotion,
+    Shipment
 }
