@@ -19,6 +19,7 @@ namespace BlindTreasure.Domain.Entities
         public DateTime? LogTime { get; set; } = DateTime.UtcNow; // Lưu trữ thời gian nhật ký, định dạng ISO 8601
 
         public ActionType? ActionType { get; set; }
+      //  public ValueType? ValueStatusType { get; set; }
         public string? OldValue { get; set; } // Trạng thái trước thay đổi
         public string? NewValue { get; set; } // Trạng thái mới
         public Guid? ActorId { get; set; } // User/System thực hiện hành động
@@ -35,6 +36,15 @@ namespace BlindTreasure.Domain.Entities
         ORDER_DETAIL_STATUS_CHANGED,
         BLIND_BOX_ADDED,
         PAYMENT_STATUS_CHANGED
+    }
+
+    public enum ValueType
+    {
+        ORDER_DETAIL,
+        SHIPMENT,
+        INVENTORY_ITEM,
+        BLIND_BOX,
+        PAYMENT
     }
 
 }

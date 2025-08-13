@@ -441,7 +441,6 @@ public class BlindBoxService : IBlindBoxService
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
 
-
     public async Task<BlindBoxDetailDto> SubmitBlindBoxAsync(Guid blindBoxId)
     {
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
@@ -515,7 +514,7 @@ public class BlindBoxService : IBlindBoxService
                 BlindBoxItemId = item.Id,
                 Probability = item.DropRate,
                 EffectiveFrom = now,
-                EffectiveTo = blindBox.ReleaseDate,
+                EffectiveTo = now.AddYears(1), // ✅ FIX: 1 năm từ bây giờ, không phải ReleaseDate
                 ApprovedBy = currentUserId,
                 ApprovedAt = now,
                 CreatedAt = now,

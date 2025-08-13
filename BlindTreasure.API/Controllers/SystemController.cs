@@ -1,9 +1,11 @@
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.UnboxDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -11,6 +13,7 @@ using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel;
 
 namespace BlindTreasure.API.Controllers;
 
@@ -805,6 +808,8 @@ public class SystemController : ControllerBase
     {
         var shipment = await _context.Shipments
             .Include(s => s.OrderDetails)
+                .ThenInclude(od => od.InventoryItems)
+            .Include(s => s.OrderDetails)
                 .ThenInclude(od => od.Order)
                     .ThenInclude(o => o.Seller)
             .Include(s => s.OrderDetails)
@@ -817,10 +822,8 @@ public class SystemController : ControllerBase
         if (shipment == null)
             return NotFound("Shipment not found.");
 
-        // Define the full status flow
         var statusFlow = new List<ShipmentStatus>
     {
-        ShipmentStatus.WAITING_PAYMENT,
         ShipmentStatus.PROCESSING,
         ShipmentStatus.PICKED_UP,
         ShipmentStatus.IN_TRANSIT,
@@ -829,25 +832,22 @@ public class SystemController : ControllerBase
         if (req.Complete)
             statusFlow.Add(ShipmentStatus.COMPLETED);
 
-        // Find the starting index
         var startIndex = statusFlow.IndexOf(shipment.Status);
         if (req.StartFrom != null)
             startIndex = statusFlow.IndexOf(req.StartFrom.Value);
         if (startIndex < 0) startIndex = 0;
 
-        // Simulate time intervals (e.g., 1 hour between each status)
         var now = DateTime.UtcNow;
         var timeStep = TimeSpan.FromHours(1);
 
         var logs = new List<object>();
-        for (int i = startIndex + 1; i < statusFlow.Count; i++)
+        for (int i = startIndex; i < statusFlow.Count; i++)
         {
             var oldStatus = shipment.Status;
             var newStatus = statusFlow[i];
             shipment.Status = newStatus;
             shipment.UpdatedAt = now + timeStep * i;
 
-            // Seller & Address
             Seller? seller = null;
             Address? customerAddress = null;
             if (shipment.OrderDetails != null && shipment.OrderDetails.Any())
@@ -858,6 +858,42 @@ public class SystemController : ControllerBase
                                   ?? firstOrderDetail.Order?.User?.Addresses?.FirstOrDefault();
             }
 
+            switch (newStatus)
+            {
+                case ShipmentStatus.PROCESSING:
+                    if (!shipment.EstimatedPickupTime.HasValue)
+                        shipment.EstimatedPickupTime = shipment.UpdatedAt?.AddHours(2) ?? now.AddHours(2);
+                    if (shipment.EstimatedDelivery == default)
+                        shipment.EstimatedDelivery = shipment.UpdatedAt?.AddDays(2) ?? now.AddDays(2);
+                    break;
+                case ShipmentStatus.PICKED_UP:
+                    if (!shipment.PickedUpAt.HasValue)
+                        shipment.PickedUpAt = shipment.UpdatedAt;
+                    break;
+                case ShipmentStatus.IN_TRANSIT:
+                    shipment.EstimatedDelivery = shipment.UpdatedAt?.AddHours(6) ?? now.AddHours(6);
+                    break;
+                case ShipmentStatus.DELIVERED:
+                    if (!shipment.ShippedAt.HasValue)
+                        shipment.ShippedAt = shipment.UpdatedAt;
+                    // Update InventoryItem status to Delivered for this shipment
+                    foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
+                    {
+                        var oldItemStatus = item.Status;
+                        item.Status = InventoryItemStatus.Delivered;
+                        await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                            item.OrderDetail,
+                            oldItemStatus,
+                            item,
+                            $"InventoryItem delivered as shipment delivered."
+                        );
+                    }
+                    break;
+                case ShipmentStatus.COMPLETED:
+                    // Optionally, you can keep InventoryItem status as Delivered
+                    break;
+            }
+
             // Generate tracking message
             var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
                 shipment, oldStatus, newStatus, seller!, customerAddress!);
@@ -866,28 +902,46 @@ public class SystemController : ControllerBase
             foreach (var od in shipment.OrderDetails ?? new List<OrderDetail>())
             {
                 await _orderDetailInventoryItemLogService.LogShipmentAddedAsync(od, shipment, trackingMessage);
+
+                // After updating InventoryItem statuses, update OrderDetail status and logs
+                OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
             }
 
-            // Log for each InventoryItem
-            foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
+            // Log for each InventoryItem (except DELIVERED, which is handled above)
+            if (newStatus != ShipmentStatus.DELIVERED && newStatus != ShipmentStatus.COMPLETED)
             {
-                var oldItemStatus = item.Status;
-                if (newStatus == ShipmentStatus.DELIVERED)
-                    item.Status = InventoryItemStatus.Delivering;
-
-                await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
-                    item.OrderDetail,
-                    oldItemStatus,
-                    item,
-                    trackingMessage
-                );
+                foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
+                {
+                    var oldItemStatus = item.Status;
+                    if (newStatus == ShipmentStatus.PICKED_UP || newStatus == ShipmentStatus.IN_TRANSIT)
+                    {
+                        // Optionally, set to Delivering for demo realism
+                        item.Status = InventoryItemStatus.Delivering;
+                    }
+                    await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                        item.OrderDetail,
+                        oldItemStatus,
+                        item,
+                        trackingMessage
+                    );
+                }
             }
 
             logs.Add(new
             {
                 Status = newStatus,
                 Time = shipment.UpdatedAt,
-                TrackingMessage = trackingMessage
+                TrackingMessage = trackingMessage,
+                shipment.EstimatedPickupTime,
+                shipment.PickedUpAt,
+                shipment.EstimatedDelivery,
+                shipment.ShippedAt,
+                OrderDetails = shipment.OrderDetails?.Select(od => new
+                {
+                    od.Id,
+                    od.Status,
+                    od.Logs
+                }).ToList()
             });
         }
 
@@ -897,7 +951,11 @@ public class SystemController : ControllerBase
         {
             shipment.Id,
             shipment.Status,
-            Message = "Shipment status flow simulated and logged.",
+            shipment.EstimatedPickupTime,
+            shipment.PickedUpAt,
+            shipment.EstimatedDelivery,
+            shipment.ShippedAt,
+            Message = "Shipment status flow simulated and logged. OrderDetail and InventoryItem statuses updated.",
             FlowLogs = logs
         });
     }
@@ -906,6 +964,7 @@ public class SystemController : ControllerBase
     public class SimulateShipmentFullFlowRequest
     {
         public Guid ShipmentId { get; set; }
+        [DefaultValue(ShipmentStatus.PICKED_UP)]
         public ShipmentStatus? StartFrom { get; set; }
         public bool Complete { get; set; } = true;
     }
@@ -2471,7 +2530,6 @@ public class SystemController : ControllerBase
         await _context.Promotions.AddRangeAsync(promotions);
         await _context.SaveChangesAsync();
     }
-
     private async Task SeedPromotionParticipants()
     {
         if (_context.PromotionParticipants.Any()) return;
@@ -2538,7 +2596,6 @@ public class SystemController : ControllerBase
             await _context.SaveChangesAsync();
         }
     }
-
     private async Task SeedSellerForUser(string sellerEmail)
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == sellerEmail);
@@ -2594,7 +2651,6 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Info($"Seller seeded successfully for {sellerEmail}.");
     }
-
     private async Task SeedRoles()
     {
         var roles = new List<Role>
@@ -2630,7 +2686,6 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Success("Roles seeded successfully.");
     }
-
     #endregion
 }
 
