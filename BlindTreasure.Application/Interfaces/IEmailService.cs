@@ -44,9 +44,10 @@ public interface IEmailService
 
     Task SendBlindBoxApprovedAsync(string toEmail, string userName, string boxName);
     Task SendBlindBoxRejectedAsync(string toEmail, string userName, string boxName, string reason);
-
     Task SendPromotionApprovedAsync(string toEmail, string? userName, string promotionCode);
     Task SendPromotionRejectedAsync(string toEmail, string? userName, string promotionCode, string reason);
     Task SendOrderPaymentSuccessToBuyerAsync(Order order);
-    Task SendOrderExpiredOrCancelledToBuyerAsync(Order order, string reason = "Đơn hàng đã hết hạn hoặc bị hủy do không thanh toán thành công.");
+
+    Task SendOrderExpiredOrCancelledToBuyerAsync(Order order,
+        string reason = "Đơn hàng đã hết hạn hoặc bị hủy do không thanh toán thành công.");
 }

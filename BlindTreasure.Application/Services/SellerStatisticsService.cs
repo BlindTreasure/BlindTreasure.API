@@ -104,7 +104,8 @@ public class SellerStatisticsService : ISellerStatisticsService
 
         var grossRevenue = orderDetails.Sum(od => od.TotalPrice);
         var totalDiscount = orderDetails.Sum(od => od.DetailDiscountPromotion ?? 0m);
-        var netRevenue = orderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice - (od.DetailDiscountPromotion ?? 0m));
+        var netRevenue =
+            orderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice - (od.DetailDiscountPromotion ?? 0m));
 
         // Refunds: Only from payments of these orders
         var orderIds = orders.Select(o => o.Id).ToList();
@@ -135,11 +136,14 @@ public class SellerStatisticsService : ISellerStatisticsService
 
         var lastOrdersCount = lastOrders.Count;
         var lastProductsSold = lastOrderDetails.Sum(od => od.Quantity);
-        var lastRevenue = lastOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice - (od.DetailDiscountPromotion ?? 0m));
+        var lastRevenue =
+            lastOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice - (od.DetailDiscountPromotion ?? 0m));
         var lastAOV = lastOrdersCount > 0 ? Math.Round(lastRevenue / lastOrdersCount, 2) : 0m;
 
         var revenueGrowth = lastRevenue > 0 ? Math.Round((netRevenue - lastRevenue) * 100 / lastRevenue, 2) : 0m;
-        var ordersGrowth = lastOrdersCount > 0 ? Math.Round((decimal)(totalOrders - lastOrdersCount) * 100 / lastOrdersCount, 2) : 0m;
+        var ordersGrowth = lastOrdersCount > 0
+            ? Math.Round((decimal)(totalOrders - lastOrdersCount) * 100 / lastOrdersCount, 2)
+            : 0m;
         var productsGrowth = lastProductsSold > 0
             ? Math.Round((decimal)(totalProductsSold - lastProductsSold) * 100 / lastProductsSold, 2)
             : 0m;
@@ -240,6 +244,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                     sales.Add(details.Count());
                     revenue.Add(details.Sum(netRevenueSelector));
                 }
+
                 break;
             case StatisticsTimeRange.Week:
                 var culture = CultureInfo.CurrentCulture;
@@ -252,6 +257,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                     sales.Add(details.Count());
                     revenue.Add(details.Sum(netRevenueSelector));
                 }
+
                 break;
             case StatisticsTimeRange.Month:
                 var daysInMonth = (end - start).Days;
@@ -264,6 +270,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                     sales.Add(details.Count());
                     revenue.Add(details.Sum(netRevenueSelector));
                 }
+
                 break;
             case StatisticsTimeRange.Quarter:
             case StatisticsTimeRange.Year:
@@ -278,6 +285,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                     sales.Add(details.Count());
                     revenue.Add(details.Sum(netRevenueSelector));
                 }
+
                 break;
             case StatisticsTimeRange.Custom:
                 var totalDays = (end - start).Days;
@@ -290,6 +298,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                     sales.Add(details.Count());
                     revenue.Add(details.Sum(netRevenueSelector));
                 }
+
                 break;
         }
 
@@ -343,6 +352,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                 end = start.AddDays(1);
                 break;
         }
+
         return (start, end);
     }
 

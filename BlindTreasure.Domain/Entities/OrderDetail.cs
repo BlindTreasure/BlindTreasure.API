@@ -30,5 +30,7 @@ public class OrderDetail : BaseEntity
     public ICollection<InventoryItem> InventoryItems { get; set; } = new List<InventoryItem>();
     public ICollection<CustomerBlindBox>? CustomerBlindBoxes { get; set; } = new List<CustomerBlindBox>();
     public ICollection<Review>? Reviews { get; set; } = new List<Review>();
-    public ICollection<OrderDetailInventoryItemLog>? OrderDetailInventoryItemLogs { get; set; } = new List<OrderDetailInventoryItemLog>();
+
+    public ICollection<OrderDetailInventoryItemLog>? OrderDetailInventoryItemLogs { get; set; } =
+        new List<OrderDetailInventoryItemLog>();
 }

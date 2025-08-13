@@ -38,6 +38,7 @@ public class InventoryItem : BaseEntity
     public DateTime? HoldUntil { get; set; } // Thời điểm khi item được giải phóng
     public Guid? LastTradeHistoryId { get; set; } // ID của giao dịch gần nhất
     public TradeHistory? LastTradeHistory { get; set; } // Navigation property
-    public ICollection<OrderDetailInventoryItemLog>? OrderDetailInventoryItemLogs { get; set; } = new List<OrderDetailInventoryItemLog>();
 
+    public ICollection<OrderDetailInventoryItemLog>? OrderDetailInventoryItemLogs { get; set; } =
+        new List<OrderDetailInventoryItemLog>();
 }

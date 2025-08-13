@@ -263,6 +263,7 @@ public class StripeController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
     /// <summary>
     ///     Tạo hoặc lấy lại link thanh toán bằng cách truyền groupid của nhóm order vào
     /// </summary>
@@ -571,13 +572,14 @@ public class StripeController : ControllerBase
             if (!string.IsNullOrEmpty(session.PaymentIntentId))
             {
                 var couponId = session.Metadata != null &&
-                           session.Metadata.TryGetValue("couponId", out var CouponIdStr)
-              ? CouponIdStr
-              : null;
+                               session.Metadata.TryGetValue("couponId", out var CouponIdStr)
+                    ? CouponIdStr
+                    : null;
 
                 _logger.Info(
                     $"[Stripe][Webhook] PaymentIntent created: {session.PaymentIntentId}, sessionId: {session.Id}");
-                await _transactionService.HandlePaymentIntentCreatedAsync(session.PaymentIntentId, session.Id, couponId );
+                await _transactionService.HandlePaymentIntentCreatedAsync(session.PaymentIntentId, session.Id,
+                    couponId);
             }
         }
         catch (StripeException e)
@@ -667,7 +669,8 @@ public class StripeController : ControllerBase
     [HttpPost("cancel-payment")]
     public async Task<IActionResult> CancelPayment([FromBody] CancelPaymentRequestDto request)
     {
-        _logger.Info($"[Stripe][CancelPayment] Yêu cầu hủy thanh toán cho order/group: {request.OrderId} / {request.CheckoutGroupId}");
+        _logger.Info(
+            $"[Stripe][CancelPayment] Yêu cầu hủy thanh toán cho order/group: {request.OrderId} / {request.CheckoutGroupId}");
         try
         {
             // Nếu truyền vào groupId thì hủy cả nhóm, còn truyền orderId thì hủy đơn lẻ
