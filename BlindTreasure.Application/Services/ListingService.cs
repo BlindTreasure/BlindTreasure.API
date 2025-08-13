@@ -126,30 +126,32 @@ public class ListingService : IListingService
         );
 
         var result = items.Select(item =>
-        {
-            var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
-
-            // Thông tin sản phẩm
-            if (item.Product != null)
             {
-                dto.ProductName = item.Product.Name;
-                dto.Image = item.Product.ImageUrls?.FirstOrDefault() ?? "";
-            }
+                var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
 
-            // Trạng thái hold sau giao dịch (3 ngày)
-            dto.IsOnHold = item.HoldUntil.HasValue && item.HoldUntil.Value > DateTime.UtcNow;
+                // Thông tin sản phẩm
+                if (item.Product != null)
+                {
+                    dto.ProductName = item.Product.Name;
+                    dto.Image = item.Product.ImageUrls?.FirstOrDefault() ?? "";
+                }
 
-            // Kiểm tra có listing active không
-            dto.HasActiveListing = item.Listings?.Any(l => l.Status == ListingStatus.Active) ?? false;
+                // Trạng thái hold sau giao dịch (3 ngày)
+                dto.IsOnHold = item.HoldUntil.HasValue && item.HoldUntil.Value > DateTime.UtcNow;
 
-            dto.Status = item.Status;
+                // Kiểm tra có listing active không
+                dto.HasActiveListing = item.Listings?.Any(l => l.Status == ListingStatus.Active) ?? false;
 
-            return dto;
-        }).ToList();
+                dto.Status = item.Status;
+
+                return dto;
+            })
+            .OrderBy(item => item.Status != InventoryItemStatus.Available) // Sắp xếp Available lên đầu
+            .ThenBy(item => item.Status) // Sắp xếp các trạng thái còn lại theo thứ tự enum
+            .ToList();
 
         // Cache kết quả
         await _cacheService.SetAsync(cacheKey, result, CacheDurations.UserItems);
-        _logger.Info($"[GetAvailableItems] Đã cache {result.Count} items cho user: {userId}");
 
         return result;
     }
@@ -172,10 +174,12 @@ public class ListingService : IListingService
         );
 
         if (inventory == null)
-            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm hợp lệ để tạo listing.");
+            throw ErrorHelper.NotFound(
+                $"InventoryItem {dto.InventoryId} không tồn tại, đã bị xóa, hoặc không thuộc quyền sở hữu của user {userId}.");
 
         if (inventory.Listings?.Any(l => l.Status == ListingStatus.Active) == true)
-            throw ErrorHelper.Conflict("Vật phẩm này đã có listing đang hoạt động.");
+            throw ErrorHelper.Conflict(
+                $"InventoryItem {dto.InventoryId} đã có active listing. Mỗi vật phẩm chỉ được phép có một active listing tại một thời điểm.");
 
         var listing = new Listing
         {
