@@ -56,7 +56,7 @@ public class CategoryService : ICategoryService
         if (category == null)
         {
             _logger.Warn($"[GetByIdAsync] Category {id} not found.");
-            throw ErrorHelper.NotFound(ErrorMessages.CategoryNotFound);
+            throw ErrorHelper.NotFound("Rất tiếc, danh mục bạn đang tìm kiếm không tồn tại hoặc đã bị xóa. Vui lòng kiểm tra lại ID danh mục.");
         }
 
         await _cacheService.SetAsync(cacheKey, category, TimeSpan.FromHours(1));
@@ -139,20 +139,20 @@ public class CategoryService : ICategoryService
         var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
-            throw ErrorHelper.Forbidden(ErrorMessages.CategoryNoUpdatePermission);
+            throw ErrorHelper.Forbidden("Bạn không có quyền thực hiện hành động này. Chỉ quản trị viên hoặc nhân viên mới có thể tạo danh mục.");
         _logger.Info($"[CreateAsync] Admin/Staff creates category {dto.Name} by {user?.FullName}");
 
         if (string.IsNullOrWhiteSpace(dto.Name))
-            throw ErrorHelper.BadRequest(ErrorMessages.CategoryNameRequired);
+            throw ErrorHelper.BadRequest("Tên danh mục không được để trống. Vui lòng nhập tên danh mục hợp lệ.");
 
         var exists = await _unitOfWork.Categories.GetQueryable().Where(x => !x.IsDeleted)
             .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower());
         if (exists)
-            throw ErrorHelper.Conflict(ErrorMessages.CategoryNameAlreadyExists);
+            throw ErrorHelper.Conflict("Tên danh mục đã tồn tại. Vui lòng chọn một tên khác.");
 
         if (dto.ParentId.HasValue)
             if (!await _unitOfWork.Categories.GetQueryable().AnyAsync(c => c.Id == dto.ParentId.Value))
-                throw ErrorHelper.BadRequest(ErrorMessages.CategoryParentIdInvalid);
+                throw ErrorHelper.BadRequest("ID danh mục cha không hợp lệ. Vui lòng chọn một danh mục cha có sẵn.");
 
         var category = new Category
         {
@@ -164,7 +164,7 @@ public class CategoryService : ICategoryService
         if (dto.ImageFile != null)
         {
             if (dto.ParentId != null)
-                throw ErrorHelper.BadRequest(ErrorMessages.CategoryImageOnlyForRoot);
+                throw ErrorHelper.BadRequest("Không thể thêm hình ảnh cho danh mục con. Hình ảnh chỉ được áp dụng cho danh mục cha.");
 
             try
             {
@@ -179,7 +179,7 @@ public class CategoryService : ICategoryService
             catch (Exception ex)
             {
                 _logger.Error($"[CreateAsync] Upload image failed: {ex.Message}");
-                throw ErrorHelper.Internal(ErrorMessages.CategoryImageUploadError);
+                throw ErrorHelper.Internal("Đã xảy ra lỗi khi tải lên hình ảnh danh mục. Vui lòng thử lại sau.");
             }
         }
 
@@ -196,7 +196,7 @@ public class CategoryService : ICategoryService
         var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
-            throw ErrorHelper.Forbidden(ErrorMessages.CategoryNoUpdatePermission);
+            throw ErrorHelper.Forbidden("Bạn không có quyền thực hiện hành động này. Chỉ quản trị viên hoặc nhân viên mới có thể cập nhật danh mục.");
 
         _logger.Info($"[UpdateAsync] Admin/Staff updates category {dto.Name ?? "(no name change)"} by {user.FullName}");
 
@@ -205,14 +205,14 @@ public class CategoryService : ICategoryService
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (category == null)
-            throw ErrorHelper.NotFound(ErrorMessages.CategoryNotFound);
+            throw ErrorHelper.NotFound("Rất tiếc, danh mục bạn muốn cập nhật không tồn tại hoặc đã bị xóa.");
 
         if (!string.IsNullOrWhiteSpace(dto.Name))
         {
             var exists = await _unitOfWork.Categories.GetQueryable().Where(x => !x.IsDeleted)
                 .AnyAsync(c => c.Name.ToLower() == dto.Name.Trim().ToLower() && c.Id != id);
             if (exists)
-                throw ErrorHelper.Conflict(ErrorMessages.CategoryNameAlreadyExists);
+                throw ErrorHelper.Conflict("Tên danh mục đã tồn tại. Vui lòng chọn một tên khác.");
 
             category.Name = dto.Name.Trim();
         }
@@ -225,10 +225,10 @@ public class CategoryService : ICategoryService
         if (dto.ParentId.HasValue)
         {
             if (dto.ParentId.Value == id)
-                throw ErrorHelper.BadRequest(ErrorMessages.CategoryParentIdSelf);
+                throw ErrorHelper.BadRequest("ID danh mục cha không thể là chính danh mục hiện tại. Vui lòng chọn một ID khác.");
 
             if (await IsDescendantAsync(id, dto.ParentId.Value))
-                throw ErrorHelper.BadRequest(ErrorMessages.CategoryHierarchyLoop);
+                throw ErrorHelper.BadRequest("Không thể đặt danh mục con làm danh mục cha để tránh tạo vòng lặp phân cấp. Vui lòng chọn một danh mục cha khác.");
 
             category.ParentId = dto.ParentId;
 
@@ -257,7 +257,7 @@ public class CategoryService : ICategoryService
         if (dto.ImageFile != null)
         {
             if (category.ParentId != null)
-                throw ErrorHelper.BadRequest(ErrorMessages.CategoryImageOnlyForRoot);
+                throw ErrorHelper.BadRequest("Không thể thêm hoặc cập nhật hình ảnh cho danh mục con. Hình ảnh chỉ được áp dụng cho danh mục cha.");
 
             try
             {
@@ -280,7 +280,7 @@ public class CategoryService : ICategoryService
             catch (Exception ex)
             {
                 _logger.Error($"[UpdateAsync] Upload image failed: {ex.Message}");
-                throw ErrorHelper.Internal(ErrorMessages.CategoryImageUploadError);
+                throw ErrorHelper.Internal("Đã xảy ra lỗi khi tải lên hình ảnh danh mục. Vui lòng thử lại sau.");
             }
         }
 
@@ -301,7 +301,7 @@ public class CategoryService : ICategoryService
         var userId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserDetailsByIdAsync(userId);
         if (user == null || (user.RoleName != RoleType.Admin && user.RoleName != RoleType.Staff))
-            throw ErrorHelper.Forbidden(ErrorMessages.CategoryNoDeletePermission);
+            throw ErrorHelper.Forbidden("Bạn không có quyền thực hiện hành động này. Chỉ quản trị viên hoặc nhân viên mới có thể xóa danh mục.");
 
         var category = await _unitOfWork.Categories.GetQueryable()
             .Include(c => c.Products)
@@ -311,14 +311,14 @@ public class CategoryService : ICategoryService
         if (category == null)
         {
             _logger.Warn($"[DeleteAsync] Category {id} not found.");
-            throw ErrorHelper.NotFound(ErrorMessages.CategoryNotFound);
+            throw ErrorHelper.NotFound("Rất tiếc, danh mục bạn muốn xóa không tồn tại hoặc đã bị xóa.");
         }
 
         _logger.Info($"[DeleteAsync] Admin/Staff deletes category {id} by {user.FullName}");
 
         if ((category.Products != null && category.Products.Any()) ||
             (category.Children != null && category.Children.Any(c => !c.IsDeleted)))
-            throw ErrorHelper.Conflict(ErrorMessages.CategoryDeleteHasChildrenOrProducts);
+            throw ErrorHelper.Conflict("Không thể xóa danh mục này vì nó vẫn còn sản phẩm hoặc danh mục con đang hoạt động. Vui lòng xóa sản phẩm và danh mục con trước.");
 
         await _unitOfWork.Categories.SoftRemove(category);
         await _unitOfWork.SaveChangesAsync();
