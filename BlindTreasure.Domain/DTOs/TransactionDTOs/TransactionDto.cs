@@ -12,4 +12,5 @@ public class TransactionDto
     public string Status { get; set; }
     public DateTime OccurredAt { get; set; }
     public string ExternalRef { get; set; }
+    public Guid? PaymentId { get; set; }
 }

@@ -177,7 +177,8 @@ public static class OrderDtoMapper
             PaymentIntentId = payment.PaymentIntentId,
             PaidAt = payment.PaidAt,
             RefundedAmount = payment.RefundedAmount,
-            Transactions = payment.Transactions?.Select(ToTransactionDto).ToList() ?? new List<TransactionDto>()
+            Transactions = payment.Transactions?.Select(ToTransactionDto).ToList() ?? new List<TransactionDto>(),
+            SessionId = payment.SessionId
         };
     }
 
@@ -191,7 +192,8 @@ public static class OrderDtoMapper
             Currency = t.Currency,
             Status = t.Status,
             OccurredAt = t.OccurredAt,
-            ExternalRef = t.ExternalRef
+            ExternalRef = t.ExternalRef,
+            PaymentId = t.PaymentId
         };
     }
 }

@@ -186,51 +186,33 @@ public class TransactionService : ITransactionService
 
         try
         {
-            // Load transaction and all necessary navigation properties in one query
-            var transaction = await _unitOfWork.Transactions.GetQueryable()
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.OrderDetails)
-                            .ThenInclude(od => od.Product)
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.OrderDetails)
-                            .ThenInclude(od => od.BlindBox)
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.OrderDetails)
-                            .ThenInclude(od => od.Shipments)
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.ShippingAddress)
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.Seller)
-                        .ThenInclude(s => s.User) // Ensure Seller.User is loaded
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.User) // Ensure Order.User is loaded
-                .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
+            var order = await _unitOfWork.Orders.GetQueryable()
+    .Include(o => o.Payment)
+        .ThenInclude(p => p.Transactions)
+    .Include(o => o.OrderDetails)
+        .ThenInclude(od => od.Product)
+    .Include(o => o.OrderDetails)
+        .ThenInclude(od => od.BlindBox)
+    .Include(o => o.OrderDetails)
+        .ThenInclude(od => od.Shipments)
+    .Include(o => o.OrderDetails)
+        .ThenInclude(od => od.InventoryItems)
+    .Include(o => o.ShippingAddress)
+    .Include(o => o.Seller)
+        .ThenInclude(s => s.User)
+    .Include(o => o.User)
+    .FirstOrDefaultAsync(o => o.Id.ToString() == orderId);
 
-            _logger.Info($"Found transaction with external ref:{transaction.Id}");
+            _logger.Info($"[HandleSuccessfulPaymentAsync] Đã tìm thấy transaction với số lượng {order.Payment.Transactions.Count}");
 
-            var order = transaction.Payment.Order;
-            if (order == null)
+            var transaction = order.Payment.Transactions
+                .FirstOrDefault(t => t.ExternalRef == sessionId);
+            if(transaction == null)
             {
-                _logger.Info($"[HandleSuccessfulPaymentAsync] Không tìm thấy Order Include bởi payment từ {transaction.Id}.");
-                order = await _unitOfWork.Orders.GetQueryable()
-                    .Include(o => o.Payment).ThenInclude(o=>o.Transactions)
-                    .Include(o => o.OrderDetails)
-                        .ThenInclude(od => od.Product)
-                    .Include(o => o.OrderDetails)
-                        .ThenInclude(od => od.BlindBox)
-                    .Include(o => o.OrderDetails)
-                        .ThenInclude(od => od.Shipments)
-                    .Include(o => o.ShippingAddress)
-                    .Include(o => o.Seller)
-                        .ThenInclude(s => s.User) // Ensure Seller.User is loaded
-                    .Include(o => o.User) // Ensure Order.User is loaded
-                    .FirstOrDefaultAsync(o => o.Id.ToString() == orderId);
+                 transaction = await _unitOfWork.Transactions.GetQueryable()
+                .Include(t => t.Payment)
+                .FirstOrDefaultAsync(t => t.ExternalRef == sessionId && t.Payment.OrderId.ToString() == orderId);
+                _logger.Info($"[HandleSuccessfulPaymentAsync] Đã tìm thấy transaction với sessionId {sessionId} và orderId {orderId}, transactionId {transaction?.Id}");
             }
 
 
@@ -242,7 +224,7 @@ public class TransactionService : ITransactionService
             }
 
             // Update transaction, payment, and order status
-            UpdatePaymentAndOrderStatus(transaction, order);
+            UpdatePaymentAndOrderStatus(order.Payment.Transactions.First(), order);
 
             // 1. Create GHN shipments and update shipment info
             await CreateGhnOrdersAndUpdateShipments(order);
