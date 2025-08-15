@@ -14,6 +14,8 @@ using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
+using OfficeOpenXml.Style;
 
 namespace BlindTreasure.Application.Services;
 
@@ -117,6 +119,69 @@ public class UnboxingService : IUnboxingService
         };
     }
 
+    public async Task<string> ExportToExcel(PaginationParameter param, Guid? userId, Guid? productId)
+    {
+        var logs = await GetLogsAsync(param, userId, productId);
+
+        // Tạo một file Excel mới
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        using (var package = new ExcelPackage())
+        {
+            // Thêm một worksheet vào file Excel
+            var worksheet = package.Workbook.Worksheets.Add("UnboxingLogs");
+
+            // Tiêu đề của các cột
+            string[] columnHeaders =
+            {
+                "Id", "CustomerBlindBoxId", "CustomerName", "ProductId", "ProductName", "Rarity", "DropRate",
+                "RollValue", "UnboxedAt", "BlindBoxName", "Reason"
+            };
+            for (int i = 0; i < columnHeaders.Length; i++)
+            {
+                worksheet.Cells[1, i + 1].Value = columnHeaders[i];
+                worksheet.Cells[1, i + 1].Style.Font.Bold = true;
+            }
+
+            // Đổ dữ liệu từ logs vào worksheet
+            for (int i = 0; i < logs.Count; i++) // Sử dụng logs.Count (vì logs là List<T>)
+            {
+                var log = logs[i];
+                worksheet.Cells[i + 2, 1].Value = log.Id.ToString();
+                worksheet.Cells[i + 2, 2].Value = log.CustomerBlindBoxId.ToString();
+                worksheet.Cells[i + 2, 3].Value = log.CustomerName;
+                worksheet.Cells[i + 2, 4].Value = log.ProductId.ToString();
+                worksheet.Cells[i + 2, 5].Value = log.ProductName;
+                worksheet.Cells[i + 2, 6].Value = log.Rarity;
+                worksheet.Cells[i + 2, 7].Value = log.DropRate.ToString();
+                worksheet.Cells[i + 2, 8].Value = log.RollValue.ToString();
+                worksheet.Cells[i + 2, 9].Value = log.UnboxedAt.ToString();
+                worksheet.Cells[i + 2, 10].Value = log.BlindBoxName;
+                worksheet.Cells[i + 2, 11].Value = log.Reason;
+            }
+
+            // Định dạng bảng
+            using (var range = worksheet.Cells[1, 1, logs.Count + 1, columnHeaders.Length]) // Sử dụng logs.Count
+            {
+                range.AutoFitColumns();
+                range.Style.Font.Name = "Calibri";
+                range.Style.Font.Size = 11;
+                range.Style.Border.Top.Style = ExcelBorderStyle.Thin;
+                range.Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
+                range.Style.Border.Left.Style = ExcelBorderStyle.Thin;
+                range.Style.Border.Right.Style = ExcelBorderStyle.Thin;
+            }
+
+            // Lưu file Excel
+            var fileName = $"UnboxingLogs_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            var filePath = Path.Combine(Directory.GetCurrentDirectory(), fileName);
+            FileInfo excelFile = new FileInfo(filePath);
+            package.SaveAs(excelFile);
+
+            return filePath; // Trả về đường dẫn của file đã lưu
+        }
+    }
+
+
     public async Task<Pagination<UnboxLogDto>> GetLogsAsync(PaginationParameter param, Guid? userId, Guid? productId)
     {
         var query = _unitOfWork.BlindBoxUnboxLogs.GetQueryable()
@@ -137,7 +202,7 @@ public class UnboxingService : IUnboxingService
             if (seller != null)
             {
                 // Lọc các BlindBoxUnboxLog theo SellerId thông qua ProductId
-                query = query.Where(x => x.ProductId != null && _unitOfWork.Products.GetQueryable()
+                query = query.Where(x => _unitOfWork.Products.GetQueryable()
                     .Any(p => p.Id == x.ProductId && p.SellerId == seller.Id));
             }
             else
@@ -216,6 +281,12 @@ public class UnboxingService : IUnboxingService
         var sb = new StringBuilder();
         var totalProbability = probabilities.Values.Sum();
 
+        // ANSI escape codes for colors
+        const string reset = "\x1b[0m";
+        const string green = "\x1b[32m";
+        const string yellow = "\x1b[33m";
+        const string cyan = "\x1b[36m";
+
         // HEADER SECTION
         sb.AppendLine("# Báo Cáo Kết Quả Mở Hộp");
         sb.AppendLine();
@@ -246,19 +317,24 @@ public class UnboxingService : IUnboxingService
             var end = start + kvp.Value;
             cumulative = end;
 
-            var productId = kvp.Key.ProductId.ToString("N")[..8] + "...";
             var itemName = kvp.Key.Product?.Name ?? "NULL";
             var rarity = GetRarityBadge(kvp.Key.RarityConfig?.Name.ToString());
             var dropRate = Math.Round(kvp.Value, 4);
             var range = $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
-            var status = kvp.Key.Id == selectedItem.Id ? "**ĐÃ CHỌN**" : "Không chọn";
 
-            sb.AppendLine($"- **{index}. Sản phẩm:** {itemName}");
-            sb.AppendLine($"  - Product ID: {productId}");
+            // Highlight selected item
+            if (kvp.Key.Id == selectedItem.Id)
+            {
+                sb.AppendLine($"{cyan}- **{index}. Sản phẩm: {itemName} (ĐÃ CHỌN){reset}**");
+            }
+            else
+            {
+                sb.AppendLine($"- {index}. Sản phẩm: {itemName}");
+            }
+
             sb.AppendLine($"  - Độ hiếm: {rarity}");
             sb.AppendLine($"  - Tỷ lệ Drop: {dropRate}%");
             sb.AppendLine($"  - Range: {range}");
-            sb.AppendLine($"  - Trạng thái: {status}");
             sb.AppendLine();
 
             index++;
@@ -269,20 +345,19 @@ public class UnboxingService : IUnboxingService
         sb.AppendLine();
         sb.AppendLine("### Chi Tiết Sản Phẩm Được Chọn");
         sb.AppendLine();
-        sb.AppendLine($"- **Product ID:** {selectedItem.ProductId}");
-        sb.AppendLine($"- **Item ID:** {selectedItem.Id}");
         sb.AppendLine($"- **Product Name:** {selectedItem.Product?.Name ?? "NULL"}");
         sb.AppendLine($"- **Configured Drop Rate:** {Math.Round(selectedItem.DropRate, 4)}%");
         sb.AppendLine($"- **Rarity Level:** {GetRarityBadge(selectedItem.RarityConfig?.Name.ToString())}");
         sb.AppendLine($"- **Roll Hit Range:** {GetHitRange(probabilities, selectedItem)}");
         sb.AppendLine();
 
+        // VALIDATION SECTION
         sb.AppendLine("## Kiểm Tra Validation");
         sb.AppendLine();
         sb.AppendLine(
-            $"- **Tổng xác suất:** {Math.Round(totalProbability, 4)}% ({(Math.Abs(totalProbability - 100) < 0.01m ? "Hợp lệ" : "Cảnh báo")})");
-        sb.AppendLine($"- **Roll trong khoảng hợp lệ:** 0 ≤ {roll} ≤ {totalProbability} (Hợp lệ)");
-        sb.AppendLine($"- **Lựa chọn Item:** Thuật toán đã thực thi (Thành công)");
+            $"- **Tổng xác suất:** {Math.Round(totalProbability, 4)}% ({(Math.Abs(totalProbability - 100) < 0.01m ? $"{green}Hợp lệ{reset}" : $"{yellow}Cảnh báo{reset}")})");
+        sb.AppendLine($"- **Roll trong khoảng hợp lệ:** 0 ≤ {roll} ≤ {totalProbability} ({green}Hợp lệ{reset})");
+        sb.AppendLine($"- **Lựa chọn Item:** Thuật toán đã thực thi ({green}Thành công{reset})");
         sb.AppendLine();
 
         // TECHNICAL NOTES
@@ -298,7 +373,7 @@ public class UnboxingService : IUnboxingService
 
 
 // Helper methods
-    private string GetRarityBadge(string rarity)
+    private string GetRarityBadge(string? rarity)
     {
         return rarity?.ToLower() switch
         {
@@ -332,10 +407,10 @@ public class UnboxingService : IUnboxingService
     {
         var customerBox = await _unitOfWork.CustomerBlindBoxes.GetQueryable()
             .Include(cb => cb.BlindBox)
-            .ThenInclude(bb => bb.BlindBoxItems)
+            .ThenInclude(bb => bb!.BlindBoxItems)
             .ThenInclude(bbi => bbi.ProbabilityConfigs)
             .Include(cb => cb.BlindBox)
-            .ThenInclude(bb => bb.BlindBoxItems)
+            .ThenInclude(bb => bb!.BlindBoxItems)
             .ThenInclude(bbi => bbi.Product)
             .FirstOrDefaultAsync(cb => cb.Id == id);
 
@@ -358,7 +433,7 @@ public class UnboxingService : IUnboxingService
             .ToListAsync();
 
         foreach (var item in customerBox.BlindBox.BlindBoxItems)
-            item.RarityConfig = rarities.FirstOrDefault(r => r.BlindBoxItemId == item.Id);
+            item.RarityConfig = rarities.FirstOrDefault(r => r.BlindBoxItemId == item.Id)!;
 
         return customerBox;
     }

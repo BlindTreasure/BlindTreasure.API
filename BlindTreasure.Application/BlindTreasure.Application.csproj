@@ -7,24 +7,25 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Remove="Services\NewFolder\**"/>
-        <EmbeddedResource Remove="Services\NewFolder\**"/>
-        <None Remove="Services\NewFolder\**"/>
+        <Compile Remove="Services\NewFolder\**" />
+        <EmbeddedResource Remove="Services\NewFolder\**" />
+        <None Remove="Services\NewFolder\**" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\BlindTreasure.Infrastructure\BlindTreasure.Infrastructure.csproj"/>
+        <ProjectReference Include="..\BlindTreasure.Infrastructure\BlindTreasure.Infrastructure.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Betalgo.OpenAI" Version="8.7.2"/>
-        <PackageReference Include="Google.Apis.Auth" Version="1.69.0"/>
-        <PackageReference Include="Minio" Version="6.0.4"/>
-        <PackageReference Include="Quartz" Version="3.14.0"/>
-        <PackageReference Include="Resend" Version="0.1.1"/>
-        <PackageReference Include="RestSharp" Version="112.1.0"/>
-        <PackageReference Include="Stripe.net" Version="48.2.0"/>
-        <PackageReference Include="System.Text.Json" Version="9.0.5"/>
+        <PackageReference Include="Betalgo.OpenAI" Version="8.7.2" />
+        <PackageReference Include="EPPlus" Version="8.0.8" />
+        <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+        <PackageReference Include="Minio" Version="6.0.4" />
+        <PackageReference Include="Quartz" Version="3.14.0" />
+        <PackageReference Include="Resend" Version="0.1.1" />
+        <PackageReference Include="RestSharp" Version="112.1.0" />
+        <PackageReference Include="Stripe.net" Version="48.2.0" />
+        <PackageReference Include="System.Text.Json" Version="9.0.5" />
     </ItemGroup>
 
 </Project>
