@@ -10,6 +10,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Stripe.Checkout;
 
 namespace BlindTreasure.Application.Services;
 
@@ -188,27 +189,27 @@ public class TransactionService : ITransactionService
             // Load transaction and all necessary navigation properties in one query
             var transaction = await _unitOfWork.Transactions.GetQueryable()
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order)
-                .ThenInclude(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.OrderDetails)
+                            .ThenInclude(od => od.Product)
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order)
-                .ThenInclude(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.OrderDetails)
+                            .ThenInclude(od => od.BlindBox)
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order)
-                .ThenInclude(o => o.OrderDetails)
-                .ThenInclude(od => od.Shipments)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.OrderDetails)
+                            .ThenInclude(od => od.Shipments)
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order)
-                .ThenInclude(o => o.ShippingAddress)
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.ShippingAddress)
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order)
-                .ThenInclude(o => o.Seller)
-                .ThenInclude(s => s.User) // Ensure Seller.User is loaded
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.Seller)
+                        .ThenInclude(s => s.User) // Ensure Seller.User is loaded
                 .Include(t => t.Payment)
-                .ThenInclude(p => p.Order)
-                .ThenInclude(o => o.User) // Ensure Order.User is loaded
+                    .ThenInclude(p => p.Order)
+                        .ThenInclude(o => o.User) // Ensure Order.User is loaded
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
             if (transaction?.Payment?.Order == null)
@@ -240,10 +241,8 @@ public class TransactionService : ITransactionService
                     _logger.Warn($"[HandleSuccessfulPaymentAsync] OrderDetail {od.Id} không có InventoryItems.");
                     continue;
                 }
-
                 OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
             }
-
             await _unitOfWork.OrderDetails.UpdateRange(order.OrderDetails.ToList());
 
             // 4. Create customer blind boxes for blind box order details
@@ -253,20 +252,26 @@ public class TransactionService : ITransactionService
             await _unitOfWork.Transactions.Update(transaction);
             await _unitOfWork.Payments.Update(transaction.Payment);
             await _unitOfWork.Orders.Update(order);
+            var session = await _unitOfWork.GroupPaymentSessions.GetQueryable()
+                .FirstOrDefaultAsync(x => x.StripeSessionId == sessionId && !x.IsCompleted); 
+            if (session != null) { 
+                session.IsCompleted = true; session.UpdatedAt = DateTime.UtcNow; await _unitOfWork.GroupPaymentSessions.Update(session); 
+                _logger.Info("Đánh dấu hoàn thành cho thanh toán nhóm"); }
             await _unitOfWork.SaveChangesAsync();
 
             await _emailService.SendOrderPaymentSuccessToBuyerAsync(order);
 
             // Notify user (buyer)
             if (order.User != null)
+            {
                 await _notificationService.PushNotificationToUser(order.UserId, new NotificationDto
                 {
                     Title = $"Thanh toán thành công đơn hàng #{order.Id}",
-                    Message =
-                        "Đơn hàng của bạn đã được xác nhận. Nếu có giao hàng, hệ thống sẽ tiến hành xử lý vận chuyển.",
+                    Message = "Đơn hàng của bạn đã được xác nhận. Nếu có giao hàng, hệ thống sẽ tiến hành xử lý vận chuyển.",
                     Type = NotificationType.Order,
                     SourceUrl = null
                 });
+            }
 
             // Notify seller
             if (order.Seller?.User != null)
@@ -337,7 +342,6 @@ public class TransactionService : ITransactionService
 
             UpdateShipmentWithGhnResponse(shipment, ghnCreateResponse);
         }
-
         await _unitOfWork.Shipments.UpdateRange(shipments);
     }
 
@@ -404,8 +408,7 @@ public class TransactionService : ITransactionService
         shipment.MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0);
         shipment.TrackingNumber = ghnCreateResponse?.OrderCode ?? "";
         //shipment.ShippedAt = DateTime.UtcNow.AddDays(4);
-        shipment.EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3))
-            .AddHours(new Random().Next(8, 18)).AddMinutes(new Random().Next(60));
+        shipment.EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8, 18)).AddMinutes(new Random().Next(60));
         shipment.EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3);
         shipment.Status = ShipmentStatus.PROCESSING;
     }
@@ -474,10 +477,9 @@ public class TransactionService : ITransactionService
                 dto = await _unitOfWork.InventoryItems.AddAsync(dto);
 
                 // Log: InventoryItem vừa được tạo cho OrderDetail sử dụng TEntity
-                var orderDetaillog =
-                    await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
-                        od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
-                    );
+                var orderDetaillog = await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
+                    od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
+                );
 
                 od.OrderDetailInventoryItemLogs.Add(orderDetaillog);
 
@@ -495,18 +497,18 @@ public class TransactionService : ITransactionService
 
                     _logger.Info($"Generate tracking message succesfully: {trackingMessage}");
 
-                    var itemInventoryLog =
-                        await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
-                            od,
-                            oldItemStatus,
-                            dto,
-                            trackingMessage
-                        );
-                    _logger.Info(
-                        $"[CreateInventoryForOrderDetailsAsync] Đã log trạng thái shipment cho inventory item {dto.Id}.");
+                    var itemInventoryLog = await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                        od,
+                        oldItemStatus,
+                        dto,
+                        trackingMessage
+                    );
+                    _logger.Info($"[CreateInventoryForOrderDetailsAsync] Đã log trạng thái shipment cho inventory item {dto.Id}.");
 
                     dto.OrderDetailInventoryItemLogs.Add(itemInventoryLog);
+
                 }
+
             }
         }
         //if (inventoryItems.Any())
@@ -537,16 +539,19 @@ public class TransactionService : ITransactionService
                     detail, null, cbBox, $"CustomerBlindBox created for OrderDetail {detail.Id} after payment."
                 );
             }
-
             var oldStatus = detail.Status;
             detail.Status = OrderDetailItemStatus.IN_INVENTORY;
             if (oldStatus != detail.Status)
-                await _orderDetailInventoryItemLogService.LogOrderDetailStatusChangeAsync(detail, oldStatus,
-                    detail.Status, "Chuyển sang IN_INVENTORY sau khi tạo Customer BlindBox.");
+            {
+                await _orderDetailInventoryItemLogService.LogOrderDetailStatusChangeAsync(detail, oldStatus, detail.Status, "Chuyển sang IN_INVENTORY sau khi tạo Customer BlindBox.");
+            }
         }
         //if (blindBoxes.Any())
         //    await _unitOfWork.CustomerBlindBoxes.AddRangeAsync(blindBoxes);
     }
+
+
+
 
 
     /// <summary>
@@ -565,6 +570,7 @@ public class TransactionService : ITransactionService
 
             if (groupSession != null)
             {
+                //groupSession.ExpiresAt = DateTime.UtcNow; expire này set để biết khi nào hết hạn.
                 groupSession.IsCompleted = true;
                 groupSession.UpdatedAt = DateTime.UtcNow;
                 await _unitOfWork.GroupPaymentSessions.Update(groupSession);
@@ -667,6 +673,8 @@ public class TransactionService : ITransactionService
                 _logger.Warn($"[HandleFailedPaymentAsync] Đã xử lý thất bại thanh toán cho group session {sessionId}.");
                 return;
             }
+
+
 
             // 2. Fallback: Single order session (old logic)
             var transaction = await _unitOfWork.Transactions.GetQueryable()

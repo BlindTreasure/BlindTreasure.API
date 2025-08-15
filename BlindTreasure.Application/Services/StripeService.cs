@@ -49,12 +49,12 @@ public class StripeService : IStripeService
         var groupSession = await _unitOfWork.GroupPaymentSessions
             .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
 
-        if (groupSession != null && groupSession.ExpiresAt < DateTime.UtcNow)
+        if (groupSession != null && groupSession.ExpiresAt > DateTime.UtcNow && !groupSession.IsCompleted) // kiểm tra chưa hết hạn
             // Session still valid
             return groupSession.PaymentUrl;
 
         // If not found or expired, call the session creation method
-        return await CreateGeneralCheckoutSessionForOrders(orders.Select(o => o.Id).ToList());
+        throw ErrorHelper.NotFound("Link thanh toán của đơn hàng này đã hết hạn hoặc bị hủy trước đó");
     }
 
     public async Task<string> GenerateExpressLoginLink()
@@ -168,7 +168,7 @@ public class StripeService : IStripeService
             },
             SuccessUrl = $"{_successRedirectUrl}?checkout_group={orders.First().CheckoutGroupId}&status=success",
             CancelUrl = $"{_failRedirectUrl}?checkout_group={orders.First().CheckoutGroupId}&status=pending",
-            ExpiresAt = DateTime.UtcNow.AddHours(1)
+            ExpiresAt = DateTime.UtcNow.AddHours(12)
         };
 
         var service = new SessionService(_stripeClient);
@@ -372,7 +372,7 @@ public class StripeService : IStripeService
                 },
                 SuccessUrl = $"{_successRedirectUrl}?order_id={order.Id}&status=success",
                 CancelUrl = $"{_failRedirectUrl}?order_id={order.Id}&status=pending",
-                ExpiresAt = DateTime.UtcNow.AddHours(24),
+                ExpiresAt = DateTime.UtcNow.AddHours(12),
                 PaymentIntentData = new SessionPaymentIntentDataOptions
                 {
                     Metadata = new Dictionary<string, string>
@@ -485,11 +485,13 @@ public class StripeService : IStripeService
     {
         var groupSession = await _unitOfWork.GroupPaymentSessions
             .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
+       
 
         if (groupSession == null)
             throw ErrorHelper.NotFound("Không tìm thấy session group thanh toán cho nhóm đơn hàng.");
 
-
+        groupSession.IsCompleted= true;
+        groupSession.ExpiresAt = DateTime.UtcNow; // Đánh dấu là đã hủy
 
         foreach (var order in orders)
         {
@@ -559,6 +561,7 @@ public class StripeService : IStripeService
                 if (session.PaymentStatus == "unpaid" && session.Status != "expired")
                 {
                     await sessionService.ExpireAsync(session.Id);
+                    Console.WriteLine(session.ExpiresAt);
                 }
             }
             catch (StripeException ex)
@@ -767,7 +770,7 @@ public class StripeService : IStripeService
             Mode = "payment",
             SuccessUrl = $"{_successRedirectUrl}?status=success&session_id={{CHECKOUT_SESSION_ID}}",
             CancelUrl = $"{_failRedirectUrl}?status=failed&session_id={{CHECKOUT_SESSION_ID}}",
-            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
+            ExpiresAt = DateTime.UtcNow.AddHours(12)
         };
 
         var service = new SessionService(_stripeClient);

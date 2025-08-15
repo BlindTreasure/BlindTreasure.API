@@ -202,8 +202,8 @@ public class UserService : IUserService
 
         await _unitOfWork.Users.AddAsync(user);
         await _unitOfWork.SaveChangesAsync();
-        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
-        await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
+        //await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+        //await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
         _logger.Success($"[CreateUserAsync] User {user.Email} created by admin.");
         return UserMapper.ToUserDto(user);

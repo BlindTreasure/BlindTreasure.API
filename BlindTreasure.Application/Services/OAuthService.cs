@@ -56,7 +56,9 @@ public class OAuthService : IOAuthService
         try
         {
             var user = await _userService.GetUserByEmail(payload.Email, true);
-            if (user == null) throw ErrorHelper.NotFound("Account not found");
+            if (user == null) {
+                throw ErrorHelper.BadRequest("Account not found");
+            }
             return ToUserDto(user);
         }
         catch (Exception ex)
@@ -64,18 +66,19 @@ public class OAuthService : IOAuthService
             // User not found, register a new one
             if (ex.Message.Contains("Account not found", StringComparison.OrdinalIgnoreCase))
             {
+                var hashedPassword = new PasswordHasher().HashPassword("123456");
+
+
                 var request = new UserCreateDto
                 {
                     Email = payload.Email,
                     FullName = payload.Name,
-                    Password = GenerateSecurePassword(), // Tạo mật khẩu ngẫu nhiên
+                    Password = passwordCharacters,
                     AvatarUrl = payload.Picture,
                     RoleName = RoleType.Customer,
-                    DateOfBirth = DateTime.UtcNow
-                    // hoặc để null nếu cho phép                                                       
-                    // Phone = null,                                                       
-                    // Gender = null,
-                    // Password = random
+                    DateOfBirth = DateTime.UtcNow,
+                    PhoneNumber= "",  // Nếu không có số điện thoại, có thể để trống
+                    
                 };
 
                 var result = await _userService.CreateUserAsync(request);
@@ -89,25 +92,6 @@ public class OAuthService : IOAuthService
             throw;
         }
     }
-
-    private static string GenerateSecurePassword(int length = 16)
-    {
-        const string characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
-        var password = new StringBuilder();
-        using (var rng = RandomNumberGenerator.Create())
-        {
-            var data = new byte[4];
-            for (var i = 0; i < length; i++)
-            {
-                rng.GetBytes(data);
-                var randomIndex = BitConverter.ToUInt32(data, 0) % characters.Length;
-                password.Append(characters[(int)randomIndex]);
-            }
-        }
-
-        return password.ToString();
-    }
-
 
     /// <summary>
     ///     Maps User entity to UserDto.
