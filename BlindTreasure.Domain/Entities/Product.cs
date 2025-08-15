@@ -29,8 +29,6 @@ public class Product : BaseEntity
     public ProductSaleType? ProductType { get; set; }
     public string? Brand { get; set; }
 
-    //
-
     // Navigation
     public ICollection<Certificate> Certificates { get; set; }
     public ICollection<BlindBoxItem> BlindBoxItems { get; set; }
