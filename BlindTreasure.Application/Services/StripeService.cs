@@ -633,6 +633,7 @@ public class StripeService : IStripeService
             var payment = new Payment
             {
                 Order = order,
+                OrderId = order.Id,
                 Amount = order.TotalAmount + (order.TotalShippingFee ?? 0m),
                 DiscountRate = 0,
                 NetAmount = netAmount,
