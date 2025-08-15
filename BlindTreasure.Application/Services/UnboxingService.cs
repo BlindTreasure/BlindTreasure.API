@@ -120,7 +120,8 @@ public class UnboxingService : IUnboxingService
         };
     }
 
-    public async Task<string> ExportToExcel(PaginationParameter param, Guid? userId, Guid? productId)
+
+    public async Task<MemoryStream> ExportToExcelStream(PaginationParameter param, Guid? userId, Guid? productId)
     {
         var logs = await GetLogsAsync(param, userId, productId);
 
@@ -135,7 +136,7 @@ public class UnboxingService : IUnboxingService
 
             // Mảng tiêu đề cột (không có ID và Reason)
             string[] columnHeaders =
-                { "CustomerName", "ItemName", "Rarity", "DropRate", "RollValue", "UnboxedAt", "BlindBoxName" };
+                { "CustomerName", "ProductName", "Rarity", "DropRate", "RollValue", "UnboxedAt", "BlindBoxName" };
 
             // Thiết lập tiêu đề cột
             for (int i = 0; i < columnHeaders.Length; i++)
@@ -143,11 +144,12 @@ public class UnboxingService : IUnboxingService
                 worksheet.Cells[1, i + 1].Value = columnHeaders[i];
                 worksheet.Cells[1, i + 1].Style.Font.Bold = true;
                 worksheet.Cells[1, i + 1].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                worksheet.Cells[1, i + 1].Style.Fill.BackgroundColor.SetColor(Color.LightBlue); 
-                worksheet.Cells[1, i + 1].Style.Font.Color.SetColor(Color.Black); 
-                worksheet.Cells[1, i + 1].Style.HorizontalAlignment =
-                    ExcelHorizontalAlignment.Center; 
+                worksheet.Cells[1, i + 1].Style.Fill.BackgroundColor.SetColor(Color.LightBlue);
+                worksheet.Cells[1, i + 1].Style.Font.Color.SetColor(Color.Black);
+                worksheet.Cells[1, i + 1].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
             }
+
+            // Đổ dữ liệu vào worksheet (không có ID và Reason)
             for (int i = 0; i < logs.Count; i++)
             {
                 var log = logs[i];
@@ -174,13 +176,11 @@ public class UnboxingService : IUnboxingService
                 range.Style.Border.Right.Style = ExcelBorderStyle.Thin;
             }
 
-            // Lưu file Excel
-            var fileName = $"UnboxingLogs_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-            var filePath = Path.Combine(Directory.GetCurrentDirectory(), fileName);
-            FileInfo excelFile = new FileInfo(filePath);
-            package.SaveAs(excelFile);
-
-            return filePath; // Trả về đường dẫn của file đã lưu
+            // Chuyển đổi package thành MemoryStream
+            MemoryStream stream = new MemoryStream();
+            package.SaveAs(stream);
+            stream.Position = 0; // Đặt vị trí về đầu stream
+            return stream;
         }
     }
 

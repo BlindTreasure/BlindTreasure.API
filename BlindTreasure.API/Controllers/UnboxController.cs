@@ -74,21 +74,12 @@ public class UnboxController : ControllerBase
     {
         try
         {
-            var filePath = await _unboxingService.ExportToExcel(param, userId, productId);
+            var stream = await _unboxingService.ExportToExcelStream(param, userId, productId);
 
-            // Trả về file cho người dùng
-            var memory = new MemoryStream();
-            using (var stream = new FileStream(filePath, FileMode.Open))
-            {
-                await stream.CopyToAsync(memory);
-            }
+            string fileName = $"UnboxingLogs_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            string fileType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            return File(stream, fileType, fileName);
 
-            memory.Position = 0;
-
-            var contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-            var fileName = Path.GetFileName(filePath);
-
-            return File(memory, contentType, fileName);
         }
         catch (Exception ex)
         {
