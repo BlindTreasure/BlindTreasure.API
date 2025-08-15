@@ -686,7 +686,7 @@ public class StripeController : ControllerBase
             }
             else
             {
-                return BadRequest(ApiResult<object>.Failure("Thiếu thông tin orderId hoặc checkoutGroupId."));
+                return BadRequest(ApiResult<object>.Failure("Thông tin request không hợp lệ hoặc thiếu thông tin orderId/checkoutGroupId."));
             }
         }
         catch (Exception ex)
