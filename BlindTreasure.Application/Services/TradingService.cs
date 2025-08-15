@@ -460,69 +460,59 @@ public class TradingService : ITradingService
         await _unitOfWork.TradeHistories.AddAsync(tradeHistory);
     }
 
-    // Method helper mới để xử lý lock logic an toàn hơn
     private async Task CompleteTradeExchangeAsync(TradeRequest tradeRequest)
     {
-        _logger.Info($"[CompleteTradeExchangeAsync] Bắt đầu trao đổi item cho trade request {tradeRequest.Id}");
+        // 1. Lấy thông tin listing item (item của owner)
+        var listingItem = tradeRequest.Listing!.InventoryItem;
+        var originalOwnerId = listingItem.UserId;
+        var newOwnerId = tradeRequest.RequesterId;
 
-        try
+        _logger.Info(
+            $"[CompleteTradeExchangeAsync] Listing item {listingItem.Id} sẽ chuyển từ {originalOwnerId} sang {newOwnerId}");
+
+        // 2. Lấy thông tin offered items (items của requester)
+        var offeredItemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
+        var offeredItems = await _unitOfWork.InventoryItems.GetAllAsync(
+            i => offeredItemIds.Contains(i.Id),
+            i => i.Product!);
+
+        _logger.Info($"[CompleteTradeExchangeAsync] Sẽ trao đổi {offeredItems.Count} offered items");
+
+        // 3. Trao đổi ownership của listing item
+        listingItem.UserId = newOwnerId; // Chuyển item của owner sang requester
+        listingItem.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày để tránh trade liên tục
+        listingItem.HoldUntil = DateTime.UtcNow.AddDays(3);
+        listingItem.LockedByRequestId = null; // Reset lock
+        listingItem.OrderDetailId = null;
+
+        await _unitOfWork.InventoryItems.Update(listingItem);
+
+        // 4. Trao đổi ownership của offered items
+        foreach (var offeredItem in offeredItems)
         {
-            // 1. Lấy thông tin listing item (item của owner)
-            var listingItem = tradeRequest.Listing!.InventoryItem;
-            var originalOwnerId = listingItem.UserId;
-            var newOwnerId = tradeRequest.RequesterId;
-
             _logger.Info(
-                $"[CompleteTradeExchangeAsync] Listing item {listingItem.Id} sẽ chuyển từ {originalOwnerId} sang {newOwnerId}");
+                $"[CompleteTradeExchangeAsync] Chuyển offered item {offeredItem.Id} từ {offeredItem.UserId} sang {originalOwnerId}");
 
-            // 2. Lấy thông tin offered items (items của requester)
-            var offeredItemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
-            var offeredItems = await _unitOfWork.InventoryItems.GetAllAsync(
-                i => offeredItemIds.Contains(i.Id),
-                i => i.Product!);
+            offeredItem.UserId = originalOwnerId; // Chuyển item của requester sang owner
+            offeredItem.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày
+            offeredItem.HoldUntil = DateTime.UtcNow.AddDays(3);
 
-            _logger.Info($"[CompleteTradeExchangeAsync] Sẽ trao đổi {offeredItems.Count} offered items");
-
-            // 3. Trao đổi ownership của listing item
-            listingItem.UserId = newOwnerId; // Chuyển item của owner sang requester
-            listingItem.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày để tránh trade liên tục
-            listingItem.HoldUntil = DateTime.UtcNow.AddDays(3);
-            listingItem.LockedByRequestId = null; // Reset lock
-
-            await _unitOfWork.InventoryItems.Update(listingItem);
-
-            // 4. Trao đổi ownership của offered items
-            foreach (var offeredItem in offeredItems)
-            {
-                _logger.Info(
-                    $"[CompleteTradeExchangeAsync] Chuyển offered item {offeredItem.Id} từ {offeredItem.UserId} sang {originalOwnerId}");
-
-                offeredItem.UserId = originalOwnerId; // Chuyển item của requester sang owner
-                offeredItem.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày
-                offeredItem.HoldUntil = DateTime.UtcNow.AddDays(3);
-
-                await _unitOfWork.InventoryItems.Update(offeredItem);
-            }
-
-            // 5. Cập nhật trạng thái trade request
-            tradeRequest.Status = TradeRequestStatus.COMPLETED;
-            tradeRequest.RespondedAt = DateTime.UtcNow;
-
-            // 6. Cập nhật trạng thái listing thành inactive
-            var listing = tradeRequest.Listing;
-            listing.Status = ListingStatus.Sold;
-            await _unitOfWork.Listings.Update(listing);
-
-            // 7. Tạo trade history record
-            await CreateTradeHistoryAsync(tradeRequest, TradeRequestStatus.COMPLETED);
-
-            _logger.Success($"[CompleteTradeExchangeAsync] Hoàn thành trao đổi cho trade request {tradeRequest.Id}");
+            await _unitOfWork.InventoryItems.Update(offeredItem);
         }
-        catch (Exception ex)
-        {
-            _logger.Error($"[CompleteTradeExchangeAsync] Lỗi khi trao đổi item: {ex.Message}");
-            throw;
-        }
+
+        // 5. Cập nhật trạng thái trade request
+        tradeRequest.Status = TradeRequestStatus.COMPLETED;
+        tradeRequest.RespondedAt = DateTime.UtcNow;
+
+        // 6. Cập nhật trạng thái listing thành inactive
+        var listing = tradeRequest.Listing;
+        listing.Status = ListingStatus.Sold;
+        await _unitOfWork.Listings.Update(listing);
+
+        // 7. Tạo trade history record
+        await CreateTradeHistoryAsync(tradeRequest, TradeRequestStatus.COMPLETED);
+
+        _logger.Success($"[CompleteTradeExchangeAsync] Hoàn thành trao đổi cho trade request {tradeRequest.Id}");
     }
 
     // Method helper để gửi SignalR notification an toàn
