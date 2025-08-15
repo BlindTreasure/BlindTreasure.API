@@ -176,8 +176,8 @@ public class StripeService : IStripeService
 
         // Ghi lại transaction cho từng order
         foreach (var order in orders)
-            await UpsertPaymentAndTransactionForOrder(order, null, userId, false, order.FinalAmount ?? 0,
-                couponId ?? null, null);
+            await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, false, order.FinalAmount ?? 0,
+                couponId ?? null, null); // LẦN TẠO GROUP BỊ SAI ĐÈ ID CỦA NHAU
 
         // Save GroupPaymentSession
         var checkoutGroupId = orders.First().CheckoutGroupId;
@@ -390,37 +390,8 @@ public class StripeService : IStripeService
 
             // 8. Ghi vào Payment & Transaction??nu
             await UpsertPaymentAndTransactionForOrder(order, session.Id, userId, isRenew, finalAmount, couponId ?? null,
-                session.PaymentIntentId);
+                session.PaymentIntentId); // LẦN TẠO RIÊNG TỪNG LINK LẺ BỊ SAI 
 
-
-            //// Save GroupPaymentSession
-            //var checkoutGroupId = order.CheckoutGroupId;
-            //var groupSession = await _unitOfWork.GroupPaymentSessions
-            //    .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
-
-            //if (groupSession == null)
-            //{
-            //    groupSession = new GroupPaymentSession
-            //    {
-            //        CheckoutGroupId = checkoutGroupId,
-            //        StripeSessionId = session.Id,
-            //        PaymentUrl = session.Url,
-            //        ExpiresAt = session.ExpiresAt,
-            //        Type = PaymentType.Order,
-            //        IsCompleted = false,
-            //        CouponId = couponId,
-            //        PaymentIntentId = session.PaymentIntentId
-            //    };
-            //    await _unitOfWork.GroupPaymentSessions.AddAsync(groupSession);
-            //}
-            //else
-            //{
-            //    groupSession.StripeSessionId = session.Id;
-            //    groupSession.PaymentUrl = session.Url;
-            //    groupSession.ExpiresAt = session.ExpiresAt;
-            //    groupSession.IsCompleted = false;
-            //    await _unitOfWork.GroupPaymentSessions.Update(groupSession);
-            //}
             await _unitOfWork.SaveChangesAsync();
 
             return session.Url;
@@ -669,7 +640,7 @@ public class StripeService : IStripeService
             order.Payment = payment;
             await _unitOfWork.Orders.Update(order);
         }
-        else if(order.Payment.Transactions.Count == 0 || order.Payment.Transactions.First().Status != "PENDING")
+        else
         {
             var tx = new Transaction
             {

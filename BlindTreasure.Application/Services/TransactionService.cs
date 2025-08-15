@@ -203,7 +203,7 @@ public class TransactionService : ITransactionService
     .Include(o => o.User)
     .FirstOrDefaultAsync(o => o.Id.ToString() == orderId);
 
-            _logger.Info($"Found Order Id {order.Id}, amount {order.TotalAmount}");
+            _logger.Info($"[HandleSuccessfulPaymentAsync] Đã tìm thấy transaction với số lượng {order.Payment.Transactions.Count}");
 
             var transaction = order.Payment.Transactions
                 .FirstOrDefault(t => t.ExternalRef == sessionId);
@@ -212,13 +212,9 @@ public class TransactionService : ITransactionService
                  transaction = await _unitOfWork.Transactions.GetQueryable()
                 .Include(t => t.Payment)
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId && t.Payment.OrderId.ToString() == orderId);
+                _logger.Info($"[HandleSuccessfulPaymentAsync] Đã tìm thấy transaction với sessionId {sessionId} và orderId {orderId}, transactionId {transaction?.Id}");
             }
 
-            if (transaction == null)
-            {
-                _logger.Warn($"[HandleSuccessfulPaymentAsync] Không tìm thấy transaction cho sessionId {sessionId} và orderId {orderId}.");
-                throw ErrorHelper.NotFound("Transaction not found for the given session and order.");
-            }
 
             // Idempotency: skip if already paid
             if (order.Status == OrderStatus.PAID.ToString())
@@ -228,7 +224,7 @@ public class TransactionService : ITransactionService
             }
 
             // Update transaction, payment, and order status
-            UpdatePaymentAndOrderStatus(transaction, order);
+            UpdatePaymentAndOrderStatus(order.Payment.Transactions.First(), order);
 
             // 1. Create GHN shipments and update shipment info
             await CreateGhnOrdersAndUpdateShipments(order);
