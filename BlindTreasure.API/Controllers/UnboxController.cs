@@ -68,6 +68,36 @@ public class UnboxController : ControllerBase
         }
     }
 
+    [HttpGet("export-logs")]
+    public async Task<IActionResult> ExportUnboxLogs([FromQuery] PaginationParameter param, Guid? userId,
+        Guid? productId)
+    {
+        try
+        {
+            var filePath = await _unboxingService.ExportToExcel(param, userId, productId);
+
+            // Trả về file cho người dùng
+            var memory = new MemoryStream();
+            using (var stream = new FileStream(filePath, FileMode.Open))
+            {
+                await stream.CopyToAsync(memory);
+            }
+
+            memory.Position = 0;
+
+            var contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            var fileName = Path.GetFileName(filePath);
+
+            return File(memory, contentType, fileName);
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
 
     /// <summary>
     ///     Lấy danh sách tỷ lệ rơi item đã phê duyệt cho một BlindBox cụ thể.

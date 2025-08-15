@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Drawing;
+using System.Text;
 using System.Text.Json;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
@@ -123,48 +124,50 @@ public class UnboxingService : IUnboxingService
     {
         var logs = await GetLogsAsync(param, userId, productId);
 
-        // Tạo một file Excel mới
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        // Set license for EPPlus
+        ExcelPackage.License.SetNonCommercialPersonal("your-name-or-organization");
+
         using (var package = new ExcelPackage())
         {
             // Thêm một worksheet vào file Excel
             var worksheet = package.Workbook.Worksheets.Add("UnboxingLogs");
+            worksheet.DefaultColWidth = 20; // Thiết lập độ rộng cột mặc định
 
-            // Tiêu đề của các cột
+            // Mảng tiêu đề cột (không có ID và Reason)
             string[] columnHeaders =
-            {
-                "Id", "CustomerBlindBoxId", "CustomerName", "ProductId", "ProductName", "Rarity", "DropRate",
-                "RollValue", "UnboxedAt", "BlindBoxName", "Reason"
-            };
+                { "CustomerName", "ItemName", "Rarity", "DropRate", "RollValue", "UnboxedAt", "BlindBoxName" };
+
+            // Thiết lập tiêu đề cột
             for (int i = 0; i < columnHeaders.Length; i++)
             {
                 worksheet.Cells[1, i + 1].Value = columnHeaders[i];
                 worksheet.Cells[1, i + 1].Style.Font.Bold = true;
+                worksheet.Cells[1, i + 1].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                worksheet.Cells[1, i + 1].Style.Fill.BackgroundColor.SetColor(Color.LightBlue); 
+                worksheet.Cells[1, i + 1].Style.Font.Color.SetColor(Color.Black); 
+                worksheet.Cells[1, i + 1].Style.HorizontalAlignment =
+                    ExcelHorizontalAlignment.Center; 
             }
-
-            // Đổ dữ liệu từ logs vào worksheet
-            for (int i = 0; i < logs.Count; i++) // Sử dụng logs.Count (vì logs là List<T>)
+            for (int i = 0; i < logs.Count; i++)
             {
                 var log = logs[i];
-                worksheet.Cells[i + 2, 1].Value = log.Id.ToString();
-                worksheet.Cells[i + 2, 2].Value = log.CustomerBlindBoxId.ToString();
-                worksheet.Cells[i + 2, 3].Value = log.CustomerName;
-                worksheet.Cells[i + 2, 4].Value = log.ProductId.ToString();
-                worksheet.Cells[i + 2, 5].Value = log.ProductName;
-                worksheet.Cells[i + 2, 6].Value = log.Rarity;
-                worksheet.Cells[i + 2, 7].Value = log.DropRate.ToString();
-                worksheet.Cells[i + 2, 8].Value = log.RollValue.ToString();
-                worksheet.Cells[i + 2, 9].Value = log.UnboxedAt.ToString();
-                worksheet.Cells[i + 2, 10].Value = log.BlindBoxName;
-                worksheet.Cells[i + 2, 11].Value = log.Reason;
+                worksheet.Cells[i + 2, 1].Value = log.CustomerName;
+                worksheet.Cells[i + 2, 2].Value = log.ProductName;
+                worksheet.Cells[i + 2, 3].Value = log.Rarity;
+                worksheet.Cells[i + 2, 4].Value = log.DropRate;
+                worksheet.Cells[i + 2, 5].Value = log.RollValue;
+                worksheet.Cells[i + 2, 6].Value = log.UnboxedAt;
+                worksheet.Cells[i + 2, 7].Value = log.BlindBoxName;
             }
 
-            // Định dạng bảng
-            using (var range = worksheet.Cells[1, 1, logs.Count + 1, columnHeaders.Length]) // Sử dụng logs.Count
+            // Thiết lập định dạng bảng
+            using (var range = worksheet.Cells[1, 1, logs.Count + 1, columnHeaders.Length])
             {
                 range.AutoFitColumns();
                 range.Style.Font.Name = "Calibri";
-                range.Style.Font.Size = 11;
+                range.Style.Font.Size = 12;
+                range.Style.HorizontalAlignment = ExcelHorizontalAlignment.Left;
+                range.Style.VerticalAlignment = ExcelVerticalAlignment.Center;
                 range.Style.Border.Top.Style = ExcelBorderStyle.Thin;
                 range.Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
                 range.Style.Border.Left.Style = ExcelBorderStyle.Thin;
@@ -180,7 +183,6 @@ public class UnboxingService : IUnboxingService
             return filePath; // Trả về đường dẫn của file đã lưu
         }
     }
-
 
     public async Task<Pagination<UnboxLogDto>> GetLogsAsync(PaginationParameter param, Guid? userId, Guid? productId)
     {
