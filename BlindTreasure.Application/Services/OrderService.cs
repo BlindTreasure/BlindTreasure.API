@@ -806,6 +806,7 @@ public class OrderService : IOrderService
         {
             order.Payment.Status = PaymentStatus.Cancelled;
             order.Payment.UpdatedAt = DateTime.UtcNow;
+            order.Payment.Transactions.ToList().ForEach(t => t.Status = TransactionStatus.Canceled.ToString());
             await _unitOfWork.Payments.Update(order.Payment);
         }
 
@@ -885,6 +886,7 @@ public class OrderService : IOrderService
             {
                 order.Payment.Status = PaymentStatus.Cancelled;
                 order.Payment.UpdatedAt = DateTime.UtcNow;
+                order.Payment.Transactions.ToList().ForEach(t => t.Status = TransactionStatus.Canceled.ToString());
                 await _unitOfWork.Payments.Update(order.Payment);
             }
 

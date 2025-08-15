@@ -16,6 +16,8 @@ public class AuthController : ControllerBase
     private readonly IClaimsService _claimsService;
     private readonly IConfiguration _configuration;
     private readonly IOAuthService _oAuthService;
+    private readonly string passwordCharacters;
+
 
     public AuthController(IAuthService authService, IClaimsService claimsService, IConfiguration configuration,
         IOAuthService oAuthService)
@@ -24,6 +26,8 @@ public class AuthController : ControllerBase
         _claimsService = claimsService;
         _configuration = configuration;
         _oAuthService = oAuthService;
+        passwordCharacters = _configuration["OAuthSettings:PasswordCharacters"] ??
+                            throw new Exception("Missing google oauth setting in config");
     }
 
     [HttpPost("register")]
@@ -176,7 +180,16 @@ public class AuthController : ControllerBase
                 return BadRequest(ApiResult.Failure("400", "Token Google không hợp lệ."));
 
             var user = await _oAuthService.AuthenticateWithGoogle(dto.Token);
-            return Ok(ApiResult<UserDto>.Success(user, "200", "Đăng nhập Google thành công."));
+            var loginDto = new LoginRequestDto
+            {
+                Email = user.Email,
+                Password = passwordCharacters, // Mật khẩu mặc định, có thể thay đổi sau khi đăng nhập
+
+            };
+
+            var result = await _authService.LoginAsync(loginDto, _configuration);
+
+            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập thành công."));
         }
         catch (Exception ex)
         {
