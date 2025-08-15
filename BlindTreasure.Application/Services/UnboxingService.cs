@@ -25,10 +25,12 @@ public class UnboxingService : IUnboxingService
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<UnboxingHub> _notificationHub;
+    private readonly IUserService _userService;
 
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
-        ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub)
+        ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub,
+        IUserService userService)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
@@ -36,6 +38,7 @@ public class UnboxingService : IUnboxingService
         _currentTime = currentTime;
         _notificationService = notificationService;
         _notificationHub = notificationHub;
+        _userService = userService;
     }
 
     public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
@@ -117,9 +120,32 @@ public class UnboxingService : IUnboxingService
     public async Task<Pagination<UnboxLogDto>> GetLogsAsync(PaginationParameter param, Guid? userId, Guid? productId)
     {
         var query = _unitOfWork.BlindBoxUnboxLogs.GetQueryable()
-            .Include(x => x.User) // Include User để lấy FullName
+            .Include(x => x.User)
             .Where(x => !x.IsDeleted) // Chỉ lấy records chưa bị xóa
             .AsNoTracking(); // Tối ưu performance
+
+        var currentUserId = _claimsService.CurrentUserId; // Lấy UserId từ claims
+        var user = await _userService.GetUserById(currentUserId);
+
+        // Kiểm tra nếu user là Seller và áp dụng filter theo SellerId
+        if (user != null && user.RoleName == RoleType.Seller)
+        {
+            // Lấy SellerId từ bảng Seller dựa trên UserId
+            var seller = await _unitOfWork.Sellers.GetQueryable()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId);
+
+            if (seller != null)
+            {
+                // Lọc các BlindBoxUnboxLog theo SellerId thông qua ProductId
+                query = query.Where(x => x.ProductId != null && _unitOfWork.Products.GetQueryable()
+                    .Any(p => p.Id == x.ProductId && p.SellerId == seller.Id));
+            }
+            else
+            {
+                // Nếu không tìm thấy Seller, trả về một query rỗng để không trả về dữ liệu nào
+                return new Pagination<UnboxLogDto>();
+            }
+        }
 
         // Áp dụng filter theo userId
         if (userId.HasValue)
@@ -190,28 +216,24 @@ public class UnboxingService : IUnboxingService
         var sb = new StringBuilder();
         var totalProbability = probabilities.Values.Sum();
 
-        // HEADER SECTION - Chuyên nghiệp hơn
-        sb.AppendLine("# 📋 Báo Cáo Kết Quả Mở Hộp");
+        // HEADER SECTION
+        sb.AppendLine("# Báo Cáo Kết Quả Mở Hộp");
         sb.AppendLine();
-        sb.AppendLine($"**Thời gian:** `{DateTime.Now:yyyy-MM-dd HH:mm:ss}`");
-        sb.AppendLine($"**Hộp ID:** `{selectedItem.BlindBoxId}`");
+        sb.AppendLine($"**Thời gian:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"**Hộp ID:** {selectedItem.BlindBoxId}");
         sb.AppendLine();
 
         // TECHNICAL INFO SECTION
-        sb.AppendLine("## 🔧 Thông Số Kỹ Thuật");
+        sb.AppendLine("## Thông Số Kỹ Thuật");
         sb.AppendLine();
-        sb.AppendLine("| Tham số | Giá trị | Ghi chú |");
-        sb.AppendLine("|---------|---------|---------|");
-        sb.AppendLine($"| **Random Seed** | `{Math.Round(roll, 6)}` | Giá trị ngẫu nhiên sinh ra |");
-        sb.AppendLine($"| **Tổng xác suất** | `{Math.Round(totalProbability, 4)}%` | Tổng tỷ lệ của tất cả items |");
-        sb.AppendLine($"| **Thuật toán** | `Weighted Random` | Phương pháp chọn item |");
+        sb.AppendLine($"- **Random Seed:** {Math.Round(roll, 6)} (Giá trị ngẫu nhiên sinh ra)");
+        sb.AppendLine($"- **Tổng xác suất:** {Math.Round(totalProbability, 4)}% (Tổng tỷ lệ của tất cả items)");
+        sb.AppendLine($"- **Thuật toán:** Weighted Random (Phương pháp chọn item)");
         sb.AppendLine();
 
-        // PROBABILITY DISTRIBUTION TABLE
-        sb.AppendLine("## 📊 Bảng Phân Phối Xác Suất");
+        // PROBABILITY DISTRIBUTION LIST
+        sb.AppendLine("## Phân Phối Xác Suất");
         sb.AppendLine();
-        sb.AppendLine("| # | Product ID | Tên Sản Phẩm | Rarity | Drop Rate (%) | Range | Status |");
-        sb.AppendLine("|---|------------|---------------|--------|---------------|-------|--------|");
 
         var index = 1;
         decimal cumulative = 0;
@@ -228,51 +250,52 @@ public class UnboxingService : IUnboxingService
             var itemName = kvp.Key.Product?.Name ?? "NULL";
             var rarity = GetRarityBadge(kvp.Key.RarityConfig?.Name.ToString());
             var dropRate = Math.Round(kvp.Value, 4);
-            var range = $"`{Math.Round(start, 4)} - {Math.Round(end, 4)}`";
-            var status = kvp.Key.Id == selectedItem.Id
-                ? "✅ **SELECTED**"
-                : "⚫";
+            var range = $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
+            var status = kvp.Key.Id == selectedItem.Id ? "**ĐÃ CHỌN**" : "Không chọn";
 
-            sb.AppendLine($"| {index} | `{productId}` | {itemName} | {rarity} | `{dropRate}%` | {range} | {status} |");
+            sb.AppendLine($"- **{index}. Sản phẩm:** {itemName}");
+            sb.AppendLine($"  - Product ID: {productId}");
+            sb.AppendLine($"  - Độ hiếm: {rarity}");
+            sb.AppendLine($"  - Tỷ lệ Drop: {dropRate}%");
+            sb.AppendLine($"  - Range: {range}");
+            sb.AppendLine($"  - Trạng thái: {status}");
+            sb.AppendLine();
+
             index++;
         }
 
-        sb.AppendLine();
-
         // SELECTION RESULT
-        sb.AppendLine("## 🎯 Kết Quả Lựa Chọn");
+        sb.AppendLine("## Kết Quả Lựa Chọn");
         sb.AppendLine();
-        sb.AppendLine("### Selected Item Details");
+        sb.AppendLine("### Chi Tiết Sản Phẩm Được Chọn");
         sb.AppendLine();
-        sb.AppendLine($"- **Product ID:** `{selectedItem.ProductId}`");
-        sb.AppendLine($"- **Item ID:** `{selectedItem.Id}`");
-        sb.AppendLine($"- **Product Name:** `{selectedItem.Product?.Name ?? "NULL"}`");
-        sb.AppendLine($"- **Configured Drop Rate:** `{Math.Round(selectedItem.DropRate, 4)}%`");
+        sb.AppendLine($"- **Product ID:** {selectedItem.ProductId}");
+        sb.AppendLine($"- **Item ID:** {selectedItem.Id}");
+        sb.AppendLine($"- **Product Name:** {selectedItem.Product?.Name ?? "NULL"}");
+        sb.AppendLine($"- **Configured Drop Rate:** {Math.Round(selectedItem.DropRate, 4)}%");
         sb.AppendLine($"- **Rarity Level:** {GetRarityBadge(selectedItem.RarityConfig?.Name.ToString())}");
-        sb.AppendLine($"- **Roll Hit Range:** `{GetHitRange(probabilities, selectedItem)}`");
+        sb.AppendLine($"- **Roll Hit Range:** {GetHitRange(probabilities, selectedItem)}");
+        sb.AppendLine();
 
-        // VALIDATION SECTION
+        sb.AppendLine("## Kiểm Tra Validation");
         sb.AppendLine();
-        sb.AppendLine("## ✅ Validation Check");
-        sb.AppendLine();
-        sb.AppendLine("| Tiêu chí | Kết quả | Status |");
-        sb.AppendLine("|----------|---------|--------|");
         sb.AppendLine(
-            $"| **Probability Sum** | `{Math.Round(totalProbability, 4)}%` | {(Math.Abs(totalProbability - 100) < 0.01m ? "✅ Valid" : "⚠️ Warning")} |");
-        sb.AppendLine($"| **Roll in Valid Range** | `0 ≤ {roll} ≤ {totalProbability}` | ✅ Valid |");
-        sb.AppendLine($"| **Item Selection** | Algorithm executed | ✅ Success |");
+            $"- **Tổng xác suất:** {Math.Round(totalProbability, 4)}% ({(Math.Abs(totalProbability - 100) < 0.01m ? "Hợp lệ" : "Cảnh báo")})");
+        sb.AppendLine($"- **Roll trong khoảng hợp lệ:** 0 ≤ {roll} ≤ {totalProbability} (Hợp lệ)");
+        sb.AppendLine($"- **Lựa chọn Item:** Thuật toán đã thực thi (Thành công)");
+        sb.AppendLine();
 
         // TECHNICAL NOTES
-        sb.AppendLine();
         sb.AppendLine("---");
         sb.AppendLine();
-        sb.AppendLine("**⚠️ Lưu ý kỹ thuật:**");
+        sb.AppendLine("**Lưu ý kỹ thuật:**");
         sb.AppendLine("- Log này chỉ dành cho mục đích kiểm tra và debug");
         sb.AppendLine("- Không chia sẻ thông tin này với khách hàng");
         sb.AppendLine("- Liên hệ team dev nếu có bất thường trong thuật toán");
 
         return sb.ToString();
     }
+
 
 // Helper methods
     private string GetRarityBadge(string rarity)

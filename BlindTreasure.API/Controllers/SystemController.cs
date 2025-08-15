@@ -260,7 +260,7 @@ public class SystemController : ControllerBase
             var currentTime = HttpContext.RequestServices.GetRequiredService<ICurrentTime>();
             var notificationService = HttpContext.RequestServices.GetRequiredService<INotificationService>();
             var notificationHub = HttpContext.RequestServices.GetRequiredService<IHubContext<UnboxingHub>>();
-
+            var userService =  HttpContext.RequestServices.GetRequiredService<IUserService>();
             // Tạo instance UnboxingService mới với đầy đủ tham số
             var unboxingService = new UnboxingService(
                 loggerService,
@@ -268,7 +268,8 @@ public class SystemController : ControllerBase
                 mockClaimsService,
                 currentTime,
                 notificationService,
-                notificationHub // Thêm tham số mới
+                notificationHub,
+                userService// Thêm tham số mới
             );
 
             var unboxResults = new List<UnboxResultDto>();
