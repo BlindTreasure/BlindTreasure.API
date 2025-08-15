@@ -5,6 +5,7 @@ using BlindTreasure.Application.Services;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.UnboxDTOs;
 using BlindTreasure.Domain.Entities;
@@ -26,16 +27,18 @@ public class SystemController : ControllerBase
     private readonly BlindTreasureDbContext _context;
     private readonly ILoggerService _logger; 
     private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
+    private readonly INotificationService _notificationService;
 
 
     public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService,
-        IUnboxingService unboxService, IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
+        IUnboxingService unboxService, IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService, INotificationService notificationService)
     {
         _context = context;
         _logger = logger;
         _cacheService = cacheService;
         _unboxService = unboxService;
         _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService;
+        _notificationService = notificationService;
     }
 
     [HttpPost("seed-all-data")]
@@ -850,12 +853,14 @@ public class SystemController : ControllerBase
 
             Seller? seller = null;
             Address? customerAddress = null;
+            User? buyer = null;
             if (shipment.OrderDetails != null && shipment.OrderDetails.Any())
             {
                 var firstOrderDetail = shipment.OrderDetails.First();
                 seller = firstOrderDetail.Order?.Seller;
-                customerAddress = firstOrderDetail.Order?.User?.Addresses?.FirstOrDefault(a => a.IsDefault)
-                                  ?? firstOrderDetail.Order?.User?.Addresses?.FirstOrDefault();
+                buyer = firstOrderDetail.Order?.User;
+                customerAddress = buyer?.Addresses?.FirstOrDefault(a => a.IsDefault)
+                                  ?? buyer?.Addresses?.FirstOrDefault();
             }
 
             switch (newStatus)
@@ -876,7 +881,6 @@ public class SystemController : ControllerBase
                 case ShipmentStatus.DELIVERED:
                     if (!shipment.ShippedAt.HasValue)
                         shipment.ShippedAt = shipment.UpdatedAt;
-                    // Update InventoryItem status to Delivered for this shipment
                     foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
                     {
                         var oldItemStatus = item.Status;
@@ -890,7 +894,6 @@ public class SystemController : ControllerBase
                     }
                     break;
                 case ShipmentStatus.COMPLETED:
-                    // Optionally, you can keep InventoryItem status as Delivered
                     break;
             }
 
@@ -902,8 +905,6 @@ public class SystemController : ControllerBase
             foreach (var od in shipment.OrderDetails ?? new List<OrderDetail>())
             {
                 await _orderDetailInventoryItemLogService.LogShipmentAddedAsync(od, shipment, trackingMessage);
-
-                // After updating InventoryItem statuses, update OrderDetail status and logs
                 OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
             }
 
@@ -915,7 +916,6 @@ public class SystemController : ControllerBase
                     var oldItemStatus = item.Status;
                     if (newStatus == ShipmentStatus.PICKED_UP || newStatus == ShipmentStatus.IN_TRANSIT)
                     {
-                        // Optionally, set to Delivering for demo realism
                         item.Status = InventoryItemStatus.Delivering;
                     }
                     await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
@@ -925,6 +925,30 @@ public class SystemController : ControllerBase
                         trackingMessage
                     );
                 }
+            }
+
+            // Push notification to buyer
+            if (buyer != null)
+            {
+                var notificationTitle = newStatus switch
+                {
+                    ShipmentStatus.PROCESSING => $"Mã giao hàng có {shipment.OrderCode} đã được xác nhận và chuẩn bị giao",
+                    ShipmentStatus.PICKED_UP => $"Mã giao hàng có{shipment.OrderCode} đã được lấy bởi đơn vị vận chuyển",
+                    ShipmentStatus.IN_TRANSIT => $"Mã giao hàng có{shipment.OrderCode} đang trên đường giao đến bạn",
+                    ShipmentStatus.DELIVERED => $"Mã giao hàng có{shipment.OrderCode} đã được giao thành công",
+                    ShipmentStatus.COMPLETED => $"Mã giao hàng có{shipment.OrderCode} đã hoàn tất",
+                    _ => $"Trạng thái đơn hàng thay đổi: {newStatus}"
+                };
+
+                var notificationDto = new NotificationDto
+                {
+                    Title = notificationTitle,
+                    Message = trackingMessage,
+                    Type = NotificationType.Shipment,
+                    SourceUrl = null
+                };
+
+                await _notificationService.PushNotificationToUser(buyer.Id, notificationDto);
             }
 
             logs.Add(new
@@ -955,11 +979,10 @@ public class SystemController : ControllerBase
             shipment.PickedUpAt,
             shipment.EstimatedDelivery,
             shipment.ShippedAt,
-            Message = "Shipment status flow simulated and logged. OrderDetail and InventoryItem statuses updated.",
+            Message = "Shipment status flow simulated, logged, and notifications sent.",
             FlowLogs = logs
         });
     }
-
     // DTO for request
     public class SimulateShipmentFullFlowRequest
     {
