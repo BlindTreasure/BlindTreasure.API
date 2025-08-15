@@ -457,9 +457,28 @@ public class TradingService : ITradingService
 
     private async Task CreateTradeHistoryAsync(TradeRequest tradeRequest, TradeRequestStatus finalStatus)
     {
-        // Nếu không có offered items, tạo 1 record với OfferedInventoryId = null (cho trường hợp free listing)
-        if (!tradeRequest.OfferedItems.Any())
+        _logger.Info($"[CreateTradeHistoryAsync] Creating trade history for request {tradeRequest.Id}");
+        _logger.Info($"[CreateTradeHistoryAsync] OfferedItems count: {tradeRequest.OfferedItems?.Count ?? 0}");
+
+        // Log chi tiết offered items
+        if (tradeRequest.OfferedItems?.Any() == true)
         {
+            _logger.Info($"[CreateTradeHistoryAsync] Found {tradeRequest.OfferedItems.Count} offered items:");
+            foreach (var item in tradeRequest.OfferedItems)
+            {
+                _logger.Info($"[CreateTradeHistoryAsync] - Offered item: {item.InventoryItemId}");
+            }
+        }
+        else
+        {
+            _logger.Warn($"[CreateTradeHistoryAsync] No offered items found for trade request {tradeRequest.Id}");
+        }
+
+        // Rest of the method remains the same...
+        if (tradeRequest.OfferedItems == null || !tradeRequest.OfferedItems.Any())
+        {
+            _logger.Info($"[CreateTradeHistoryAsync] Creating single record with null OfferedInventoryId");
+
             var tradeHistory = new TradeHistory
             {
                 ListingId = tradeRequest.ListingId,
@@ -473,7 +492,8 @@ public class TradingService : ITradingService
         }
         else
         {
-            // Tạo 1 TradeHistory record cho mỗi offered item
+            _logger.Info($"[CreateTradeHistoryAsync] Creating {tradeRequest.OfferedItems.Count} history records");
+
             foreach (var offeredItem in tradeRequest.OfferedItems)
             {
                 var tradeHistory = new TradeHistory
@@ -486,6 +506,9 @@ public class TradingService : ITradingService
                     CreatedAt = tradeRequest.CreatedAt
                 };
                 await _unitOfWork.TradeHistories.AddAsync(tradeHistory);
+
+                _logger.Info(
+                    $"[CreateTradeHistoryAsync] Created history record with OfferedInventoryId: {offeredItem.InventoryItemId}");
             }
         }
     }
@@ -494,7 +517,32 @@ public class TradingService : ITradingService
     {
         _logger.Info($"[CompleteTradeExchangeAsync] Bắt đầu trao đổi item cho trade request {tradeRequest.Id}");
 
-        // 1. Lấy thông tin listing item (item của owner)
+        // ✅ BƯỚC 1: RELOAD OFFERED ITEMS NGAY TỪ ĐẦU
+        _logger.Info(
+            $"[CompleteTradeExchangeAsync] Checking OfferedItems count: {tradeRequest.OfferedItems?.Count ?? 0}");
+
+        // Nếu OfferedItems chưa được load, load lại
+        if (tradeRequest.OfferedItems == null || !tradeRequest.OfferedItems.Any())
+        {
+            _logger.Warn($"[CompleteTradeExchangeAsync] OfferedItems is empty, reloading...");
+
+            var reloadedTradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequest.Id,
+                t => t.OfferedItems);
+
+            if (reloadedTradeRequest?.OfferedItems != null)
+            {
+                tradeRequest.OfferedItems = reloadedTradeRequest.OfferedItems;
+                _logger.Info(
+                    $"[CompleteTradeExchangeAsync] Reloaded OfferedItems count: {tradeRequest.OfferedItems.Count}");
+            }
+            else
+            {
+                _logger.Error(
+                    $"[CompleteTradeExchangeAsync] Failed to reload OfferedItems for trade request {tradeRequest.Id}");
+            }
+        }
+
+        // 2. Lấy thông tin listing item (item của owner)
         var listingItem = tradeRequest.Listing!.InventoryItem;
         var originalOwnerId = listingItem.UserId;
         var newOwnerId = tradeRequest.RequesterId;
@@ -502,7 +550,7 @@ public class TradingService : ITradingService
         _logger.Info(
             $"[CompleteTradeExchangeAsync] Listing item {listingItem.Id} sẽ chuyển từ {originalOwnerId} sang {newOwnerId}");
 
-        // 2. Lấy thông tin offered items (items của requester)
+        // 3. Lấy thông tin offered items (items của requester)
         var offeredItemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
         var offeredItems = await _unitOfWork.InventoryItems.GetAllAsync(
             i => offeredItemIds.Contains(i.Id),
@@ -510,21 +558,20 @@ public class TradingService : ITradingService
 
         _logger.Info($"[CompleteTradeExchangeAsync] Sẽ trao đổi {offeredItems.Count} offered items");
 
-        // 3. Trao đổi ownership của listing item
-        //  Tìm nạp listingItem từ database để có thể chỉnh sửa OrderDetailId
+        // 4. Trao đổi ownership của listing item
         var listingItemToUpdate = await _unitOfWork.InventoryItems.GetByIdAsync(listingItem.Id);
         if (listingItemToUpdate != null)
         {
-            listingItemToUpdate.UserId = newOwnerId; // Chuyển item của owner sang requester
-            listingItemToUpdate.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày để tránh trade liên tục
+            listingItemToUpdate.UserId = newOwnerId;
+            listingItemToUpdate.Status = InventoryItemStatus.OnHold;
             listingItemToUpdate.HoldUntil = DateTime.UtcNow.AddDays(3);
-            listingItemToUpdate.LockedByRequestId = null; // Reset lock
-            listingItemToUpdate.OrderDetailId = null; // Set OrderDetailId to null
+            listingItemToUpdate.LockedByRequestId = null;
+            listingItemToUpdate.OrderDetailId = null;
 
             await _unitOfWork.InventoryItems.Update(listingItemToUpdate);
         }
 
-        // 4. Trao đổi ownership của offered items
+        // 5. Trao đổi ownership của offered items
         foreach (var offeredItem in offeredItems)
         {
             _logger.Info(
@@ -534,7 +581,7 @@ public class TradingService : ITradingService
             if (offeredItemToUpdate != null)
             {
                 offeredItemToUpdate.UserId = originalOwnerId;
-                offeredItemToUpdate.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày
+                offeredItemToUpdate.Status = InventoryItemStatus.OnHold;
                 offeredItemToUpdate.HoldUntil = DateTime.UtcNow.AddDays(3);
                 offeredItemToUpdate.OrderDetailId = null;
 
@@ -542,16 +589,16 @@ public class TradingService : ITradingService
             }
         }
 
-        // 5. Cập nhật trạng thái trade request
+        // 6. Cập nhật trạng thái trade request
         tradeRequest.Status = TradeRequestStatus.COMPLETED;
         tradeRequest.RespondedAt = DateTime.UtcNow;
 
-        // 6. Cập nhật trạng thái listing thành inactive
+        // 7. Cập nhật trạng thái listing thành inactive
         var listing = tradeRequest.Listing;
         listing.Status = ListingStatus.Sold;
         await _unitOfWork.Listings.Update(listing);
 
-        // 7. Tạo trade history record
+        // ✅ 8. TẠO TRADE HISTORY SAU KHI ĐÃ RELOAD OFFERED ITEMS
         await CreateTradeHistoryAsync(tradeRequest, TradeRequestStatus.COMPLETED);
 
         _logger.Success($"[CompleteTradeExchangeAsync] Hoàn thành trao đổi cho trade request {tradeRequest.Id}");
@@ -1165,9 +1212,14 @@ public class TradingService : ITradingService
             ListingItemImage = tradeHistory.Listing?.InventoryItem?.Product?.ImageUrls?.FirstOrDefault() ?? "",
             RequesterId = tradeHistory.RequesterId,
             RequesterName = tradeHistory.Requester.FullName ?? tradeHistory.Requester?.FullName ?? "Unknown",
+        
+            // Giữ nguyên offered item logic
             OfferedInventoryId = tradeHistory.OfferedInventoryId,
             OfferedItemName = tradeHistory.OfferedInventory?.Product?.Name ?? "No Item",
             OfferedItemImage = tradeHistory.OfferedInventory?.Product?.ImageUrls?.FirstOrDefault() ?? "",
+        
+            ListingInventoryItemId = tradeHistory.Listing?.InventoryItem?.Id,
+        
             FinalStatus = tradeHistory.FinalStatus,
             CompletedAt = tradeHistory.CompletedAt,
             CreatedAt = tradeHistory.CreatedAt
@@ -1175,6 +1227,5 @@ public class TradingService : ITradingService
 
         return dto;
     }
-
     #endregion
 }
