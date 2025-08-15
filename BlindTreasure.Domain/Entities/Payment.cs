@@ -14,6 +14,8 @@ public class Payment : BaseEntity
     public string Method { get; set; }
     public PaymentStatus Status { get; set; }
     public string? PaymentIntentId { get; set; }
+    public string? SessionId { get; set; } // Stripe session ID for checkout session
+
     public DateTime PaidAt { get; set; } // thời gian thanh toán 
 
     public decimal RefundedAmount { get; set; } = 0;

@@ -565,7 +565,7 @@ public class OrderService : IOrderService
         // Tạo link thanh toán tổng cho tất cả order
         if (createdOrderIds.Count == 1)
             // If only one order, use its payment URL
-            result.GeneralPaymentUrl = result.Orders.First().PaymentUrl;
+            result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
         else
             // Multiple orders, create a general checkout session
             result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
@@ -788,8 +788,9 @@ public class OrderService : IOrderService
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.Payment)
-            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Payment).ThenInclude(o=> o.Transactions)
+            .Include(o => o.User)
+            .Include(o => o.Seller)
             .FirstOrDefaultAsync();
 
         if (order == null)
@@ -864,8 +865,9 @@ public class OrderService : IOrderService
         var orders = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.CheckoutGroupId == checkoutGroupId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.Payment)
-            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Payment).ThenInclude(o=>o.Transactions)
+            .Include(o=> o.User)
+            .Include(o => o.Seller)
             .ToListAsync();
 
         if (!orders.Any())
@@ -918,7 +920,7 @@ public class OrderService : IOrderService
                 var sellerMsg = $@"
                 Đơn hàng #{order.Id} của khách <b>{buyerName}</b> đã bị hủy bởi khách hàng.<br/>
                 Vui lòng kiểm tra lại trạng thái đơn hàng trong hệ thống.";
-                await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
+                await _notificationService.PushNotificationToUser(order.Seller.UserId, new NotificationDto
                 {
                     Title = $"Đơn hàng #{order.Id} đã bị hủy",
                     Message = sellerMsg,
@@ -929,7 +931,7 @@ public class OrderService : IOrderService
         }
 
         // Vô hiệu hóa link/session thanh toán Stripe cho nhóm
-        await _stripeService.DisableStripeGroupPaymentSessionAsync(checkoutGroupId);
+        await _stripeService.DisableStripeGroupPaymentSessionAsync(checkoutGroupId, orders);
         _loggerService.Info($"Cancelled succesfully payment for group order {checkoutGroupId}.");
 
         await _unitOfWork.SaveChangesAsync();

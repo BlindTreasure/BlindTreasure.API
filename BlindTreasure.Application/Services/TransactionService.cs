@@ -581,6 +581,13 @@ public class TransactionService : ITransactionService
 
                 foreach (var order in orders)
                 {
+                    if(order.Status == OrderStatus.CANCELLED.ToString() || order.Status == OrderStatus.EXPIRED.ToString() ||
+                       order.Status == OrderStatus.PAID.ToString())
+                    {
+                        _logger.Warn($"[HandleFailedPaymentAsync] Order {order.Id} đã ở trạng thái không cần xử lý.");
+                        continue; // Skip already cancelled, expired or paid orders
+                    }
+
                     // Mark order as expired
                     order.Status = OrderStatus.EXPIRED.ToString();
                     order.UpdatedAt = DateTime.UtcNow;
@@ -674,14 +681,16 @@ public class TransactionService : ITransactionService
                 .ThenInclude(p => p.Order).ThenInclude(o => o.User)
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
-            if (transaction == null)
-                throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
-
-            transaction.Status = TransactionStatus.Failed.ToString();
-            if (transaction.Payment != null)
-                transaction.Payment.Status = PaymentStatus.Failed;
             if (transaction.Payment?.Order != null)
             {
+                var status = transaction.Payment.Order.Status;
+                if (status == OrderStatus.CANCELLED.ToString() || status == OrderStatus.EXPIRED.ToString() ||
+                    status == OrderStatus.PAID.ToString())
+                {
+                    _logger.Warn($"[HandleFailedPaymentAsync] Order {transaction.Payment.OrderId} đã ở trạng thái không cần xử lý.");
+                    return; // Skip already cancelled, expired or paid orders
+                }   
+
                 transaction.Payment.Order.Status = OrderStatus.EXPIRED.ToString();
                 foreach (var detail in transaction.Payment.Order.OrderDetails)
                 {
@@ -699,6 +708,13 @@ public class TransactionService : ITransactionService
                 }
             }
 
+            if (transaction == null)
+                throw ErrorHelper.NotFound("Không tìm thấy transaction cho session Stripe này.");
+
+            transaction.Status = TransactionStatus.Failed.ToString();
+            if (transaction.Payment != null)
+                transaction.Payment.Status = PaymentStatus.Failed;
+      
             await _unitOfWork.Transactions.Update(transaction);
             if (transaction.Payment != null)
                 await _unitOfWork.Payments.Update(transaction.Payment);
@@ -761,6 +777,21 @@ public class TransactionService : ITransactionService
         {
             var transactions = await _unitOfWork.Transactions.GetQueryable()
                 .Where(t => t.ExternalRef == sessionId).ToListAsync();
+
+            var groupSession = await _unitOfWork.GroupPaymentSessions
+                .FirstOrDefaultAsync(s => s.StripeSessionId == sessionId && !s.IsCompleted);
+
+            if (groupSession != null)
+            {
+                groupSession.PaymentIntentId = paymentIntentId;
+                groupSession.UpdatedAt = DateTime.UtcNow;
+                groupSession.IsCompleted = true;
+                groupSession.PaymentUrl = "";
+                await _unitOfWork.GroupPaymentSessions.Update(groupSession);
+                _logger.Info($"[HandlePaymentIntentCreatedAsync] Đã cập nhật PaymentIntentId cho group session {groupSession.Id}.");
+            }
+            else
+                _logger.Warn($"[HandlePaymentIntentCreatedAsync] Không tìm thấy group session cho session {sessionId}.");
 
             if (transactions.Any())
                 foreach (var transaction in transactions)
