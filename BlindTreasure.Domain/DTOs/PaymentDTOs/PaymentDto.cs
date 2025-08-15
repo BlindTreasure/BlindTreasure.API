@@ -16,4 +16,5 @@ public class PaymentDto
     public DateTime PaidAt { get; set; }
     public decimal RefundedAmount { get; set; } = 0;
     public List<TransactionDto> Transactions { get; set; } = new(); // Thêm dòng này
+    public string? SessionId { get; set; } 
 }

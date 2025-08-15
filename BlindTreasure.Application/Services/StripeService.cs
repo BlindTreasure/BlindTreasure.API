@@ -649,10 +649,13 @@ public class StripeService : IStripeService
                 CouponId = couponId
                
             };
+            payment = await _unitOfWork.Payments.AddAsync(payment);
+
 
             payment.Transactions.Add(new Transaction
             {
                 Payment = payment,
+                PaymentId = payment.Id,
                 Type = type,
                 Amount = netAmount,
                 Currency = "vnd",

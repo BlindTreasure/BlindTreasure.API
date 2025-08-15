@@ -186,53 +186,39 @@ public class TransactionService : ITransactionService
 
         try
         {
-            // Load transaction and all necessary navigation properties in one query
-            var transaction = await _unitOfWork.Transactions.GetQueryable()
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.OrderDetails)
-                            .ThenInclude(od => od.Product)
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.OrderDetails)
-                            .ThenInclude(od => od.BlindBox)
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.OrderDetails)
-                            .ThenInclude(od => od.Shipments)
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.ShippingAddress)
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.Seller)
-                        .ThenInclude(s => s.User) // Ensure Seller.User is loaded
-                .Include(t => t.Payment)
-                    .ThenInclude(p => p.Order)
-                        .ThenInclude(o => o.User) // Ensure Order.User is loaded
-                .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
+            var order = await _unitOfWork.Orders.GetQueryable()
+    .Include(o => o.Payment)
+        .ThenInclude(p => p.Transactions)
+    .Include(o => o.OrderDetails)
+        .ThenInclude(od => od.Product)
+    .Include(o => o.OrderDetails)
+        .ThenInclude(od => od.BlindBox)
+    .Include(o => o.OrderDetails)
+        .ThenInclude(od => od.Shipments)
+    .Include(o => o.OrderDetails)
+        .ThenInclude(od => od.InventoryItems)
+    .Include(o => o.ShippingAddress)
+    .Include(o => o.Seller)
+        .ThenInclude(s => s.User)
+    .Include(o => o.User)
+    .FirstOrDefaultAsync(o => o.Id.ToString() == orderId);
 
-            _logger.Info($"Found transaction with external ref:{transaction.Id}");
+            _logger.Info($"Found Order Id {order.Id}, amount {order.TotalAmount}");
 
-            var order = transaction.Payment.Order;
-            if (order == null)
+            var transaction = order.Payment.Transactions
+                .FirstOrDefault(t => t.ExternalRef == sessionId);
+            if(transaction == null)
             {
-                _logger.Info($"[HandleSuccessfulPaymentAsync] Không tìm thấy Order Include bởi payment từ {transaction.Id}.");
-                order = await _unitOfWork.Orders.GetQueryable()
-                    .Include(o => o.Payment).ThenInclude(o=>o.Transactions)
-                    .Include(o => o.OrderDetails)
-                        .ThenInclude(od => od.Product)
-                    .Include(o => o.OrderDetails)
-                        .ThenInclude(od => od.BlindBox)
-                    .Include(o => o.OrderDetails)
-                        .ThenInclude(od => od.Shipments)
-                    .Include(o => o.ShippingAddress)
-                    .Include(o => o.Seller)
-                        .ThenInclude(s => s.User) // Ensure Seller.User is loaded
-                    .Include(o => o.User) // Ensure Order.User is loaded
-                    .FirstOrDefaultAsync(o => o.Id.ToString() == orderId);
+                 transaction = await _unitOfWork.Transactions.GetQueryable()
+                .Include(t => t.Payment)
+                .FirstOrDefaultAsync(t => t.ExternalRef == sessionId && t.Payment.OrderId.ToString() == orderId);
             }
 
+            if (transaction == null)
+            {
+                _logger.Warn($"[HandleSuccessfulPaymentAsync] Không tìm thấy transaction cho sessionId {sessionId} và orderId {orderId}.");
+                throw ErrorHelper.NotFound("Transaction not found for the given session and order.");
+            }
 
             // Idempotency: skip if already paid
             if (order.Status == OrderStatus.PAID.ToString())
