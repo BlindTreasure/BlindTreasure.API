@@ -47,11 +47,11 @@ public class CustomerBlindBoxService : ICustomerBlindBoxService
     {
         var uid = userId ?? _claimsService.CurrentUserId;
         if (uid == Guid.Empty)
-            throw ErrorHelper.Unauthorized("User ID is required for creating customer inventory.");
+            throw ErrorHelper.Unauthorized("ID người dùng không được tìm thấy. Vui lòng đăng nhập lại để tạo kho Blind Box.");
 
         var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(dto.BlindBoxId);
         if (blindBox == null || blindBox.IsDeleted)
-            throw ErrorHelper.NotFound("BlindBox not found.");
+            throw ErrorHelper.NotFound("Rất tiếc, hộp quà bí mật bạn đang tìm kiếm không tồn tại hoặc đã bị xóa. Vui lòng kiểm tra lại ID.");
 
         var entity = new CustomerBlindBox
         {
@@ -148,7 +148,7 @@ public class CustomerBlindBoxService : ICustomerBlindBoxService
     {
         var entity = await _unitOfWork.CustomerBlindBoxes.GetByIdAsync(id);
         if (entity == null || entity.IsDeleted)
-            throw ErrorHelper.NotFound("Customer inventory not found.");
+            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm Blind Box của bạn trong kho để cập nhật trạng thái. Vui lòng kiểm tra lại ID.");
 
         entity.IsOpened = true;
         entity.OpenedAt = DateTime.UtcNow;
@@ -160,7 +160,7 @@ public class CustomerBlindBoxService : ICustomerBlindBoxService
 
         await _cacheService.RemoveAsync(GetCacheKey(id));
         _loggerService.Success($"[MarkAsOpenedAsync] Customer inventory {id} marked as opened.");
-        return await GetByIdAsync(id) ?? throw ErrorHelper.Internal("Failed to update customer inventory.");
+        return await GetByIdAsync(id) ?? throw ErrorHelper.Internal("Đã xảy ra lỗi hệ thống khi cập nhật trạng thái kho Blind Box. Vui lòng thử lại sau.");
     }
 
     /// <summary>
@@ -170,7 +170,7 @@ public class CustomerBlindBoxService : ICustomerBlindBoxService
     {
         var entity = await _unitOfWork.CustomerBlindBoxes.GetByIdAsync(id);
         if (entity == null || entity.IsDeleted)
-            throw ErrorHelper.NotFound("Customer inventory not found.");
+            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm Blind Box của bạn trong kho để xóa. Vui lòng kiểm tra lại ID.");
 
         entity.IsDeleted = true;
         entity.DeletedAt = DateTime.UtcNow;
