@@ -26,7 +26,10 @@ public interface IOrderDetailInventoryItemLogService
         OrderDetailItemStatus oldStatus, OrderDetailItemStatus newStatus, string? msg);
 
     Task<OrderDetailInventoryItemLog> LogShipmentAddedAsync(OrderDetail orderDetail, Shipment shipment, string? msg);
-    Task<OrderDetailInventoryItemLog> LogShipmentOfOrderDetailChangedStatusAsync(OrderDetail orderDetail, ShipmentStatus oldStatus, Shipment shipmentNewStatus, string? msg);
+
+    Task<OrderDetailInventoryItemLog> LogShipmentOfOrderDetailChangedStatusAsync(OrderDetail orderDetail,
+        ShipmentStatus oldStatus, Shipment shipmentNewStatus, string? msg);
+
     Task<OrderDetailInventoryItemLog> LogShipmentTrackingInventoryItemUpdateAsync(OrderDetail orderDetail,
         InventoryItemStatus oldStatus, InventoryItem InventoryWithNewStatus, string trackingMessage);
 }

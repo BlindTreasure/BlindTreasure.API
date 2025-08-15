@@ -165,16 +165,12 @@ public class ChatMessageService : IChatMessageService
 
         // Gọi phương thức lưu tin nhắn media
         if (isVideo)
-        {
             // TODO: Nếu cần có phương thức riêng cho video thì implement thêm
             await SaveImageMessageAsync(senderId, receiverId, mediaUrl, mediaFile.FileName, fileSizeStr,
                 mediaFile.ContentType);
-        }
         else
-        {
             await SaveImageMessageAsync(senderId, receiverId, mediaUrl, mediaFile.FileName, fileSizeStr,
                 mediaFile.ContentType);
-        }
 
         // Lấy thông tin người gửi
         var sender = await _unitOfWork.Users.GetByIdAsync(senderId);
@@ -210,7 +206,6 @@ public class ChatMessageService : IChatMessageService
 
         return mediaUrl;
     }
-
 
 
     public async Task<ChatMessageDto?> GetMessageByIdAsync(Guid messageId)
@@ -610,8 +605,8 @@ public class ChatMessageService : IChatMessageService
         var ids = new[] { user1Id, user2Id }.OrderBy(x => x).ToList();
         return $"chat:last:{ids[0]}:{ids[1]}";
     }
-    
-        private bool IsValidMediaFile(IFormFile file)
+
+    private bool IsValidMediaFile(IFormFile file)
     {
         // Check if file is null or empty
         if (file.Length == 0)
@@ -672,7 +667,7 @@ public class ChatMessageService : IChatMessageService
         _logger.Info($"File {file.FileName} passed validation");
         return true;
     }
-    
+
     private string FormatFileSize(long bytes)
     {
         string[] sizes = { "B", "KB", "MB", "GB" };

@@ -17,7 +17,10 @@ public interface IChatMessageService
     // Lưu trữ tin nhắn
     Task SaveMessageAsync(Guid senderId, Guid receiverId, string content);
     Task SaveAiMessageAsync(Guid customerId, string content);
-    Task SaveImageMessageAsync(Guid senderId, Guid receiverId, string imageUrl, string fileName, string fileSize, string mimeType);
+
+    Task SaveImageMessageAsync(Guid senderId, Guid receiverId, string imageUrl, string fileName, string fileSize,
+        string mimeType);
+
     Task SaveInventoryItemMessageAsync(Guid senderId, Guid receiverId, Guid inventoryItemId, string customMessage = "");
 
     // Lấy tin nhắn và hội thoại
