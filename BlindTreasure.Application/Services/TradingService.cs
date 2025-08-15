@@ -43,7 +43,7 @@ public class TradingService : ITradingService
             l => l.InventoryItem.Product!);
 
         if (listing == null)
-            throw ErrorHelper.NotFound("Listing không tồn tại.");
+            throw ErrorHelper.NotFound("Rất tiếc, bài đăng bạn đang tìm kiếm không tồn tại hoặc đã bị xóa.");
 
         // Lấy tất cả các trade requests cho listing
         var tradeRequests = await _unitOfWork.TradeRequests.GetAllAsync(
@@ -197,24 +197,24 @@ public class TradingService : ITradingService
                 t => t.Listing!.InventoryItem.Product!,
                 t => t.Requester!);
 
-            if (tradeRequest == null) throw ErrorHelper.NotFound("Trade Request không tồn tại.");
+            if (tradeRequest == null) throw ErrorHelper.NotFound("Rất tiếc, yêu cầu trao đổi này không tồn tại hoặc đã bị hủy.");
 
 
             // BƯỚC 2: Validate trạng thái
             if (tradeRequest.Status != TradeRequestStatus.PENDING)
-                throw ErrorHelper.BadRequest("Giao dịch này đã được xử lý hoặc hết hạn.");
+                throw ErrorHelper.BadRequest("Giao dịch này đã được xử lý hoặc đã hết hạn.");
 
             // BƯỚC 3: Validate listing
-            if (tradeRequest.Listing == null) throw ErrorHelper.Internal("Thông tin listing không hợp lệ.");
+            if (tradeRequest.Listing == null) throw ErrorHelper.Internal("Đã xảy ra lỗi hệ thống khi xử lý thông tin bài đăng. Vui lòng thử lại sau.");
 
             // BƯỚC 4: Validate inventory item
             if (tradeRequest.Listing.InventoryItem == null)
-                throw ErrorHelper.Internal("Thông tin inventory item không hợp lệ.");
+                throw ErrorHelper.Internal("Đã xảy ra lỗi hệ thống khi xử lý thông tin vật phẩm. Vui lòng thử lại sau.");
 
             // BƯỚC 5: Kiểm tra quyền respond (chỉ owner của listing mới được respond)
             var currentUserId = _claimsService.CurrentUserId;
             if (tradeRequest.Listing.InventoryItem.UserId != currentUserId)
-                throw ErrorHelper.Forbidden("Bạn không có quyền phản hồi trade request này.");
+                throw ErrorHelper.Forbidden("Bạn không có quyền phản hồi yêu cầu trao đổi này vì bạn không phải là chủ sở hữu vật phẩm.");
 
             // BƯỚC 6: Cập nhật trạng thái trade request
             var originalStatus = tradeRequest.Status;
@@ -279,7 +279,7 @@ public class TradingService : ITradingService
             if (tradeRequest == null)
             {
                 _logger.Error($"[LockDealAsync] Trade request {tradeRequestId} không tồn tại");
-                throw ErrorHelper.NotFound("Trade request không tồn tại.");
+                throw ErrorHelper.NotFound("Rất tiếc, yêu cầu trao đổi này không tồn tại hoặc đã bị hủy.");
             }
 
             _logger.Info($"[LockDealAsync] Tìm thấy trade request {tradeRequestId}, status: {tradeRequest.Status}");
@@ -289,20 +289,20 @@ public class TradingService : ITradingService
             {
                 _logger.Warn(
                     $"[LockDealAsync] Trade request {tradeRequestId} không ở trạng thái ACCEPTED, status hiện tại: {tradeRequest.Status}");
-                throw ErrorHelper.BadRequest("Trade request chưa được chấp nhận.");
+                throw ErrorHelper.BadRequest("Yêu cầu trao đổi này chưa được chấp nhận bởi cả hai bên. Vui lòng chờ đối tác xác nhận.");
             }
 
             // BƯỚC 5: VALIDATE LISTING VÀ INVENTORY ITEM
             if (tradeRequest.Listing == null)
             {
                 _logger.Error($"[LockDealAsync] Listing null cho trade request {tradeRequestId}");
-                throw ErrorHelper.Internal("Thông tin listing không hợp lệ.");
+                throw ErrorHelper.Internal("Đã xảy ra lỗi hệ thống khi xử lý thông tin bài đăng. Vui lòng thử lại sau.");
             }
 
             if (tradeRequest.Listing.InventoryItem == null)
             {
                 _logger.Error($"[LockDealAsync] InventoryItem null cho listing {tradeRequest.Listing.Id}");
-                throw ErrorHelper.Internal("Thông tin inventory item không hợp lệ.");
+                throw ErrorHelper.Internal("Đã xảy ra lỗi hệ thống khi xử lý thông tin vật phẩm. Vui lòng thử lại sau.");
             }
 
             // BƯỚC 6: XÁC ĐỊNH LISTING OWNER (User A)
@@ -317,7 +317,7 @@ public class TradingService : ITradingService
             {
                 _logger.Warn(
                     $"[LockDealAsync] User {userId} không phải owner ({listingOwnerId}) hoặc requester ({tradeRequest.RequesterId})");
-                throw ErrorHelper.Forbidden("Bạn không có quyền lock giao dịch này.");
+                throw ErrorHelper.Forbidden("Bạn không có quyền khóa giao dịch này. Chỉ chủ sở hữu vật phẩm hoặc người yêu cầu mới có thể khóa.");
             }
 
             _logger.Info(
@@ -331,13 +331,13 @@ public class TradingService : ITradingService
             if (isOwner && tradeRequest.OwnerLocked)
             {
                 _logger.Warn($"[LockDealAsync] Owner {userId} đã lock trước đó");
-                throw ErrorHelper.BadRequest("Bạn đã lock giao dịch này rồi.");
+                throw ErrorHelper.BadRequest("Bạn đã khóa giao dịch này rồi. Vui lòng chờ đối tác thực hiện hành động của họ.");
             }
 
             if (isRequester && tradeRequest.RequesterLocked)
             {
                 _logger.Warn($"[LockDealAsync] Requester {userId} đã lock trước đó");
-                throw ErrorHelper.BadRequest("Bạn đã lock giao dịch này rồi.");
+                throw ErrorHelper.BadRequest("Bạn đã khóa giao dịch này rồi. Vui lòng chờ đối tác thực hiện hành động của họ.");
             }
 
             // BƯỚC 9: XỬ LÝ LOGIC LOCK VÀ KIỂM TRA HOÀN THÀNH
@@ -425,7 +425,7 @@ public class TradingService : ITradingService
             t => t.Requester!,
             t => t.OfferedItems);
 
-        if (tradeRequest == null) throw ErrorHelper.NotFound("Không có offer nào tồn tại.");
+        if (tradeRequest == null) throw ErrorHelper.NotFound("Rất tiếc, không tìm thấy yêu cầu trao đổi nào.");
 
         var offeredInventoryItems = new List<InventoryItem>();
         if (tradeRequest.OfferedItems.Any())
@@ -724,7 +724,7 @@ public class TradingService : ITradingService
         {
             _logger.Warn(
                 $"[ValidateMultipleOfferedItems] Phát hiện duplicate items: {string.Join(", ", duplicateIds)}");
-            throw ErrorHelper.BadRequest("Không thể đề xuất cùng một item nhiều lần trong một giao dịch.");
+            throw ErrorHelper.BadRequest("Bạn không thể đề xuất cùng một vật phẩm nhiều lần trong một giao dịch. Vui lòng chọn các vật phẩm khác nhau.");
         }
 
         var offeredItems = new List<InventoryItem>();
@@ -745,7 +745,7 @@ public class TradingService : ITradingService
             _logger.Info($"[ValidateMultipleOfferedItems] Listing {listing.Id} yêu cầu trao đổi");
 
             if (!offeredInventoryIds.Any())
-                throw ErrorHelper.BadRequest("Listing này yêu cầu bạn phải đề xuất ít nhất một item để trao đổi.");
+                throw ErrorHelper.BadRequest("Bài đăng này yêu cầu bạn phải đề xuất ít nhất một vật phẩm để trao đổi. Vui lòng chọn vật phẩm.");
 
             offeredItems = await ValidateItemsOwnership(offeredInventoryIds, userId);
         }
@@ -779,7 +779,7 @@ public class TradingService : ITradingService
         try
         {
             await _listingService.GetListingByIdAsync(listingId);
-            _logger.Info($"[ValidateTradeRequestCreation] Đã tìm thấy listing {listingId} qua ListingService");
+            _logger.Info($"[ValidateTradeRequestCreation] Đã tìm thấy bài đăng {listingId} qua ListingService");
 
             // Sau khi xác nhận listing tồn tại, lấy thông tin đầy đủ từ database
             var listing = await _unitOfWork.Listings.GetByIdAsync(listingId,
@@ -790,14 +790,14 @@ public class TradingService : ITradingService
             {
                 _logger.Error(
                     $"[ValidateTradeRequestCreation] Tình huống bất thường: ListingService tìm thấy ID {listingId} nhưng Repository không tìm thấy");
-                throw ErrorHelper.Internal("Có lỗi khi xác thực thông tin listing.");
+                throw ErrorHelper.Internal("Đã xảy ra lỗi hệ thống khi xác thực thông tin bài đăng. Vui lòng thử lại sau.");
             }
 
             if (listing.Status != ListingStatus.Active)
             {
                 _logger.Warn(
-                    $"[ValidateTradeRequestCreation] Listing {listingId} không còn hoạt động, status: {listing.Status}");
-                throw ErrorHelper.BadRequest("Listing không còn hoạt động.");
+                    $"[ValidateTradeRequestCreation] Bài đăng {listingId} không còn hoạt động, status: {listing.Status}");
+                throw ErrorHelper.BadRequest("Bài đăng này hiện không còn hoạt động hoặc đã bị gỡ bỏ. Bạn không thể tạo yêu cầu trao đổi.");
             }
 
             // Kiểm tra người dùng không tạo trade cho listing của chính mình
@@ -805,7 +805,7 @@ public class TradingService : ITradingService
             {
                 _logger.Warn(
                     $"[ValidateTradeRequestCreation] User {userId} cố gắng tạo trade request cho listing của chính mình {listing.Id}");
-                throw ErrorHelper.BadRequest("Bạn không thể tạo yêu cầu trao đổi với chính mình.");
+                throw ErrorHelper.BadRequest("Bạn không thể tạo yêu cầu trao đổi với vật phẩm của chính mình.");
             }
 
             // Kiểm tra trạng thái giữ của listing item
@@ -842,7 +842,7 @@ public class TradingService : ITradingService
         {
             _logger.Warn(
                 $"[ValidateTradeRequestCreation] ListingService không tìm thấy listing {listingId}: {ex.Message}");
-            throw ErrorHelper.NotFound("Listing không tồn tại.");
+            throw ErrorHelper.NotFound("Bài đăng không tồn tại.");
         }
         catch (Exception ex)
         {
@@ -860,12 +860,12 @@ public class TradingService : ITradingService
             i => i.Product!);
 
         if (items.Count != itemIds.Count)
-            throw ErrorHelper.BadRequest("Một số item bạn muốn đổi không hợp lệ.");
+            throw ErrorHelper.BadRequest("Một hoặc nhiều vật phẩm bạn muốn trao đổi không hợp lệ. Vui lòng kiểm tra lại danh sách.");
 
         foreach (var item in items)
         {
             if (item.UserId != userId)
-                throw ErrorHelper.BadRequest($"Item '{item.Product?.Name}' không thuộc về bạn.");
+                throw ErrorHelper.BadRequest($"Vật phẩm '{item.Product?.Name}' không thuộc sở hữu của bạn. Bạn không thể sử dụng nó để trao đổi.");
 
             if (item.Status == InventoryItemStatus.OnHold && item.HoldUntil.HasValue && item.HoldUntil.Value <= now)
             {
@@ -876,7 +876,7 @@ public class TradingService : ITradingService
             }
             else if (item.Status != InventoryItemStatus.Available)
             {
-                throw ErrorHelper.BadRequest($"Item '{item.Product?.Name}' không khả dụng.");
+                throw ErrorHelper.BadRequest($"Vật phẩm '{item.Product?.Name}' hiện không khả dụng để trao đổi. Vui lòng chọn vật phẩm khác.");
             }
         }
 

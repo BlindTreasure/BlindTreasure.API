@@ -37,11 +37,11 @@ public class ListingService : IListingService
         var cachedListing = await _cacheService.GetAsync<ListingDetailDto>(cacheKey);
         if (cachedListing != null)
         {
-            _logger.Info($"[GetByIdAsync] Cache hit cho listing: {id}");
+            _logger.Info($"[GetByIdAsync] Cache hit cho bài đăng: {id}");
             return cachedListing;
         }
 
-        _logger.Info($"[GetByIdAsync] Cache miss cho listing: {id}, truy vấn database");
+        _logger.Info($"[GetByIdAsync] Cache miss cho bài đăng: {id}, truy vấn database");
 
         var listing = await _unitOfWork.Listings
             .GetQueryable()
@@ -52,7 +52,7 @@ public class ListingService : IListingService
             .FirstOrDefaultAsync();
 
         if (listing == null)
-            throw ErrorHelper.NotFound("Listing không tồn tại.");
+            throw ErrorHelper.NotFound("Rất tiếc, bài đăng bạn đang tìm kiếm không tồn tại hoặc đã bị xóa.");
 
         var result = MapListingToDto(listing);
 
@@ -62,7 +62,7 @@ public class ListingService : IListingService
             : CacheDurations.InactiveListing;
 
         await _cacheService.SetAsync(cacheKey, result, cacheDuration);
-        _logger.Info($"[GetByIdAsync] Đã cache listing {id} với duration: {cacheDuration}");
+        _logger.Info($"[GetByIdAsync] Đã cache bài đăng {id} với duration: {cacheDuration}");
 
         return result;
     }
@@ -71,7 +71,7 @@ public class ListingService : IListingService
     {
         var currentUserId = _claimsService.CurrentUserId;
 
-        _logger.Info($"[GetAllListingsAsync] Truy vấn listings với params: {param}");
+        _logger.Info($"[GetAllListingsAsync] Truy vấn bài đăng với params: {param}");
 
         var query = _unitOfWork.Listings.GetQueryable()
             .Include(l => l.InventoryItem)
@@ -97,7 +97,7 @@ public class ListingService : IListingService
 
         var listingDtos = listings.Select(MapListingToDto).ToList();
 
-        _logger.Info($"[GetAllListingsAsync] Tìm thấy {count} listings");
+        _logger.Info($"[GetAllListingsAsync] Tìm thấy {count} bài đăng");
 
         return new Pagination<ListingDetailDto>(listingDtos, count, param.PageIndex, param.PageSize);
     }
@@ -175,11 +175,11 @@ public class ListingService : IListingService
 
         if (inventory == null)
             throw ErrorHelper.NotFound(
-                $"InventoryItem {dto.InventoryId} không tồn tại, đã bị xóa, hoặc không thuộc quyền sở hữu của user {userId}.");
+                $"Rất tiếc, vật phẩm tồn kho với ID {dto.InventoryId} không tồn tại, đã bị xóa, hoặc bạn không phải là chủ sở hữu.");
 
         if (inventory.Listings?.Any(l => l.Status == ListingStatus.Active) == true)
             throw ErrorHelper.Conflict(
-                $"InventoryItem {dto.InventoryId} đã có active listing. Mỗi vật phẩm chỉ được phép có một active listing tại một thời điểm.");
+                $"Vật phẩm này (ID: {dto.InventoryId}) hiện đang có một bài đăng đang hoạt động. Mỗi vật phẩm chỉ được phép có một bài đăng hoạt động tại một thời điểm.");
 
         var listing = new Listing
         {
@@ -197,9 +197,9 @@ public class ListingService : IListingService
         // Xóa cache của user items
         await InvalidateUserItemsCache(userId);
 
-        _logger.Info($"[CreateListing] Đã tạo listing {listing.Id} và xóa cache");
+        _logger.Info($"[CreateListing] Đã tạo bài đăng {listing.Id} và xóa cache");
 
-        // Load đầy đủ thông tin listing vừa tạo
+        // Load đầy đủ thông tin bài đăng vừa tạo
         return await GetListingByIdAsync(listing.Id);
     }
 
@@ -211,11 +211,11 @@ public class ListingService : IListingService
             .FirstOrDefaultAsync(l => l.Id == listingId && !l.IsDeleted);
 
         if (listing == null)
-            throw ErrorHelper.NotFound("Listing không tồn tại.");
+            throw ErrorHelper.NotFound("Rất tiếc, bài đăng này không tồn tại hoặc đã bị gỡ bỏ.");
 
         var userId = _claimsService.CurrentUserId;
         if (listing.InventoryItem.UserId != userId)
-            throw ErrorHelper.Forbidden("Bạn không có quyền đóng listing này.");
+            throw ErrorHelper.Forbidden("Bạn không có quyền đóng bài đăng này vì bạn không phải là chủ sở hữu vật phẩm.");
 
         listing.Status = ListingStatus.Sold;
         await _unitOfWork.Listings.Update(listing);
@@ -225,7 +225,7 @@ public class ListingService : IListingService
         await InvalidateListingCache(listingId);
         await InvalidateUserItemsCache(userId);
 
-        _logger.Info($"[CloseListing] Đã đóng listing {listingId} và xóa cache");
+        _logger.Info($"[CloseListing] Đã đóng bài đăng {listingId} và xóa cache");
 
         return await GetListingByIdAsync(listingId);
     }
@@ -234,7 +234,7 @@ public class ListingService : IListingService
     {
         var listing = await _unitOfWork.Listings.GetByIdAsync(listingId);
         if (listing == null)
-            throw ErrorHelper.NotFound("Không tìm thấy listing để báo cáo.");
+            throw ErrorHelper.NotFound("Rất tiếc, không tìm thấy bài đăng để báo cáo.");
 
         var report = new ListingReport
         {
@@ -247,14 +247,14 @@ public class ListingService : IListingService
         await _unitOfWork.ListingReports.AddAsync(report);
         await _unitOfWork.SaveChangesAsync();
 
-        _logger.Info($"[ReportListing] User {_claimsService.CurrentUserId} đã báo cáo listing {listingId}");
+        _logger.Info($"[ReportListing] User {_claimsService.CurrentUserId} đã báo cáo bài đăng {listingId}");
     }
 
     #region Cache Management
 
     private static class CacheKeys
     {
-        private const string PREFIX = "listing:";
+        private const string PREFIX = "bai_dang:";
 
         public static string GetListingDetail(Guid listingId)
         {
@@ -278,7 +278,7 @@ public class ListingService : IListingService
     {
         var cacheKey = CacheKeys.GetListingDetail(listingId);
         await _cacheService.RemoveAsync(cacheKey);
-        _logger.Info($"[Cache] Đã xóa cache listing: {listingId}");
+        _logger.Info($"[Cache] Đã xóa cache bài đăng: {listingId}");
     }
 
     private async Task InvalidateUserItemsCache(Guid userId)
@@ -359,14 +359,14 @@ public class ListingService : IListingService
         if (inventoryItem == null)
         {
             _logger.Warn($"[EnsureItemCanBeListed] Không tìm thấy item {inventoryId} hợp lệ");
-            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm hợp lệ để tạo listing.");
+            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm hợp lệ để tạo bài đăng.");
         }
 
-        // Kiểm tra listing active
+        // Kiểm tra bài đăng active
         if (inventoryItem.Listings?.Any(l => l.Status == ListingStatus.Active) == true)
         {
-            _logger.Warn($"[EnsureItemCanBeListed] Item {inventoryId} đã có listing active");
-            throw ErrorHelper.Conflict("Vật phẩm này đã có listing đang hoạt động.");
+            _logger.Warn($"[EnsureItemCanBeListed] Item {inventoryId} đã có bài đăng active");
+            throw ErrorHelper.Conflict("Vật phẩm này đã có bài đăng đang hoạt động.");
         }
 
         // Kiểm tra giao dịch pending
@@ -379,10 +379,10 @@ public class ListingService : IListingService
         if (hasPendingTrade)
         {
             _logger.Warn($"[EnsureItemCanBeListed] Item {inventoryId} đang có giao dịch pending");
-            throw ErrorHelper.Conflict("Vật phẩm này đang có giao dịch chờ xử lý.");
+            throw ErrorHelper.Conflict("Vật phẩm này hiện đang có giao dịch chờ xử lý. Vui lòng thử lại sau khi giao dịch kết thúc.");
         }
 
-        _logger.Success($"[EnsureItemCanBeListed] Item {inventoryId} đủ điều kiện tạo listing");
+        _logger.Success($"[EnsureItemCanBeListed] Item {inventoryId} đủ điều kiện tạo bài đăng");
     }
 
     #endregion
