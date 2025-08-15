@@ -25,6 +25,7 @@ public class BlindBoxService : IBlindBoxService
     private readonly INotificationService _notificationService;
     private readonly ICurrentTime _time;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IUserService _userService;
 
     public BlindBoxService(
         IUnitOfWork unitOfWork,
@@ -34,7 +35,7 @@ public class BlindBoxService : IBlindBoxService
         IBlobService blobService,
         ICacheService cacheService,
         ILoggerService logger, IEmailService emailService, ICategoryService categoryService,
-        INotificationService notificationService)
+        INotificationService notificationService, IUserService userService)
     {
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
@@ -46,6 +47,7 @@ public class BlindBoxService : IBlindBoxService
         _emailService = emailService;
         _categoryService = categoryService;
         _notificationService = notificationService;
+        _userService = userService;
     }
 
     public async Task<Pagination<BlindBoxDetailDto>> GetAllBlindBoxesAsync(BlindBoxQueryParameter param)
@@ -54,9 +56,9 @@ public class BlindBoxService : IBlindBoxService
             .Include(s => s.Seller)
             .Where(b => !b.IsDeleted);
 
-        query = ApplyFilters(query, param);
 
-        // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
+        query = await ApplyFilters(query, param);
+
         query = ApplySorting(query, param);
 
         var count = await query.CountAsync();
@@ -82,7 +84,6 @@ public class BlindBoxService : IBlindBoxService
             var dto = await MapBlindBoxToDtoAsync(b);
             dtos.Add(dto);
         }
-
         var result = new Pagination<BlindBoxDetailDto>(dtos, count, param.PageIndex, param.PageSize);
         return result;
     }
@@ -782,8 +783,17 @@ public class BlindBoxService : IBlindBoxService
         return Task.FromResult(dto);
     }
 
-    private IQueryable<BlindBox> ApplyFilters(IQueryable<BlindBox> query, BlindBoxQueryParameter param)
+    private async Task<IQueryable<BlindBox>> ApplyFilters(IQueryable<BlindBox> query, BlindBoxQueryParameter param)
     {
+        var userId = _claimsService.CurrentUserId;
+        var user = await _userService.GetUserById(userId);
+
+        // Kiểm tra nếu user là Seller và áp dụng filter theo SellerId
+        if (user != null && user.RoleName == RoleType.Seller)
+        {
+            query = query.Where(b => b.Seller!.UserId == userId);
+        }
+
         var keyword = param.Search?.Trim().ToLower();
         if (!string.IsNullOrEmpty(keyword))
             query = query.Where(b => b.Name.ToLower().Contains(keyword));
