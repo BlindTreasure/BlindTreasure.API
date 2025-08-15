@@ -425,7 +425,7 @@ public class TradingService : ITradingService
             t => t.Requester!,
             t => t.OfferedItems);
 
-        if (tradeRequest == null) throw ErrorHelper.NotFound("Trade Request không tồn tại.");
+        if (tradeRequest == null) throw ErrorHelper.NotFound("Không có offer nào tồn tại.");
 
         var offeredInventoryItems = new List<InventoryItem>();
         if (tradeRequest.OfferedItems.Any())
@@ -462,6 +462,8 @@ public class TradingService : ITradingService
 
     private async Task CompleteTradeExchangeAsync(TradeRequest tradeRequest)
     {
+        _logger.Info($"[CompleteTradeExchangeAsync] Bắt đầu trao đổi item cho trade request {tradeRequest.Id}");
+
         // 1. Lấy thông tin listing item (item của owner)
         var listingItem = tradeRequest.Listing!.InventoryItem;
         var originalOwnerId = listingItem.UserId;
@@ -479,13 +481,18 @@ public class TradingService : ITradingService
         _logger.Info($"[CompleteTradeExchangeAsync] Sẽ trao đổi {offeredItems.Count} offered items");
 
         // 3. Trao đổi ownership của listing item
-        listingItem.UserId = newOwnerId; // Chuyển item của owner sang requester
-        listingItem.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày để tránh trade liên tục
-        listingItem.HoldUntil = DateTime.UtcNow.AddDays(3);
-        listingItem.LockedByRequestId = null; // Reset lock
-        listingItem.OrderDetailId = null;
+        //  Tìm nạp listingItem từ database để có thể chỉnh sửa OrderDetailId
+        var listingItemToUpdate = await _unitOfWork.InventoryItems.GetByIdAsync(listingItem.Id);
+        if (listingItemToUpdate != null)
+        {
+            listingItemToUpdate.UserId = newOwnerId; // Chuyển item của owner sang requester
+            listingItemToUpdate.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày để tránh trade liên tục
+            listingItemToUpdate.HoldUntil = DateTime.UtcNow.AddDays(3);
+            listingItemToUpdate.LockedByRequestId = null; // Reset lock
+            listingItemToUpdate.OrderDetailId = null; // Set OrderDetailId to null
 
-        await _unitOfWork.InventoryItems.Update(listingItem);
+            await _unitOfWork.InventoryItems.Update(listingItemToUpdate);
+        }
 
         // 4. Trao đổi ownership của offered items
         foreach (var offeredItem in offeredItems)
@@ -493,11 +500,17 @@ public class TradingService : ITradingService
             _logger.Info(
                 $"[CompleteTradeExchangeAsync] Chuyển offered item {offeredItem.Id} từ {offeredItem.UserId} sang {originalOwnerId}");
 
-            offeredItem.UserId = originalOwnerId; // Chuyển item của requester sang owner
-            offeredItem.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày
-            offeredItem.HoldUntil = DateTime.UtcNow.AddDays(3);
+            // Tìm nạp offeredItem từ database để có thể chỉnh sửa OrderDetailId
+            var offeredItemToUpdate = await _unitOfWork.InventoryItems.GetByIdAsync(offeredItem.Id);
+            if (offeredItemToUpdate != null)
+            {
+                offeredItemToUpdate.UserId = originalOwnerId; // Chuyển item của requester sang owner
+                offeredItemToUpdate.Status = InventoryItemStatus.OnHold; // Đặt OnHold 3 ngày
+                offeredItemToUpdate.HoldUntil = DateTime.UtcNow.AddDays(3);
+                offeredItemToUpdate.OrderDetailId = null; // Set OrderDetailId to null
 
-            await _unitOfWork.InventoryItems.Update(offeredItem);
+                await _unitOfWork.InventoryItems.Update(offeredItemToUpdate);
+            }
         }
 
         // 5. Cập nhật trạng thái trade request
