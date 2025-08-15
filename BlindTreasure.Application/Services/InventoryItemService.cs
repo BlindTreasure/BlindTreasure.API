@@ -146,7 +146,7 @@ public class InventoryItemService : IInventoryItemService
         if (item == null || item.IsDeleted)
             return null;
 
-       // await _cacheService.SetAsync(cacheKey, item, TimeSpan.FromMinutes(30));
+        // await _cacheService.SetAsync(cacheKey, item, TimeSpan.FromMinutes(30));
         _loggerService.Info($"[GetByIdAsync] Inventory item {id} loaded from DB and cached.");
         return InventoryItemMapper.ToInventoryItemDtoFullIncluded(item);
     }

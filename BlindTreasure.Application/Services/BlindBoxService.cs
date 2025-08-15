@@ -25,6 +25,7 @@ public class BlindBoxService : IBlindBoxService
     private readonly INotificationService _notificationService;
     private readonly ICurrentTime _time;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IUserService _userService;
 
     public BlindBoxService(
         IUnitOfWork unitOfWork,
@@ -34,7 +35,7 @@ public class BlindBoxService : IBlindBoxService
         IBlobService blobService,
         ICacheService cacheService,
         ILoggerService logger, IEmailService emailService, ICategoryService categoryService,
-        INotificationService notificationService)
+        INotificationService notificationService, IUserService userService)
     {
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
@@ -46,67 +47,19 @@ public class BlindBoxService : IBlindBoxService
         _emailService = emailService;
         _categoryService = categoryService;
         _notificationService = notificationService;
+        _userService = userService;
     }
 
     public async Task<Pagination<BlindBoxDetailDto>> GetAllBlindBoxesAsync(BlindBoxQueryParameter param)
     {
-        _logger.Info(
-            $"[GetAllBlindBoxesAsync] Public requests blind box list. Page: {param.PageIndex}, Size: {param.PageSize}");
-
         var query = _unitOfWork.BlindBoxes.GetQueryable()
             .Include(s => s.Seller)
             .Where(b => !b.IsDeleted);
 
-        var cacheKey = BlindBoxCacheKeys.BlindBoxAll(JsonSerializer.Serialize(param));
-        var cached = await _cacheService.GetAsync<Pagination<BlindBoxDetailDto>>(cacheKey);
-        if (cached != null)
-            return cached;
 
-        // Filter
-        var keyword = param.Search?.Trim().ToLower();
-        if (!string.IsNullOrEmpty(keyword))
-            query = query.Where(b => b.Name.ToLower().Contains(keyword));
+        query = await ApplyFilters(query, param);
 
-        if (param.SellerId.HasValue)
-            query = query.Where(b => b.SellerId == param.SellerId.Value);
-
-        if (param.Status.HasValue)
-            query = query.Where(b => b.Status == param.Status.Value);
-
-        if (param.MinPrice.HasValue)
-            query = query.Where(b => b.Price >= param.MinPrice.Value);
-
-        if (param.MaxPrice.HasValue)
-            query = query.Where(b => b.Price <= param.MaxPrice.Value);
-
-        if (param.ReleaseDateFrom.HasValue)
-            query = query.Where(b => b.ReleaseDate >= param.ReleaseDateFrom.Value);
-
-        if (param.ReleaseDateTo.HasValue)
-            query = query.Where(b => b.ReleaseDate <= param.ReleaseDateTo.Value);
-
-        if (param.CategoryId.HasValue)
-        {
-            var categoryIds = await _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value);
-            query = query.Where(b => categoryIds.Contains(b.CategoryId));
-        }
-
-        if (param.HasItem == true)
-        {
-            var boxIdsWithItem = _unitOfWork.BlindBoxItems.GetQueryable()
-                .Where(i => !i.IsDeleted)
-                .Select(i => i.BlindBoxId)
-                .Distinct();
-
-            query = query.Where(b => boxIdsWithItem.Contains(b.Id));
-        }
-
-
-        // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
-        if (param.Desc)
-            query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
-        else
-            query = query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
+        query = ApplySorting(query, param);
 
         var count = await query.CountAsync();
 
@@ -125,17 +78,13 @@ public class BlindBoxService : IBlindBoxService
             await LoadBlindBoxItemsAsync(items);
         }
 
-
         var dtos = new List<BlindBoxDetailDto>();
         foreach (var b in items)
         {
             var dto = await MapBlindBoxToDtoAsync(b);
             dtos.Add(dto);
         }
-
         var result = new Pagination<BlindBoxDetailDto>(dtos, count, param.PageIndex, param.PageSize);
-
-        _logger.Info("[GetAllBlindBoxesAsync] Blind box list loaded from DB.");
         return result;
     }
 
@@ -171,14 +120,12 @@ public class BlindBoxService : IBlindBoxService
         var result = await MapBlindBoxToDtoAsync(blindBox);
 
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromHours(1));
-        _logger.Info($"[GetBlindBoxByIdAsync] Blind box {blindBoxId} loaded from DB and cached.");
         return result;
     }
 
     public async Task<BlindBoxDetailDto> CreateBlindBoxAsync(CreateBlindBoxDto dto)
     {
         var currentUserId = _claimsService.CurrentUserId;
-        _logger.Info($"[CreateBlindBoxAsync] User {currentUserId} requests to create blind box: {dto.Name}");
 
         if (dto == null)
             throw ErrorHelper.BadRequest(ErrorMessages.BlindBoxDataRequired);
@@ -686,30 +633,6 @@ public class BlindBoxService : IBlindBoxService
 
     #region private methods
 
-    private async Task ValidateSameRootCategoryAsync(List<Guid> productIds)
-    {
-        var products = await _unitOfWork.Products.GetQueryable()
-            .Where(p => productIds.Contains(p.Id) && !p.IsDeleted)
-            .Include(p => p.Category)
-            .ThenInclude(c => c.Parent)
-            .ToListAsync();
-
-        Guid GetRootId(Category category)
-        {
-            while (category.Parent != null)
-                category = category.Parent;
-            return category.Id;
-        }
-
-        var distinctRootIds = products
-            .Select(p => GetRootId(p.Category))
-            .Distinct()
-            .ToList();
-
-        if (distinctRootIds.Count > 1)
-            throw ErrorHelper.BadRequest("Tất cả sản phẩm trong blind box phải cùng loại (cùng root category).");
-    }
-
     private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemRequestDto> items)
     {
         if (items.Count != 6 && items.Count != 12)
@@ -849,20 +772,77 @@ public class BlindBoxService : IBlindBoxService
     {
         var dto = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
 
-        // Cập nhật stock status
         dto.BlindBoxStockStatus = blindBox.TotalQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
 
-        // Nếu BlindBox hết hàng nhưng status không phản ánh điều đó, cập nhật trong DB
         if (blindBox.TotalQuantity <= 0 && blindBox.Status == BlindBoxStatus.Approved)
-            // Chỉ log thông báo, việc cập nhật sẽ được thực hiện ở nơi khác để tránh side effect
             _logger.Warn($"[MapBlindBoxToDtoAsync] BlindBox {blindBox.Id} đã hết hàng nhưng status vẫn là Approved");
 
         dto.Brand = blindBox.Seller?.CompanyName;
-
-        // Gán danh sách item
-        if (blindBox.BlindBoxItems != null) dto.Items = MapToBlindBoxItemDtos(blindBox.BlindBoxItems);
+        dto.Items = MapToBlindBoxItemDtos(blindBox.BlindBoxItems);
 
         return Task.FromResult(dto);
+    }
+
+    private async Task<IQueryable<BlindBox>> ApplyFilters(IQueryable<BlindBox> query, BlindBoxQueryParameter param)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var user = await _userService.GetUserById(userId);
+
+        // Kiểm tra nếu user là Seller và áp dụng filter theo SellerId
+        if (user != null && user.RoleName == RoleType.Seller)
+        {
+            query = query.Where(b => b.Seller!.UserId == userId);
+        }
+
+        var keyword = param.Search?.Trim().ToLower();
+        if (!string.IsNullOrEmpty(keyword))
+            query = query.Where(b => b.Name.ToLower().Contains(keyword));
+
+        if (param.SellerId.HasValue)
+            query = query.Where(b => b.SellerId == param.SellerId.Value);
+
+        if (param.Status.HasValue)
+            query = query.Where(b => b.Status == param.Status.Value);
+
+        if (param.MinPrice.HasValue)
+            query = query.Where(b => b.Price >= param.MinPrice.Value);
+
+        if (param.MaxPrice.HasValue)
+            query = query.Where(b => b.Price <= param.MaxPrice.Value);
+
+        if (param.ReleaseDateFrom.HasValue)
+            query = query.Where(b => b.ReleaseDate >= param.ReleaseDateFrom.Value);
+
+        if (param.ReleaseDateTo.HasValue)
+            query = query.Where(b => b.ReleaseDate <= param.ReleaseDateTo.Value);
+
+        if (param.CategoryId.HasValue)
+        {
+            var categoryIds = _categoryService.GetAllChildCategoryIdsAsync(param.CategoryId.Value).GetAwaiter()
+                .GetResult();
+            query = query.Where(b => categoryIds.Contains(b.CategoryId));
+        }
+
+        if (param.HasItem == true)
+        {
+            var boxIdsWithItem = _unitOfWork.BlindBoxItems.GetQueryable()
+                .Where(i => !i.IsDeleted)
+                .Select(i => i.BlindBoxId)
+                .Distinct();
+
+            query = query.Where(b => boxIdsWithItem.Contains(b.Id));
+        }
+
+        return query;
+    }
+
+    private IQueryable<BlindBox> ApplySorting(IQueryable<BlindBox> query, BlindBoxQueryParameter param)
+    {
+        if (param.Desc)
+            query = query.OrderByDescending(b => b.UpdatedAt ?? b.CreatedAt);
+        else
+            query = query.OrderBy(b => b.UpdatedAt ?? b.CreatedAt);
+        return query;
     }
 
     private List<BlindBoxItemResponseDto> MapToBlindBoxItemDtos(IEnumerable<BlindBoxItem> items)
