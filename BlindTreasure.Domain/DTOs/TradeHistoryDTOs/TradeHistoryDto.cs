@@ -8,6 +8,7 @@ public class TradeHistoryDto
     public Guid ListingId { get; set; }
     public string ListingItemName { get; set; }
     public string ListingItemImage { get; set; }
+    public Guid? ListingInventoryItemId { get; set; }
     public Guid RequesterId { get; set; }
     public string RequesterName { get; set; }
     public Guid? OfferedInventoryId { get; set; }
