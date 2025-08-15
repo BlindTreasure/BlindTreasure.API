@@ -212,10 +212,27 @@ public class TransactionService : ITransactionService
                         .ThenInclude(o => o.User) // Ensure Order.User is loaded
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
-            if (transaction?.Payment?.Order == null)
-                throw ErrorHelper.NotFound("Không tìm thấy transaction hoặc order cho session Stripe này.");
+            _logger.Info($"Found transaction with external ref:{transaction.Id}");
 
             var order = transaction.Payment.Order;
+            if (order == null)
+            {
+                _logger.Info($"[HandleSuccessfulPaymentAsync] Không tìm thấy Order Include bởi payment từ {transaction.Id}.");
+                order = await _unitOfWork.Orders.GetQueryable()
+                    .Include(o => o.Payment).ThenInclude(o=>o.Transactions)
+                    .Include(o => o.OrderDetails)
+                        .ThenInclude(od => od.Product)
+                    .Include(o => o.OrderDetails)
+                        .ThenInclude(od => od.BlindBox)
+                    .Include(o => o.OrderDetails)
+                        .ThenInclude(od => od.Shipments)
+                    .Include(o => o.ShippingAddress)
+                    .Include(o => o.Seller)
+                        .ThenInclude(s => s.User) // Ensure Seller.User is loaded
+                    .Include(o => o.User) // Ensure Order.User is loaded
+                    .FirstOrDefaultAsync(o => o.Id.ToString() == orderId);
+            }
+
 
             // Idempotency: skip if already paid
             if (order.Status == OrderStatus.PAID.ToString())
