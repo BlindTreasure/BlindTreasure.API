@@ -175,12 +175,6 @@ public class ChatController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Upload ảnh và gửi tin nhắn ảnh qua chat
-    /// </summary>
-    /// <param name="receiverId">ID người nhận</param>
-    /// <param name="imageFile">File ảnh</param>
-    /// <returns>ApiResult</returns>
     [HttpPost("send-image")]
     [ProducesResponseType(typeof(ApiResult), 200)]
     [ProducesResponseType(typeof(ApiResult), 400)]
@@ -190,72 +184,8 @@ public class ChatController : ControllerBase
         {
             var senderId = _claimsService.CurrentUserId;
 
-            // Validate file
-            if (imageFile == null || imageFile.Length == 0)
-                return BadRequest(ApiResult.Failure("400", "Vui lòng chọn file ảnh."));
-
-            // Kiểm tra định dạng file
-            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-            var fileExtension = Path.GetExtension(imageFile.FileName).ToLower();
-            if (!allowedExtensions.Contains(fileExtension))
-                return BadRequest(ApiResult.Failure("400",
-                    "Định dạng file không được hỗ trợ. Chỉ chấp nhận: jpg, jpeg, png, gif, webp"));
-
-            // Kiểm tra kích thước file (max 10MB)
-            const long maxFileSize = 10 * 1024 * 1024; // 10MB
-            if (imageFile.Length > maxFileSize)
-                return BadRequest(ApiResult.Failure("400", "File quá lớn. Kích thước tối đa: 10MB"));
-
-            // Kiểm tra receiver có tồn tại không
-            var receiver = await _userService.GetUserById(receiverId);
-            if (receiver == null || receiver.IsDeleted)
-                return NotFound(ApiResult.Failure("404", "Người nhận không tồn tại."));
-
-            // Tạo tên file duy nhất
-            var uniqueFileName = $"chat/{senderId}/{Guid.NewGuid()}{fileExtension}";
-
-            // Upload ảnh lên MinIO
-            using var stream = imageFile.OpenReadStream();
-            await _blobService.UploadFileAsync(uniqueFileName, stream);
-
-            // Lấy URL của ảnh
-            var imageUrl = await _blobService.GetPreviewUrlAsync(uniqueFileName);
-
-            // Tính kích thước file
-            var fileSizeStr = FormatFileSize(imageFile.Length);
-
-            // Lưu tin nhắn ảnh vào database
-            await _chatMessageService.SaveImageMessageAsync(senderId, receiverId,
-                imageUrl, imageFile.FileName, fileSizeStr, imageFile.ContentType);
-
-            // Lấy thông tin người gửi
-            var sender = await _userService.GetUserById(senderId);
-
-            // Tạo message object để gửi qua SignalR
-            var messageData = new
-            {
-                id = Guid.NewGuid().ToString(),
-                senderId = senderId.ToString(),
-                receiverId = receiverId.ToString(),
-                senderName = sender?.FullName ?? "Unknown",
-                senderAvatar = sender?.AvatarUrl ?? "",
-                content = "[Hình ảnh]",
-                imageUrl,
-                fileName = imageFile.FileName,
-                fileSize = fileSizeStr,
-                mimeType = imageFile.ContentType,
-                messageType = ChatMessageType.ImageMessage.ToString(),
-                timestamp = DateTime.UtcNow,
-                isRead = false
-            };
-
-            // Gửi qua SignalR cho cả sender và receiver
-            await _hubContext.Clients.Users(new[] { senderId.ToString(), receiverId.ToString() })
-                .SendAsync("ReceiveImageMessage", messageData);
-
-            // Cập nhật số tin chưa đọc cho receiver
-            var unreadCount = await _chatMessageService.GetUnreadMessageCountAsync(receiverId);
-            await _hubContext.Clients.User(receiverId.ToString()).SendAsync("UnreadCountUpdated", unreadCount);
+            // Gọi service để xử lý tất cả logic
+            await _chatMessageService.UploadAndSendImageMessageAsync(senderId, receiverId, imageFile);
 
             return Ok(ApiResult.Success("200", "Gửi ảnh thành công."));
         }

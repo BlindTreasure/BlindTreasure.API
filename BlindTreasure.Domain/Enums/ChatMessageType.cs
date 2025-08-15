@@ -6,5 +6,6 @@ public enum ChatMessageType
     UserToAi,
     AiToUser,
     ImageMessage,
-    InventoryItemMessage
+    InventoryItemMessage,
+    VideoMessage
 }

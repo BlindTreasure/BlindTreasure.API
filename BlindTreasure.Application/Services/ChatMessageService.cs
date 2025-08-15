@@ -9,6 +9,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,16 +22,18 @@ public class ChatMessageService : IChatMessageService
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<ChatHub> _hubContext;
+    private readonly IBlobService _blobService;
     private readonly Dictionary<string, DateTime> _onlineUsers = new();
 
     public ChatMessageService(ICacheService cacheService, IClaimsService claimsService, ILoggerService logger,
-        IUnitOfWork unitOfWork, IHubContext<ChatHub> hubContext)
+        IUnitOfWork unitOfWork, IHubContext<ChatHub> hubContext, IBlobService blobService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
         _logger = logger;
         _unitOfWork = unitOfWork;
         _hubContext = hubContext;
+        _blobService = blobService;
     }
 
     public async Task SaveImageMessageAsync(Guid senderId, Guid receiverId,
@@ -117,6 +120,98 @@ public class ChatMessageService : IChatMessageService
         return await _unitOfWork.ChatMessages.GetQueryable()
             .CountAsync(m => m.ReceiverId == userId && !m.IsRead);
     }
+
+    /// <summary>
+    /// Upload và gửi tin nhắn hình ảnh hoặc video
+    /// </summary>
+    /// <param name="senderId">ID người gửi</param>
+    /// <param name="receiverId">ID người nhận</param>
+    /// <param name="mediaFile">File hình ảnh hoặc video</param>
+    /// <returns>URL của file đã upload</returns>
+    public async Task<string> UploadAndSendImageMessageAsync(Guid senderId, Guid receiverId, IFormFile mediaFile)
+    {
+        // Validate file
+        if (mediaFile == null)
+            throw ErrorHelper.BadRequest("Vui lòng chọn file media.");
+
+        if (!IsValidMediaFile(mediaFile))
+            throw ErrorHelper.BadRequest("File không hợp lệ. Vui lòng kiểm tra định dạng và kích thước file.");
+
+        // Kiểm tra receiver có tồn tại không
+        var receiver = await _unitOfWork.Users.GetByIdAsync(receiverId);
+        if (receiver == null || receiver.IsDeleted)
+            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
+
+        // Xác định loại media (hình ảnh hoặc video)
+        var isVideo = mediaFile.ContentType.StartsWith("video/");
+        var fileExtension = Path.GetExtension(mediaFile.FileName).ToLowerInvariant();
+
+        // Tạo tên file duy nhất và thư mục lưu trữ
+        var uniqueFileName = $"chat/{senderId}/{Guid.NewGuid()}{fileExtension}";
+
+        // Upload media lên MinIO
+        using var stream = mediaFile.OpenReadStream();
+        await _blobService.UploadFileAsync(uniqueFileName, stream);
+
+        // Lấy URL của media
+        var mediaUrl = await _blobService.GetPreviewUrlAsync(uniqueFileName);
+
+        // Tính kích thước file
+        var fileSizeStr = FormatFileSize(mediaFile.Length);
+
+        // Lưu tin nhắn media vào database
+        var messageType = isVideo ? ChatMessageType.VideoMessage : ChatMessageType.ImageMessage;
+        var content = isVideo ? "[Video]" : "[Hình ảnh]";
+
+        // Gọi phương thức lưu tin nhắn media
+        if (isVideo)
+        {
+            // TODO: Nếu cần có phương thức riêng cho video thì implement thêm
+            await SaveImageMessageAsync(senderId, receiverId, mediaUrl, mediaFile.FileName, fileSizeStr,
+                mediaFile.ContentType);
+        }
+        else
+        {
+            await SaveImageMessageAsync(senderId, receiverId, mediaUrl, mediaFile.FileName, fileSizeStr,
+                mediaFile.ContentType);
+        }
+
+        // Lấy thông tin người gửi
+        var sender = await _unitOfWork.Users.GetByIdAsync(senderId);
+
+        // Tạo message object để gửi qua SignalR
+        var messageData = new
+        {
+            id = Guid.NewGuid().ToString(),
+            senderId = senderId.ToString(),
+            receiverId = receiverId.ToString(),
+            senderName = sender?.FullName ?? "Unknown",
+            senderAvatar = sender?.AvatarUrl ?? "",
+            content = mediaUrl, // Theo yêu cầu, gửi URL vào content
+            fileName = mediaFile.FileName,
+            fileSize = fileSizeStr,
+            mimeType = mediaFile.ContentType,
+            messageType = messageType.ToString(),
+            timestamp = DateTime.UtcNow,
+            isRead = false
+        };
+
+        // Gửi qua SignalR cho cả sender và receiver
+        var eventName = isVideo ? "ReceiveVideoMessage" : "ReceiveImageMessage";
+        await _hubContext.Clients.Users(new[] { senderId.ToString(), receiverId.ToString() })
+            .SendAsync(eventName, messageData);
+
+        // Cập nhật số tin chưa đọc cho receiver
+        var unreadCount = await GetUnreadMessageCountAsync(receiverId);
+        await _hubContext.Clients.User(receiverId.ToString()).SendAsync("UnreadCountUpdated", unreadCount);
+
+        // Log hành động
+        _logger.Info($"[Chat] User {senderId} sent {(isVideo ? "video" : "image")} to {receiverId}: {mediaUrl}");
+
+        return mediaUrl;
+    }
+
+
 
     public async Task<ChatMessageDto?> GetMessageByIdAsync(Guid messageId)
     {
@@ -514,5 +609,81 @@ public class ChatMessageService : IChatMessageService
     {
         var ids = new[] { user1Id, user2Id }.OrderBy(x => x).ToList();
         return $"chat:last:{ids[0]}:{ids[1]}";
+    }
+    
+        private bool IsValidMediaFile(IFormFile file)
+    {
+        // Check if file is null or empty
+        if (file.Length == 0)
+        {
+            _logger.Warn("Empty file detected");
+            return false;
+        }
+
+        // Check file size (max 50MB)
+        const int maxSizeBytes = 50 * 1024 * 1024; // 50MB
+        if (file.Length > maxSizeBytes)
+        {
+            _logger.Warn(
+                $"File {file.FileName} exceeds size limit: {file.Length} bytes (max: {maxSizeBytes})");
+            return false;
+        }
+
+        // Check file extension
+        var allowedExtensions = new[]
+        {
+            // Images
+            ".jpg", ".jpeg", ".png", ".gif", ".webp",
+            // Videos
+            ".mp4", ".mov", ".avi", ".wmv", ".mkv"
+        };
+        var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+        if (string.IsNullOrEmpty(fileExtension) || !allowedExtensions.Contains(fileExtension))
+        {
+            _logger.Warn($"File {file.FileName} has invalid extension: {fileExtension}");
+            return false;
+        }
+
+        // Check MIME type
+        var allowedMimeTypes = new[]
+        {
+            // Images
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/gif",
+            "image/webp",
+            // Videos
+            "video/mp4",
+            "video/quicktime",
+            "video/x-msvideo",
+            "video/x-ms-wmv",
+            "video/x-matroska"
+        };
+
+        if (string.IsNullOrEmpty(file.ContentType) ||
+            !allowedMimeTypes.Contains(file.ContentType.ToLowerInvariant()))
+        {
+            _logger.Warn($"File {file.FileName} has invalid MIME type: {file.ContentType}");
+            return false;
+        }
+
+        _logger.Info($"File {file.FileName} passed validation");
+        return true;
+    }
+    
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        var order = 0;
+        double len = bytes;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+
+        return $"{len:0.##} {sizes[order]}";
     }
 }
