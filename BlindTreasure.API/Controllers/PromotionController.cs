@@ -222,4 +222,47 @@ public class PromotionController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
+
+    /// <summary>
+    /// Lấy thông tin sử dụng một voucher cụ thể của một user.
+    /// </summary>
+    [HttpGet("usage")]
+    [ProducesResponseType(typeof(ApiResult<PromotionUserUsageDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPromotionUsage([FromQuery] Guid promotionId, [FromQuery] Guid userId)
+    {
+        try
+        {
+            var result = await _promotionService.GetSpecificPromotionUsagesync(promotionId, userId);
+            return Ok(ApiResult<PromotionUserUsageDto>.Success(result, "200", "Lấy thông tin sử dụng voucher thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<PromotionUserUsageDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    /// Lấy danh sách tất cả voucher đã sử dụng của một user.
+    /// </summary>
+    [HttpGet("usages")]
+    [ProducesResponseType(typeof(ApiResult<List<PromotionUserUsageDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPromotionUsages([FromQuery] Guid userId)
+    {
+        try
+        {
+            var result = await _promotionService.GetPromotionUsageOfUserAsync(userId);
+            return Ok(ApiResult<List<PromotionUserUsageDto>>.Success(result, "200", "Lấy danh sách sử dụng voucher thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<List<PromotionUserUsageDto>>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+
 }
