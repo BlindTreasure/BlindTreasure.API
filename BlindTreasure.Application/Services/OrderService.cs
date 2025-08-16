@@ -453,7 +453,7 @@ public class OrderService : IOrderService
                 if (promo == null || promo.Status != PromotionStatus.Approved)
                     throw ErrorHelper.BadRequest("Invalid promotion");
 
-                var participant = await _unitOfWork.PromotionParticipants.GetQueryable()
+                var participant = await _unitOfWork.PromotionParticipants.GetQueryable().Include(p => p.Promotion)
                     .Where(p => p.PromotionId == promo.Id && p.SellerId == group.SellerId)
                     .FirstOrDefaultAsync();
                 if (participant == null)
@@ -461,6 +461,17 @@ public class OrderService : IOrderService
                     _loggerService.Warn($"Seller {group.SellerId} not participate in promotion {promo.Code}");
                     throw ErrorHelper.BadRequest(
                         $"Promotion not applicable for this seller. ( Seller did not participate to this promotion :{promo.Id} )");
+                }
+
+                // --- NEW: Check per-user usage limit ---
+                var maxUsagePerUser = promo.MaxUsagePerUser ?? 1;
+                var userUsage = await _unitOfWork.PromotionUserUsages.GetQueryable()
+                    .Where(u => u.PromotionId == promo.Id && u.UserId == userId)
+                    .FirstOrDefaultAsync();
+
+                if (userUsage != null && userUsage.UsageCount >= maxUsagePerUser)
+                {
+                    throw ErrorHelper.BadRequest($"Bạn đã sử dụng khuyến mãi {promo.Id} hết số lần tối đa({maxUsagePerUser} lần).");
                 }
 
                 var sellerOrderDetails = order.OrderDetails.ToList();
@@ -481,6 +492,25 @@ public class OrderService : IOrderService
 
                 promo.UsageLimit = (promo.UsageLimit ?? 0) - 1;
                 await _unitOfWork.Promotions.Update(promo);
+
+                // --- NEW: Update PromotionUserUsage ---
+                if (userUsage == null)
+                {
+                    userUsage = new PromotionUserUsage
+                    {
+                        PromotionId = promo.Id,
+                        UserId = userId,
+                        UsageCount = 1,
+                        LastUsedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.PromotionUserUsages.AddAsync(userUsage);
+                }
+                else
+                {
+                    userUsage.UsageCount += 1;
+                    userUsage.LastUsedAt = DateTime.UtcNow;
+                    await _unitOfWork.PromotionUserUsages.Update(userUsage);
+                }
             }
             else
             {

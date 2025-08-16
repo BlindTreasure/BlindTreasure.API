@@ -205,17 +205,6 @@ public class TransactionService : ITransactionService
 
             _logger.Info($"[HandleSuccessfulPaymentAsync] Đã tìm thấy transaction với số lượng {order.Payment.Transactions.Count}");
 
-            var transaction = order.Payment.Transactions
-                .FirstOrDefault(t => t.ExternalRef == sessionId);
-            if(transaction == null)
-            {
-                 transaction = await _unitOfWork.Transactions.GetQueryable()
-                .Include(t => t.Payment)
-                .FirstOrDefaultAsync(t => t.ExternalRef == sessionId && t.Payment.OrderId.ToString() == orderId);
-                _logger.Info($"[HandleSuccessfulPaymentAsync] Đã tìm thấy transaction với sessionId {sessionId} và orderId {orderId}, transactionId {transaction?.Id}");
-            }
-
-
             // Idempotency: skip if already paid
             if (order.Status == OrderStatus.PAID.ToString())
             {
@@ -223,8 +212,21 @@ public class TransactionService : ITransactionService
                 return;
             }
 
+            if(order.Payment.Transactions == null || !order.Payment.Transactions.Any())
+            {
+                _logger.Warn($"[HandleSuccessfulPaymentAsync] Order {orderId} không có transactions, không thể xử lý thanh toán.");
+                throw ErrorHelper.BadRequest("Không tìm thấy giao dịch thanh toán cho đơn hàng này.");
+            }
+
+            foreach (var transaction in order.Payment.Transactions)
+            {           
+                 UpdatePaymentAndOrderStatus(transaction, order);
+                if(transaction.ExternalRef == sessionId)
+                {
+                    _logger.Info($"[HandleSuccessfulPaymentAsync] Đã tìm thấy transaction với sessionId {sessionId} và status Pending.");
+                }
+            }
             // Update transaction, payment, and order status
-            UpdatePaymentAndOrderStatus(order.Payment.Transactions.First(), order);
 
             // 1. Create GHN shipments and update shipment info
             await CreateGhnOrdersAndUpdateShipments(order);
@@ -247,17 +249,19 @@ public class TransactionService : ITransactionService
             // 4. Create customer blind boxes for blind box order details
             await CreateCustomerBlindBoxForOrderDetails(order);
 
-            // 5. Save all changes in one batch
-            await _unitOfWork.Transactions.Update(transaction);
-            await _unitOfWork.Payments.Update(transaction.Payment);
+
             await _unitOfWork.Orders.Update(order);
             var session = await _unitOfWork.GroupPaymentSessions.GetQueryable()
-                .FirstOrDefaultAsync(x => x.StripeSessionId == sessionId && !x.IsCompleted); 
-            if (session != null) { 
-                session.IsCompleted = true; session.UpdatedAt = DateTime.UtcNow; await _unitOfWork.GroupPaymentSessions.Update(session); 
-                _logger.Info("Đánh dấu hoàn thành cho thanh toán nhóm"); }
-            await _unitOfWork.SaveChangesAsync();
+                .FirstOrDefaultAsync(x => x.StripeSessionId == sessionId && !x.IsCompleted);
+            if (session != null)
+            {
+                session.IsCompleted = true;
+                session.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.GroupPaymentSessions.Update(session);
+                _logger.Info("Đánh dấu hoàn thành cho thanh toán nhóm");
+            }
 
+            await _unitOfWork.SaveChangesAsync();
             await _emailService.SendOrderPaymentSuccessToBuyerAsync(order);
 
             // Notify user (buyer)

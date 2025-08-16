@@ -8,17 +8,3 @@ public class DirectCartCheckoutDto : CreateCheckoutRequestDto
     public bool? IsShip { get; set; } = false; // có muốn ship hàng hay không
 }
 
-public class DirectCartItemDto
-{
-    public Guid? ProductId { get; set; }
-    public string? ProductName { get; set; }
-    public Guid? BlindBoxId { get; set; }
-    public string? BlindBoxName { get; set; }
-    public int Quantity { get; set; }
-    public decimal UnitPrice { get; set; }
-
-    public decimal TotalPrice { get; set; }
-
-    public Guid? PromotionId { get; set; } // voucher được apply theo seller nên phải tính trên item
-    // Có thể bổ sung thêm payment info, note, v.v.
-}
