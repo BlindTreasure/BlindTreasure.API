@@ -59,12 +59,12 @@ public class UnboxingService : IUnboxingService
             .ToList();
 
         if (items != null && !items.Any())
-            throw ErrorHelper.BadRequest("Hộp này không còn item nào để mở.");
+            throw ErrorHelper.BadRequest("Rất tiếc, hộp này đã hết vật phẩm. Vui lòng quay lại sau.");
 
         // 3 & 4. Random item theo xác suất (dùng hàm mới)
         var (selectedItem, roll, probabilityMap) = GetRandomItemByProbability(items, now);
         if (selectedItem == null)
-            throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
+            throw ErrorHelper.Internal("Đã có lỗi xảy ra khi chọn vật phẩm từ hộp. Vui lòng thử lại.");
 
         // Ghi log vào bảng
         await _unitOfWork.BlindBoxUnboxLogs.AddAsync(new BlindBoxUnboxLog
@@ -90,7 +90,7 @@ public class UnboxingService : IUnboxingService
         });
 
         if (selectedItem == null)
-            throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
+            throw ErrorHelper.Internal("Đã có lỗi xảy ra khi chọn vật phẩm từ hộp. Vui lòng thử lại.");
 
         await GrantUnboxedItemToUser(selectedItem, customerBox, userId, now);
 
@@ -504,12 +504,12 @@ public class UnboxingService : IUnboxingService
         if (customerBox == null || customerBox.UserId != userId || customerBox.IsDeleted || customerBox.IsOpened)
         {
             var msg = customerBox == null
-                ? "Không tìm thấy hộp hợp lệ để mở."
+                ? "Không tìm thấy hộp của bạn. Vui lòng kiểm tra lại."
                 : customerBox.IsDeleted
-                    ? "Hộp không hợp lệ (đã bị xóa)."
+                    ? "Hộp này không còn hợp lệ hoặc đã bị xóa."
                     : customerBox.IsOpened
-                        ? "Hộp đã được mở trước đó."
-                        : "Không có quyền mở hộp này.";
+                        ? "Bạn đã mở hộp này rồi. Mỗi hộp chỉ được mở một lần."
+                        : "Bạn không có quyền thực hiện hành động này với hộp của người khác.";
             throw ErrorHelper.BadRequest(msg);
         }
 

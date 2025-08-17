@@ -210,7 +210,7 @@ public class InventoryItemService : IInventoryItemService
     {
         var item = await _unitOfWork.InventoryItems.GetByIdAsync(id, i => i.Product);
         if (item == null || item.IsDeleted)
-            throw ErrorHelper.NotFound("Inventory item not found.");
+            throw ErrorHelper.NotFound("Vật phẩm trong kho với mã định danh đã cung cấp không tồn tại hoặc đã bị xóa. Vui lòng kiểm tra lại mã vật phẩm.");
 
         if (!string.IsNullOrWhiteSpace(dto.Location))
             item.Location = dto.Location;
@@ -227,14 +227,14 @@ public class InventoryItemService : IInventoryItemService
         await _cacheService.RemoveAsync(GetCacheKey(id));
 
         _loggerService.Success($"[UpdateAsync] Inventory item {id} updated.");
-        return await GetByIdAsync(id) ?? throw ErrorHelper.Internal("Failed to update inventory item.");
+        return await GetByIdAsync(id) ?? throw ErrorHelper.Internal("Đã xảy ra lỗi trong quá trình cập nhật vật phẩm trong kho. Vui lòng thử lại sau. Nếu lỗi vẫn tiếp diễn, hãy liên hệ hỗ trợ.");
     }
 
     public async Task<bool> DeleteAsync(Guid id)
     {
         var item = await _unitOfWork.InventoryItems.GetByIdAsync(id);
         if (item == null || item.IsDeleted)
-            throw ErrorHelper.NotFound("Inventory item not found.");
+            throw ErrorHelper.NotFound("Vật phẩm trong kho với mã định danh đã cung cấp không tồn tại hoặc đã bị xóa. Vui lòng kiểm tra lại mã vật phẩm.");
 
         item.IsDeleted = true;
         item.DeletedAt = DateTime.UtcNow;
@@ -475,7 +475,7 @@ public class InventoryItemService : IInventoryItemService
                 .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
                 .FirstOrDefaultAsync();
             if (address == null)
-                throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
+                throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ giao hàng mặc định cho tài khoản của bạn. Vui lòng thiết lập một địa chỉ mặc định trong hồ sơ của bạn để tiếp tục.");
 
             // Gộp inventory item cùng ProductId
             var ghnOrderItems = group
