@@ -35,6 +35,7 @@ public class StripeController : ControllerBase
     private readonly ITransactionService _transactionService;
     private readonly IUserService _userService;
 
+
     public StripeController(
         ISellerService sellerService,
         IClaimsService claimService,
@@ -231,6 +232,8 @@ public class StripeController : ControllerBase
                         foreach (var orderId in orderIds)
                             await HandleSuccessfulPaymentForOrder(orderId, completedSession.Id,
                                 completedSession.Metadata);
+
+
                     }
                     else
                     {
@@ -558,7 +561,14 @@ public class StripeController : ControllerBase
     /// </summary>
     private async Task HandleExpiredCheckoutSession(Session session)
     {
-        _logger.Warn($"[Stripe][Webhook] Checkout session expired: {session.Id}");
+        if (session.PaymentStatus == "unpaid" && session.Status != "expired" && DateTime.UtcNow < session.ExpiresAt)
+        {
+            _logger.Info($"[Stripe][Webhook] Checkout session not expired yet: {session.Id}");
+            return;
+        }
+
+
+            _logger.Warn($"[Stripe][Webhook] Checkout session expired: {session.Id}");
         await _transactionService.HandleFailedPaymentAsync(session.Id);
     }
 
@@ -686,7 +696,7 @@ public class StripeController : ControllerBase
             }
             else
             {
-                return BadRequest(ApiResult<object>.Failure("Thiếu thông tin orderId hoặc checkoutGroupId."));
+                return BadRequest(ApiResult<object>.Failure("Thông tin request không hợp lệ hoặc thiếu thông tin orderId/checkoutGroupId."));
             }
         }
         catch (Exception ex)

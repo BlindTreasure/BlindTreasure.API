@@ -22,10 +22,13 @@ public class Promotion : BaseEntity
 
     public Seller? Seller { get; set; }
     public RoleType? CreatedByRole { get; set; }
+
+    public int? MaxUsagePerUser { get; set; } = 2;// e.g. 2
     public ICollection<PromotionParticipant> PromotionParticipants { get; set; }
 
 
     //navigation property to Order
     public ICollection<Order> Orders { get; set; }
     public ICollection<OrderSellerPromotion> OrderSellerPromotions { get; set; }
+    public ICollection<PromotionUserUsage> PromotionUserUsages { get; set; } = new List<PromotionUserUsage>();
 }

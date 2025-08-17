@@ -38,6 +38,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<Review> Reviews { get; }
     IGenericRepository<GroupPaymentSession> GroupPaymentSessions { get; }
     IGenericRepository<OrderDetailInventoryItemLog> OrderDetailInventoryItemLogs { get; }
+    IGenericRepository<PromotionUserUsage> PromotionUserUsages { get; }
 
     Task<int> SaveChangesAsync();
 }

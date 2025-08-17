@@ -1,6 +1,7 @@
 ﻿using System.Text.RegularExpressions;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PromotionDTOs;
@@ -173,6 +174,9 @@ public class PromotionService : IPromotionService
         promotion.UsageLimit = dto.UsageLimit;
         promotion.UpdatedAt = DateTime.UtcNow;
         promotion.CreatedByRole = user.RoleName;
+        
+        if(promotion.MaxUsagePerUser != dto.MaxUsagePerUser)
+            promotion.MaxUsagePerUser = dto.MaxUsagePerUser;
 
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
@@ -301,7 +305,7 @@ public class PromotionService : IPromotionService
             o.Status != "Cancelled" &&
             o.UserId == order.UserId); // có thể tracking thêm bảng OrderPromotion nếu có
 
-        if (promotion.UsageLimit.HasValue && usageCount >= promotion.UsageLimit.Value)
+        if (promotion.MaxUsagePerUser.HasValue && usageCount >= promotion.MaxUsagePerUser.Value)
             throw ErrorHelper.BadRequest("Voucher đã được sử dụng quá giới hạn.");
 
 
@@ -621,6 +625,31 @@ public class PromotionService : IPromotionService
 
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(10));
         return result;
+    }
+
+    public async Task<PromotionUserUsageDto> GetSpecificPromotionUsagesync(Guid promotionId, Guid userId)
+    {
+        var usage = await _unitOfWork.PromotionUserUsages.GetQueryable().AsNoTracking()
+            .Where(u => u.PromotionId == promotionId && u.UserId == userId).Include(u => u.Promotion)
+            .FirstOrDefaultAsync();
+
+        if(usage == null)
+            throw ErrorHelper.NotFound("Không tìm thấy thông tin sử dụng voucher của người dùng.");
+
+        var dto = PromotionDtoMapper.ToPromotionUsageDto(usage);
+
+        return dto;
+    }
+
+    public async Task<List<PromotionUserUsageDto>> GetPromotionUsageOfUserAsync(Guid userId)
+    {
+        var usage = await _unitOfWork.PromotionUserUsages.GetQueryable().AsNoTracking()
+            .Where(u => u.UserId == userId).Include(u => u.Promotion)
+            .ToListAsync();
+
+        var dtos = usage.Select(PromotionDtoMapper.ToPromotionUsageDto).ToList();
+
+        return dtos;
     }
 
     #endregion

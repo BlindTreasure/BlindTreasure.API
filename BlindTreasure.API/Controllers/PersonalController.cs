@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AddressDTOs;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
+using BlindTreasure.Domain.DTOs.PromotionDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -18,14 +19,16 @@ public class PersonalController : ControllerBase
     private readonly IClaimsService _claimsService;
     private readonly ISellerService _sellerService;
     private readonly IUserService _userService;
+    private readonly IPromotionService _promotionService;
 
     public PersonalController(IClaimsService claimsService, IUserService userService, ISellerService sellerService,
-        IAddressService addressService)
+        IAddressService addressService, IPromotionService promotionService)
     {
         _claimsService = claimsService;
         _userService = userService;
         _sellerService = sellerService;
         _addressService = addressService;
+        _promotionService = promotionService;
     }
 
     /// <summary>
@@ -301,4 +304,51 @@ public class PersonalController : ControllerBase
             return StatusCode(status, error);
         }
     }
+
+    /// <summary>
+    /// Lấy thông tin sử dụng một voucher cụ thể của user đang đăng nhập.
+    /// </summary>
+    [Authorize]
+    [HttpGet("promotion-usages/{promotionId}")]
+    [ProducesResponseType(typeof(ApiResult<PromotionUserUsageDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 404)]
+    public async Task<IActionResult> GetMyPromotionUsage(Guid promotionId)
+    {
+        try
+        {
+            var userId = _claimsService.CurrentUserId;
+            var result = await _promotionService.GetSpecificPromotionUsagesync(promotionId, userId);
+            return Ok(ApiResult<PromotionUserUsageDto>.Success(result, "200", "Lấy thông tin sử dụng voucher thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<PromotionUserUsageDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
+    /// Lấy danh sách tất cả voucher đã sử dụng của user đang đăng nhập.
+    /// </summary>
+    [Authorize]
+    [HttpGet("promotion-usages")]
+    [ProducesResponseType(typeof(ApiResult<List<PromotionUserUsageDto>>), 200)]
+    public async Task<IActionResult> GetMyPromotionUsages()
+    {
+        try
+        {
+            var userId = _claimsService.CurrentUserId;
+            var result = await _promotionService.GetPromotionUsageOfUserAsync(userId);
+            return Ok(ApiResult<List<PromotionUserUsageDto>>.Success(result, "200", "Lấy danh sách sử dụng voucher thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<List<PromotionUserUsageDto>>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+
 }

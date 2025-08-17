@@ -453,7 +453,7 @@ public class OrderService : IOrderService
                 if (promo == null || promo.Status != PromotionStatus.Approved)
                     throw ErrorHelper.BadRequest("Invalid promotion");
 
-                var participant = await _unitOfWork.PromotionParticipants.GetQueryable()
+                var participant = await _unitOfWork.PromotionParticipants.GetQueryable().Include(p => p.Promotion)
                     .Where(p => p.PromotionId == promo.Id && p.SellerId == group.SellerId)
                     .FirstOrDefaultAsync();
                 if (participant == null)
@@ -461,6 +461,17 @@ public class OrderService : IOrderService
                     _loggerService.Warn($"Seller {group.SellerId} not participate in promotion {promo.Code}");
                     throw ErrorHelper.BadRequest(
                         $"Promotion not applicable for this seller. ( Seller did not participate to this promotion :{promo.Id} )");
+                }
+
+                // --- NEW: Check per-user usage limit ---
+                var maxUsagePerUser = promo.MaxUsagePerUser ?? 1;
+                var userUsage = await _unitOfWork.PromotionUserUsages.GetQueryable()
+                    .Where(u => u.PromotionId == promo.Id && u.UserId == userId)
+                    .FirstOrDefaultAsync();
+
+                if (userUsage != null && userUsage.UsageCount >= maxUsagePerUser)
+                {
+                    throw ErrorHelper.BadRequest($"Bạn đã sử dụng khuyến mãi {promo.Id} hết số lần tối đa({maxUsagePerUser} lần).");
                 }
 
                 var sellerOrderDetails = order.OrderDetails.ToList();
@@ -481,6 +492,25 @@ public class OrderService : IOrderService
 
                 promo.UsageLimit = (promo.UsageLimit ?? 0) - 1;
                 await _unitOfWork.Promotions.Update(promo);
+
+                // --- NEW: Update PromotionUserUsage ---
+                if (userUsage == null)
+                {
+                    userUsage = new PromotionUserUsage
+                    {
+                        PromotionId = promo.Id,
+                        UserId = userId,
+                        UsageCount = 1,
+                        LastUsedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.PromotionUserUsages.AddAsync(userUsage);
+                }
+                else
+                {
+                    userUsage.UsageCount += 1;
+                    userUsage.LastUsedAt = DateTime.UtcNow;
+                    await _unitOfWork.PromotionUserUsages.Update(userUsage);
+                }
             }
             else
             {
@@ -565,7 +595,7 @@ public class OrderService : IOrderService
         // Tạo link thanh toán tổng cho tất cả order
         if (createdOrderIds.Count == 1)
             // If only one order, use its payment URL
-            result.GeneralPaymentUrl = result.Orders.First().PaymentUrl;
+            result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
         else
             // Multiple orders, create a general checkout session
             result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
@@ -788,8 +818,9 @@ public class OrderService : IOrderService
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.Payment)
-            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Payment).ThenInclude(o=> o.Transactions)
+            .Include(o => o.User)
+            .Include(o => o.Seller)
             .FirstOrDefaultAsync();
 
         if (order == null)
@@ -805,6 +836,7 @@ public class OrderService : IOrderService
         {
             order.Payment.Status = PaymentStatus.Cancelled;
             order.Payment.UpdatedAt = DateTime.UtcNow;
+            order.Payment.Transactions.ToList().ForEach(t => t.Status = TransactionStatus.Canceled.ToString());
             await _unitOfWork.Payments.Update(order.Payment);
         }
 
@@ -864,8 +896,9 @@ public class OrderService : IOrderService
         var orders = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.CheckoutGroupId == checkoutGroupId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.Payment)
-            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Payment).ThenInclude(o=>o.Transactions)
+            .Include(o=> o.User)
+            .Include(o => o.Seller)
             .ToListAsync();
 
         if (!orders.Any())
@@ -883,6 +916,7 @@ public class OrderService : IOrderService
             {
                 order.Payment.Status = PaymentStatus.Cancelled;
                 order.Payment.UpdatedAt = DateTime.UtcNow;
+                order.Payment.Transactions.ToList().ForEach(t => t.Status = TransactionStatus.Canceled.ToString());
                 await _unitOfWork.Payments.Update(order.Payment);
             }
 
@@ -918,7 +952,7 @@ public class OrderService : IOrderService
                 var sellerMsg = $@"
                 Đơn hàng #{order.Id} của khách <b>{buyerName}</b> đã bị hủy bởi khách hàng.<br/>
                 Vui lòng kiểm tra lại trạng thái đơn hàng trong hệ thống.";
-                await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
+                await _notificationService.PushNotificationToUser(order.Seller.UserId, new NotificationDto
                 {
                     Title = $"Đơn hàng #{order.Id} đã bị hủy",
                     Message = sellerMsg,
@@ -929,7 +963,7 @@ public class OrderService : IOrderService
         }
 
         // Vô hiệu hóa link/session thanh toán Stripe cho nhóm
-        await _stripeService.DisableStripeGroupPaymentSessionAsync(checkoutGroupId);
+        await _stripeService.DisableStripeGroupPaymentSessionAsync(checkoutGroupId, orders);
         _loggerService.Info($"Cancelled succesfully payment for group order {checkoutGroupId}.");
 
         await _unitOfWork.SaveChangesAsync();

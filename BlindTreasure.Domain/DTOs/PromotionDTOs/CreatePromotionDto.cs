@@ -23,5 +23,7 @@ public class CreatePromotionDto
     public DateTime EndDate { get; set; } =
         DateTime.SpecifyKind(DateTime.Parse("2100-01-01T00:00:00Z"), DateTimeKind.Utc);
 
-    [DefaultValue(100)] public int UsageLimit { get; set; } = 1;
+    [DefaultValue(100)] public int UsageLimit { get; set; }
+    [DefaultValue(2)] public int? MaxUsagePerUser { get; set; } = 2; // e.g. 2
+
 }

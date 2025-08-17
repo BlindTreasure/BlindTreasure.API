@@ -16,4 +16,6 @@ public interface IPromotionService
     Task<ParticipantPromotionDto> ParticipatePromotionAsync(Guid id);
     Task<ParticipantPromotionDto> WithdrawPromotionAsync(WithdrawParticipantPromotionDto dto);
     Task<List<SellerParticipantDto>> GetPromotionParticipantsAsync(SellerParticipantPromotionParameter param);
+    Task<List<PromotionUserUsageDto>> GetPromotionUsageOfUserAsync(Guid userId);
+    Task<PromotionUserUsageDto> GetSpecificPromotionUsagesync(Guid promotionId, Guid userId);
 }
