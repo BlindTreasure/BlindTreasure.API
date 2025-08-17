@@ -28,7 +28,7 @@ public class CustomerFavouriteController : ControllerBase
         try
         {
             var result = await _customerFavouriteService.AddToFavouriteAsync(request);
-            return Ok(ApiResult<CustomerFavouriteDto>.Success(result, message: "Đã thêm vào danh sách yêu thích."));
+            return Ok(ApiResult<CustomerFavouriteDto>.Success(result, message: "Sản phẩm đã được thêm vào danh sách yêu thích của bạn."));
         }
         catch (Exception ex)
         {
@@ -47,7 +47,7 @@ public class CustomerFavouriteController : ControllerBase
         try
         {
             await _customerFavouriteService.RemoveFromFavouriteAsync(favouriteId);
-            return Ok(ApiResult.Success(message: "Đã xóa khỏi danh sách yêu thích."));
+            return Ok(ApiResult.Success(message: "Vật phẩm đã được xóa khỏi danh sách yêu thích của bạn."));
         }
         catch (Exception ex)
         {
@@ -70,7 +70,7 @@ public class CustomerFavouriteController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách sản phẩm yêu thích thành công."));
+            }, "200", "Danh sách sản phẩm yêu thích của bạn đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -89,7 +89,8 @@ public class CustomerFavouriteController : ControllerBase
         try
         {
             var result = await _customerFavouriteService.IsInFavouriteAsync(productId, blindBoxId);
-            return Ok(ApiResult<bool>.Success(result));
+            return Ok(ApiResult<bool>.Success(result, "200",
+                result ? "Sản phẩm này đã có trong danh sách yêu thích của bạn." : "Sản phẩm này chưa có trong danh sách yêu thích của bạn."));
         }
         catch (Exception ex)
         {

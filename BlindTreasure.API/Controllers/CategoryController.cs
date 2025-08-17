@@ -38,7 +38,7 @@ public class CategoryController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách category thành công."));
+            }, "200", "Danh sách danh mục đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -56,7 +56,7 @@ public class CategoryController : ControllerBase
         {
             var result = await _categoryService.GetCategoriesWithAllProductsAsync();
             return Ok(ApiResult<List<CategoryWithProductsDto>>.Success(result, "200",
-                "Lấy danh sách danh mục kèm sản phẩm thành công."));
+                "Danh sách danh mục và sản phẩm liên quan đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -77,7 +77,7 @@ public class CategoryController : ControllerBase
         try
         {
             var result = await _categoryService.GetByIdAsync(id);
-            return Ok(ApiResult<CategoryDto>.Success(result, "200", "Lấy thông tin category thành công."));
+            return Ok(ApiResult<CategoryDto>.Success(result, "200", "Thông tin chi tiết danh mục đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -100,7 +100,7 @@ public class CategoryController : ControllerBase
         try
         {
             var result = await _categoryService.CreateAsync(dto);
-            return Ok(ApiResult<CategoryDto>.Success(result, "200", "Tạo category thành công."));
+            return Ok(ApiResult<CategoryDto>.Success(result, "200", "Danh mục đã được tạo thành công."));
         }
         catch (Exception ex)
         {
@@ -124,7 +124,7 @@ public class CategoryController : ControllerBase
         try
         {
             var result = await _categoryService.UpdateAsync(id, dto);
-            return Ok(ApiResult<CategoryDto>.Success(result, "200", "Cập nhật category thành công."));
+            return Ok(ApiResult<CategoryDto>.Success(result, "200", "Danh mục đã được cập nhật thành công."));
         }
         catch (Exception ex)
         {
@@ -147,7 +147,7 @@ public class CategoryController : ControllerBase
         try
         {
             var result = await _categoryService.DeleteAsync(id);
-            return Ok(ApiResult<CategoryDto>.Success(result, "200", "Xóa category thành công."));
+            return Ok(ApiResult<CategoryDto>.Success(result, "200", "Danh mục đã được xóa thành công."));
         }
         catch (Exception ex)
         {

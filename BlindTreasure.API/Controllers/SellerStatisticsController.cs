@@ -46,11 +46,11 @@ public class SellerStatisticsController : ControllerBase
         {
             var sellerId = _claimsService.CurrentUserId;
             if (sellerId == Guid.Empty)
-                return Forbid("Không tìm thấy seller đang đăng nhập.");
+                return Forbid("Không tìm thấy người bán đang đăng nhập.");
 
             var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
             if (seller == null)
-                return NotFound("Seller không tồn tại.");
+                return NotFound("Người bán không tồn tại.");
 
             var result = await _sellerStatisticsService.GetDashboardStatisticsAsync(seller.SellerId, request, ct);
             return Ok(result);
@@ -80,7 +80,7 @@ public class SellerStatisticsController : ControllerBase
         {
             var seller = await _sellerService.GetSellerProfileByIdAsync(sellerId);
             if (seller == null)
-                return NotFound("Seller không tồn tại.");
+                return NotFound("Người bán không tồn tại.");
 
             var result = await _sellerStatisticsService.GetDashboardStatisticsAsync(sellerId, request, ct);
             return Ok(result);
@@ -105,11 +105,11 @@ public class SellerStatisticsController : ControllerBase
         {
             var sellerId = _claimsService.CurrentUserId;
             if (sellerId == Guid.Empty)
-                return Forbid("Không tìm thấy seller đang đăng nhập.");
+                return Forbid("Không tìm thấy người bán đang đăng nhập.");
 
             var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
             if (seller == null)
-                return NotFound("Seller không tồn tại.");
+                return NotFound("Người bán không tồn tại.");
             var result = await _sellerStatisticsService.GetOverviewStatisticsAsync(seller.SellerId, req, ct);
             return Ok(ApiResult<SellerOverviewStatisticsDto>.Success(result, "200", "Thống kê tổng quan thành công."));
         }
@@ -131,11 +131,11 @@ public class SellerStatisticsController : ControllerBase
         {
             var sellerId = _claimsService.CurrentUserId;
             if (sellerId == Guid.Empty)
-                return Forbid("Không tìm thấy seller đang đăng nhập.");
+                return Forbid("Không tìm thấy người bán đang đăng nhập.");
 
             var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
             if (seller == null)
-                return NotFound("Seller không tồn tại.");
+                return NotFound("Người bán không tồn tại.");
             var result = await _sellerStatisticsService.GetTopProductsAsync(seller.SellerId, req, ct);
             return Ok(ApiResult<List<TopSellingProductDto>>.Success(result, "200", "Lấy top sản phẩm thành công."));
         }
@@ -157,11 +157,11 @@ public class SellerStatisticsController : ControllerBase
         {
             var sellerId = _claimsService.CurrentUserId;
             if (sellerId == Guid.Empty)
-                return Forbid("Không tìm thấy seller đang đăng nhập.");
+                return Forbid("Không tìm thấy người bán đang đăng nhập.");
 
             var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
             if (seller == null)
-                return NotFound("Seller không tồn tại.");
+                return NotFound("Người bán không tồn tại.");
             var result = await _sellerStatisticsService.GetTopBlindBoxesAsync(seller.SellerId, req, ct);
             return Ok(ApiResult<List<TopSellingBlindBoxDto>>.Success(result, "200", "Lấy top blindbox thành công."));
         }
@@ -184,11 +184,11 @@ public class SellerStatisticsController : ControllerBase
         {
             var sellerId = _claimsService.CurrentUserId;
             if (sellerId == Guid.Empty)
-                return Forbid("Không tìm thấy seller đang đăng nhập.");
+                return Forbid("Không tìm thấy người bán đang đăng nhập.");
 
             var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
             if (seller == null)
-                return NotFound("Seller không tồn tại.");
+                return NotFound("Người bán không tồn tại.");
             var result = await _sellerStatisticsService.GetOrderStatusStatisticsAsync(seller.SellerId, req, ct);
             return Ok(ApiResult<List<OrderStatusStatisticsDto>>.Success(result, "200",
                 "Lấy thống kê trạng thái đơn hàng thành công."));
@@ -212,11 +212,11 @@ public class SellerStatisticsController : ControllerBase
         {
             var sellerId = _claimsService.CurrentUserId;
             if (sellerId == Guid.Empty)
-                return Forbid("Không tìm thấy seller đang đăng nhập.");
+                return Forbid("Không tìm thấy người bán đang đăng nhập.");
 
             var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
             if (seller == null)
-                return NotFound("Seller không tồn tại.");
+                return NotFound("Người bán không tồn tại.");
             var result = await _sellerStatisticsService.GetTimeSeriesStatisticsAsync(seller.SellerId, req, ct);
             return Ok(ApiResult<SellerStatisticsResponseDto>.Success(result, "200",
                 "Lấy thống kê theo thời gian thành công."));

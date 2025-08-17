@@ -35,7 +35,7 @@ public class ListingController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách listing thành công."));
+            }, "200", "Danh sách tin rao vặt đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -53,7 +53,7 @@ public class ListingController : ControllerBase
         {
             var result = await _listingService.GetListingByIdAsync(listingId);
             return Ok(ApiResult<object>.Success(result, "200",
-                "Lấy chi tiết listing thành công."));
+                "Thông tin chi tiết tin rao vặt đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -72,7 +72,7 @@ public class ListingController : ControllerBase
         try
         {
             var result = await _listingService.CreateListingAsync(dto);
-            return Ok(ApiResult<object>.Success(result, "200", "Tạo listing thành công."));
+            return Ok(ApiResult<object>.Success(result, "200", "Tin rao vặt đã được tạo thành công."));
         }
         catch (Exception ex)
         {
@@ -91,7 +91,7 @@ public class ListingController : ControllerBase
         try
         {
             await _listingService.ReportListingAsync(listingId, request.Reason);
-            return Ok(ApiResult<object>.Success(null, "200", "Báo cáo listing thành công."));
+            return Ok(ApiResult<object>.Success(null, "200", "Báo cáo tin rao vặt thành công. Chúng tôi sẽ xem xét sớm."));
         }
         catch (Exception ex)
         {
@@ -110,7 +110,7 @@ public class ListingController : ControllerBase
         try
         {
             var result = await _listingService.GetAvailableItemsForListingAsync();
-            return Ok(ApiResult<List<InventoryItemDto>>.Success(result, "200", "Lấy danh sách vật phẩm thành công."));
+            return Ok(ApiResult<List<InventoryItemDto>>.Success(result, "200", "Danh sách vật phẩm có thể tạo tin rao vặt đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -129,7 +129,7 @@ public class ListingController : ControllerBase
         try
         {
             var result = await _listingService.CloseListingAsync(listingId);
-            return Ok(ApiResult<object>.Success(new { result }, "200", "Đóng listing thành công."));
+            return Ok(ApiResult<object>.Success(new { result }, "200", "Tin rao vặt đã được đóng thành công."));
         }
         catch (Exception ex)
         {

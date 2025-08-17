@@ -33,7 +33,7 @@ public class ShipmentController : ControllerBase
         try
         {
             var result = await _shipmentService.GetByIdAsync(id);
-            return Ok(ApiResult<ShipmentDto>.Success(result, "200", "Lấy thông tin shipment thành công."));
+            return Ok(ApiResult<ShipmentDto>.Success(result, "200", "Lấy thông tin lô hàng thành công."));
         }
         catch (Exception ex)
         {
@@ -55,7 +55,7 @@ public class ShipmentController : ControllerBase
         try
         {
             var result = await _shipmentService.GetMyShipmentsAsync(orderId, orderDetailId);
-            return Ok(ApiResult<List<ShipmentDto>>.Success(result, "200", "Lấy danh sách shipment thành công."));
+            return Ok(ApiResult<List<ShipmentDto>>.Success(result, "200", "Lấy danh sách lô hàng thành công."));
         }
         catch (Exception ex)
         {
@@ -77,7 +77,7 @@ public class ShipmentController : ControllerBase
         {
             var result = await _shipmentService.GetByOrderDetailIdAsync(orderDetailId);
             return Ok(ApiResult<List<ShipmentDto>>.Success(result, "200",
-                "Lấy shipment theo order detail thành công."));
+                "Lấy lô hàng theo chi tiết đơn hàng thành công."));
         }
         catch (Exception ex)
         {

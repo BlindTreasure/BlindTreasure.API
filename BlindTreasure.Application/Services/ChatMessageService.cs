@@ -4,7 +4,9 @@ using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ChatDTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
@@ -351,10 +353,7 @@ public class ChatMessageService : IChatMessageService
         _logger.Info(
             $"[GetMessagesAsync] User {currentUserId} requests messages with {targetId}. Page: {param.PageIndex}, Size: {param.PageSize}");
 
-        // Tạo cache key dựa trên các tham số
         var cacheKey = $"chat:messages:{currentUserId}:{targetId}:{param.PageIndex}:{param.PageSize}";
-
-        // Thử lấy từ cache trước
         var cachedResult = await _cacheService.GetAsync<Pagination<ChatMessageDto>>(cacheKey);
         if (cachedResult != null)
         {
@@ -365,7 +364,8 @@ public class ChatMessageService : IChatMessageService
         IQueryable<ChatMessage> query;
 
         if (targetId == Guid.Empty)
-            // Chat giữa User và AI
+        {
+            // Chat User ↔ AI
             query = _unitOfWork.ChatMessages.GetQueryable()
                 .Where(m =>
                     (m.SenderType == ChatParticipantType.User && m.SenderId == currentUserId &&
@@ -374,8 +374,10 @@ public class ChatMessageService : IChatMessageService
                     (m.SenderType == ChatParticipantType.AI && m.ReceiverType == ChatParticipantType.User &&
                      m.ReceiverId == currentUserId)
                 );
+        }
         else
-            // Chat giữa 2 người dùng
+        {
+            // Chat User ↔ User
             query = _unitOfWork.ChatMessages.GetQueryable()
                 .Where(m =>
                     (m.SenderId == currentUserId && m.ReceiverId == targetId &&
@@ -384,20 +386,22 @@ public class ChatMessageService : IChatMessageService
                     (m.SenderId == targetId && m.ReceiverId == currentUserId &&
                      m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
                 );
+        }
 
-        // ✅ THÊM INCLUDE ĐẦY ĐỦ CHO INVENTORY ITEM
+        // ✅ Include đầy đủ InventoryItem quan hệ
         query = query
             .Include(m => m.Sender)
             .Include(m => m.Receiver)
             .Include(m => m.InventoryItem)
-            .ThenInclude(i => i.Product) // Include Product của InventoryItem
+            .ThenInclude(i => i.Product)
+            .Include(m => m.InventoryItem.Listings)
+            .Include(m => m.InventoryItem.OrderDetail)
+            .Include(m => m.InventoryItem.Shipment)
             .OrderBy(m => m.SentAt)
             .AsNoTracking();
 
-        // Tính tổng số lượng tin nhắn
         var count = await query.CountAsync();
 
-        // Lấy tin nhắn theo phân trang
         List<ChatMessage> messages;
         if (param.PageIndex == 0)
             messages = await query.ToListAsync();
@@ -407,7 +411,6 @@ public class ChatMessageService : IChatMessageService
                 .Take(param.PageSize)
                 .ToListAsync();
 
-        // ✅ CẢI THIỆN LOGIC MAPPING DTO
         var chatMessageDtos = messages.Select(m => new ChatMessageDto
         {
             Id = m.Id,
@@ -424,34 +427,35 @@ public class ChatMessageService : IChatMessageService
             IsRead = m.IsRead,
             IsCurrentUserSender = m.SenderId == currentUserId,
             MessageType = m.MessageType,
-            // Thông tin file media
             FileUrl = m.FileUrl,
             FileName = m.FileName,
             FileSize = m.FileSize,
             FileMimeType = m.FileMimeType,
-            // ✅ KIỂM TRA NULL TRƯỚC KHI MAPPING INVENTORY ITEM
             InventoryItemId = m.InventoryItemId,
             InventoryItem = m.InventoryItem != null
                 ? new InventoryItemDto
                 {
                     Id = m.InventoryItem.Id,
-                    ProductName = m.InventoryItem.Product?.Name ?? "Sản phẩm không xác định",
-                    Image = m.InventoryItem.Product?.ImageUrls?.FirstOrDefault() ?? "/assets/no-image.png",
-                    Tier = m.InventoryItem.Tier,
-                    Status = m.InventoryItem.Status,
-                    Location = m.InventoryItem.Location ?? "Không xác định",
-                    // Thêm các trường khác nếu cần
                     UserId = m.InventoryItem.UserId,
                     ProductId = m.InventoryItem.ProductId,
-                    IsFromBlindBox = m.InventoryItem.IsFromBlindBox
+                    ProductName = m.InventoryItem.Product?.Name ?? "Sản phẩm không xác định",
+                    Image = m.InventoryItem.Product?.ImageUrls?.FirstOrDefault() ?? "/assets/no-image.png",
+                    Location = m.InventoryItem.Location ?? "Không xác định",
+                    Status = m.InventoryItem.Status,
+                    CreatedAt = m.InventoryItem.CreatedAt,
+                    IsFromBlindBox = m.InventoryItem.IsFromBlindBox,
+                    SourceCustomerBlindBoxId = m.InventoryItem.SourceCustomerBlindBoxId,
+                    Tier = m.InventoryItem.Tier,
+                    IsOnHold = m.InventoryItem.HoldUntil.HasValue && m.InventoryItem.HoldUntil > DateTime.UtcNow,
+                    HasActiveListing = m.InventoryItem.Listings != null &&
+                                       m.InventoryItem.Listings.Any(l =>
+                                           !l.IsDeleted && l.Status == ListingStatus.Active)
                 }
                 : null
         }).ToList();
 
-        // Tạo kết quả phân trang
         var result = new Pagination<ChatMessageDto>(chatMessageDtos, count, param.PageIndex, param.PageSize);
 
-        // ✅ GIẢM THỜI GIAN CACHE DO CÓ DỮ LIỆU PHỨC TạP
         await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromSeconds(30));
         _logger.Info($"[GetMessagesAsync] Messages cached with key: {cacheKey}");
 
