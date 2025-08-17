@@ -84,7 +84,5 @@ public class ShipmentService : IShipmentService
         return shipments.Select(ShipmentDtoMapper.ToShipmentDtoWithFullIncluded).ToList();
     }
 
-    #region private methods
 
-    #endregion
 }
