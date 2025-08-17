@@ -435,7 +435,6 @@ public class ProductService : IProductService
         return query;
     }
 
-
     private async Task ValidateProductDto(ProductCreateDto dto)
     {
         _logger.Info(
