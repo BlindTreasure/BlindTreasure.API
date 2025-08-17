@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.Enums;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.Entities;
 
@@ -16,7 +17,10 @@ public class Product : BaseEntity
     public Category Category { get; set; }
 
     public decimal Price { get; set; }
-    public int Stock { get; set; }
+    public int TotalStockQuantity { get; set; }
+    public int ReservedInBlindBox { get; set; }      
+    [NotMapped]
+    public int AvailableToSell => TotalStockQuantity - ReservedInBlindBox;
     public List<string> ImageUrls { get; set; } = new(); // new: khởi tạo mặc định tránh null
     public ProductStatus Status { get; set; }
 

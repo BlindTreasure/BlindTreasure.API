@@ -109,7 +109,7 @@ public class CartItemService : ICartItemService
             var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId.Value);
             if (product == null || product.IsDeleted)
                 throw ErrorHelper.NotFound(ErrorMessages.CartItemProductNotFound);
-            if (product.Stock < dto.Quantity)
+            if (product.TotalStockQuantity < dto.Quantity)
                 throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOutOfStock);
             unitPrice = product.Price;
         }
@@ -179,7 +179,7 @@ public class CartItemService : ICartItemService
             var product = cartItem.Product;
             if (product == null || product.IsDeleted)
                 throw ErrorHelper.NotFound(ErrorMessages.CartItemProductNotFound);
-            if (product.Stock < dto.Quantity)
+            if (product.TotalStockQuantity < dto.Quantity)
                 throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOutOfStock);
             cartItem.UnitPrice = product.Price;
         }

@@ -32,7 +32,7 @@ public class ProductSellerCreateDto
     [Required]
     [Range(0, int.MaxValue)]
     [DefaultValue(10)]
-    public int Stock { get; set; }
+    public int TotalStockQuantity { get; set; }
 
     [Required]
     [DefaultValue(ProductStatus.Active)]

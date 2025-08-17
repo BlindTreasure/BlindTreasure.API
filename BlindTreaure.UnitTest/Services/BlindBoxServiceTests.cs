@@ -496,7 +496,7 @@ public class BlindBoxServiceTests
             Id = id,
             Name = $"Product {index + 1}",
             SellerId = _sellerId,
-            Stock = 100,
+            TotalStockQuantity = 100,
             Status = ProductStatus.Active,
             IsDeleted = false
         }).ToList();
@@ -726,7 +726,7 @@ public class BlindBoxServiceTests
             Id = productId,
             Name = "Test Product",
             SellerId = _sellerId,
-            Stock = 100,
+            TotalStockQuantity = 100,
             Status = ProductStatus.Active
         };
 
@@ -821,7 +821,7 @@ public class BlindBoxServiceTests
             Id = productId,
             Name = "Test Product",
             SellerId = _sellerId,
-            Stock = 20, // Stock không đủ
+            TotalStockQuantity = 20, // Stock không đủ
             Status = ProductStatus.Active
         };
 
@@ -895,7 +895,7 @@ public class BlindBoxServiceTests
         {
             Id = productId,
             SellerId = _sellerId,
-            Stock = 10,
+            TotalStockQuantity = 10,
             IsDeleted = false
         };
         var blindBoxItem = new BlindBoxItem
@@ -946,7 +946,7 @@ public class BlindBoxServiceTests
         // Assert
         Assert.NotNull(result);
         Assert.Equal(blindBoxId, result.Id);
-        _productRepoMock.Verify(x => x.UpdateRange(It.Is<List<Product>>(l => l[0].Stock == 15)), Times.Once);
+        _productRepoMock.Verify(x => x.UpdateRange(It.Is<List<Product>>(l => l[0].TotalStockQuantity == 15)), Times.Once);
         _blindBoxItemRepoMock.Verify(x => x.SoftRemoveRange(It.IsAny<List<BlindBoxItem>>()), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
     }
@@ -980,7 +980,7 @@ public class BlindBoxServiceTests
         {
             Id = productId,
             SellerId = _sellerId,
-            Stock = 10,
+            TotalStockQuantity = 10,
             IsDeleted = false
         };
         var blindBoxItem = new BlindBoxItem
@@ -1029,7 +1029,7 @@ public class BlindBoxServiceTests
         Assert.NotNull(result);
         Assert.Equal(blindBoxId, result.Id);
         _blindBoxRepoMock.Verify(x => x.SoftRemove(It.IsAny<BlindBox>()), Times.Once);
-        _productRepoMock.Verify(x => x.UpdateRange(It.Is<List<Product>>(l => l[0].Stock == 15)), Times.Once);
+        _productRepoMock.Verify(x => x.UpdateRange(It.Is<List<Product>>(l => l[0].TotalStockQuantity == 15)), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
     }
 

@@ -285,7 +285,7 @@ public class OrderService : IOrderService
             if (od.ProductId.HasValue)
             {
                 var product = await _unitOfWork.Products.GetByIdAsync(od.ProductId.Value);
-                product.Stock += od.Quantity;
+                product.TotalStockQuantity += od.Quantity;
                 await _unitOfWork.Products.Update(product);
             }
             else if (od.BlindBoxId.HasValue)
@@ -404,11 +404,11 @@ public class OrderService : IOrderService
                 if (item.ProductId.HasValue)
                 {
                     var p = prodById[item.ProductId.Value];
-                    if (p.Status != ProductStatus.Active || p.Stock < item.Quantity)
+                    if (p.Status != ProductStatus.Active || p.TotalStockQuantity < item.Quantity)
                         throw ErrorHelper.BadRequest($"Product {p.Name} invalid or out of stock.");
                     unitPrice = p.Price;
                     itemName = p.Name;
-                    p.Stock -= item.Quantity;
+                    p.TotalStockQuantity -= item.Quantity;
                     await _unitOfWork.Products.Update(p);
                 }
                 else
