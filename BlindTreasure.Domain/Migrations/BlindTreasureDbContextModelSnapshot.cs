@@ -797,8 +797,9 @@ namespace BlindTreasure.Domain.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<int?>("Tier")
-                        .HasColumnType("integer");
+                    b.Property<string>("Tier")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

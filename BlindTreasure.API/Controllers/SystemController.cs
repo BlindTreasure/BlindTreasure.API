@@ -1018,6 +1018,24 @@ public class SystemController : ControllerBase
         var staffAvatar =
             "https://cdn4.iconfinder.com/data/icons/taxi-service-flat/90/support__services__employee__avatar_-512.png";
 
+        List<Address> defaultAddress =
+        [
+            new()
+            {
+                FullName = "Trần Gia Phúc",
+                Phone = "0987570351",
+                AddressLine = "Bưng Ông Thoàn, Phường Phú Hữu, TP.Thủ Đức, HCM",
+                City = "Thành Phố Thủ Đức",
+                Province = "Hồ Chí Minh",
+                Ward = "Phường Phú Hữu",
+                District = "Thành Phố Thủ Đức",
+                PostalCode = "90763",
+                Country = "Vietnam",
+                IsDefault = true,
+                CreatedAt = now
+            }
+        ];
+
         var users = new List<User>
         {
             // customer 1
@@ -1031,23 +1049,7 @@ public class SystemController : ControllerBase
                 RoleName = RoleType.Customer,
                 CreatedAt = now,
                 AvatarUrl = defaultAvatar,
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Trần Gia Phúc",
-                        Phone = "0987570351",
-                        AddressLine = "Bưng Ông Thoàn, Phường Phú Hữu, TP.Thủ Đức, HCM",
-                        City = "Thành Phố Thủ Đức",
-                        Province = "Hồ Chí Minh",
-                        Ward = "Phường Phú Hữu",
-                        District = "Thành Phố Thủ Đức",
-                        PostalCode = "90763",
-                        Country = "Vietnam",
-                        IsDefault = false,
-                        CreatedAt = now
-                    }
-                }
+                Addresses = defaultAddress
             },
             //customer 2
             new()
@@ -1061,23 +1063,7 @@ public class SystemController : ControllerBase
                 CreatedAt = now,
                 AvatarUrl =
                     "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQIf4R5qPKHPNMyAqV-FjS_OTBB8pfUV29Phg&s",
-                Addresses = new List<Address>
-                {
-                    new()
-                    {
-                        FullName = "Hồ Nhật Quang",
-                        Phone = "0987570351",
-                        AddressLine = "Bưng Ông Thoàn, Phường Phú Hữu, TP.Thủ Đức, HCM",
-                        City = "Thành Phố Thủ Đức",
-                        Province = "Hồ Chí Minh",
-                        Ward = "Phường Phú Hữu",
-                        District = "Thành Phố Thủ Đức",
-                        PostalCode = "90763",
-                        Country = "Vietnam",
-                        IsDefault = false,
-                        CreatedAt = now
-                    }
-                }
+                Addresses = defaultAddress
             },
             new()
             {
@@ -1177,10 +1163,10 @@ public class SystemController : ControllerBase
 
                 var tablesToDelete = new List<Func<Task>>
                 {
+                    () => context.ChatMessages.ExecuteDeleteAsync(),
                     () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),
                     () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerFavourites.ExecuteDeleteAsync(),
-                    () => context.ChatMessages.ExecuteDeleteAsync(),
                     () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
                     () => context.RarityConfigs.ExecuteDeleteAsync(),
