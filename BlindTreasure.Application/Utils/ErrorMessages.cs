@@ -1,4 +1,5 @@
 ﻿namespace BlindTreasure.Application.Utils;
+
 public static class ErrorMessages
 {
     #region Notificaiton Error Message
@@ -108,7 +109,10 @@ public static class ErrorMessages
     public const string BlindBoxItemCountInvalid = "Hộp bí ẩn phải chứa đúng 6 hoặc 12 món đồ.";
     public const string BlindBoxAtLeastOneItem = "Hộp bí ẩn phải có ít nhất một món đồ.";
     public const string BlindBoxDropRateMustBe100 = "Tổng tỷ lệ rơi phải bằng 100%.";
-    public const string BlindBoxNotFoundOrNotPending = "Không tìm thấy hộp bí ẩn hoặc hộp không ở trạng thái chờ duyệt.";
+
+    public const string BlindBoxNotFoundOrNotPending =
+        "Không tìm thấy hộp bí ẩn hoặc hộp không ở trạng thái chờ duyệt.";
+
     public const string BlindBoxNoItems = "Hộp bí ẩn không có món đồ nào.";
     public const string BlindBoxRejectReasonRequired = "Lý do từ chối là bắt buộc.";
 
@@ -162,7 +166,9 @@ public static class ErrorMessages
     public const string OrderCartEmptyLog = "[CheckoutAsync] Giỏ hàng trống.";
     public const string OrderCheckoutStartLog = "[CheckoutAsync] Bắt đầu xử lý thanh toán từ giỏ hàng hệ thống.";
     public const string OrderClientCartInvalid = "Giỏ hàng không hợp lệ hoặc trống.";
-    public const string OrderClientCartInvalidLog = "[CheckoutFromClientCartAsync] Giỏ hàng client không hợp lệ hoặc trống.";
+
+    public const string OrderClientCartInvalidLog =
+        "[CheckoutFromClientCartAsync] Giỏ hàng client không hợp lệ hoặc trống.";
 
     public const string OrderCheckoutFromClientStartLog =
         "[CheckoutFromClientCartAsync] Bắt đầu xử lý thanh toán từ giỏ hàng client.";
@@ -180,7 +186,9 @@ public static class ErrorMessages
     public const string OrderBlindBoxNotFound = "Không tìm thấy hộp bí ẩn {0}.";
     public const string OrderBlindBoxNotApproved = "Hộp bí ẩn {0} chưa được duyệt.";
     public const string OrderBlindBoxOutOfStock = "Hộp bí ẩn {0} đã hết hàng.";
-    public const string OrderCartClearedAfterCheckoutLog = "[CheckoutCore] Đã xóa giỏ hàng hệ thống sau khi thanh toán.";
+
+    public const string OrderCartClearedAfterCheckoutLog =
+        "[CheckoutCore] Đã xóa giỏ hàng hệ thống sau khi thanh toán.";
 
     public const string OrderCacheClearedAfterCheckoutLog =
         "[CheckoutCore] Đã xóa cache đơn hàng cho người dùng {0} sau khi thanh toán.";
@@ -224,11 +232,16 @@ public static class ErrorMessages
     public const string ProductDeleteSuccessLog = "[DeleteAsync] Sản phẩm {0} được xóa mềm bởi người dùng {1}";
     public const string ProductImageFileInvalidLog = "[UploadProductImageAsync] File ảnh không hợp lệ hoặc trống.";
     public const string ProductImageFileInvalid = "File ảnh không hợp lệ hoặc trống.";
-    public const string ProductImageNotFoundLog = "[UploadProductImageAsync] Không tìm thấy sản phẩm {0} hoặc đã bị xóa.";
+
+    public const string ProductImageNotFoundLog =
+        "[UploadProductImageAsync] Không tìm thấy sản phẩm {0} hoặc đã bị xóa.";
+
     public const string ProductImageUrlErrorLog = "[UploadProductImageAsync] Không thể tạo URL cho file {0}";
     public const string ProductImageUrlError = "Không thể tạo URL ảnh.";
     public const string ProductImageUploadingLog = "[UploadProductImageAsync] Đang tải file: {0}";
-    public const string ProductImageUpdateSuccessLog = "[UploadProductImageAsync] Đã cập nhật ảnh cho sản phẩm {0}: {1}";
+
+    public const string ProductImageUpdateSuccessLog =
+        "[UploadProductImageAsync] Đã cập nhật ảnh cho sản phẩm {0}: {1}";
 
     #endregion
 }

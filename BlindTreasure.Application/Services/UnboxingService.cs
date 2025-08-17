@@ -125,10 +125,7 @@ public class UnboxingService : IUnboxingService
     {
         // Nếu request giữ nguyên mặc định paging => coi như không phân trang
         PaginationParameter? paging = null;
-        if (!(request.PageIndex == 1 && request.PageSize == 5 && request.Desc == true))
-        {
-            paging = request;
-        }
+        if (!(request.PageIndex == 1 && request.PageSize == 5 && request.Desc == true)) paging = request;
 
         var logs = await GetLogsForExportAsync(
             paging,
@@ -147,7 +144,7 @@ public class UnboxingService : IUnboxingService
             string[] columnHeaders =
                 { "CustomerName", "ProductName", "Rarity", "DropRate", "RollValue", "UnboxedAt", "BlindBoxName" };
 
-            for (int i = 0; i < columnHeaders.Length; i++)
+            for (var i = 0; i < columnHeaders.Length; i++)
             {
                 worksheet.Cells[1, i + 1].Value = columnHeaders[i];
                 worksheet.Cells[1, i + 1].Style.Font.Bold = true;
@@ -157,7 +154,7 @@ public class UnboxingService : IUnboxingService
                 worksheet.Cells[1, i + 1].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
             }
 
-            for (int i = 0; i < logs.Count; i++)
+            for (var i = 0; i < logs.Count; i++)
             {
                 var log = logs[i];
                 worksheet.Cells[i + 2, 1].Value = log.CustomerName;
@@ -207,14 +204,10 @@ public class UnboxingService : IUnboxingService
                 .FirstOrDefaultAsync(s => s.UserId == currentUserId);
 
             if (seller != null)
-            {
                 query = query.Where(x => _unitOfWork.Products.GetQueryable()
                     .Any(p => p.Id == x.ProductId && p.SellerId == seller.Id));
-            }
             else
-            {
                 return new List<UnboxLogDto>();
-            }
         }
 
         // Filter theo userId/productId nếu có
@@ -287,16 +280,12 @@ public class UnboxingService : IUnboxingService
                 .FirstOrDefaultAsync(s => s.UserId == currentUserId);
 
             if (seller != null)
-            {
                 // Lọc các BlindBoxUnboxLog theo SellerId thông qua ProductId
                 query = query.Where(x => _unitOfWork.Products.GetQueryable()
                     .Any(p => p.Id == x.ProductId && p.SellerId == seller.Id));
-            }
             else
-            {
                 // Nếu không tìm thấy Seller, trả về một query rỗng để không trả về dữ liệu nào
                 return new Pagination<UnboxLogDto>();
-            }
         }
 
         // Áp dụng filter theo userId
@@ -411,13 +400,9 @@ public class UnboxingService : IUnboxingService
 
             // Highlight selected item
             if (kvp.Key.Id == selectedItem.Id)
-            {
                 sb.AppendLine($"{cyan}- **{index}. Sản phẩm: {itemName} (ĐÃ CHỌN){reset}**");
-            }
             else
-            {
                 sb.AppendLine($"- {index}. Sản phẩm: {itemName}");
-            }
 
             sb.AppendLine($"  - Độ hiếm: {rarity}");
             sb.AppendLine($"  - Tỷ lệ Drop: {dropRate}%");

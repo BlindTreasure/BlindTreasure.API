@@ -47,7 +47,8 @@ public class ReviewService : IReviewService
         if (user == null || user.IsDeleted)
         {
             _loggerService.Error($"User not found or deleted: {userId}");
-            throw ErrorHelper.NotFound("Không tìm thấy thông tin tài khoản của bạn. Vui lòng thử lại hoặc liên hệ hỗ trợ.");
+            throw ErrorHelper.NotFound(
+                "Không tìm thấy thông tin tài khoản của bạn. Vui lòng thử lại hoặc liên hệ hỗ trợ.");
         }
 
         // 2. Get OrderDetail
@@ -65,7 +66,8 @@ public class ReviewService : IReviewService
         if (orderDetail?.Order == null)
         {
             _loggerService.Error($"OrderDetail not found or Order is null: {createDto.OrderDetailId}");
-            throw ErrorHelper.NotFound("Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn. Vui lòng kiểm tra lại thông tin.");
+            throw ErrorHelper.NotFound(
+                "Không tìm thấy chi tiết đơn hàng hoặc đơn hàng không thuộc về bạn. Vui lòng kiểm tra lại thông tin.");
         }
 
         // 3. Validate OrderDetail
@@ -174,7 +176,8 @@ public class ReviewService : IReviewService
                 .AnyAsync(b => b.Id == review.BlindBoxId && b.SellerId == seller.Id);
 
         if (!hasPermission)
-            throw ErrorHelper.Forbidden("Bạn không có quyền phản hồi đánh giá này. Vui lòng đảm bảo bạn là chủ sở hữu hợp lệ.");
+            throw ErrorHelper.Forbidden(
+                "Bạn không có quyền phản hồi đánh giá này. Vui lòng đảm bảo bạn là chủ sở hữu hợp lệ.");
 
         // Cập nhật phản hồi
         review.SellerResponse = replyContent.Trim();
@@ -311,7 +314,8 @@ public class ReviewService : IReviewService
 
         //Kiểm tra bài đánh giá có thuộc về tài khoản đang đăng nhập hay không
         if (review.UserId != userId)
-            throw ErrorHelper.BadRequest("Bạn không có quyền xóa bài đánh giá này vì nó không thuộc về tài khoản của bạn.");
+            throw ErrorHelper.BadRequest(
+                "Bạn không có quyền xóa bài đánh giá này vì nó không thuộc về tài khoản của bạn.");
 
         review.IsDeleted = true;
 
@@ -387,7 +391,8 @@ public class ReviewService : IReviewService
         if (param.ProductId.HasValue && param.BlindBoxId.HasValue)
         {
             _loggerService.Warn("Cannot filter by both ProductId and BlindBoxId simultaneously");
-            throw ErrorHelper.BadRequest("Không thể lọc đồng thời theo cả sản phẩm và hộp quà bí mật. Vui lòng chọn một trong hai.");
+            throw ErrorHelper.BadRequest(
+                "Không thể lọc đồng thời theo cả sản phẩm và hộp quà bí mật. Vui lòng chọn một trong hai.");
         }
 
         // Kiểm tra giá trị Rating hợp lệ
@@ -408,7 +413,8 @@ public class ReviewService : IReviewService
         {
             _loggerService.Warn(
                 $"MinRating ({param.MinRating.Value}) is greater than MaxRating ({param.MaxRating.Value})");
-            throw ErrorHelper.BadRequest("Giá trị đánh giá tối thiểu không thể lớn hơn giá trị đánh giá tối đa. Vui lòng kiểm tra lại.");
+            throw ErrorHelper.BadRequest(
+                "Giá trị đánh giá tối thiểu không thể lớn hơn giá trị đánh giá tối đa. Vui lòng kiểm tra lại.");
         }
 
         // Kiểm tra giá trị phân trang
@@ -519,7 +525,8 @@ public class ReviewService : IReviewService
         if (replyContent.Length > 1000)
         {
             _loggerService.Warn($"Reply content too long: {replyContent.Length} characters");
-            throw ErrorHelper.BadRequest("Nội dung phản hồi không được vượt quá 1000 ký tự. Vui lòng rút gọn nội dung.");
+            throw ErrorHelper.BadRequest(
+                "Nội dung phản hồi không được vượt quá 1000 ký tự. Vui lòng rút gọn nội dung.");
         }
     }
 
@@ -543,20 +550,23 @@ public class ReviewService : IReviewService
         if (user == null)
         {
             _loggerService.Error($"User with ID {userId} not found or deleted");
-            throw ErrorHelper.NotFound("Không tìm thấy thông tin người dùng của bạn. Vui lòng thử lại hoặc liên hệ hỗ trợ.");
+            throw ErrorHelper.NotFound(
+                "Không tìm thấy thông tin người dùng của bạn. Vui lòng thử lại hoặc liên hệ hỗ trợ.");
         }
 
         // Kiểm tra role thủ công
         if (user.RoleName != RoleType.Seller)
         {
             _loggerService.Error($"User with ID {userId} has role {user.RoleName}, not Seller");
-            throw ErrorHelper.Forbidden("Bạn không có quyền thực hiện hành động này. Chỉ người bán mới có thể phản hồi đánh giá.");
+            throw ErrorHelper.Forbidden(
+                "Bạn không có quyền thực hiện hành động này. Chỉ người bán mới có thể phản hồi đánh giá.");
         }
 
         if (user.Status != UserStatus.Active)
         {
             _loggerService.Warn($"User with ID {userId} has status {user.Status}");
-            throw ErrorHelper.Forbidden("Tài khoản của bạn hiện không ở trạng thái hoạt động. Vui lòng liên hệ hỗ trợ để biết thêm chi tiết.");
+            throw ErrorHelper.Forbidden(
+                "Tài khoản của bạn hiện không ở trạng thái hoạt động. Vui lòng liên hệ hỗ trợ để biết thêm chi tiết.");
         }
 
         _loggerService.Info($"Successfully validated user {userId} with Seller role");
@@ -571,7 +581,8 @@ public class ReviewService : IReviewService
         if (createDto == null)
         {
             _loggerService.Error("CreateReviewDto is null in ValidateCreateReviewInput");
-            throw ErrorHelper.BadRequest("Dữ liệu đánh giá không hợp lệ. Vui lòng kiểm tra lại thông tin bạn đã cung cấp.");
+            throw ErrorHelper.BadRequest(
+                "Dữ liệu đánh giá không hợp lệ. Vui lòng kiểm tra lại thông tin bạn đã cung cấp.");
         }
 
         // Validate OrderDetailId
@@ -599,7 +610,8 @@ public class ReviewService : IReviewService
         if (createDto.Comment.Trim().All(c => !char.IsLetterOrDigit(c)))
         {
             _loggerService.Warn($"Comment contains only special characters: {createDto.Comment}");
-            throw ErrorHelper.BadRequest("Nội dung đánh giá phải chứa ít nhất một chữ cái hoặc số. Vui lòng kiểm tra lại.");
+            throw ErrorHelper.BadRequest(
+                "Nội dung đánh giá phải chứa ít nhất một chữ cái hoặc số. Vui lòng kiểm tra lại.");
         }
 
         // THÊM: Kiểm tra từ ngữ không phù hợp (có thể dùng list từ cấm)
@@ -618,7 +630,8 @@ public class ReviewService : IReviewService
         if (createDto.Comment.Length > 2000)
         {
             _loggerService.Warn($"Comment too long: {createDto.Comment.Length} characters");
-            throw ErrorHelper.BadRequest("Nội dung đánh giá không được vượt quá 2000 ký tự. Vui lòng rút gọn nội dung.");
+            throw ErrorHelper.BadRequest(
+                "Nội dung đánh giá không được vượt quá 2000 ký tự. Vui lòng rút gọn nội dung.");
         }
 
         // THÊM: Kiểm tra encoding
@@ -634,7 +647,8 @@ public class ReviewService : IReviewService
             if (createDto.Images.Count > 5)
             {
                 _loggerService.Warn($"Too many images: {createDto.Images.Count} files");
-                throw ErrorHelper.BadRequest("Bạn chỉ được tải lên tối đa 5 hình ảnh cho một đánh giá. Vui lòng chọn lại số lượng hình ảnh.");
+                throw ErrorHelper.BadRequest(
+                    "Bạn chỉ được tải lên tối đa 5 hình ảnh cho một đánh giá. Vui lòng chọn lại số lượng hình ảnh.");
             }
 
             // THÊM: Kiểm tra tổng dung lượng tất cả file
@@ -643,7 +657,8 @@ public class ReviewService : IReviewService
             if (totalSize > maxTotalSize)
             {
                 _loggerService.Warn($"Total file size too large: {totalSize} bytes");
-                throw ErrorHelper.BadRequest("Tổng dung lượng tất cả hình ảnh không được vượt quá 100MB. Vui lòng giảm kích thước hoặc số lượng ảnh.");
+                throw ErrorHelper.BadRequest(
+                    "Tổng dung lượng tất cả hình ảnh không được vượt quá 100MB. Vui lòng giảm kích thước hoặc số lượng ảnh.");
             }
 
             // THÊM: Kiểm tra file trùng lặp
@@ -654,7 +669,8 @@ public class ReviewService : IReviewService
                 if (!fileHashes.Add(hash))
                 {
                     _loggerService.Warn($"Duplicate file detected: {file.FileName}");
-                    throw ErrorHelper.BadRequest("Không được tải lên các file hình ảnh giống nhau. Vui lòng chọn các hình ảnh khác nhau.");
+                    throw ErrorHelper.BadRequest(
+                        "Không được tải lên các file hình ảnh giống nhau. Vui lòng chọn các hình ảnh khác nhau.");
                 }
             }
 
@@ -664,13 +680,15 @@ public class ReviewService : IReviewService
                 if (imageFile == null)
                 {
                     _loggerService.Warn("Null image file in list");
-                    throw ErrorHelper.BadRequest("Danh sách hình ảnh chứa file không hợp lệ. Vui lòng kiểm tra lại các file đã chọn.");
+                    throw ErrorHelper.BadRequest(
+                        "Danh sách hình ảnh chứa file không hợp lệ. Vui lòng kiểm tra lại các file đã chọn.");
                 }
 
                 if (!IsValidMediaFile(imageFile))
                 {
                     _loggerService.Warn($"Invalid image file: {imageFile.FileName}");
-                    throw ErrorHelper.BadRequest($"File {imageFile.FileName} không hợp lệ. Vui lòng tải lên định dạng hình ảnh hoặc video được hỗ trợ.");
+                    throw ErrorHelper.BadRequest(
+                        $"File {imageFile.FileName} không hợp lệ. Vui lòng tải lên định dạng hình ảnh hoặc video được hỗ trợ.");
                 }
             }
         }
@@ -711,10 +729,12 @@ public class ReviewService : IReviewService
     {
         // THÊM: Kiểm tra orderDetail bị soft delete
         if (orderDetail == null || orderDetail.IsDeleted)
-            throw ErrorHelper.NotFound("Chi tiết đơn hàng không tồn tại hoặc đã bị xóa. Vui lòng kiểm tra lại đơn hàng của bạn.");
+            throw ErrorHelper.NotFound(
+                "Chi tiết đơn hàng không tồn tại hoặc đã bị xóa. Vui lòng kiểm tra lại đơn hàng của bạn.");
 
         if (orderDetail.Order == null)
-            throw ErrorHelper.NotFound("Không tìm thấy thông tin đơn hàng liên quan đến chi tiết này. Vui lòng thử lại sau.");
+            throw ErrorHelper.NotFound(
+                "Không tìm thấy thông tin đơn hàng liên quan đến chi tiết này. Vui lòng thử lại sau.");
 
         // THÊM: Kiểm tra Order bị soft delete
         if (orderDetail.Order.IsDeleted)
@@ -727,26 +747,31 @@ public class ReviewService : IReviewService
             throw ErrorHelper.BadRequest("Trạng thái đơn hàng không hợp lệ. Vui lòng liên hệ hỗ trợ.");
 
         if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
-            throw ErrorHelper.BadRequest("Bạn chỉ có thể đánh giá sau khi đơn hàng đã được giao thành công và thanh toán hoàn tất.");
+            throw ErrorHelper.BadRequest(
+                "Bạn chỉ có thể đánh giá sau khi đơn hàng đã được giao thành công và thanh toán hoàn tất.");
 
         // THÊM: Kiểm tra thời gian order (không được quá cũ)
         if (orderDetail.Order.CreatedAt < DateTime.UtcNow.AddMonths(-6))
-            throw ErrorHelper.BadRequest("Bạn không thể đánh giá đơn hàng đã hoàn thành quá 6 tháng. Thời gian đánh giá đã hết.");
+            throw ErrorHelper.BadRequest(
+                "Bạn không thể đánh giá đơn hàng đã hoàn thành quá 6 tháng. Thời gian đánh giá đã hết.");
 
         // THÊM: Kiểm tra cả Product và BlindBox đều null
         if (!orderDetail.ProductId.HasValue && !orderDetail.BlindBoxId.HasValue)
-            throw ErrorHelper.BadRequest("Chi tiết đơn hàng này không có sản phẩm hoặc hộp quà bí mật hợp lệ để đánh giá.");
+            throw ErrorHelper.BadRequest(
+                "Chi tiết đơn hàng này không có sản phẩm hoặc hộp quà bí mật hợp lệ để đánh giá.");
 
         // THÊM: Kiểm tra có cả Product và BlindBox (invalid case)
         if (orderDetail.ProductId.HasValue && orderDetail.BlindBoxId.HasValue)
-            throw ErrorHelper.BadRequest("Chi tiết đơn hàng không thể có cả sản phẩm và hộp quà bí mật cùng lúc. Vui lòng kiểm tra lại dữ liệu.");
+            throw ErrorHelper.BadRequest(
+                "Chi tiết đơn hàng không thể có cả sản phẩm và hộp quà bí mật cùng lúc. Vui lòng kiểm tra lại dữ liệu.");
 
         // THÊM: Kiểm tra Product/BlindBox có bị xóa không
         if (orderDetail.ProductId.HasValue && orderDetail.Product?.IsDeleted == true)
             throw ErrorHelper.BadRequest("Sản phẩm trong đơn hàng đã bị xóa. Bạn không thể đánh giá sản phẩm này.");
 
         if (orderDetail.BlindBoxId.HasValue && orderDetail.BlindBox?.IsDeleted == true)
-            throw ErrorHelper.BadRequest("Hộp quà bí mật trong đơn hàng đã bị xóa. Bạn không thể đánh giá hộp quà này.");
+            throw ErrorHelper.BadRequest(
+                "Hộp quà bí mật trong đơn hàng đã bị xóa. Bạn không thể đánh giá hộp quà này.");
 
         // Kiểm tra duplicate review
         var existingReview = await _unitOfWork.Reviews.GetQueryable()
@@ -758,7 +783,8 @@ public class ReviewService : IReviewService
             // THÊM: Thông tin chi tiết về review đã tồn tại
             _loggerService.Warn(
                 $"User {userId} already reviewed OrderDetail {orderDetailId} with Review {existingReview.Id}");
-            throw ErrorHelper.Conflict("Bạn đã gửi đánh giá cho sản phẩm/hộp quà này trong đơn hàng này rồi. Mỗi sản phẩm/hộp quà chỉ được đánh giá một lần.");
+            throw ErrorHelper.Conflict(
+                "Bạn đã gửi đánh giá cho sản phẩm/hộp quà này trong đơn hàng này rồi. Mỗi sản phẩm/hộp quà chỉ được đánh giá một lần.");
         }
 
         // THÊM: Kiểm tra user có bị ban không
@@ -767,7 +793,8 @@ public class ReviewService : IReviewService
             throw ErrorHelper.Forbidden("Tài khoản của bạn đã bị tạm khóa. Bạn không thể tạo đánh giá vào lúc này.");
 
         if (user?.Status != UserStatus.Active)
-            throw ErrorHelper.Forbidden("Tài khoản của bạn hiện không ở trạng thái hoạt động. Vui lòng liên hệ hỗ trợ để biết thêm chi tiết.");
+            throw ErrorHelper.Forbidden(
+                "Tài khoản của bạn hiện không ở trạng thái hoạt động. Vui lòng liên hệ hỗ trợ để biết thêm chi tiết.");
     }
 
     private bool IsValidMediaFile(IFormFile file)

@@ -36,6 +36,73 @@ public class ChatMessageService : IChatMessageService
         _blobService = blobService;
     }
 
+    public async Task ShareInventoryItemAsync(Guid senderId, Guid receiverId, Guid inventoryItemId,
+        string customMessage = "")
+    {
+        var receiver = await _unitOfWork.Users.GetByIdAsync(receiverId);
+        if (receiver == null || receiver.IsDeleted)
+            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
+
+        var inventoryItem = await _unitOfWork.InventoryItems.GetQueryable()
+            .Include(i => i.Product)
+            .FirstOrDefaultAsync(i => i.Id == inventoryItemId);
+
+        if (inventoryItem == null)
+            throw ErrorHelper.NotFound("Vật phẩm không tồn tại.");
+
+        if (inventoryItem.UserId != senderId)
+            throw ErrorHelper.Forbidden("Bạn không có quyền chia sẻ vật phẩm này.");
+
+        await SaveInventoryItemMessageAsync(senderId, receiverId, inventoryItemId, customMessage);
+
+        var sender = await _unitOfWork.Users.GetByIdAsync(senderId);
+
+        var itemDto = new InventoryItemDto
+        {
+            Id = inventoryItem.Id,
+            UserId = inventoryItem.UserId,
+            ProductId = inventoryItem.ProductId,
+            ProductName = inventoryItem.Product?.Name ?? "Không xác định",
+            Image = inventoryItem.Product?.ImageUrls?.FirstOrDefault() ?? "/assets/no-image.png",
+            Location = inventoryItem.Location,
+            Status = inventoryItem.Status,
+            CreatedAt = inventoryItem.CreatedAt,
+            IsFromBlindBox = inventoryItem.IsFromBlindBox,
+            SourceCustomerBlindBoxId = inventoryItem.SourceCustomerBlindBoxId,
+            Tier = inventoryItem.Tier,
+            IsOnHold = inventoryItem.HoldUntil.HasValue && inventoryItem.HoldUntil > DateTime.UtcNow,
+            HasActiveListing = inventoryItem.Listings != null &&
+                               inventoryItem.Listings.Any(l => !l.IsDeleted && l.Status == ListingStatus.Active)
+        };
+
+        var content = string.IsNullOrEmpty(customMessage)
+            ? $"[Chia sẻ vật phẩm: {inventoryItem.Product?.Name ?? "Không xác định"}]"
+            : customMessage;
+
+        var messageData = new
+        {
+            id = Guid.NewGuid().ToString(),
+            senderId = senderId.ToString(),
+            receiverId = receiverId.ToString(),
+            senderName = sender?.FullName ?? "Unknown",
+            senderAvatar = sender?.AvatarUrl ?? "",
+            content,
+            inventoryItemId = inventoryItem.Id,
+            inventoryItem = itemDto,
+            messageType = nameof(ChatMessageType.InventoryItemMessage),
+            timestamp = DateTime.UtcNow,
+            isRead = false
+        };
+
+        // Gửi qua SignalR
+        await _hubContext.Clients.Users([senderId.ToString(), receiverId.ToString()])
+            .SendAsync("ReceiveInventoryItemMessage", messageData);
+
+        var unreadCount = await GetUnreadMessageCountAsync(receiverId);
+        await _hubContext.Clients.User(receiverId.ToString()).SendAsync("UnreadCountUpdated", unreadCount);
+    }
+
+
     public async Task SaveImageMessageAsync(Guid senderId, Guid receiverId,
         string imageUrl, string fileName, string fileSize, string mimeType)
     {
@@ -246,10 +313,7 @@ public class ChatMessageService : IChatMessageService
     public async Task<bool> IsUserOnline(string userId)
     {
         // Kiểm tra cả trong memory và cache Redis
-        if (_onlineUsers.ContainsKey(userId))
-        {
-            return true;
-        }
+        if (_onlineUsers.ContainsKey(userId)) return true;
 
         return await _cacheService.ExistsAsync($"user_online:{userId}");
     }
@@ -410,9 +474,7 @@ public class ChatMessageService : IChatMessageService
         {
             // ✅ CẬP NHẬT LẠI TRẠNG THÁI ONLINE NGAY CẢ KHI CÓ CACHE
             foreach (var conversation in cachedResult.ToList())
-            {
                 conversation.IsOnline = await IsUserOnline(conversation.OtherUserId.ToString());
-            }
 
             _logger.Info($"[GetConversationsAsync] Cache hit for conversations with key: {cacheKey}");
             return cachedResult;

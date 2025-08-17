@@ -281,10 +281,7 @@ public class TradingService : ITradingService
                 t => t.Requester!); // Người gửi yêu cầu trade
 
             // BƯỚC 3: VALIDATE TRADE REQUEST TỒN TẠI
-            if (tradeRequest == null)
-            {
-                throw ErrorHelper.NotFound("Yêu cầu trao đổi không tồn tại hoặc đã bị hủy.");
-            }
+            if (tradeRequest == null) throw ErrorHelper.NotFound("Yêu cầu trao đổi không tồn tại hoặc đã bị hủy.");
 
             _logger.Info($"[LockDealAsync] Tìm thấy trade request {tradeRequestId}, status: {tradeRequest.Status}");
 
@@ -464,9 +461,7 @@ public class TradingService : ITradingService
         {
             _logger.Info($"[CreateTradeHistoryAsync] Found {tradeRequest.OfferedItems.Count} offered items:");
             foreach (var item in tradeRequest.OfferedItems)
-            {
                 _logger.Info($"[CreateTradeHistoryAsync] - Offered item: {item.InventoryItemId}");
-            }
         }
         else
         {
@@ -1211,14 +1206,14 @@ public class TradingService : ITradingService
             ListingItemImage = tradeHistory.Listing?.InventoryItem?.Product?.ImageUrls?.FirstOrDefault() ?? "",
             RequesterId = tradeHistory.RequesterId,
             RequesterName = tradeHistory.Requester.FullName ?? tradeHistory.Requester?.FullName ?? "Unknown",
-        
+
             // Giữ nguyên offered item logic
             OfferedInventoryId = tradeHistory.OfferedInventoryId,
             OfferedItemName = tradeHistory.OfferedInventory?.Product?.Name ?? "No Item",
             OfferedItemImage = tradeHistory.OfferedInventory?.Product?.ImageUrls?.FirstOrDefault() ?? "",
-        
+
             ListingInventoryItemId = tradeHistory.Listing?.InventoryItem?.Id,
-        
+
             FinalStatus = tradeHistory.FinalStatus,
             CompletedAt = tradeHistory.CompletedAt,
             CreatedAt = tradeHistory.CreatedAt
@@ -1226,5 +1221,6 @@ public class TradingService : ITradingService
 
         return dto;
     }
+
     #endregion
 }

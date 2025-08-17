@@ -164,7 +164,8 @@ public class CustomerFavouriteService : ICustomerFavouriteService
                     Status = cf.Product.Status,
                     ProductType = cf.Product.ProductType,
                     TotalStockQuantity = cf.Product.TotalStockQuantity,
-                    ProductStockStatus = cf.Product.TotalStockQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock
+                    ProductStockStatus =
+                        cf.Product.TotalStockQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock
                 }
                 : null,
             BlindBox = cf.BlindBox != null

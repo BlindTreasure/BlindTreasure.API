@@ -298,15 +298,11 @@ public class ListingService : IListingService
         {
             var currentUserId = _claimsService.CurrentUserId;
             if (param.IsOwnerListings.Value)
-            {
                 // Lấy listings của user hiện tại
                 query = query.Where(l => l.InventoryItem.UserId == currentUserId);
-            }
             else
-            {
                 // Loại trừ listings của user hiện tại
                 query = query.Where(l => l.InventoryItem.UserId != currentUserId);
-            }
         }
 
         // Filter theo userId cụ thể

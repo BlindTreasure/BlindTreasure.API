@@ -6,53 +6,45 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Application.Mappers
+namespace BlindTreasure.Application.Mappers;
+
+public static class PromotionDtoMapper
 {
-    public static class PromotionDtoMapper
+    public static PromotionDto ToPromotionDto(Promotion promotion)
     {
-        public static PromotionDto ToPromotionDto(Promotion promotion)
+        if (promotion == null) return null;
+        return new PromotionDto
         {
-            if (promotion == null) return null;
-            return new PromotionDto
-            {
-                Id = promotion.Id,
-                Code = promotion.Code,
-                Description = promotion.Description,
-                DiscountType = promotion.DiscountType,
-                DiscountValue = promotion.DiscountValue,
-                StartDate = promotion.StartDate,
-                EndDate = promotion.EndDate,
-                UsageLimit = promotion.UsageLimit,
-                Status = promotion.Status,
-                SellerId = promotion.SellerId,
-                RejectReason = promotion.RejectReason,
-                CreatedByRole = promotion.CreatedByRole,
-                UpdatedAt = promotion.UpdatedAt,
-                IsDeleted = promotion.IsDeleted,
-            };
+            Id = promotion.Id,
+            Code = promotion.Code,
+            Description = promotion.Description,
+            DiscountType = promotion.DiscountType,
+            DiscountValue = promotion.DiscountValue,
+            StartDate = promotion.StartDate,
+            EndDate = promotion.EndDate,
+            UsageLimit = promotion.UsageLimit,
+            Status = promotion.Status,
+            SellerId = promotion.SellerId,
+            RejectReason = promotion.RejectReason,
+            CreatedByRole = promotion.CreatedByRole,
+            UpdatedAt = promotion.UpdatedAt,
+            IsDeleted = promotion.IsDeleted
+        };
+    }
 
-        }
-
-        public static PromotionUserUsageDto ToPromotionUsageDto(PromotionUserUsage promotionUserUsage)
+    public static PromotionUserUsageDto ToPromotionUsageDto(PromotionUserUsage promotionUserUsage)
+    {
+        if (promotionUserUsage == null) return null;
+        return new PromotionUserUsageDto
         {
-            if (promotionUserUsage == null) return null;
-            return new PromotionUserUsageDto
-            {
-                Id = promotionUserUsage.Id,
-                PromotionId = promotionUserUsage.PromotionId,
-                UserId = promotionUserUsage.UserId,
-                User = promotionUserUsage.User != null ? UserMapper.ToUserDto(promotionUserUsage.User) : null,
-                UsageCount = promotionUserUsage.UsageCount,
-                LastUsedAt = promotionUserUsage.LastUsedAt,
-                IsMaxUsageReached = promotionUserUsage.IsMaxUsageReached,
-                Promotion = promotionUserUsage.Promotion != null ? ToPromotionDto(promotionUserUsage.Promotion) : null,
-            };
-        }
-
-
-
-
-
-
+            Id = promotionUserUsage.Id,
+            PromotionId = promotionUserUsage.PromotionId,
+            UserId = promotionUserUsage.UserId,
+            User = promotionUserUsage.User != null ? UserMapper.ToUserDto(promotionUserUsage.User) : null,
+            UsageCount = promotionUserUsage.UsageCount,
+            LastUsedAt = promotionUserUsage.LastUsedAt,
+            IsMaxUsageReached = promotionUserUsage.IsMaxUsageReached,
+            Promotion = promotionUserUsage.Promotion != null ? ToPromotionDto(promotionUserUsage.Promotion) : null
+        };
     }
 }

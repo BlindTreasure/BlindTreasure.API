@@ -174,8 +174,8 @@ public class PromotionService : IPromotionService
         promotion.UsageLimit = dto.UsageLimit;
         promotion.UpdatedAt = DateTime.UtcNow;
         promotion.CreatedByRole = user.RoleName;
-        
-        if(promotion.MaxUsagePerUser != dto.MaxUsagePerUser)
+
+        if (promotion.MaxUsagePerUser != dto.MaxUsagePerUser)
             promotion.MaxUsagePerUser = dto.MaxUsagePerUser;
 
         await _unitOfWork.Promotions.Update(promotion);
@@ -633,7 +633,7 @@ public class PromotionService : IPromotionService
             .Where(u => u.PromotionId == promotionId && u.UserId == userId).Include(u => u.Promotion)
             .FirstOrDefaultAsync();
 
-        if(usage == null)
+        if (usage == null)
             throw ErrorHelper.NotFound("Không tìm thấy thông tin sử dụng voucher của người dùng.");
 
         var dto = PromotionDtoMapper.ToPromotionUsageDto(usage);

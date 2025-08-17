@@ -43,7 +43,8 @@ public class ShipmentService : IShipmentService
             .FirstOrDefaultAsync(s => s.Id == shipmentId && !s.IsDeleted);
 
         if (shipment == null)
-            throw ErrorHelper.NotFound("Rất tiếc, không tìm thấy thông tin vận chuyển bạn đang tìm kiếm hoặc đã bị xóa. Vui lòng kiểm tra lại ID.");
+            throw ErrorHelper.NotFound(
+                "Rất tiếc, không tìm thấy thông tin vận chuyển bạn đang tìm kiếm hoặc đã bị xóa. Vui lòng kiểm tra lại ID.");
 
         //// Chỉ cho phép user là chủ đơn hàng xem shipment
         //var userId = _claimsService.CurrentUserId;
@@ -83,6 +84,4 @@ public class ShipmentService : IShipmentService
 
         return shipments.Select(ShipmentDtoMapper.ToShipmentDtoWithFullIncluded).ToList();
     }
-
-
 }

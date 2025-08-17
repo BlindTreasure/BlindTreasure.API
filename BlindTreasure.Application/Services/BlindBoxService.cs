@@ -806,10 +806,7 @@ public class BlindBoxService : IBlindBoxService
         var user = await _userService.GetUserById(userId);
 
         // Kiểm tra nếu user là Seller và áp dụng filter theo SellerId
-        if (user != null && user.RoleName == RoleType.Seller)
-        {
-            query = query.Where(b => b.Seller!.UserId == userId);
-        }
+        if (user != null && user.RoleName == RoleType.Seller) query = query.Where(b => b.Seller!.UserId == userId);
 
         var keyword = param.Search?.Trim().ToLower();
         if (!string.IsNullOrEmpty(keyword))

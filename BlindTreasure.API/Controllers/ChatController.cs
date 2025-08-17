@@ -20,25 +20,14 @@ public class ChatController : ControllerBase
 {
     private readonly IChatMessageService _chatMessageService;
     private readonly IClaimsService _claimsService;
-    private readonly IBlobService _blobService;
-    private readonly IUserService _userService;
-    private readonly IHubContext<ChatHub> _hubContext;
-    private readonly IUnitOfWork _unitOfWork;
 
     public ChatController(
         IChatMessageService chatMessageService,
-        IClaimsService claimsService,
-        IBlobService blobService,
-        IUserService userService,
-        IHubContext<ChatHub> hubContext,
-        IUnitOfWork unitOfWork)
+        IClaimsService claimsService)
+
     {
         _chatMessageService = chatMessageService;
         _claimsService = claimsService;
-        _blobService = blobService;
-        _userService = userService;
-        _hubContext = hubContext;
-        _unitOfWork = unitOfWork;
     }
 
     /// <summary>
@@ -205,80 +194,14 @@ public class ChatController : ControllerBase
     /// <param name="customMessage">Tin nhắn tùy chỉnh</param>
     /// <returns>ApiResult</returns>
     [HttpPost("share-inventory-item")]
-    [ProducesResponseType(typeof(ApiResult), 200)]
-    [ProducesResponseType(typeof(ApiResult), 400)]
     public async Task<IActionResult> ShareInventoryItem([FromForm] Guid receiverId,
         [FromForm] Guid inventoryItemId, [FromForm] string customMessage = "")
     {
         try
         {
             var senderId = _claimsService.CurrentUserId;
-
-            // Kiểm tra receiver có tồn tại không
-            var receiver = await _userService.GetUserById(receiverId);
-            if (receiver == null || receiver.IsDeleted)
-                return NotFound(ApiResult.Failure("404", "Người nhận không tồn tại."));
-
-            // Kiểm tra InventoryItem có tồn tại và thuộc về sender không
-            var inventoryItem = await _unitOfWork.InventoryItems
-                .GetQueryable()
-                .Include(i => i.Product)
-                .FirstOrDefaultAsync(i => i.Id == inventoryItemId);
-
-            if (inventoryItem == null)
-                return NotFound(ApiResult.Failure("404", "Vật phẩm không tồn tại."));
-
-            if (inventoryItem.UserId != senderId)
-                return Forbid(ApiResult.Failure("403", "Bạn không có quyền chia sẻ vật phẩm này.").ToString());
-
-            // Lưu tin nhắn chia sẻ InventoryItem
-            await _chatMessageService.SaveInventoryItemMessageAsync(senderId, receiverId, inventoryItemId,
-                customMessage);
-
-            // Lấy thông tin người gửi
-            var sender = await _userService.GetUserById(senderId);
-
-            // Chuẩn bị dữ liệu InventoryItem để gửi cho client
-            var itemDto = new
-            {
-                id = inventoryItem.Id,
-                productName = inventoryItem.Product?.Name ?? "Không xác định",
-                productImage = inventoryItem.Product?.ImageUrls.FirstOrDefault(),
-                tier = inventoryItem.Tier?.ToString() ?? "Không xác định",
-                status = inventoryItem.Status.ToString(),
-                location = inventoryItem.Location
-            };
-
-            // Nội dung hiển thị
-            var content = string.IsNullOrEmpty(customMessage)
-                ? $"[Chia sẻ vật phẩm: {inventoryItem.Product?.Name ?? "Không xác định"}]"
-                : customMessage;
-
-            // Tạo message object để gửi qua SignalR
-            var messageData = new
-            {
-                id = Guid.NewGuid().ToString(),
-                senderId = senderId.ToString(),
-                receiverId = receiverId.ToString(),
-                senderName = sender?.FullName ?? "Unknown",
-                senderAvatar = sender?.AvatarUrl ?? "",
-                content,
-                inventoryItemId = inventoryItem.Id,
-                inventoryItem = itemDto,
-                messageType = ChatMessageType.InventoryItemMessage.ToString(),
-                timestamp = DateTime.UtcNow,
-                isRead = false
-            };
-
-            // Gửi qua SignalR cho cả sender và receiver
-            await _hubContext.Clients.Users(new[] { senderId.ToString(), receiverId.ToString() })
-                .SendAsync("ReceiveInventoryItemMessage", messageData);
-
-            // Cập nhật số tin chưa đọc cho receiver
-            var unreadCount = await _chatMessageService.GetUnreadMessageCountAsync(receiverId);
-            await _hubContext.Clients.User(receiverId.ToString()).SendAsync("UnreadCountUpdated", unreadCount);
-
-            return Ok(ApiResult.Success("200", "Chia sẻ vật phẩm thành công."));
+            await _chatMessageService.ShareInventoryItemAsync(senderId, receiverId, inventoryItemId, customMessage);
+            return Ok(ApiResult.Success("200", "Chia sẻ thông tin vật phẩm thành công."));
         }
         catch (Exception ex)
         {
@@ -287,6 +210,7 @@ public class ChatController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
+
 
     /// <summary>
     /// Đánh dấu tất cả tin nhắn từ người gửi là đã đọc
