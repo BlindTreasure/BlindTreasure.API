@@ -163,8 +163,8 @@ public class CustomerFavouriteService : ICustomerFavouriteService
                     SellerId = cf.Product.SellerId,
                     Status = cf.Product.Status,
                     ProductType = cf.Product.ProductType,
-                    Stock = cf.Product.Stock,
-                    ProductStockStatus = cf.Product.Stock > 0 ? StockStatus.InStock : StockStatus.OutOfStock
+                    TotalStockQuantity = cf.Product.TotalStockQuantity,
+                    ProductStockStatus = cf.Product.TotalStockQuantity > 0 ? StockStatus.InStock : StockStatus.OutOfStock
                 }
                 : null,
             BlindBox = cf.BlindBox != null

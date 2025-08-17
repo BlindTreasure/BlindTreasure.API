@@ -84,6 +84,7 @@ public class BlindBoxService : IBlindBoxService
             var dto = await MapBlindBoxToDtoAsync(b);
             dtos.Add(dto);
         }
+
         var result = new Pagination<BlindBoxDetailDto>(dtos, count, param.PageIndex, param.PageSize);
         return result;
     }
@@ -310,7 +311,7 @@ public class BlindBoxService : IBlindBoxService
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
                 throw ErrorHelper.BadRequest($"Sản phẩm tại vị trí {i + 1} không hợp lệ.");
-            if (item.Quantity > product.Stock)
+            if (item.Quantity > product.TotalStockQuantity)
                 throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho.");
 
             var dropRate = dropRates[item];
@@ -411,13 +412,16 @@ public class BlindBoxService : IBlindBoxService
             if (product == null)
                 throw ErrorHelper.BadRequest("Không tìm thấy sản phẩm cho item trong BlindBox.");
 
-            if (item.Quantity > product.Stock)
-                throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho để submit BlindBox.");
+            // Kiểm tra AvailableToSell thay vì Stock
+            if (item.Quantity > product.AvailableToSell)
+                throw ErrorHelper.BadRequest(
+                    $"Sản phẩm '{product.Name}' không đủ tồn kho khả dụng để submit BlindBox.");
 
-            product.Stock -= item.Quantity;
+            // Reserve stock thay vì trừ TotalStockQuantity
+            product.ReservedInBlindBox += item.Quantity;
 
-            // Cập nhật status của product nếu stock = 0
-            if (product.Stock == 0 && product.Status != ProductStatus.InActive)
+            // Cập nhật status dựa trên AvailableToSell
+            if (product.AvailableToSell == 0 && product.Status != ProductStatus.InActive)
                 product.Status = ProductStatus.OutOfStock;
         }
 
@@ -491,7 +495,7 @@ public class BlindBoxService : IBlindBoxService
 
             await _unitOfWork.BlindBoxes.Update(blindBox);
 
-            // --- Hoàn lại stock cho từng item ---
+            // --- Release reserved stock cho từng item ---
             var productIds = blindBox.BlindBoxItems.Select(i => i.ProductId).Distinct().ToList();
             var products = await _unitOfWork.Products.GetAllAsync(p =>
                 productIds.Contains(p.Id) && !p.IsDeleted && p.SellerId == blindBox.Seller.Id);
@@ -500,7 +504,14 @@ public class BlindBoxService : IBlindBoxService
             {
                 var product = products.FirstOrDefault(p => p.Id == item.ProductId);
                 if (product != null)
-                    product.Stock += item.Quantity;
+                {
+                    // Release reserved stock thay vì cộng vào TotalStockQuantity
+                    product.ReservedInBlindBox -= item.Quantity;
+
+                    // Cập nhật status nếu sản phẩm từ OutOfStock trở thành Available
+                    if (product.AvailableToSell > 0 && product.Status == ProductStatus.OutOfStock)
+                        product.Status = ProductStatus.Active;
+                }
             }
 
             await _unitOfWork.Products.UpdateRange(products);
@@ -530,7 +541,6 @@ public class BlindBoxService : IBlindBoxService
             }
         );
 
-
         return await GetBlindBoxByIdAsync(blindBox.Id);
     }
 
@@ -552,12 +562,12 @@ public class BlindBoxService : IBlindBoxService
         if (seller == null)
             throw ErrorHelper.Forbidden(ErrorMessages.BlindBoxNoDeleteItemPermission);
 
-        if (blindBox.BlindBoxItems != null && !blindBox.BlindBoxItems.Any())
+        if (blindBox.BlindBoxItems == null || !blindBox.BlindBoxItems.Any())
             return await GetBlindBoxByIdAsync(blindBoxId);
 
         var items = blindBox.BlindBoxItems.ToList();
 
-        // Hoàn lại stock
+        // Release reserved stock
         var productIds = items.Select(i => i.ProductId).Distinct().ToList();
         var products = await _unitOfWork.Products.GetAllAsync(p =>
             productIds.Contains(p.Id) && !p.IsDeleted && p.SellerId == seller.Id);
@@ -566,7 +576,14 @@ public class BlindBoxService : IBlindBoxService
         {
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product != null)
-                product.Stock += item.Quantity;
+            {
+                // Release reserved stock thay vì cộng vào TotalStockQuantity
+                product.ReservedInBlindBox -= item.Quantity;
+
+                // Cập nhật status nếu sản phẩm từ OutOfStock trở thành Available
+                if (product.AvailableToSell > 0 && product.Status == ProductStatus.OutOfStock)
+                    product.Status = ProductStatus.Active;
+            }
         }
 
         await _unitOfWork.Products.UpdateRange(products);
@@ -608,7 +625,7 @@ public class BlindBoxService : IBlindBoxService
         {
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product != null)
-                product.Stock += item.Quantity;
+                product.TotalStockQuantity += item.Quantity;
         }
 
         await _unitOfWork.Products.UpdateRange(products);

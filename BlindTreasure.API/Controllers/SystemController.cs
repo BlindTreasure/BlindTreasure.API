@@ -369,7 +369,7 @@ public class SystemController : ControllerBase
 
             // Lấy 1 product ngẫu nhiên
             var randomProduct = await _context.Products
-                .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 &&
+                .Where(p => p.Status == ProductStatus.Active && p.TotalStockQuantity > 0 &&
                             p.ProductType == ProductSaleType.DirectSale && !p.IsDeleted)
                 .OrderBy(p => Guid.NewGuid())
                 .FirstOrDefaultAsync();
@@ -483,7 +483,7 @@ public class SystemController : ControllerBase
 
             // Get 3 random products that can be reviewed (active, in stock)
             var products = await _context.Products
-                .Where(p => p.Status == ProductStatus.Active && p.Stock > 0 && !p.IsDeleted)
+                .Where(p => p.Status == ProductStatus.Active && p.TotalStockQuantity > 0 && !p.IsDeleted)
                 .Include(p => p.Seller) // Include seller để lấy thông tin
                 .OrderBy(p => Guid.NewGuid())
                 .Take(3)
@@ -618,7 +618,7 @@ public class SystemController : ControllerBase
                     inventoryItems.Add(inventoryItem);
 
                     // Giảm stock của product
-                    product.Stock -= 1;
+                    product.TotalStockQuantity -= 1;
                 }
             }
 
@@ -1349,7 +1349,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 350000,
-                            Stock = 50,
+                            TotalStockQuantity = 50,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1369,7 +1369,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 450000,
-                            Stock = 30,
+                            TotalStockQuantity = 30,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1389,7 +1389,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 200000,
-                            Stock = 70,
+                            TotalStockQuantity = 70,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1409,7 +1409,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 200000,
-                            Stock = 70,
+                            TotalStockQuantity = 70,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1434,7 +1434,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 3000000,
-                            Stock = 70,
+                            TotalStockQuantity = 70,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1466,7 +1466,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 990000,
-                            Stock = 40,
+                            TotalStockQuantity = 40,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1487,7 +1487,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 550000,
-                            Stock = 25,
+                            TotalStockQuantity = 25,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1509,7 +1509,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 1190000,
-                            Stock = 10,
+                            TotalStockQuantity = 10,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1529,7 +1529,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = seller.Id,
                             Price = 750000,
-                            Stock = 70,
+                            TotalStockQuantity = 70,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1578,7 +1578,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = smiskiSeller.Id,
                             Price = 299000,
-                            Stock = 40,
+                            TotalStockQuantity = 40,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1599,7 +1599,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = smiskiSeller.Id,
                             Price = 255000,
-                            Stock = 25,
+                            TotalStockQuantity = 25,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1620,7 +1620,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = smiskiSeller.Id,
                             Price = 319000,
-                            Stock = 10,
+                            TotalStockQuantity = 10,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1641,7 +1641,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = smiskiSeller.Id,
                             Price = 275000,
-                            Stock = 70,
+                            TotalStockQuantity = 70,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1662,7 +1662,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = smiskiSeller.Id,
                             Price = 319000,
-                            Stock = 10,
+                            TotalStockQuantity = 10,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1683,7 +1683,7 @@ public class SystemController : ControllerBase
                             CategoryId = category.Id,
                             SellerId = smiskiSeller.Id,
                             Price = 275000,
-                            Stock = 70,
+                            TotalStockQuantity = 70,
                             Status = ProductStatus.Active,
                             CreatedAt = now,
                             ImageUrls = new List<string>
@@ -1751,7 +1751,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 320000,
-                    Stock = 40,
+                    TotalStockQuantity = 40,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -1771,7 +1771,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 320000,
-                    Stock = 40,
+                    TotalStockQuantity = 40,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -1791,7 +1791,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 320000,
-                    Stock = 40,
+                    TotalStockQuantity = 40,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -1811,7 +1811,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 320000,
-                    Stock = 40,
+                    TotalStockQuantity = 40,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -1831,7 +1831,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 320000,
-                    Stock = 40,
+                    TotalStockQuantity = 40,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -1851,7 +1851,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 320000,
-                    Stock = 40,
+                    TotalStockQuantity = 40,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -2007,7 +2007,7 @@ public class SystemController : ControllerBase
                     "Luôn ẩn mình trong một góc nhỏ, SMISKI lặng lẽ ôm lấy đầu gối, đôi mắt mơ màng nhìn xa xăm, chìm đắm trong những suy tư miên man. Hình ảnh này gợi lên một cảm giác yên bình, một chút cô đơn nhưng đầy chất thơ, như một người bạn nhỏ đang cùng bạn chia sẻ những khoảnh khắc tĩnh lặng của tâm hồn.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
-                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                Price = 280000, TotalStockQuantity = 50, Status = ProductStatus.Active, CreatedAt = now,
                 ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_01.png" },
                 Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
             },
@@ -2019,7 +2019,7 @@ public class SystemController : ControllerBase
                     "Bạn sẽ thường bắt gặp SMISKI này ngồi một mình trong im lặng, ánh mắt tập trung nhìn xuống một vật gì đó vô định. Với tính cách có phần cảnh giác và hướng nội, nó yêu thích không gian riêng tư, nơi nó có thể chìm vào thế giới của riêng mình mà không bị làm phiền. Một hình ảnh đầy bí ẩn và cuốn hút, dành cho những ai trân trọng khoảnh khắc được ở một mình.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
-                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                Price = 280000, TotalStockQuantity = 50, Status = ProductStatus.Active, CreatedAt = now,
                 ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_02.png" },
                 Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
             },
@@ -2031,7 +2031,7 @@ public class SystemController : ControllerBase
                     "Đây là một SMISKI nhút nhát và dễ giật mình. Mỗi khi bạn vô tình phát hiện ra, nó sẽ lập tức quay lại, đôi mắt mở to nhìn bạn đầy ngạc nhiên và có chút bối rối. Khoảnh khắc đáng yêu này sẽ khiến bạn bất giác mỉm cười, như vừa khám phá ra một bí mật nhỏ bé và ngộ nghĩnh trong căn phòng của mình.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
-                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                Price = 280000, TotalStockQuantity = 50, Status = ProductStatus.Active, CreatedAt = now,
                 ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_03.png" },
                 Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
             },
@@ -2043,7 +2043,7 @@ public class SystemController : ControllerBase
                     "Gặp gỡ SMISKI lười biếng nhất hội! Nó chỉ thích nằm dài thư giãn ở bất cứ đâu, từ trên bàn làm việc cho đến kệ sách. Với nó, không có gì tuyệt vời hơn là được nghỉ ngơi và chẳng phải làm gì cả. Mọi hoạt động liên quan đến di chuyển hay vận động đều nằm ngoài từ điển của SMISKI này. Hãy để nó mang lại cho bạn một lời nhắc nhở nhẹ nhàng về việc tận hưởng những phút giây không làm gì.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
-                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                Price = 280000, TotalStockQuantity = 50, Status = ProductStatus.Active, CreatedAt = now,
                 ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_04.png" },
                 Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
             },
@@ -2055,7 +2055,7 @@ public class SystemController : ControllerBase
                     "Trốn tìm chính là biệt tài của SMISKI này. Nó là một bậc thầy trong việc tìm kiếm những nơi ẩn náu độc đáo, từ kẽ hở nhỏ nhất cho đến phía sau một chậu cây. Nó cảm thấy an toàn và thoải mái nhất khi được cuộn mình trong những không gian nhỏ hẹp. Sở hữu SMISKI này, bạn sẽ có một trò chơi trốn tìm nho nhỏ mỗi ngày trong chính căn phòng của mình.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
-                Price = 280000, Stock = 50, Status = ProductStatus.Active, CreatedAt = now,
+                Price = 280000, TotalStockQuantity = 50, Status = ProductStatus.Active, CreatedAt = now,
                 ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_05.png" },
                 Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
             },
@@ -2067,7 +2067,7 @@ public class SystemController : ControllerBase
                     "Luôn trong tư thế khom người, SMISKI này rụt rè hé nhìn mọi thứ từ một góc an toàn. Nó có vẻ tò mò về thế giới xung quanh nhưng lại cần rất nhiều can đảm để thực sự tiến lại gần. Một hình ảnh vừa ngộ nghĩnh vừa đáng yêu, thể hiện sự tò mò nhưng đầy e dè, như một đứa trẻ đang khám phá thế giới rộng lớn.",
                 CategoryId = smiskiCategory.Id,
                 SellerId = seller.Id,
-                Price = 500000, Stock = 20, Status = ProductStatus.Active, CreatedAt = now,
+                Price = 500000, TotalStockQuantity = 20, Status = ProductStatus.Active, CreatedAt = now,
                 ImageUrls = new List<string> { "https://smiski.com/wp-content/uploads/2016/03/s1_06.png" },
                 Brand = seller.CompanyName, Material = "PVC", ProductType = ProductSaleType.BlindBoxOnly, Height = 10
             }
@@ -2219,7 +2219,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 450000,
-                    Stock = 20,
+                    TotalStockQuantity = 20,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -2239,7 +2239,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 450000,
-                    Stock = 20,
+                    TotalStockQuantity = 20,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -2259,7 +2259,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 450000,
-                    Stock = 20,
+                    TotalStockQuantity = 20,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -2279,7 +2279,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 450000,
-                    Stock = 20,
+                    TotalStockQuantity = 20,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -2299,7 +2299,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 450000,
-                    Stock = 20,
+                    TotalStockQuantity = 20,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>
@@ -2319,7 +2319,7 @@ public class SystemController : ControllerBase
                     CategoryId = category.Id,
                     SellerId = seller.Id,
                     Price = 900000,
-                    Stock = 10,
+                    TotalStockQuantity = 10,
                     Status = ProductStatus.Active,
                     CreatedAt = now,
                     ImageUrls = new List<string>

@@ -136,7 +136,7 @@ public class ProductService : IProductService
 
         // Xác định status dựa trên stock
         var status = dto.Status;
-        if (dto.Stock == 0 && dto.Status != ProductStatus.InActive)
+        if (dto.TotalStockQuantity == 0 && dto.Status != ProductStatus.InActive)
             status = ProductStatus.OutOfStock;
 
         var product = new Product
@@ -145,7 +145,8 @@ public class ProductService : IProductService
             Description = dto.Description.Trim(),
             CategoryId = dto.CategoryId,
             Price = dto.Price,
-            Stock = dto.Stock,
+            TotalStockQuantity = dto.TotalStockQuantity, // NEW
+            ReservedInBlindBox = 0, // NEW - mặc định = 0
             Height = dto.Height,
             Material = dto.Material,
             ProductType = dto.ProductType ?? ProductSaleType.DirectSale,
@@ -158,6 +159,12 @@ public class ProductService : IProductService
             IsDeleted = false,
             Status = status
         };
+
+        // Cập nhật logic xác định status
+        if (product.AvailableToSell == 0 && dto.Status != ProductStatus.InActive)
+            status = ProductStatus.OutOfStock;
+
+        product.Status = status;
 
         var result = await _unitOfWork.Products.AddAsync(product);
         await _unitOfWork.SaveChangesAsync();
@@ -207,14 +214,25 @@ public class ProductService : IProductService
             product.CategoryId = dto.CategoryId.Value;
         if (dto.Price.HasValue)
             product.Price = dto.Price.Value;
-        if (dto.Stock.HasValue)
+        if (dto.TotalStockQuantity.HasValue)
         {
-            product.Stock = dto.Stock.Value;
+            product.TotalStockQuantity = dto.TotalStockQuantity.Value;
             // Tự động cập nhật status khi stock = 0
-            if (dto.Stock.Value == 0 && product.Status != ProductStatus.InActive)
+            if (dto.TotalStockQuantity.Value == 0 && product.Status != ProductStatus.InActive)
                 product.Status = ProductStatus.OutOfStock;
             // Tự động cập nhật status khi stock > 0 và status hiện tại là OutOfStock
-            else if (dto.Stock.Value > 0 && product.Status == ProductStatus.OutOfStock)
+            else if (dto.TotalStockQuantity.Value > 0 && product.Status == ProductStatus.OutOfStock)
+                product.Status = ProductStatus.Active;
+        }
+
+        if (dto.TotalStockQuantity.HasValue)
+        {
+            product.TotalStockQuantity = dto.TotalStockQuantity.Value;
+
+            // Cập nhật status dựa trên AvailableToSell
+            if (product.AvailableToSell == 0 && product.Status != ProductStatus.InActive)
+                product.Status = ProductStatus.OutOfStock;
+            else if (product.AvailableToSell > 0 && product.Status == ProductStatus.OutOfStock)
                 product.Status = ProductStatus.Active;
         }
 
@@ -375,29 +393,43 @@ public class ProductService : IProductService
         if (param.ReleaseDateTo.HasValue)
             query = query.Where(p => p.CreatedAt <= param.ReleaseDateTo.Value);
 
-        // Sort + push OutOfStock to bottom
+        // Sort + push OutOfStock (AvailableToSell = 0) to bottom
         if (param.SortBy == null)
             query = query
-                .OrderBy(p => p.Stock == 0)
+                .OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0) // AvailableToSell == 0
                 .ThenBy(p => p.Price);
         else
             query = param.SortBy switch
             {
                 ProductSortField.Name => param.Desc
-                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.Name)
-                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.Name),
+                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenByDescending(p => p.Name)
+                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenBy(p => p.Name),
+
                 ProductSortField.Price => param.Desc
-                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.Price)
-                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.Price),
+                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenByDescending(p => p.Price)
+                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenBy(p => p.Price),
+
                 ProductSortField.Stock => param.Desc
-                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.Stock)
-                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.Stock),
+                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenByDescending(p => p.TotalStockQuantity - p.ReservedInBlindBox) // Sort by AvailableToSell
+                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenBy(p => p.TotalStockQuantity - p.ReservedInBlindBox), // Sort by AvailableToSell
+
                 ProductSortField.CreatedAt => param.Desc
-                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.CreatedAt)
-                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.CreatedAt),
+                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenByDescending(p => p.CreatedAt)
+                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenBy(p => p.CreatedAt),
+
                 _ => param.Desc
-                    ? query.OrderBy(p => p.Stock == 0).ThenByDescending(p => p.UpdatedAt ?? p.CreatedAt)
-                    : query.OrderBy(p => p.Stock == 0).ThenBy(p => p.UpdatedAt ?? p.CreatedAt)
+                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                        .ThenBy(p => p.UpdatedAt ?? p.CreatedAt)
             };
 
         return query;
@@ -407,7 +439,7 @@ public class ProductService : IProductService
     private async Task ValidateProductDto(ProductCreateDto dto)
     {
         _logger.Info(
-            $"[ValidateProductDto] Start validating product: Name='{dto.Name}', Description='{dto.Description}', Price={dto.Price}, Stock={dto.Stock}, CategoryId={dto.CategoryId}");
+            $"[ValidateProductDto] Start validating product: Name='{dto.Name}', Description='{dto.Description}', Price={dto.Price}, Stock={dto.TotalStockQuantity}, CategoryId={dto.CategoryId}");
 
         if (string.IsNullOrWhiteSpace(dto.Name))
         {
@@ -427,9 +459,10 @@ public class ProductService : IProductService
             throw ErrorHelper.BadRequest("Giá sản phẩm phải lớn hơn 0.");
         }
 
-        if (dto.Stock < 0)
+        if (dto.TotalStockQuantity < 0)
         {
-            _logger.Warn($"[ValidateProductDto] Validation failed: 'Stock' must be >= 0. Input value: {dto.Stock}");
+            _logger.Warn(
+                $"[ValidateProductDto] Validation failed: 'Stock' must be >= 0. Input value: {dto.TotalStockQuantity}");
             throw ErrorHelper.BadRequest("Số lượng tồn kho phải >= 0.");
         }
 
@@ -462,7 +495,8 @@ public class ProductService : IProductService
     private ProducDetailDto MapProductToDetailDto(Product product)
     {
         var dto = _mapper.Map<Product, ProducDetailDto>(product);
-        dto.ProductStockStatus = product.Stock > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
+        dto.ProductStockStatus = product.AvailableToSell > 0 ? StockStatus.InStock : StockStatus.OutOfStock;
+        dto.AvailableToSell = product.AvailableToSell; // Map computed field
         dto.Brand = product.Seller.CompanyName;
         return dto;
     }

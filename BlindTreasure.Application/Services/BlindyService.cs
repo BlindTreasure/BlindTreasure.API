@@ -230,7 +230,7 @@ public class BlindyService : IBlindyService
                Tên: {p.Name}
                Mô tả: {p.Description}
                Giá: {p.Price} VNĐ
-               Tồn kho: {p.Stock}
+               Tồn kho: {p.TotalStockQuantity}
                Danh mục: {p.Category?.Name ?? "Không rõ"}
                Seller: {p.Seller.CompanyName ?? "Không rõ"}
                Số lượt đánh giá: {p.Reviews?.Count ?? 0}

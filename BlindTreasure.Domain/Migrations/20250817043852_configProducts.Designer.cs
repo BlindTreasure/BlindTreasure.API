@@ -3,6 +3,7 @@ using System;
 using BlindTreasure.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    partial class BlindTreasureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250817043852_configProducts")]
+    partial class configProducts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1369,9 +1372,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<decimal>("RefundedAmount")
                         .HasColumnType("numeric");
 
-                    b.Property<string>("SessionId")
-                        .HasColumnType("text");
-
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -1751,9 +1751,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<int?>("MaxUsagePerUser")
-                        .HasColumnType("integer");
-
                     b.Property<string>("RejectReason")
                         .HasColumnType("text");
 
@@ -1828,54 +1825,6 @@ namespace BlindTreasure.Domain.Migrations
                         .IsUnique();
 
                     b.ToTable("PromotionParticipants");
-                });
-
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.PromotionUserUsage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime>("LastUsedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("PromotionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("UsageCount")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PromotionId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("PromotionUserUsages");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.RarityConfig", b =>
@@ -3165,23 +3114,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Seller");
                 });
 
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.PromotionUserUsage", b =>
-                {
-                    b.HasOne("BlindTreasure.Domain.Entities.Promotion", "Promotion")
-                        .WithMany("PromotionUserUsages")
-                        .HasForeignKey("PromotionId");
-
-                    b.HasOne("BlindTreasure.Domain.Entities.User", "User")
-                        .WithMany("PromotionUserUsages")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Promotion");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("BlindTreasure.Domain.Entities.RarityConfig", b =>
                 {
                     b.HasOne("BlindTreasure.Domain.Entities.BlindBoxItem", "BlindBoxItem")
@@ -3481,8 +3413,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Orders");
 
                     b.Navigation("PromotionParticipants");
-
-                    b.Navigation("PromotionUserUsages");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Role", b =>
@@ -3532,8 +3462,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Notifications");
 
                     b.Navigation("Orders");
-
-                    b.Navigation("PromotionUserUsages");
 
                     b.Navigation("Reviews");
 

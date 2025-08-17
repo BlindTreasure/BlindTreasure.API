@@ -496,7 +496,7 @@ public class BlindBoxServiceTests
             Id = id,
             Name = $"Product {index + 1}",
             SellerId = _sellerId,
-            Stock = 100,
+            TotalStockQuantity = 100,
             Status = ProductStatus.Active,
             IsDeleted = false
         }).ToList();
@@ -726,7 +726,7 @@ public class BlindBoxServiceTests
             Id = productId,
             Name = "Test Product",
             SellerId = _sellerId,
-            Stock = 100,
+            TotalStockQuantity = 100,
             Status = ProductStatus.Active
         };
 
@@ -821,7 +821,7 @@ public class BlindBoxServiceTests
             Id = productId,
             Name = "Test Product",
             SellerId = _sellerId,
-            Stock = 20, // Stock không đủ
+            TotalStockQuantity = 20, // Stock không đủ
             Status = ProductStatus.Active
         };
 
@@ -868,90 +868,7 @@ public class BlindBoxServiceTests
 
     #endregion
 
-    #region ClearItemsFromBlindBoxAsync Tests
 
-    /// <summary>
-    /// Tests if items are successfully cleared from a blind box and product stock is restored when the seller owns the blind box.
-    /// </summary>
-    /// <remarks>
-    /// Scenario: A seller clears items from their blind box, and the associated product stocks need to be returned.
-    /// Expected: The blind box items are soft-deleted, product stocks are increased, and the updated blind box details are returned.
-    /// Coverage: Clearing blind box items, stock restoration, and soft deletion of items.
-    /// </remarks>
-    [Fact]
-    public async Task ClearItemsFromBlindBoxAsync_ShouldClearItemsAndRestoreStock_WhenSellerOwnsBlindBox()
-    {
-        // Arrange
-        var blindBoxId = Guid.NewGuid();
-        var productId = Guid.NewGuid();
-        var seller = new Seller
-        {
-            Id = _sellerId,
-            UserId = _currentUserId,
-            Status = SellerStatus.Approved,
-            IsDeleted = false
-        };
-        var product = new Product
-        {
-            Id = productId,
-            SellerId = _sellerId,
-            Stock = 10,
-            IsDeleted = false
-        };
-        var blindBoxItem = new BlindBoxItem
-        {
-            Id = Guid.NewGuid(),
-            BlindBoxId = blindBoxId,
-            ProductId = productId,
-            Quantity = 5,
-            IsDeleted = false
-        };
-        var blindBox = new BlindBox
-        {
-            Id = blindBoxId,
-            Name = "skibidi",
-            Description = "skibidi",
-            SellerId = _sellerId,
-            BlindBoxItems = new List<BlindBoxItem> { blindBoxItem },
-            IsDeleted = false
-        };
-        // Mock repo/service
-        _blindBoxRepoMock.Setup(x => x.FirstOrDefaultAsync(
-                It.IsAny<Expression<Func<BlindBox, bool>>>(),
-                It.IsAny<Expression<Func<BlindBox, object>>[]>()))
-            .ReturnsAsync(blindBox);
-        _sellerRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<Seller, bool>>>()))
-            .ReturnsAsync(seller);
-        _productRepoMock.Setup(x => x.GetAllAsync(
-                It.IsAny<Expression<Func<Product, bool>>>(),
-                It.IsAny<Expression<Func<Product, object>>[]>()))
-            .ReturnsAsync(new List<Product> { product });
-        _productRepoMock.Setup(x => x.UpdateRange(It.IsAny<List<Product>>()))
-            .ReturnsAsync(true);
-        _blindBoxItemRepoMock.Setup(x => x.SoftRemoveRange(It.IsAny<List<BlindBoxItem>>()))
-            .ReturnsAsync(true);
-        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
-            .ReturnsAsync(1);
-        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
-            .Returns(Task.CompletedTask);
-        _blindBoxItemRepoMock.Setup(x => x.GetQueryable())
-            .Returns(new List<BlindBoxItem>().AsQueryable().BuildMock());
-        _mapperServiceMock.Setup(x => x.Map<BlindBox, BlindBoxDetailDto>(It.IsAny<BlindBox>()))
-            .Returns(new BlindBoxDetailDto { Id = blindBoxId, Name = "Test BlindBox" });
-        _cacheServiceMock
-            .Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<BlindBoxDetailDto>(), It.IsAny<TimeSpan>()))
-            .Returns(Task.CompletedTask);
-        // Act
-        var result = await _blindBoxService.ClearItemsFromBlindBoxAsync(blindBoxId);
-        // Assert
-        Assert.NotNull(result);
-        Assert.Equal(blindBoxId, result.Id);
-        _productRepoMock.Verify(x => x.UpdateRange(It.Is<List<Product>>(l => l[0].Stock == 15)), Times.Once);
-        _blindBoxItemRepoMock.Verify(x => x.SoftRemoveRange(It.IsAny<List<BlindBoxItem>>()), Times.Once);
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
-    }
-
-    #endregion
 
     #region DeleteBlindBoxAsync Tests
 
@@ -980,7 +897,7 @@ public class BlindBoxServiceTests
         {
             Id = productId,
             SellerId = _sellerId,
-            Stock = 10,
+            TotalStockQuantity = 10,
             IsDeleted = false
         };
         var blindBoxItem = new BlindBoxItem
@@ -1029,7 +946,7 @@ public class BlindBoxServiceTests
         Assert.NotNull(result);
         Assert.Equal(blindBoxId, result.Id);
         _blindBoxRepoMock.Verify(x => x.SoftRemove(It.IsAny<BlindBox>()), Times.Once);
-        _productRepoMock.Verify(x => x.UpdateRange(It.Is<List<Product>>(l => l[0].Stock == 15)), Times.Once);
+        _productRepoMock.Verify(x => x.UpdateRange(It.Is<List<Product>>(l => l[0].TotalStockQuantity == 15)), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
     }
 

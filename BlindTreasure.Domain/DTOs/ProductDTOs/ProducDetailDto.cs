@@ -9,8 +9,9 @@ public class ProducDetailDto
     public string? Description { get; set; }
     public Guid CategoryId { get; set; }
     public decimal Price { get; set; }
-    public int Stock { get; set; }
+    public int TotalStockQuantity { get; set; }
     public StockStatus ProductStockStatus { get; set; }
+    public int AvailableToSell { get; set; }
     public decimal? Height { get; set; }
     public string? Material { get; set; }
     public ProductSaleType? ProductType { get; set; }
