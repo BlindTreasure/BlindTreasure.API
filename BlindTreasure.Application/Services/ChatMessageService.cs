@@ -245,9 +245,14 @@ public class ChatMessageService : IChatMessageService
 
     public async Task<bool> IsUserOnline(string userId)
     {
+        // Kiểm tra cả trong memory và cache Redis
+        if (_onlineUsers.ContainsKey(userId))
+        {
+            return true;
+        }
+
         return await _cacheService.ExistsAsync($"user_online:{userId}");
     }
-
 
     public async Task SaveMessageAsync(Guid senderId, Guid receiverId, string content)
     {
@@ -273,6 +278,7 @@ public class ChatMessageService : IChatMessageService
         _logger.Info($"[Chat] {senderId} → {receiverId}: {content}");
     }
 
+    // Trong ChatMessageService.cs - phương thức GetMessagesAsync
     public async Task<Pagination<ChatMessageDto>> GetMessagesAsync(
         Guid currentUserId,
         Guid targetId,
@@ -315,8 +321,12 @@ public class ChatMessageService : IChatMessageService
                      m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
                 );
 
-        // Thêm Include để load thông tin User
-        query = query.Include(m => m.Sender).Include(m => m.Receiver)
+        // ✅ THÊM INCLUDE ĐẦY ĐỦ CHO INVENTORY ITEM
+        query = query
+            .Include(m => m.Sender)
+            .Include(m => m.Receiver)
+            .Include(m => m.InventoryItem)
+            .ThenInclude(i => i.Product) // Include Product của InventoryItem
             .OrderBy(m => m.SentAt)
             .AsNoTracking();
 
@@ -333,7 +343,7 @@ public class ChatMessageService : IChatMessageService
                 .Take(param.PageSize)
                 .ToListAsync();
 
-        // Map kết quả sang DTO
+        // ✅ CẢI THIỆN LOGIC MAPPING DTO
         var chatMessageDtos = messages.Select(m => new ChatMessageDto
         {
             Id = m.Id,
@@ -350,22 +360,26 @@ public class ChatMessageService : IChatMessageService
             IsRead = m.IsRead,
             IsCurrentUserSender = m.SenderId == currentUserId,
             MessageType = m.MessageType,
-            // Thêm thông tin ảnh
+            // Thông tin file media
             FileUrl = m.FileUrl,
             FileName = m.FileName,
             FileSize = m.FileSize,
             FileMimeType = m.FileMimeType,
-            // Thêm thông tin InventoryItem
+            // ✅ KIỂM TRA NULL TRƯỚC KHI MAPPING INVENTORY ITEM
             InventoryItemId = m.InventoryItemId,
             InventoryItem = m.InventoryItem != null
                 ? new InventoryItemDto
                 {
                     Id = m.InventoryItem.Id,
-                    ProductName = m.InventoryItem.Product?.Name ?? "Không xác định",
-                    Image = m.InventoryItem.Product?.ImageUrls.FirstOrDefault()!,
+                    ProductName = m.InventoryItem.Product?.Name ?? "Sản phẩm không xác định",
+                    Image = m.InventoryItem.Product?.ImageUrls?.FirstOrDefault() ?? "/assets/no-image.png",
                     Tier = m.InventoryItem.Tier,
                     Status = m.InventoryItem.Status,
-                    Location = m.InventoryItem.Location
+                    Location = m.InventoryItem.Location ?? "Không xác định",
+                    // Thêm các trường khác nếu cần
+                    UserId = m.InventoryItem.UserId,
+                    ProductId = m.InventoryItem.ProductId,
+                    IsFromBlindBox = m.InventoryItem.IsFromBlindBox
                 }
                 : null
         }).ToList();
@@ -373,8 +387,8 @@ public class ChatMessageService : IChatMessageService
         // Tạo kết quả phân trang
         var result = new Pagination<ChatMessageDto>(chatMessageDtos, count, param.PageIndex, param.PageSize);
 
-        // Lưu kết quả vào cache với thời gian hết hạn ngắn (1 phút) vì chat thường xuyên cập nhật
-        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromMinutes(1));
+        // ✅ GIẢM THỜI GIAN CACHE DO CÓ DỮ LIỆU PHỨC TạP
+        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromSeconds(30));
         _logger.Info($"[GetMessagesAsync] Messages cached with key: {cacheKey}");
 
         return result;
@@ -390,10 +404,16 @@ public class ChatMessageService : IChatMessageService
         // Tạo cache key dựa trên các tham số
         var cacheKey = $"chat:conversations:{userId}:{param.PageIndex}:{param.PageSize}";
 
-        // Thử lấy từ cache trước
+        // ✅ GIẢM THỜI GIAN CACHE CHO CONVERSATION VÌ CẦN CẬP NHẬT ONLINE STATUS
         var cachedResult = await _cacheService.GetAsync<Pagination<ConversationDto>>(cacheKey);
         if (cachedResult != null)
         {
+            // ✅ CẬP NHẬT LẠI TRẠNG THÁI ONLINE NGAY CẢ KHI CÓ CACHE
+            foreach (var conversation in cachedResult.ToList())
+            {
+                conversation.IsOnline = await IsUserOnline(conversation.OtherUserId.ToString());
+            }
+
             _logger.Info($"[GetConversationsAsync] Cache hit for conversations with key: {cacheKey}");
             return cachedResult;
         }
@@ -457,12 +477,27 @@ public class ChatMessageService : IChatMessageService
             else
                 otherUser = lastMessage.Receiver;
 
-            // Xử lý nội dung tin nhắn dựa trên loại tin nhắn
+            // ✅ CẢI THIỆN XỬ LÝ NỘI DUNG TIN NHẮN
             var lastMessageContent = lastMessage.Content;
-            if (lastMessage.MessageType == ChatMessageType.ImageMessage)
-                lastMessageContent = "[Hình ảnh]";
-            else if (lastMessage.MessageType == ChatMessageType.InventoryItemMessage)
-                lastMessageContent = "[Chia sẻ vật phẩm]";
+            switch (lastMessage.MessageType)
+            {
+                case ChatMessageType.ImageMessage:
+                    lastMessageContent = "[Hình ảnh]";
+                    break;
+                case ChatMessageType.VideoMessage:
+                    lastMessageContent = "[Video]";
+                    break;
+                case ChatMessageType.InventoryItemMessage:
+                    lastMessageContent = "[Chia sẻ vật phẩm]";
+                    break;
+                case ChatMessageType.AiToUser:
+                case ChatMessageType.UserToAi:
+                    lastMessageContent = lastMessage.Content;
+                    break;
+                default:
+                    lastMessageContent = lastMessage.Content;
+                    break;
+            }
 
             var conversation = new ConversationDto
             {
@@ -481,15 +516,20 @@ public class ChatMessageService : IChatMessageService
         // Sắp xếp theo thời gian của tin nhắn mới nhất
         conversations = conversations.OrderByDescending(c => c.LastMessageTime).ToList();
 
-        // Kiểm tra trạng thái online
-        foreach (var conversation in conversations)
-            conversation.IsOnline = await IsUserOnline(conversation.OtherUserId.ToString());
+        // ✅ KIỂM TRA TRẠNG THÁI ONLINE CHO TẤT CẢ USERS CÙNG LÚC
+        var userStatusTasks = conversations.Select(async c =>
+        {
+            c.IsOnline = await IsUserOnline(c.OtherUserId.ToString());
+            return c;
+        });
+
+        await Task.WhenAll(userStatusTasks);
 
         // Tạo kết quả phân trang
         var result = new Pagination<ConversationDto>(conversations, count, param.PageIndex, param.PageSize);
 
-        // Lưu kết quả vào cache
-        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromSeconds(30));
+        // ✅ CACHE NGẮN HƠN VÌ CẦN CẬP NHẬT ONLINE STATUS THƯỜNG XUYÊN
+        await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromSeconds(15));
         _logger.Info($"[GetConversationsAsync] Conversations cached with key: {cacheKey}");
 
         return result;

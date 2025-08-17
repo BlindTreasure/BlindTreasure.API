@@ -25,13 +25,14 @@ public class SystemController : ControllerBase
     private readonly ICacheService _cacheService;
     private readonly IUnboxingService _unboxService;
     private readonly BlindTreasureDbContext _context;
-    private readonly ILoggerService _logger; 
+    private readonly ILoggerService _logger;
     private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
     private readonly INotificationService _notificationService;
 
 
     public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService,
-        IUnboxingService unboxService, IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService, INotificationService notificationService)
+        IUnboxingService unboxService, IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService,
+        INotificationService notificationService)
     {
         _context = context;
         _logger = logger;
@@ -260,7 +261,7 @@ public class SystemController : ControllerBase
             var currentTime = HttpContext.RequestServices.GetRequiredService<ICurrentTime>();
             var notificationService = HttpContext.RequestServices.GetRequiredService<INotificationService>();
             var notificationHub = HttpContext.RequestServices.GetRequiredService<IHubContext<UnboxingHub>>();
-            var userService =  HttpContext.RequestServices.GetRequiredService<IUserService>();
+            var userService = HttpContext.RequestServices.GetRequiredService<IUserService>();
             // Tạo instance UnboxingService mới với đầy đủ tham số
             var unboxingService = new UnboxingService(
                 loggerService,
@@ -269,7 +270,7 @@ public class SystemController : ControllerBase
                 currentTime,
                 notificationService,
                 notificationHub,
-                userService// Thêm tham số mới
+                userService // Thêm tham số mới
             );
 
             var unboxResults = new List<UnboxResultDto>();
@@ -714,7 +715,17 @@ public class SystemController : ControllerBase
             await _cacheService.RemoveByPatternAsync("listings:");
             await _cacheService.RemoveByPatternAsync("listing:");
             await _cacheService.RemoveByPatternAsync("Promotion:");
+            await _cacheService.RemoveByPatternAsync("refresh:");
+            await _cacheService.RemoveByPatternAsync("otp-sent:");
+            await _cacheService.RemoveByPatternAsync("otp:");
+            await _cacheService.RemoveByPatternAsync("counter:");
+            await _cacheService.RemoveByPatternAsync("order:");
+            await _cacheService.RemoveByPatternAsync("noti:");
+            await _cacheService.RemoveByPatternAsync("ParticipantPromotion:");
 
+            // ✅ THÊM CÁC CACHE PATTERNS CHO CHAT MESSAGES
+            await _cacheService.RemoveByPatternAsync("chat:");
+            await _cacheService.RemoveByPatternAsync("user_online:");
 
             return Ok(ApiResult<object>.Success("200", "Clear caching thành công."));
         }
@@ -734,12 +745,12 @@ public class SystemController : ControllerBase
     {
         var shipment = await _context.Shipments
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.Order)
-                    .ThenInclude(o => o.Seller)
+            .ThenInclude(od => od.Order)
+            .ThenInclude(o => o.Seller)
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.Order)
-                    .ThenInclude(o => o.User)
-                        .ThenInclude(u => u.Addresses)
+            .ThenInclude(od => od.Order)
+            .ThenInclude(o => o.User)
+            .ThenInclude(u => u.Addresses)
             .Include(s => s.InventoryItems)
             .FirstOrDefaultAsync(s => s.Id == req.ShipmentId);
 
@@ -798,7 +809,6 @@ public class SystemController : ControllerBase
         });
     }
 
-   
 
     // Request DTOs
     public class SimulateShipmentStatusRequest
@@ -812,14 +822,14 @@ public class SystemController : ControllerBase
     {
         var shipment = await _context.Shipments
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.InventoryItems)
+            .ThenInclude(od => od.InventoryItems)
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.Order)
-                    .ThenInclude(o => o.Seller)
+            .ThenInclude(od => od.Order)
+            .ThenInclude(o => o.Seller)
             .Include(s => s.OrderDetails)
-                .ThenInclude(od => od.Order)
-                    .ThenInclude(o => o.User)
-                        .ThenInclude(u => u.Addresses)
+            .ThenInclude(od => od.Order)
+            .ThenInclude(o => o.User)
+            .ThenInclude(u => u.Addresses)
             .Include(s => s.InventoryItems)
             .FirstOrDefaultAsync(s => s.Id == req.ShipmentId);
 
@@ -827,12 +837,12 @@ public class SystemController : ControllerBase
             return NotFound("Shipment not found.");
 
         var statusFlow = new List<ShipmentStatus>
-    {
-        ShipmentStatus.PROCESSING,
-        ShipmentStatus.PICKED_UP,
-        ShipmentStatus.IN_TRANSIT,
-        ShipmentStatus.DELIVERED
-    };
+        {
+            ShipmentStatus.PROCESSING,
+            ShipmentStatus.PICKED_UP,
+            ShipmentStatus.IN_TRANSIT,
+            ShipmentStatus.DELIVERED
+        };
         if (req.Complete)
             statusFlow.Add(ShipmentStatus.COMPLETED);
 
@@ -893,6 +903,7 @@ public class SystemController : ControllerBase
                             $"InventoryItem delivered as shipment delivered."
                         );
                     }
+
                     break;
                 case ShipmentStatus.COMPLETED:
                     break;
@@ -919,6 +930,7 @@ public class SystemController : ControllerBase
                     {
                         item.Status = InventoryItemStatus.Delivering;
                     }
+
                     await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
                         item.OrderDetail,
                         oldItemStatus,
@@ -933,8 +945,10 @@ public class SystemController : ControllerBase
             {
                 var notificationTitle = newStatus switch
                 {
-                    ShipmentStatus.PROCESSING => $"Mã giao hàng có {shipment.OrderCode} đã được xác nhận và chuẩn bị giao",
-                    ShipmentStatus.PICKED_UP => $"Mã giao hàng có{shipment.OrderCode} đã được lấy bởi đơn vị vận chuyển",
+                    ShipmentStatus.PROCESSING =>
+                        $"Mã giao hàng có {shipment.OrderCode} đã được xác nhận và chuẩn bị giao",
+                    ShipmentStatus.PICKED_UP =>
+                        $"Mã giao hàng có{shipment.OrderCode} đã được lấy bởi đơn vị vận chuyển",
                     ShipmentStatus.IN_TRANSIT => $"Mã giao hàng có{shipment.OrderCode} đang trên đường giao đến bạn",
                     ShipmentStatus.DELIVERED => $"Mã giao hàng có{shipment.OrderCode} đã được giao thành công",
                     ShipmentStatus.COMPLETED => $"Mã giao hàng có{shipment.OrderCode} đã hoàn tất",
@@ -984,12 +998,15 @@ public class SystemController : ControllerBase
             FlowLogs = logs
         });
     }
+
     // DTO for request
     public class SimulateShipmentFullFlowRequest
     {
         public Guid ShipmentId { get; set; }
+
         [DefaultValue(ShipmentStatus.PICKED_UP)]
         public ShipmentStatus? StartFrom { get; set; }
+
         public bool Complete { get; set; } = true;
     }
 
@@ -998,7 +1015,8 @@ public class SystemController : ControllerBase
         var passwordHasher = new PasswordHasher();
         var now = DateTime.UtcNow;
         var defaultAvatar = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg";
-        var staffAvatar = "https://cdn4.iconfinder.com/data/icons/taxi-service-flat/90/support__services__employee__avatar_-512.png";
+        var staffAvatar =
+            "https://cdn4.iconfinder.com/data/icons/taxi-service-flat/90/support__services__employee__avatar_-512.png";
 
         var users = new List<User>
         {
@@ -1017,15 +1035,15 @@ public class SystemController : ControllerBase
                 {
                     new()
                     {
-                        FullName = "Trần Gia Phúc", 
-                        Phone = "0987570351", 
-                        AddressLine = "Bưng Ông Thoàn, Phường Phú Hữu, TP.Thủ Đức, HCM", 
-                        City = "Thành Phố Thủ Đức", 
-                        Province = "Hồ Chí Minh", 
-                        Ward = "Phường Phú Hữu", 
-                        District = "Thành Phố Thủ Đức", 
-                        PostalCode = "90763", 
-                        Country = "Vietnam", 
+                        FullName = "Trần Gia Phúc",
+                        Phone = "0987570351",
+                        AddressLine = "Bưng Ông Thoàn, Phường Phú Hữu, TP.Thủ Đức, HCM",
+                        City = "Thành Phố Thủ Đức",
+                        Province = "Hồ Chí Minh",
+                        Ward = "Phường Phú Hữu",
+                        District = "Thành Phố Thủ Đức",
+                        PostalCode = "90763",
+                        Country = "Vietnam",
                         IsDefault = false,
                         CreatedAt = now
                     }
@@ -1041,20 +1059,21 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Customer,
                 CreatedAt = now,
-                AvatarUrl = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQIf4R5qPKHPNMyAqV-FjS_OTBB8pfUV29Phg&s",
+                AvatarUrl =
+                    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQIf4R5qPKHPNMyAqV-FjS_OTBB8pfUV29Phg&s",
                 Addresses = new List<Address>
                 {
                     new()
                     {
-                        FullName = "Hồ Nhật Quang", 
-                        Phone = "0987570351", 
-                        AddressLine = "Bưng Ông Thoàn, Phường Phú Hữu, TP.Thủ Đức, HCM", 
-                        City = "Thành Phố Thủ Đức", 
-                        Province = "Hồ Chí Minh", 
-                        Ward = "Phường Phú Hữu", 
-                        District = "Thành Phố Thủ Đức", 
-                        PostalCode = "90763", 
-                        Country = "Vietnam", 
+                        FullName = "Hồ Nhật Quang",
+                        Phone = "0987570351",
+                        AddressLine = "Bưng Ông Thoàn, Phường Phú Hữu, TP.Thủ Đức, HCM",
+                        City = "Thành Phố Thủ Đức",
+                        Province = "Hồ Chí Minh",
+                        Ward = "Phường Phú Hữu",
+                        District = "Thành Phố Thủ Đức",
+                        PostalCode = "90763",
+                        Country = "Vietnam",
                         IsDefault = false,
                         CreatedAt = now
                     }
@@ -1102,7 +1121,8 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = "https://images-platform.99static.com//j3lFsXdVOtsovHgOHMt2TIOnevU=/279x0:1622x1343/fit-in/500x500/99designs-contests-attachments/23/23600/attachment_23600424"
+                AvatarUrl =
+                    "https://images-platform.99static.com//j3lFsXdVOtsovHgOHMt2TIOnevU=/279x0:1622x1343/fit-in/500x500/99designs-contests-attachments/23/23600/attachment_23600424"
             },
             new()
             {
@@ -1115,7 +1135,7 @@ public class SystemController : ControllerBase
                 CreatedAt = now,
                 AvatarUrl = defaultAvatar
             },
-            
+
             new()
             {
                 Email = "smiskiofficial@gmail.com",
@@ -1175,12 +1195,12 @@ public class SystemController : ControllerBase
 
                     () => context.TradeHistories.ExecuteDeleteAsync(),
                     () => context.TradeRequests.ExecuteDeleteAsync(),
-                    () => context.TradeRequestItems.ExecuteDeleteAsync(), 
+                    () => context.TradeRequestItems.ExecuteDeleteAsync(),
                     () => context.SupportTickets.ExecuteDeleteAsync(),
                     () => context.Transactions.ExecuteDeleteAsync(),
                     () => context.Notifications.ExecuteDeleteAsync(),
                     () => context.OtpVerifications.ExecuteDeleteAsync(),
-                    () => context.ListingReports.ExecuteDeleteAsync(), 
+                    () => context.ListingReports.ExecuteDeleteAsync(),
 
                     () => context.Orders.ExecuteDeleteAsync(),
                     () => context.Payments.ExecuteDeleteAsync(),
@@ -1196,9 +1216,9 @@ public class SystemController : ControllerBase
                     () => context.Sellers.ExecuteDeleteAsync(),
                     () => context.Users.ExecuteDeleteAsync(),
                     () => context.Roles.ExecuteDeleteAsync(),
-                    () => context.Payouts.ExecuteDeleteAsync(), 
+                    () => context.Payouts.ExecuteDeleteAsync(),
                     () => context.PayoutLogs.ExecuteDeleteAsync(),
-                    () => context.PayoutDetails.ExecuteDeleteAsync() 
+                    () => context.PayoutDetails.ExecuteDeleteAsync()
                 };
 
                 foreach (var deleteFunc in tablesToDelete)
@@ -2573,6 +2593,7 @@ public class SystemController : ControllerBase
         await _context.Promotions.AddRangeAsync(promotions);
         await _context.SaveChangesAsync();
     }
+
     private async Task SeedPromotionParticipants()
     {
         if (_context.PromotionParticipants.Any()) return;
@@ -2639,6 +2660,7 @@ public class SystemController : ControllerBase
             await _context.SaveChangesAsync();
         }
     }
+
     private async Task SeedSellerForUser(string sellerEmail)
     {
         var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == sellerEmail);
@@ -2694,6 +2716,7 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Info($"Seller seeded successfully for {sellerEmail}.");
     }
+
     private async Task SeedRoles()
     {
         var roles = new List<Role>
@@ -2729,6 +2752,7 @@ public class SystemController : ControllerBase
         await _context.SaveChangesAsync();
         _logger.Success("Roles seeded successfully.");
     }
+
     #endregion
 }
 

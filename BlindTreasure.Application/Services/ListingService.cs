@@ -69,20 +69,12 @@ public class ListingService : IListingService
 
     public async Task<Pagination<ListingDetailDto>> GetAllListingsAsync(ListingQueryParameter param)
     {
-        var currentUserId = _claimsService.CurrentUserId;
-
-        _logger.Info($"[GetAllListingsAsync] Truy vấn bài đăng với params: {param}");
-
         var query = _unitOfWork.Listings.GetQueryable()
             .Include(l => l.InventoryItem)
             .ThenInclude(i => i.Product)
             .Include(l => l.InventoryItem.User)
             .Where(l => !l.IsDeleted)
             .AsNoTracking();
-
-        // Mặc định loại trừ listings của current user
-        if (!(param.IsOwnerListings.HasValue && param.IsOwnerListings.Value))
-            query = query.Where(l => l.InventoryItem.UserId != currentUserId);
 
         // Áp dụng filters
         query = ApplyFilters(query, param);
@@ -96,8 +88,6 @@ public class ListingService : IListingService
             .ToListAsync();
 
         var listingDtos = listings.Select(MapListingToDto).ToList();
-
-        _logger.Info($"[GetAllListingsAsync] Tìm thấy {count} bài đăng");
 
         return new Pagination<ListingDetailDto>(listingDtos, count, param.PageIndex, param.PageSize);
     }
@@ -215,7 +205,8 @@ public class ListingService : IListingService
 
         var userId = _claimsService.CurrentUserId;
         if (listing.InventoryItem.UserId != userId)
-            throw ErrorHelper.Forbidden("Bạn không có quyền đóng bài đăng này vì bạn không phải là chủ sở hữu vật phẩm.");
+            throw ErrorHelper.Forbidden(
+                "Bạn không có quyền đóng bài đăng này vì bạn không phải là chủ sở hữu vật phẩm.");
 
         listing.Status = ListingStatus.Sold;
         await _unitOfWork.Listings.Update(listing);
@@ -303,10 +294,19 @@ public class ListingService : IListingService
             query = query.Where(l => l.IsFree == param.IsFree.Value);
 
         // Filter theo owner
-        if (param.IsOwnerListings.HasValue && param.IsOwnerListings.Value)
+        if (param.IsOwnerListings.HasValue)
         {
             var currentUserId = _claimsService.CurrentUserId;
-            query = query.Where(l => l.InventoryItem.UserId == currentUserId);
+            if (param.IsOwnerListings.Value)
+            {
+                // Lấy listings của user hiện tại
+                query = query.Where(l => l.InventoryItem.UserId == currentUserId);
+            }
+            else
+            {
+                // Loại trừ listings của user hiện tại
+                query = query.Where(l => l.InventoryItem.UserId != currentUserId);
+            }
         }
 
         // Filter theo userId cụ thể
@@ -379,7 +379,8 @@ public class ListingService : IListingService
         if (hasPendingTrade)
         {
             _logger.Warn($"[EnsureItemCanBeListed] Item {inventoryId} đang có giao dịch pending");
-            throw ErrorHelper.Conflict("Vật phẩm này hiện đang có giao dịch chờ xử lý. Vui lòng thử lại sau khi giao dịch kết thúc.");
+            throw ErrorHelper.Conflict(
+                "Vật phẩm này hiện đang có giao dịch chờ xử lý. Vui lòng thử lại sau khi giao dịch kết thúc.");
         }
 
         _logger.Success($"[EnsureItemCanBeListed] Item {inventoryId} đủ điều kiện tạo bài đăng");
