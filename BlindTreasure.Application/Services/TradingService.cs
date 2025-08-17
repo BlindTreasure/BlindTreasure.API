@@ -43,7 +43,7 @@ public class TradingService : ITradingService
             l => l.InventoryItem.Product!);
 
         if (listing == null)
-            throw ErrorHelper.NotFound("Rất tiếc, bài đăng bạn đang tìm kiếm không tồn tại hoặc đã bị xóa.");
+            throw ErrorHelper.NotFound("Bài đăng không tồn tại hoặc đã bị xóa. Vui lòng kiểm tra lại.");
 
         // Lấy tất cả các trade requests cho listing
         var tradeRequests = await _unitOfWork.TradeRequests.GetAllAsync(
@@ -198,12 +198,12 @@ public class TradingService : ITradingService
                 t => t.Requester!);
 
             if (tradeRequest == null)
-                throw ErrorHelper.NotFound("Rất tiếc, yêu cầu trao đổi này không tồn tại hoặc đã bị hủy.");
+                throw ErrorHelper.NotFound("Yêu cầu trao đổi không tồn tại hoặc đã bị hủy.");
 
 
             // BƯỚC 2: Validate trạng thái
             if (tradeRequest.Status != TradeRequestStatus.PENDING)
-                throw ErrorHelper.BadRequest("Giao dịch này đã được xử lý hoặc đã hết hạn.");
+                throw ErrorHelper.BadRequest("Giao dịch này đã được xử lý hoặc đã hết thời gian phản hồi.");
 
             // BƯỚC 3: Validate listing
             if (tradeRequest.Listing == null)
@@ -219,7 +219,7 @@ public class TradingService : ITradingService
             var currentUserId = _claimsService.CurrentUserId;
             if (tradeRequest.Listing.InventoryItem.UserId != currentUserId)
                 throw ErrorHelper.Forbidden(
-                    "Bạn không có quyền phản hồi yêu cầu trao đổi này vì bạn không phải là chủ sở hữu vật phẩm.");
+                    "Bạn không có quyền phản hồi yêu cầu này. Chỉ chủ sở hữu vật phẩm mới có thể thực hiện.");
 
             // BƯỚC 6: Cập nhật trạng thái trade request
             var originalStatus = tradeRequest.Status;
@@ -281,11 +281,7 @@ public class TradingService : ITradingService
                 t => t.Requester!); // Người gửi yêu cầu trade
 
             // BƯỚC 3: VALIDATE TRADE REQUEST TỒN TẠI
-            if (tradeRequest == null)
-            {
-                _logger.Error($"[LockDealAsync] Trade request {tradeRequestId} không tồn tại");
-                throw ErrorHelper.NotFound("Rất tiếc, yêu cầu trao đổi này không tồn tại hoặc đã bị hủy.");
-            }
+            if (tradeRequest == null) throw ErrorHelper.NotFound("Yêu cầu trao đổi không tồn tại hoặc đã bị hủy.");
 
             _logger.Info($"[LockDealAsync] Tìm thấy trade request {tradeRequestId}, status: {tradeRequest.Status}");
 
@@ -326,7 +322,7 @@ public class TradingService : ITradingService
                 _logger.Warn(
                     $"[LockDealAsync] User {userId} không phải owner ({listingOwnerId}) hoặc requester ({tradeRequest.RequesterId})");
                 throw ErrorHelper.Forbidden(
-                    "Bạn không có quyền khóa giao dịch này. Chỉ chủ sở hữu vật phẩm hoặc người yêu cầu mới có thể khóa.");
+                    "Bạn không có quyền khóa giao dịch này. Chỉ chủ sở hữu vật phẩm hoặc người gửi yêu cầu mới có thể khóa.");
             }
 
             _logger.Info(
@@ -341,14 +337,14 @@ public class TradingService : ITradingService
             {
                 _logger.Warn($"[LockDealAsync] Owner {userId} đã lock trước đó");
                 throw ErrorHelper.BadRequest(
-                    "Bạn đã khóa giao dịch này rồi. Vui lòng chờ đối tác thực hiện hành động của họ.");
+                    "Bạn đã khóa giao dịch này. Vui lòng chờ đối tác hoàn tất hành động của họ.");
             }
 
             if (isRequester && tradeRequest.RequesterLocked)
             {
                 _logger.Warn($"[LockDealAsync] Requester {userId} đã lock trước đó");
                 throw ErrorHelper.BadRequest(
-                    "Bạn đã khóa giao dịch này rồi. Vui lòng chờ đối tác thực hiện hành động của họ.");
+                    "Bạn đã khóa giao dịch này. Vui lòng chờ đối tác hoàn tất hành động của họ.");
             }
 
             // BƯỚC 9: XỬ LÝ LOGIC LOCK VÀ KIỂM TRA HOÀN THÀNH
@@ -436,7 +432,7 @@ public class TradingService : ITradingService
             t => t.Requester!,
             t => t.OfferedItems);
 
-        if (tradeRequest == null) throw ErrorHelper.NotFound("Rất tiếc, không tìm thấy yêu cầu trao đổi nào.");
+        if (tradeRequest == null) throw ErrorHelper.NotFound("Không tìm thấy yêu cầu trao đổi.");
 
         var offeredInventoryItems = new List<InventoryItem>();
         if (tradeRequest.OfferedItems.Any())
@@ -465,9 +461,7 @@ public class TradingService : ITradingService
         {
             _logger.Info($"[CreateTradeHistoryAsync] Found {tradeRequest.OfferedItems.Count} offered items:");
             foreach (var item in tradeRequest.OfferedItems)
-            {
                 _logger.Info($"[CreateTradeHistoryAsync] - Offered item: {item.InventoryItemId}");
-            }
         }
         else
         {
@@ -941,7 +935,7 @@ public class TradingService : ITradingService
 
         if (items.Count != itemIds.Count)
             throw ErrorHelper.BadRequest(
-                "Một hoặc nhiều vật phẩm bạn muốn trao đổi không hợp lệ. Vui lòng kiểm tra lại danh sách.");
+                "Một hoặc nhiều vật phẩm không hợp lệ. Vui lòng kiểm tra lại danh sách.");
 
         foreach (var item in items)
         {
@@ -1212,14 +1206,14 @@ public class TradingService : ITradingService
             ListingItemImage = tradeHistory.Listing?.InventoryItem?.Product?.ImageUrls?.FirstOrDefault() ?? "",
             RequesterId = tradeHistory.RequesterId,
             RequesterName = tradeHistory.Requester.FullName ?? tradeHistory.Requester?.FullName ?? "Unknown",
-        
+
             // Giữ nguyên offered item logic
             OfferedInventoryId = tradeHistory.OfferedInventoryId,
             OfferedItemName = tradeHistory.OfferedInventory?.Product?.Name ?? "No Item",
             OfferedItemImage = tradeHistory.OfferedInventory?.Product?.ImageUrls?.FirstOrDefault() ?? "",
-        
+
             ListingInventoryItemId = tradeHistory.Listing?.InventoryItem?.Id,
-        
+
             FinalStatus = tradeHistory.FinalStatus,
             CompletedAt = tradeHistory.CompletedAt,
             CreatedAt = tradeHistory.CreatedAt
@@ -1227,5 +1221,6 @@ public class TradingService : ITradingService
 
         return dto;
     }
+
     #endregion
 }

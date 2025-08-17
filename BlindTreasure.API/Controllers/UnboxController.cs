@@ -69,17 +69,18 @@ public class UnboxController : ControllerBase
     }
 
     [HttpGet("export-logs")]
-    public async Task<IActionResult> ExportUnboxLogs([FromQuery] PaginationParameter param, Guid? userId,
-        Guid? productId)
+    public async Task<IActionResult> ExportUnboxLogs([FromQuery] ExportUnboxLogRequest request)
     {
         try
         {
-            var stream = await _unboxingService.ExportToExcelStream(param, userId, productId);
+            var stream = await _unboxingService.ExportToExcelStream(request);
+
+            if (stream.CanSeek)
+                stream.Position = 0;
 
             string fileName = $"UnboxingLogs_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
             string fileType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
             return File(stream, fileType, fileName);
-
         }
         catch (Exception ex)
         {

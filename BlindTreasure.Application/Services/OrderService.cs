@@ -470,9 +470,8 @@ public class OrderService : IOrderService
                     .FirstOrDefaultAsync();
 
                 if (userUsage != null && userUsage.UsageCount >= maxUsagePerUser)
-                {
-                    throw ErrorHelper.BadRequest($"Bạn đã sử dụng khuyến mãi {promo.Id} hết số lần tối đa({maxUsagePerUser} lần).");
-                }
+                    throw ErrorHelper.BadRequest(
+                        $"Bạn đã sử dụng khuyến mãi {promo.Id} hết số lần tối đa({maxUsagePerUser} lần).");
 
                 var sellerOrderDetails = order.OrderDetails.ToList();
                 ApplyPromotionToOrderDetails(sellerOrderDetails, promo);
@@ -818,7 +817,7 @@ public class OrderService : IOrderService
         var order = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.Payment).ThenInclude(o=> o.Transactions)
+            .Include(o => o.Payment).ThenInclude(o => o.Transactions)
             .Include(o => o.User)
             .Include(o => o.Seller)
             .FirstOrDefaultAsync();
@@ -896,8 +895,8 @@ public class OrderService : IOrderService
         var orders = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.CheckoutGroupId == checkoutGroupId && o.UserId == userId && !o.IsDeleted)
             .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.Payment).ThenInclude(o=>o.Transactions)
-            .Include(o=> o.User)
+            .Include(o => o.Payment).ThenInclude(o => o.Transactions)
+            .Include(o => o.User)
             .Include(o => o.Seller)
             .ToListAsync();
 

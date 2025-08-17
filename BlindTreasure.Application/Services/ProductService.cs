@@ -396,39 +396,39 @@ public class ProductService : IProductService
         // Sort + push OutOfStock (AvailableToSell = 0) to bottom
         if (param.SortBy == null)
             query = query
-                .OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0) // AvailableToSell == 0
+                .OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0) // AvailableToSell == 0
                 .ThenBy(p => p.Price);
         else
             query = param.SortBy switch
             {
                 ProductSortField.Name => param.Desc
-                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    ? query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenByDescending(p => p.Name)
-                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    : query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenBy(p => p.Name),
 
                 ProductSortField.Price => param.Desc
-                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    ? query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenByDescending(p => p.Price)
-                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    : query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenBy(p => p.Price),
 
                 ProductSortField.Stock => param.Desc
-                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    ? query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenByDescending(p => p.TotalStockQuantity - p.ReservedInBlindBox) // Sort by AvailableToSell
-                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    : query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenBy(p => p.TotalStockQuantity - p.ReservedInBlindBox), // Sort by AvailableToSell
 
                 ProductSortField.CreatedAt => param.Desc
-                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    ? query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenByDescending(p => p.CreatedAt)
-                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    : query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenBy(p => p.CreatedAt),
 
                 _ => param.Desc
-                    ? query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    ? query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenByDescending(p => p.UpdatedAt ?? p.CreatedAt)
-                    : query.OrderBy(p => (p.TotalStockQuantity - p.ReservedInBlindBox) == 0)
+                    : query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
                         .ThenBy(p => p.UpdatedAt ?? p.CreatedAt)
             };
 

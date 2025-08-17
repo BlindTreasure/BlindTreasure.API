@@ -56,9 +56,7 @@ public class OAuthService : IOAuthService
         try
         {
             var user = await _userService.GetUserByEmail(payload.Email, true);
-            if (user == null) {
-                throw ErrorHelper.BadRequest("Account not found");
-            }
+            if (user == null) throw ErrorHelper.BadRequest("Account not found");
             return ToUserDto(user);
         }
         catch (Exception ex)
@@ -77,8 +75,7 @@ public class OAuthService : IOAuthService
                     AvatarUrl = payload.Picture,
                     RoleName = RoleType.Customer,
                     DateOfBirth = DateTime.UtcNow,
-                    PhoneNumber= "",  // Nếu không có số điện thoại, có thể để trống
-                    
+                    PhoneNumber = "" // Nếu không có số điện thoại, có thể để trống
                 };
 
                 var result = await _userService.CreateUserAsync(request);

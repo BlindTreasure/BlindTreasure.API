@@ -59,12 +59,12 @@ public class UnboxingService : IUnboxingService
             .ToList();
 
         if (items != null && !items.Any())
-            throw ErrorHelper.BadRequest("Hộp này không còn item nào để mở.");
+            throw ErrorHelper.BadRequest("Rất tiếc, hộp này đã hết vật phẩm. Vui lòng quay lại sau.");
 
         // 3 & 4. Random item theo xác suất (dùng hàm mới)
         var (selectedItem, roll, probabilityMap) = GetRandomItemByProbability(items, now);
         if (selectedItem == null)
-            throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
+            throw ErrorHelper.Internal("Đã có lỗi xảy ra khi chọn vật phẩm từ hộp. Vui lòng thử lại.");
 
         // Ghi log vào bảng
         await _unitOfWork.BlindBoxUnboxLogs.AddAsync(new BlindBoxUnboxLog
@@ -90,7 +90,7 @@ public class UnboxingService : IUnboxingService
         });
 
         if (selectedItem == null)
-            throw ErrorHelper.Internal("Không thể chọn được item từ hộp.");
+            throw ErrorHelper.Internal("Đã có lỗi xảy ra khi chọn vật phẩm từ hộp. Vui lòng thử lại.");
 
         await GrantUnboxedItemToUser(selectedItem, customerBox, userId, now);
 
@@ -121,25 +121,30 @@ public class UnboxingService : IUnboxingService
     }
 
 
-    public async Task<MemoryStream> ExportToExcelStream(PaginationParameter param, Guid? userId, Guid? productId)
+    public async Task<MemoryStream> ExportToExcelStream(ExportUnboxLogRequest request)
     {
-        var logs = await GetLogsAsync(param, userId, productId);
+        // Nếu request giữ nguyên mặc định paging => coi như không phân trang
+        PaginationParameter? paging = null;
+        if (!(request.PageIndex == 1 && request.PageSize == 5 && request.Desc == true)) paging = request;
 
-        // Set license for EPPlus
+        var logs = await GetLogsForExportAsync(
+            paging,
+            request.UserId,
+            request.ProductId,
+            request.FromDate,
+            request.ToDate);
+
         ExcelPackage.License.SetNonCommercialPersonal("your-name-or-organization");
 
         using (var package = new ExcelPackage())
         {
-            // Thêm một worksheet vào file Excel
             var worksheet = package.Workbook.Worksheets.Add("UnboxingLogs");
-            worksheet.DefaultColWidth = 20; // Thiết lập độ rộng cột mặc định
+            worksheet.DefaultColWidth = 20;
 
-            // Mảng tiêu đề cột (không có ID và Reason)
             string[] columnHeaders =
                 { "CustomerName", "ProductName", "Rarity", "DropRate", "RollValue", "UnboxedAt", "BlindBoxName" };
 
-            // Thiết lập tiêu đề cột
-            for (int i = 0; i < columnHeaders.Length; i++)
+            for (var i = 0; i < columnHeaders.Length; i++)
             {
                 worksheet.Cells[1, i + 1].Value = columnHeaders[i];
                 worksheet.Cells[1, i + 1].Style.Font.Bold = true;
@@ -149,8 +154,7 @@ public class UnboxingService : IUnboxingService
                 worksheet.Cells[1, i + 1].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
             }
 
-            // Đổ dữ liệu vào worksheet (không có ID và Reason)
-            for (int i = 0; i < logs.Count; i++)
+            for (var i = 0; i < logs.Count; i++)
             {
                 var log = logs[i];
                 worksheet.Cells[i + 2, 1].Value = log.CustomerName;
@@ -158,11 +162,10 @@ public class UnboxingService : IUnboxingService
                 worksheet.Cells[i + 2, 3].Value = log.Rarity;
                 worksheet.Cells[i + 2, 4].Value = log.DropRate;
                 worksheet.Cells[i + 2, 5].Value = log.RollValue;
-                worksheet.Cells[i + 2, 6].Value = log.UnboxedAt;
+                worksheet.Cells[i + 2, 6].Value = log.UnboxedAt.ToString("yyyy-MM-dd HH:mm:ss");
                 worksheet.Cells[i + 2, 7].Value = log.BlindBoxName;
             }
 
-            // Thiết lập định dạng bảng
             using (var range = worksheet.Cells[1, 1, logs.Count + 1, columnHeaders.Length])
             {
                 range.AutoFitColumns();
@@ -176,12 +179,87 @@ public class UnboxingService : IUnboxingService
                 range.Style.Border.Right.Style = ExcelBorderStyle.Thin;
             }
 
-            // Chuyển đổi package thành MemoryStream
-            MemoryStream stream = new MemoryStream();
+            var stream = new MemoryStream();
             package.SaveAs(stream);
-            stream.Position = 0; // Đặt vị trí về đầu stream
+            if (stream.CanSeek) stream.Position = 0;
             return stream;
         }
+    }
+
+    private async Task<List<UnboxLogDto>> GetLogsForExportAsync(PaginationParameter? param, Guid? userId,
+        Guid? productId, DateTime? fromDate, DateTime? toDate)
+    {
+        var query = _unitOfWork.BlindBoxUnboxLogs.GetQueryable()
+            .Include(x => x.User)
+            .Where(x => !x.IsDeleted)
+            .AsNoTracking();
+
+        var currentUserId = _claimsService.CurrentUserId;
+        var user = await _userService.GetUserById(currentUserId);
+
+        // Seller filter giống GetLogsAsync: nếu current user là Seller thì chỉ lấy logs liên quan tới seller đó
+        if (user != null && user.RoleName == RoleType.Seller)
+        {
+            var seller = await _unitOfWork.Sellers.GetQueryable()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId);
+
+            if (seller != null)
+                query = query.Where(x => _unitOfWork.Products.GetQueryable()
+                    .Any(p => p.Id == x.ProductId && p.SellerId == seller.Id));
+            else
+                return new List<UnboxLogDto>();
+        }
+
+        // Filter theo userId/productId nếu có
+        if (userId.HasValue)
+            query = query.Where(x => x.UserId == userId.Value);
+
+        if (productId.HasValue)
+            query = query.Where(x => x.ProductId == productId.Value);
+
+        // Filter theo fromDate/toDate nếu có (inclusive)
+        if (fromDate.HasValue)
+            query = query.Where(x => x.UnboxedAt >= fromDate.Value);
+
+        if (toDate.HasValue)
+            query = query.Where(x => x.UnboxedAt <= toDate.Value);
+
+        // Sort mới nhất trước
+        query = query.OrderByDescending(x => x.UnboxedAt);
+
+        // Nếu client truyền paging (param != null && param.PageIndex > 0) => áp dụng paging
+        List<BlindBoxUnboxLog> items;
+        if (param != null && param.PageIndex > 0)
+        {
+            var pageSize = param.PageSize > 0 ? param.PageSize : 50;
+            items = await query
+                .Skip((param.PageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+        }
+        else
+        {
+            // Mặc định xuất hết dữ liệu — BE CẢNH BÁO: nếu bảng quá lớn có thể ảnh hưởng performance
+            items = await query.ToListAsync();
+        }
+
+        // Map sang DTO
+        var dtos = items.Select(x => new UnboxLogDto
+        {
+            Id = x.Id,
+            CustomerBlindBoxId = x.CustomerBlindBoxId,
+            CustomerName = x.User?.FullName ?? "N/A",
+            ProductId = x.ProductId,
+            ProductName = x.ProductName,
+            Rarity = x.Rarity,
+            DropRate = x.DropRate,
+            RollValue = x.RollValue,
+            UnboxedAt = x.UnboxedAt,
+            BlindBoxName = x.BlindBoxName ?? "N/A",
+            Reason = x.Reason ?? "N/A"
+        }).ToList();
+
+        return dtos;
     }
 
     public async Task<Pagination<UnboxLogDto>> GetLogsAsync(PaginationParameter param, Guid? userId, Guid? productId)
@@ -202,16 +280,12 @@ public class UnboxingService : IUnboxingService
                 .FirstOrDefaultAsync(s => s.UserId == currentUserId);
 
             if (seller != null)
-            {
                 // Lọc các BlindBoxUnboxLog theo SellerId thông qua ProductId
                 query = query.Where(x => _unitOfWork.Products.GetQueryable()
                     .Any(p => p.Id == x.ProductId && p.SellerId == seller.Id));
-            }
             else
-            {
                 // Nếu không tìm thấy Seller, trả về một query rỗng để không trả về dữ liệu nào
                 return new Pagination<UnboxLogDto>();
-            }
         }
 
         // Áp dụng filter theo userId
@@ -326,13 +400,9 @@ public class UnboxingService : IUnboxingService
 
             // Highlight selected item
             if (kvp.Key.Id == selectedItem.Id)
-            {
                 sb.AppendLine($"{cyan}- **{index}. Sản phẩm: {itemName} (ĐÃ CHỌN){reset}**");
-            }
             else
-            {
                 sb.AppendLine($"- {index}. Sản phẩm: {itemName}");
-            }
 
             sb.AppendLine($"  - Độ hiếm: {rarity}");
             sb.AppendLine($"  - Tỷ lệ Drop: {dropRate}%");
@@ -419,12 +489,12 @@ public class UnboxingService : IUnboxingService
         if (customerBox == null || customerBox.UserId != userId || customerBox.IsDeleted || customerBox.IsOpened)
         {
             var msg = customerBox == null
-                ? "Không tìm thấy hộp hợp lệ để mở."
+                ? "Không tìm thấy hộp của bạn. Vui lòng kiểm tra lại."
                 : customerBox.IsDeleted
-                    ? "Hộp không hợp lệ (đã bị xóa)."
+                    ? "Hộp này không còn hợp lệ hoặc đã bị xóa."
                     : customerBox.IsOpened
-                        ? "Hộp đã được mở trước đó."
-                        : "Không có quyền mở hộp này.";
+                        ? "Bạn đã mở hộp này rồi. Mỗi hộp chỉ được mở một lần."
+                        : "Bạn không có quyền thực hiện hành động này với hộp của người khác.";
             throw ErrorHelper.BadRequest(msg);
         }
 

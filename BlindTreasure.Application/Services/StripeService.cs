@@ -49,7 +49,8 @@ public class StripeService : IStripeService
         var groupSession = await _unitOfWork.GroupPaymentSessions
             .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
 
-        if (groupSession != null && groupSession.ExpiresAt > DateTime.UtcNow && !groupSession.IsCompleted) // kiểm tra chưa hết hạn
+        if (groupSession != null && groupSession.ExpiresAt > DateTime.UtcNow &&
+            !groupSession.IsCompleted) // kiểm tra chưa hết hạn
             // Session still valid
             return groupSession.PaymentUrl;
 
@@ -279,10 +280,10 @@ public class StripeService : IStripeService
             // 5. Chuẩn bị shipmentDescriptions (nếu cần)
             var shipmentDescriptions = new List<string>();
             foreach (var od in order.OrderDetails)
-                foreach (var s in od.Shipments)
-                    shipmentDescriptions.Add(
-                        $"#{od.Id}: {s.Provider} - mã {s.OrderCode ?? "N/A"} - phí {s.TotalFee:N0}đ - trạng thái {s.Status}"
-                    );
+            foreach (var s in od.Shipments)
+                shipmentDescriptions.Add(
+                    $"#{od.Id}: {s.Provider} - mã {s.OrderCode ?? "N/A"} - phí {s.TotalFee:N0}đ - trạng thái {s.Status}"
+                );
 
             var shipmentDesc = shipmentDescriptions.Any()
                 ? string.Join(" | ", shipmentDescriptions)
@@ -452,27 +453,25 @@ public class StripeService : IStripeService
     /// <summary>
     /// Vô hiệu hóa session thanh toán Stripe (hủy PaymentIntent và xóa coupon nếu còn hiệu lực)
     /// </summary>
-    public async Task<GroupPaymentSession> DisableStripeGroupPaymentSessionAsync(Guid checkoutGroupId, List<Order> orders)
+    public async Task<GroupPaymentSession> DisableStripeGroupPaymentSessionAsync(Guid checkoutGroupId,
+        List<Order> orders)
     {
         var groupSession = await _unitOfWork.GroupPaymentSessions
             .FirstOrDefaultAsync(s => s.CheckoutGroupId == checkoutGroupId && !s.IsCompleted);
-       
+
 
         if (groupSession == null)
             throw ErrorHelper.NotFound("Không tìm thấy session group thanh toán cho nhóm đơn hàng.");
 
-        groupSession.IsCompleted= true;
+        groupSession.IsCompleted = true;
         groupSession.ExpiresAt = DateTime.UtcNow; // Đánh dấu là đã hủy
 
         foreach (var order in orders)
-        {
             // Xử lý hủy thanh toán cho từng đơn hàng
             await DisableStripeOrderPaymentSessionAsync(order.Id);
-        }
 
         // Ưu tiên hủy Session trước
         if (!string.IsNullOrWhiteSpace(groupSession.StripeSessionId))
-        {
             try
             {
                 var sessionService = new SessionService(_stripeClient);
@@ -480,16 +479,13 @@ public class StripeService : IStripeService
 
                 // Chỉ expire session nếu chưa thanh toán và chưa hết hạn
                 if (session.PaymentStatus == "unpaid" && session.Status != "expired")
-                {
                     await sessionService.ExpireAsync(session.Id);
-                }
             }
             catch (StripeException ex)
             {
                 // Log lỗi nhưng không throw
                 Console.WriteLine(ex + $"Failed to expire Stripe session: {groupSession.StripeSessionId}");
             }
-        }
 
         // Hủy PaymentIntent nếu còn hiệu lực
         if (!string.IsNullOrWhiteSpace(groupSession.PaymentIntentId))
@@ -499,7 +495,6 @@ public class StripeService : IStripeService
                 var paymentIntent = await paymentIntentService.GetAsync(groupSession.PaymentIntentId);
                 if (paymentIntent != null && paymentIntent.Status == "requires_payment_method")
                     await paymentIntentService.CancelAsync(groupSession.PaymentIntentId);
-
             }
             catch (StripeException)
             {
@@ -522,7 +517,6 @@ public class StripeService : IStripeService
 
         // Ưu tiên hủy Session trước
         if (!string.IsNullOrWhiteSpace(order.Payment.SessionId))
-        {
             try
             {
                 var sessionService = new SessionService(_stripeClient);
@@ -540,32 +534,24 @@ public class StripeService : IStripeService
                 // Log lỗi nhưng không throw
                 Console.WriteLine(ex + $"Failed to expire Stripe session: {order.Payment.SessionId}");
             }
-        }
 
         // Hủy PaymentIntent nếu có (cho trường hợp đã tạo)
         if (!string.IsNullOrWhiteSpace(order.Payment.PaymentIntentId))
-        {
             try
             {
                 var paymentIntentService = new PaymentIntentService(_stripeClient);
                 var paymentIntent = await paymentIntentService.GetAsync(order.Payment.PaymentIntentId);
 
                 if (paymentIntent.Status == "requires_payment_method")
-                {
                     await paymentIntentService.CancelAsync(order.Payment.PaymentIntentId);
-                }
             }
             catch (StripeException)
             {
                 // Bỏ qua nếu PaymentIntent không tồn tại
             }
-        }
 
         // Xóa coupon nếu có
-        if (!string.IsNullOrWhiteSpace(order.Payment.CouponId))
-        {
-            await CleanupStripeCoupon(order.Payment.CouponId);
-        }
+        if (!string.IsNullOrWhiteSpace(order.Payment.CouponId)) await CleanupStripeCoupon(order.Payment.CouponId);
     }
 
 
@@ -618,7 +604,6 @@ public class StripeService : IStripeService
                 CreatedBy = userId,
                 Transactions = new List<Transaction>(),
                 CouponId = couponId
-               
             };
             payment = await _unitOfWork.Payments.AddAsync(payment);
 
