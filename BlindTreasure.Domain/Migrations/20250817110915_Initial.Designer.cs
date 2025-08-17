@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    [Migration("20250816190731_promotionUserUsage")]
-    partial class promotionUserUsage
+    [Migration("20250817110915_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -800,8 +800,9 @@ namespace BlindTreasure.Domain.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<int?>("Tier")
-                        .HasColumnType("integer");
+                    b.Property<string>("Tier")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1675,6 +1676,9 @@ namespace BlindTreasure.Domain.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<int>("ReservedInBlindBox")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("SellerId")
                         .HasColumnType("uuid");
 
@@ -1683,7 +1687,7 @@ namespace BlindTreasure.Domain.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<int>("Stock")
+                    b.Property<int>("TotalStockQuantity")
                         .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")

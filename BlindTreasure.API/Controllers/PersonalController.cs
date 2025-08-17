@@ -68,9 +68,9 @@ public class PersonalController : ControllerBase
             var userId = _claimsService.CurrentUserId;
             var result = await _userService.GetUserDetailsByIdAsync(userId);
             if (result == null)
-                return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
+                return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy người dùng."));
 
-            return Ok(ApiResult<UserDto>.Success(result, "200", "Lấy thông tin user thành công."));
+            return Ok(ApiResult<UserDto>.Success(result, "200", "Lấy thông tin người dùng thành công."));
         }
         catch (Exception ex)
         {
@@ -116,13 +116,13 @@ public class PersonalController : ControllerBase
         var userId = _claimsService.CurrentUserId;
 
         if (file.Length == 0)
-            return BadRequest(ApiResult.Failure("400", "File không hợp lệ."));
+            return BadRequest(ApiResult.Failure("400", "Tập tin không hợp lệ."));
 
         var result = await _userService.UploadAvatarAsync(userId, file);
         if (result == null)
-            return BadRequest(ApiResult.Failure("400", "Không thể cập nhật avatar."));
+            return BadRequest(ApiResult.Failure("400", "Không thể cập nhật ảnh đại diện."));
 
-        return Ok(ApiResult<UpdateAvatarResultDto>.Success(result, "200", "Cập nhật avatar thành công."));
+        return Ok(ApiResult<UpdateAvatarResultDto>.Success(result, "200", "Cập nhật ảnh đại diện thành công."));
     }
 
     /// <summary>
@@ -138,7 +138,7 @@ public class PersonalController : ControllerBase
         {
             var userId = _claimsService.CurrentUserId;
             var result = await _sellerService.UpdateSellerInfoAsync(userId, dto);
-            return Ok(ApiResult<object>.Success(result, "200", "Cập nhật hồ sơ Seller thành công."));
+            return Ok(ApiResult<object>.Success(result, "200", "Cập nhật hồ sơ người bán thành công."));
         }
         catch (Exception ex)
         {
@@ -295,7 +295,7 @@ public class PersonalController : ControllerBase
         {
             var userId = _claimsService.CurrentUserId;
             var avatarUrl = await _sellerService.UpdateSellerAvatarAsync(userId, file);
-            return Ok(ApiResult<string>.Success(avatarUrl, "200", "Cập nhật avatar Seller thành công."));
+            return Ok(ApiResult<string>.Success(avatarUrl, "200", "Cập nhật ảnh đại diện người bán thành công."));
         }
         catch (Exception ex)
         {

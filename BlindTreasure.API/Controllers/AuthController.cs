@@ -38,7 +38,7 @@ public class AuthController : ControllerBase
         try
         {
             var result = await _authService.RegisterCustomerAsync(dto);
-            return Ok(ApiResult<UserDto>.Success(result!, "200", "Đăng ký thành công."));
+            return Ok(ApiResult<UserDto>.Success(result!, "200", "Đăng ký tài khoản khách hàng thành công."));
         }
         catch (Exception ex)
         {
@@ -56,7 +56,7 @@ public class AuthController : ControllerBase
         try
         {
             var result = await _authService.RegisterSellerAsync(dto);
-            return Ok(ApiResult<UserDto>.Success(result!, "200", "Đăng ký seller thành công."));
+            return Ok(ApiResult<UserDto>.Success(result!, "200", "Đăng ký tài khoản người bán thành công."));
         }
         catch (Exception ex)
         {
@@ -74,7 +74,7 @@ public class AuthController : ControllerBase
         try
         {
             var result = await _authService.LoginAsync(dto, _configuration);
-            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập thành công."));
+            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập thành công. Chào mừng bạn trở lại!"));
         }
         catch (Exception ex)
         {
@@ -95,7 +95,7 @@ public class AuthController : ControllerBase
         {
             var userId = _claimsService.CurrentUserId;
             var result = await _authService.LogoutAsync(userId);
-            return Ok(ApiResult<object>.Success(result!, "200", "Đăng xuất thành công. "));
+            return Ok(ApiResult<object>.Success(result!, "200", "Đăng xuất thành công. Hẹn gặp lại bạn!"));
         }
         catch (Exception ex)
         {
@@ -115,7 +115,7 @@ public class AuthController : ControllerBase
         try
         {
             var result = await _authService.RefreshTokenAsync(requestToken, _configuration);
-            return Ok(ApiResult<object>.Success(result!, "200", "Refresh Token successfully"));
+            return Ok(ApiResult<object>.Success(result!, "200", "Làm mới phiên đăng nhập thành công."));
         }
         catch (Exception ex)
         {
@@ -132,9 +132,9 @@ public class AuthController : ControllerBase
     {
         var verified = await _authService.VerifyEmailOtpAsync(dto.Email, dto.Otp);
         if (!verified)
-            return BadRequest(ApiResult.Failure("400", "OTP không hợp lệ hoặc đã hết hạn."));
+            return BadRequest(ApiResult.Failure("400", "Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng thử lại."));
 
-        return Ok(ApiResult.Success("200", "Xác thực thành công. Tài khoản đã được kích hoạt."));
+        return Ok(ApiResult.Success("200", "Xác thực thành công. Tài khoản của bạn đã được kích hoạt."));
     }
 
     [HttpPost("resend-otp")]
@@ -145,7 +145,7 @@ public class AuthController : ControllerBase
         try
         {
             var sent = await _authService.ResendOtpAsync(dto.Email, dto.Type);
-            return Ok(ApiResult<object>.Success(sent!, "200", "OTP đã được gửi thành công."));
+            return Ok(ApiResult<object>.Success(sent!, "200", "Mã OTP đã được gửi lại thành công. Vui lòng kiểm tra email của bạn."));
         }
         catch (Exception ex)
         {
@@ -162,8 +162,8 @@ public class AuthController : ControllerBase
     {
         var reset = await _authService.ResetPasswordAsync(dto.Email, dto.Otp, dto.NewPassword);
         if (!reset)
-            return BadRequest(ApiResult.Failure("400", "OTP không hợp lệ, đã hết hạn hoặc dữ liệu không hợp lệ."));
-        return Ok(ApiResult.Success("200", "Mật khẩu đã được đặt lại thành công."));
+            return BadRequest(ApiResult.Failure("400", "Mã OTP không hợp lệ, đã hết hạn hoặc thông tin đặt lại mật khẩu không chính xác."));
+        return Ok(ApiResult.Success("200", "Mật khẩu của bạn đã được đặt lại thành công."));
     }
 
     /// <summary>
@@ -177,7 +177,7 @@ public class AuthController : ControllerBase
         try
         {
             if (string.IsNullOrWhiteSpace(dto.Token))
-                return BadRequest(ApiResult.Failure("400", "Token Google không hợp lệ."));
+                return BadRequest(ApiResult.Failure("400", "Token Google không hợp lệ. Vui lòng thử lại."));
 
             var user = await _oAuthService.AuthenticateWithGoogle(dto.Token);
             var loginDto = new LoginRequestDto
@@ -189,7 +189,7 @@ public class AuthController : ControllerBase
 
             var result = await _authService.LoginAsync(loginDto, _configuration);
 
-            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập thành công."));
+            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập bằng Google thành công. Chào mừng bạn trở lại!"));
         }
         catch (Exception ex)
         {

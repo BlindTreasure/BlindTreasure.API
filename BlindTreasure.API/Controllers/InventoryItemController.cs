@@ -49,7 +49,7 @@ public class InventoryItemController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách inventory thành công."));
+            }, "200", "Danh sách vật phẩm trong kho của bạn đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -76,7 +76,7 @@ public class InventoryItemController : ControllerBase
             var result = await _inventoryItemService.CreateAsync(dto, null);
             _logger.Success(
                 $"[InventoryItemController][Create] Tạo inventory item mới thành công cho product {dto.ProductId}.");
-            return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Tạo inventory item thành công."));
+            return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Vật phẩm trong kho đã được tạo thành công."));
         }
         catch (Exception ex)
         {
@@ -94,7 +94,7 @@ public class InventoryItemController : ControllerBase
         {
             var result = await _inventoryItemService.GetMyUnboxedItemsFromBlindBoxAsync(blindBoxId);
             return Ok(ApiResult<List<InventoryItemDto>>.Success(result, "200",
-                "Lấy sản phẩm đã mở từ blind box thành công."));
+                "Các vật phẩm đã mở từ Blind Box đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -120,11 +120,11 @@ public class InventoryItemController : ControllerBase
             if (item == null)
             {
                 _logger.Warn($"[InventoryItemController][GetById] Không tìm thấy inventory item {id}");
-                return NotFound(ApiResult<object>.Failure("404", "Không tìm thấy inventory item."));
+                return NotFound(ApiResult<object>.Failure("404", "Không tìm thấy vật phẩm trong kho."));
             }
 
             _logger.Info($"[InventoryItemController][GetById] Lấy chi tiết inventory item {id} thành công.");
-            return Ok(ApiResult<InventoryItemDto>.Success(item, "200", "Lấy chi tiết inventory item thành công."));
+            return Ok(ApiResult<InventoryItemDto>.Success(item, "200", "Thông tin chi tiết vật phẩm trong kho đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -150,7 +150,7 @@ public class InventoryItemController : ControllerBase
         {
             var result = await _inventoryItemService.UpdateAsync(id, dto);
             _logger.Success($"[InventoryItemController][Update] Cập nhật inventory item {id} thành công.");
-            return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Cập nhật inventory item thành công."));
+            return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Vật phẩm trong kho đã được cập nhật thành công."));
         }
         catch (Exception ex)
         {
@@ -176,11 +176,11 @@ public class InventoryItemController : ControllerBase
             if (!success)
             {
                 _logger.Warn($"[InventoryItemController][Delete] Không tìm thấy inventory item {id}");
-                return NotFound(ApiResult<object>.Failure("404", "Không tìm thấy inventory item."));
+                return NotFound(ApiResult<object>.Failure("404", "Không tìm thấy vật phẩm trong kho để xóa."));
             }
 
             _logger.Success($"[InventoryItemController][Delete] Xóa inventory item {id} thành công.");
-            return Ok(ApiResult<object>.Success(null, "200", "Xóa inventory item thành công."));
+            return Ok(ApiResult<object>.Success(null, "200", "Vật phẩm trong kho đã được xóa thành công."));
         }
         catch (Exception ex)
         {
@@ -206,7 +206,7 @@ public class InventoryItemController : ControllerBase
             var result = await _inventoryItemService.RequestShipmentAsync(request);
             _logger.Success(
                 $"[InventoryItemController][RequestShipment] Đã tạo yêu cầu giao hàng cho list item {request.InventoryItemIds}.");
-            return Ok(ApiResult<ShipmentItemResponseDTO>.Success(result, "200", "Yêu cầu giao hàng thành công."));
+            return Ok(ApiResult<ShipmentItemResponseDTO>.Success(result, "200", "Yêu cầu giao hàng đã được tạo thành công."));
         }
         catch (Exception ex)
         {
@@ -234,7 +234,7 @@ public class InventoryItemController : ControllerBase
             _logger.Success(
                 $"[RequestPreviewShipmentForListItems][RequestShipment] Đã tạo yêu cầu preview đơn giao hàng cho list item: {requests.InventoryItemIds}.");
             return Ok(ApiResult<List<ShipmentCheckoutResponseDTO>>.Success(result, "200",
-                "Yêu cầu xem trước đơn giao hàng thành công."));
+                "Xem trước đơn hàng vận chuyển đã được tạo thành công."));
         }
         catch (Exception ex)
         {

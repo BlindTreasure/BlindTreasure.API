@@ -46,7 +46,7 @@ public class SellerController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách sellers thành công."));
+            }, "200", "Lấy danh sách người bán thành công."));
         }
         catch (Exception ex)
         {
@@ -67,7 +67,7 @@ public class SellerController : ControllerBase
         try
         {
             var data = await _sellerService.GetSellerProfileByIdAsync(id);
-            return Ok(ApiResult<object>.Success(data, "200", "Lấy thông tin của Seller thành công."));
+            return Ok(ApiResult<object>.Success(data, "200", "Lấy thông tin của người bán thành công."));
         }
         catch (Exception ex)
         {
@@ -108,8 +108,7 @@ public class SellerController : ControllerBase
             await _sellerVerificationService.VerifySellerAsync(sellerId, dto);
 
             var msg = dto.IsApproved
-                ? "Seller đã được xác minh."
-                : $"Seller đã bị từ chối. Lý do: {dto.RejectReason ?? "Không có"}";
+                ? "Người bán đã được xác minh." : "Người bán đã bị từ chối. Lý do: " + (dto.RejectReason ?? "Không có");
 
             return Ok(ApiResult.Success("200", msg));
         }

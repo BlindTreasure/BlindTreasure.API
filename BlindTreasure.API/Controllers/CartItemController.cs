@@ -29,7 +29,7 @@ public class CartItemController : ControllerBase
         try
         {
             var cart = await _cartItemService.GetCurrentUserCartAsync();
-            return Ok(ApiResult<CartDto>.Success(cart));
+            return Ok(ApiResult<CartDto>.Success(cart, "200", "Giỏ hàng của bạn đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -50,7 +50,7 @@ public class CartItemController : ControllerBase
         try
         {
             var result = await _cartItemService.UpdateCartItemAsync(dto);
-            return Ok(ApiResult<CartDto>.Success(result, "200", "Cập nhật giỏ hàng thành công."));
+            return Ok(ApiResult<CartDto>.Success(result, "200", "Giỏ hàng đã được cập nhật thành công."));
         }
         catch (Exception ex)
         {
@@ -72,7 +72,7 @@ public class CartItemController : ControllerBase
         try
         {
             var result = await _cartItemService.RemoveCartItemAsync(id);
-            return Ok(ApiResult<CartDto>.Success(result, "200", "Xóa item khỏi giỏ hàng thành công."));
+            return Ok(ApiResult<CartDto>.Success(result, "200", "Vật phẩm đã được xóa khỏi giỏ hàng thành công."));
         }
         catch (Exception ex)
         {
@@ -90,7 +90,7 @@ public class CartItemController : ControllerBase
     public async Task<IActionResult> ClearCart()
     {
         await _cartItemService.ClearCartAsync();
-        return Ok(ApiResult<object>.Success(null, "200", "Đã xóa toàn bộ giỏ hàng."));
+        return Ok(ApiResult<object>.Success(null, "200", "Toàn bộ giỏ hàng của bạn đã được xóa."));
     }
 
     /// <summary>
@@ -104,7 +104,7 @@ public class CartItemController : ControllerBase
         try
         {
             var result = await _cartItemService.AddToCartAsync(dto);
-            return Ok(ApiResult<CartDto>.Success(result, "200", "Thêm vào giỏ hàng thành công."));
+            return Ok(ApiResult<CartDto>.Success(result, "200", "Vật phẩm đã được thêm vào giỏ hàng thành công."));
         }
         catch (Exception ex)
         {

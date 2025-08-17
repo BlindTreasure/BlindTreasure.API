@@ -30,7 +30,7 @@ public class ReviewController : ControllerBase
         try
         {
             var result = await _reviewService.CreateReviewAsync(createDto);
-            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Đánh giá được tạo thành công"));
+            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Đánh giá được tạo thành công."));
         }
         catch (Exception ex)
         {
@@ -55,7 +55,7 @@ public class ReviewController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách thành công."));
+            }, "200", "Lấy danh sách đánh giá thành công."));
         }
         catch (Exception ex)
         {
@@ -78,7 +78,7 @@ public class ReviewController : ControllerBase
         try
         {
             var result = await _reviewService.ReplyToReviewAsync(reviewId, replyDto.Content);
-            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Phản hồi đánh giá thành công"));
+            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Phản hồi đánh giá thành công."));
         }
         catch (Exception ex)
         {
@@ -99,7 +99,7 @@ public class ReviewController : ControllerBase
         try
         {
             var result = await _reviewService.GetByIdAsync(reviewId);
-            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Xem chi tiết review thành công"));
+            return Ok(ApiResult<ReviewResponseDto>.Success(result, "200", "Xem chi tiết đánh giá thành công."));
         }
         catch (Exception ex)
         {

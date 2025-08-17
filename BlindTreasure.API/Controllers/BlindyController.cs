@@ -21,7 +21,7 @@ public class BlindyController : ControllerBase
         try
         {
             var response = await _blindyService.AskGeminiAsync(prompt);
-            return Ok(ApiResult<string>.Success(response));
+            return Ok(ApiResult<string>.Success(response, "200", "Phản hồi từ Gemini đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -38,7 +38,7 @@ public class BlindyController : ControllerBase
         try
         {
             var result = await _blindyService.AnalyzeUsersWithAi();
-            return Ok(ApiResult<string>.Success(result));
+            return Ok(ApiResult<string>.Success(result, "200", "Phân tích người dùng bằng AI đã hoàn tất."));
         }
         catch (Exception ex)
         {
@@ -55,7 +55,7 @@ public class BlindyController : ControllerBase
         try
         {
             var result = await _blindyService.GetProductsForAiAnalysisAsync();
-            return Ok(ApiResult<string>.Success(result));
+            return Ok(ApiResult<string>.Success(result, "200", "Phân tích sản phẩm bằng AI đã hoàn tất."));
         }
         catch (Exception ex)
         {

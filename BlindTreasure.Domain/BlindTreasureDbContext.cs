@@ -64,11 +64,18 @@ public class BlindTreasureDbContext : DbContext
 
         #region enums converter
 
+        modelBuilder.Entity<RarityConfig>()
+            .Property(c => c.Name)
+            .HasConversion<string>()
+            .HasMaxLength(32);
+        modelBuilder.Entity<InventoryItem>()
+            .Property(c => c.Tier)
+            .HasConversion<string>()
+            .HasMaxLength(32);
         modelBuilder.Entity<ChatMessage>()
             .Property(c => c.MessageType)
             .HasConversion<string>()
             .HasMaxLength(32);
-
         modelBuilder.Entity<ChatMessage>()
             .Property(m => m.SenderType)
             .HasConversion<string>()

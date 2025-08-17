@@ -530,11 +530,12 @@ public class UnboxingService : IUnboxingService
             Id = Guid.NewGuid(),
             ProductId = selectedItem.ProductId,
             UserId = userId,
-            Location = defaultAddress?.Province ?? "HCM", // giữ "HCM" nếu không có
+            Location = defaultAddress?.Province ?? "HCM",
             Status = InventoryItemStatus.Available,
             AddressId = defaultAddress?.Id,
             IsFromBlindBox = true,
             SourceCustomerBlindBoxId = customerBox.Id,
+            Tier = selectedItem.RarityConfig.Name,
             CreatedAt = now,
             CreatedBy = userId,
             OrderDetailId = customerBox.OrderDetailId
@@ -551,7 +552,7 @@ public class UnboxingService : IUnboxingService
 
     private async Task NotifyOutOfStockAsync(BlindBox blindBox, BlindBoxItem item)
     {
-        blindBox.Status = BlindBoxStatus.Rejected; // hoặc enum riêng như Disabled/OutOfStock nếu có
+        blindBox.Status = BlindBoxStatus.Rejected;
         await _unitOfWork.BlindBoxes.Update(blindBox);
 
         var sellerUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);

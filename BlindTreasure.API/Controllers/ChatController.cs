@@ -50,7 +50,7 @@ public class ChatController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách cuộc trò chuyện thành công."));
+            }, "200", "Danh sách cuộc trò chuyện của bạn đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -72,7 +72,7 @@ public class ChatController : ControllerBase
         {
             var currentUserId = _claimsService.CurrentUserId;
             var count = await _chatMessageService.GetUnreadMessageCountAsync(currentUserId);
-            return Ok(ApiResult<int>.Success(count, "200", "Lấy số tin nhắn chưa đọc thành công."));
+            return Ok(ApiResult<int>.Success(count, "200", "Số lượng tin nhắn chưa đọc đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -102,7 +102,7 @@ public class ChatController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy lịch sử tin nhắn thành công."));
+            }, "200", "Lịch sử tin nhắn đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -132,7 +132,7 @@ public class ChatController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy lịch sử chat với AI thành công."));
+            }, "200", "Lịch sử chat với AI đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -154,7 +154,7 @@ public class ChatController : ControllerBase
         {
             var senderId = _claimsService.CurrentUserId;
             await _chatMessageService.SaveMessageAsync(senderId, request.ReceiverId, request.Content);
-            return Ok(ApiResult.Success("200", "Gửi tin nhắn thành công"));
+            return Ok(ApiResult.Success("200", "Tin nhắn đã được gửi thành công."));
         }
         catch (Exception ex)
         {
@@ -176,7 +176,7 @@ public class ChatController : ControllerBase
             // Gọi service để xử lý tất cả logic
             await _chatMessageService.UploadAndSendImageMessageAsync(senderId, receiverId, imageFile);
 
-            return Ok(ApiResult.Success("200", "Gửi ảnh thành công."));
+            return Ok(ApiResult.Success("200", "Ảnh đã được gửi thành công."));
         }
         catch (Exception ex)
         {
@@ -201,7 +201,7 @@ public class ChatController : ControllerBase
         {
             var senderId = _claimsService.CurrentUserId;
             await _chatMessageService.ShareInventoryItemAsync(senderId, receiverId, inventoryItemId, customMessage);
-            return Ok(ApiResult.Success("200", "Chia sẻ thông tin vật phẩm thành công."));
+            return Ok(ApiResult.Success("200", "Thông tin vật phẩm đã được chia sẻ thành công."));
         }
         catch (Exception ex)
         {
@@ -224,7 +224,7 @@ public class ChatController : ControllerBase
         {
             var currentUserId = _claimsService.CurrentUserId;
             await _chatMessageService.MarkMessagesAsReadAsync(fromUserId, currentUserId);
-            return Ok(ApiResult.Success("200", "Đánh dấu đã đọc thành công"));
+            return Ok(ApiResult.Success("200", "Tin nhắn đã được đánh dấu là đã đọc thành công."));
         }
         catch (Exception ex)
         {
@@ -246,7 +246,7 @@ public class ChatController : ControllerBase
         {
             var currentUserId = _claimsService.CurrentUserId;
             await _chatMessageService.MarkConversationAsReadAsync(currentUserId, otherUserId);
-            return Ok(ApiResult.Success("200", "Đánh dấu cuộc trò chuyện đã đọc thành công"));
+            return Ok(ApiResult.Success("200", "Cuộc trò chuyện đã được đánh dấu là đã đọc thành công."));
         }
         catch (Exception ex)
         {

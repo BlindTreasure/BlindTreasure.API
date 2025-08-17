@@ -37,7 +37,7 @@ public class NotificationController : ControllerBase
                 pageIndex,
                 pageSize,
                 items
-            }));
+            }, "200", "Danh sách thông báo đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -54,7 +54,7 @@ public class NotificationController : ControllerBase
         {
             var userId = _claimsService.CurrentUserId;
             var count = await _notificationService.GetUnreadNotificationsCount(userId);
-            return Ok(ApiResult<int>.Success(count));
+            return Ok(ApiResult<int>.Success(count, "200", "Số lượng thông báo chưa đọc đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -72,7 +72,7 @@ public class NotificationController : ControllerBase
         {
             var userId = _claimsService.CurrentUserId;
             await _notificationService.ReadAllNotifications(userId);
-            return Ok(ApiResult.Success("200", "Đã đọc tất cả thông báo"));
+            return Ok(ApiResult.Success("200", "Tất cả thông báo đã được đánh dấu là đã đọc."));
         }
         catch (Exception ex)
         {
@@ -88,7 +88,7 @@ public class NotificationController : ControllerBase
         try
         {
             var result = await _notificationService.ReadNotification(id);
-            return Ok(ApiResult<object>.Success(result));
+            return Ok(ApiResult<object>.Success(result, "200", "Thông báo đã được đánh dấu là đã đọc."));
         }
         catch (Exception ex)
         {
@@ -104,7 +104,7 @@ public class NotificationController : ControllerBase
         try
         {
             await _notificationService.DeleteNotification(id);
-            return Ok(ApiResult.Success("200", "Xóa thông báo thành công"));
+            return Ok(ApiResult.Success("200", "Thông báo đã được xóa thành công."));
         }
         catch (Exception ex)
         {

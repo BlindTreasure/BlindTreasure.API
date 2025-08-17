@@ -41,7 +41,7 @@ public class BlindBoxesController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách Blind Box thành công."));
+            }, "200", "Danh sách Blind Box đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -65,7 +65,7 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.GetBlindBoxByIdAsync(id);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Lấy thông tin Blind Box thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Thông tin chi tiết Blind Box đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -89,7 +89,7 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.CreateBlindBoxAsync(dto);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "201", "Tạo Blind Box thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "201", "Blind Box đã được tạo thành công."));
         }
         catch (Exception ex)
         {
@@ -110,7 +110,7 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.UpdateBlindBoxAsync(id, dto);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Cập nhật Blind Box thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Blind Box đã được cập nhật thành công."));
         }
         catch (Exception ex)
         {
@@ -136,7 +136,7 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.AddItemsToBlindBoxAsync(id, items);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Thêm item vào Blind Box thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Vật phẩm đã được thêm vào Blind Box thành công."));
         }
         catch (Exception ex)
         {
@@ -160,7 +160,7 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.SubmitBlindBoxAsync(id);
-            return Ok(ApiResult<object>.Success(result, "200", "Gửi duyệt Blind Box thành công."));
+            return Ok(ApiResult<object>.Success(result, "200", "Yêu cầu duyệt Blind Box đã được gửi thành công."));
         }
         catch (Exception ex)
         {
@@ -186,7 +186,7 @@ public class BlindBoxesController : ControllerBase
         {
             var result = await _blindBoxService.ReviewBlindBoxAsync(id, request.Approve, request.RejectReason);
             return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200",
-                request.Approve ? "Phê duyệt thành công." : "Từ chối thành công."));
+                request.Approve ? "Blind Box đã được phê duyệt." : "Blind Box đã bị từ chối."));
         }
         catch (Exception ex)
         {
@@ -213,7 +213,7 @@ public class BlindBoxesController : ControllerBase
         {
             var result = await _blindBoxService.ClearItemsFromBlindBoxAsync(id);
             return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200",
-                "Xoá toàn bộ item trong Blind Box thành công."));
+                "Tất cả vật phẩm trong Blind Box đã được xóa thành công."));
         }
         catch (Exception ex)
         {
@@ -237,7 +237,7 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.DeleteBlindBoxAsync(id);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Xoá Blind Box thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Blind Box đã được xóa thành công."));
         }
         catch (Exception ex)
         {
