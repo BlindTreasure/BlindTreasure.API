@@ -673,12 +673,14 @@ public class BlindBoxService : IBlindBoxService
             if (requiredQuantity > product.TotalStockQuantity)
             {
                 throw ErrorHelper.BadRequest(
-                        $"Sản phẩm '{product.Name}' không đủ số lượng hiện có. " +
-                        $"Cần {requiredQuantity}, nhưng chỉ có {product.TotalStockQuantity}."
-                    );
+                    $"Sản phẩm '{product.Name}' không đủ số lượng hiện có. " +
+                    $"Do BlindBox có {blindBox.TotalQuantity} hộp, mỗi hộp cần {item.Quantity} sản phẩm, " +
+                    $"nên tổng cộng cần {requiredQuantity}, nhưng chỉ có {product.TotalStockQuantity}."
+                );
             }
         }
     }
+
 
     
     private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemRequestDto> items)
