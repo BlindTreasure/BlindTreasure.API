@@ -1,8 +1,9 @@
-﻿using BlindTreasure.Domain.DTOs.UserDTOs;
+﻿using BlindTreasure.Domain.DTOs.AuthenDTOs;
+using BlindTreasure.Domain.DTOs.UserDTOs;
 
 namespace BlindTreasure.Infrastructure.Interfaces;
 
 public interface IOAuthService
 {
-    Task<UserDto> AuthenticateWithGoogle(string token);
+    Task<LoginResponseDto> AuthenticateWithGoogle(string token);
 }

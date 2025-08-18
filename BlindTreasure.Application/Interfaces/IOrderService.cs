@@ -2,6 +2,7 @@ using BlindTreasure.Domain.DTOs.CartItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
+using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Commons;
 
 namespace BlindTreasure.Application.Interfaces;
@@ -21,4 +22,5 @@ public interface IOrderService
 
     Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(List<CartSellerItemDto> items,
         bool? IsPreview = false);
+    Task RollbackOrderInventoryAndPromotionAsync(Order order);
 }

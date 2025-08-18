@@ -1,13 +1,14 @@
-﻿using System.Security.Cryptography;
-using System.Text;
-using BlindTreasure.Application.Interfaces;
+﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Google.Apis.Auth;
 using Microsoft.Extensions.Configuration;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace BlindTreasure.Application.Services;
 
@@ -18,8 +19,9 @@ public class OAuthService : IOAuthService
     private readonly IUserService _userService;
     private readonly string clientId;
     private readonly string passwordCharacters;
+    public readonly IAuthService _authService;
 
-    public OAuthService(IUserService userService, IUnitOfWork unitOfWork, IConfiguration configuration)
+    public OAuthService(IUserService userService, IUnitOfWork unitOfWork, IConfiguration configuration, IAuthService authService)
     {
         _userService = userService;
         _unitOfWork = unitOfWork;
@@ -28,10 +30,11 @@ public class OAuthService : IOAuthService
                    throw new Exception("Missing google client Id in config");
         passwordCharacters = _configuration["OAuthSettings:PasswordCharacters"] ??
                              throw new Exception("Missing google oauth setting in config");
+        _authService = authService;
     }
 
 
-    public async Task<UserDto> AuthenticateWithGoogle(string token)
+    public async Task<LoginResponseDto> AuthenticateWithGoogle(string token)
     {
         if (string.IsNullOrWhiteSpace(clientId)) throw ErrorHelper.BadRequest("Client Id is missing");
 
@@ -57,7 +60,14 @@ public class OAuthService : IOAuthService
         {
             var user = await _userService.GetUserByEmail(payload.Email, true);
             if (user == null) throw ErrorHelper.BadRequest("Account not found");
-            return ToUserDto(user);
+            var result = await _authService.LoginAsync(new LoginRequestDto
+            {
+                Email = user.Email,
+                Password = user.Password, // Mật khẩu tạm thời, sẽ được thay đổi sau khi đăng nhập
+                IsLoginGoole = true // Không cần nhớ đăng nhập cho OAuth
+            }, _configuration);
+
+            return result;
         }
         catch (Exception ex)
         {
@@ -71,16 +81,22 @@ public class OAuthService : IOAuthService
                 {
                     Email = payload.Email,
                     FullName = payload.Name,
-                    Password = passwordCharacters,
+                    Password = "123456",
                     AvatarUrl = payload.Picture,
                     RoleName = RoleType.Customer,
-                    DateOfBirth = DateTime.UtcNow,
                     PhoneNumber = "" // Nếu không có số điện thoại, có thể để trống
                 };
 
-                var result = await _userService.CreateUserAsync(request);
-                if (result == null)
+                var user = await _userService.CreateUserAsync(request);
+                if (user == null)
                     throw ErrorHelper.Internal("Failed to create user");
+
+                var result = await _authService.LoginAsync(new LoginRequestDto
+                {
+                    Email = user.Email,
+                    Password = "123456", // Mật khẩu tạm thời, sẽ được thay đổi sau khi đăng nhập
+                    IsLoginGoole = true // Không cần nhớ đăng nhập cho OAuth
+                }, _configuration);
 
                 return result;
             }
