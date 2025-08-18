@@ -244,14 +244,38 @@ public class SystemController : ControllerBase
                 .ToList();
 
             _logger.Info($"[SeedUserInventory] Đã chọn {selectedBoxes.Count} hộp để unbox");
+    
+            // Tạo UnboxingService với mock ClaimsService
+            var mockClaimsService = new MockClaimsService(user.Id);
 
+            // Lấy các dependencies cần thiết từ DI container
+            var loggerService = HttpContext.RequestServices.GetRequiredService<ILoggerService>();
+            var unitOfWork = HttpContext.RequestServices.GetRequiredService<IUnitOfWork>();
+            var currentTime = HttpContext.RequestServices.GetRequiredService<ICurrentTime>();
+            var notificationService = HttpContext.RequestServices.GetRequiredService<INotificationService>();
+            var notificationHub = HttpContext.RequestServices.GetRequiredService<IHubContext<UnboxingHub>>();
+            var userService =  HttpContext.RequestServices.GetRequiredService<IUserService>();
+            var blinboxService =  HttpContext.RequestServices.GetRequiredService<IBlindBoxService>();
+            // Tạo instance UnboxingService mới với đầy đủ tham số
+            var unboxingService = new UnboxingService(
+                loggerService,
+                unitOfWork,
+                mockClaimsService,
+                currentTime,
+                notificationService,
+                notificationHub,
+                userService,
+                blinboxService// Thêm tham số mới
+            );
+            
+            
             var unboxResults = new List<UnboxResultDto>();
 
             // Unbox từng hộp đã chọn
             foreach (var box in selectedBoxes)
                 try
                 {
-                    var result = await _unboxService.UnboxAsync(box.Id);
+                    var result = await unboxingService.UnboxAsync(box.Id);
                     unboxResults.Add(result);
                 }
                 catch (Exception ex)
@@ -1135,7 +1159,6 @@ public class SystemController : ControllerBase
                 {
                     () => context.ChatMessages.ExecuteDeleteAsync(),
                     () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),
-                    () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerFavourites.ExecuteDeleteAsync(),
                     () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
@@ -1148,6 +1171,7 @@ public class SystemController : ControllerBase
                     () => context.Listings.ExecuteDeleteAsync(),
                     () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
+                    () => context.GroupPaymentSessions.ExecuteDeleteAsync(),
 
                     () => context.TradeHistories.ExecuteDeleteAsync(),
                     () => context.TradeRequests.ExecuteDeleteAsync(),
@@ -1160,6 +1184,7 @@ public class SystemController : ControllerBase
 
                     () => context.Orders.ExecuteDeleteAsync(),
                     () => context.Payments.ExecuteDeleteAsync(),
+                    () => context.PromotionUserUsages.ExecuteDeleteAsync(),
                     () => context.Promotions.ExecuteDeleteAsync(),
                     () => context.PromotionParticipants.ExecuteDeleteAsync(),
                     () => context.Addresses.ExecuteDeleteAsync(),
