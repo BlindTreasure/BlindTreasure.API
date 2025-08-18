@@ -364,7 +364,6 @@ public class ChatMessageService : IChatMessageService
         IQueryable<ChatMessage> query;
 
         if (targetId == Guid.Empty)
-        {
             // Chat User ↔ AI
             query = _unitOfWork.ChatMessages.GetQueryable()
                 .Where(m =>
@@ -374,9 +373,7 @@ public class ChatMessageService : IChatMessageService
                     (m.SenderType == ChatParticipantType.AI && m.ReceiverType == ChatParticipantType.User &&
                      m.ReceiverId == currentUserId)
                 );
-        }
         else
-        {
             // Chat User ↔ User
             query = _unitOfWork.ChatMessages.GetQueryable()
                 .Where(m =>
@@ -386,7 +383,6 @@ public class ChatMessageService : IChatMessageService
                     (m.SenderId == targetId && m.ReceiverId == currentUserId &&
                      m.SenderType == ChatParticipantType.User && m.ReceiverType == ChatParticipantType.User)
                 );
-        }
 
         // ✅ Include đầy đủ InventoryItem quan hệ
         query = query

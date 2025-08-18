@@ -6,6 +6,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
+using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.UnboxDTOs;
 using BlindTreasure.Domain.DTOs.UnboxLogDTOs;
@@ -29,11 +30,12 @@ public class UnboxingService : IUnboxingService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<UnboxingHub> _notificationHub;
     private readonly IUserService _userService;
+    private readonly IBlindBoxService _blindBoxService;
 
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
         ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub,
-        IUserService userService)
+        IUserService userService, IBlindBoxService blindBoxService)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
@@ -42,6 +44,7 @@ public class UnboxingService : IUnboxingService
         _notificationService = notificationService;
         _notificationHub = notificationHub;
         _userService = userService;
+        _blindBoxService = blindBoxService;
     }
 
     public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
@@ -511,20 +514,34 @@ public class UnboxingService : IUnboxingService
     }
 
 
+    /// <summary>
+    /// Cấp vật phẩm mở được cho user, trừ stock, tính lại drop rate và thêm vào inventory
+    /// </summary>
     private async Task GrantUnboxedItemToUser(
         BlindBoxItem selectedItem,
         CustomerBlindBox customerBox,
         Guid userId,
         DateTime now)
     {
+        // 1. Giảm quantity của item vừa unbox
         selectedItem.Quantity--;
 
-        if (selectedItem.Quantity == 0)
-            await NotifyOutOfStockAsync(customerBox.BlindBox, selectedItem);
+        // 2. Nếu blindbox tồn tại → cập nhật drop rate sau khi stock thay đổi
+        if (customerBox.BlindBox != null)
+        {
+            // 2.1. Tính toán lại drop rate của toàn bộ items trong box
+            await UpdateDropRatesAfterUnboxingAsync(customerBox.BlindBox);
 
+            // 2.2. Nếu item vừa unbox hết số lượng → notify out of stock
+            if (selectedItem.Quantity == 0)
+                await NotifyOutOfStockAsync(customerBox.BlindBox, selectedItem);
+        }
+
+        // 3. Lấy địa chỉ mặc định của user để set location cho inventory item
         var defaultAddress = await _unitOfWork.Addresses.GetQueryable()
             .FirstOrDefaultAsync(a => a.UserId == userId && a.IsDefault && !a.IsDeleted);
 
+        // 4. Tạo inventory item mới để thêm vào kho của user
         var inventory = new InventoryItem
         {
             Id = Guid.NewGuid(),
@@ -541,14 +558,71 @@ public class UnboxingService : IUnboxingService
             OrderDetailId = customerBox.OrderDetailId
         };
 
+        // 5. Đánh dấu hộp đã được mở
         customerBox.IsOpened = true;
         customerBox.OpenedAt = now;
 
+        // 6. Lưu thay đổi vào DB
         await _unitOfWork.InventoryItems.AddAsync(inventory);
         await _unitOfWork.CustomerBlindBoxes.Update(customerBox);
         await _unitOfWork.BlindBoxItems.Update(selectedItem);
         await _unitOfWork.SaveChangesAsync();
     }
+
+    /// <summary>
+    /// Cập nhật DropRate cho tất cả item trong BlindBox sau khi stock thay đổi
+    /// </summary>
+    private async Task UpdateDropRatesAfterUnboxingAsync(BlindBox blindBox)
+    {
+        // 1. Load toàn bộ items trong box (bao gồm RarityConfig)
+        var items = await _unitOfWork.BlindBoxItems.GetQueryable()
+            .Include(i => i.RarityConfig)
+            .Where(i => i.BlindBoxId == blindBox.Id && !i.IsDeleted)
+            .ToListAsync();
+
+        if (!items.Any())
+            return;
+
+        // 2. Check rule: nếu có item Common mà hết hàng (Quantity == 0) → disable box
+        if (items.Any(i => i.RarityConfig != null
+                           && i.RarityConfig.Name == RarityName.Common
+                           && i.Quantity == 0))
+        {
+            blindBox.Status = BlindBoxStatus.Disabled;
+            await _unitOfWork.BlindBoxes.Update(blindBox);
+            await _unitOfWork.SaveChangesAsync();
+            return;
+        }
+
+        // 3. Convert sang DTO để gọi CalculateDropRates trong BlindBoxService
+        var dtoItems = items.Select(i => new BlindBoxItemRequestDto
+        {
+            ProductId = i.ProductId,
+            Quantity = i.Quantity,
+            Weight = i.RarityConfig?.Weight ?? 1
+        }).ToList();
+
+        // 4. Gọi BlindBoxService.CalculateDropRates để tính toán lại drop rates
+        var dropRates = _blindBoxService.CalculateDropRates(dtoItems);
+
+        // 5. Map kết quả DropRate mới vào các BlindBoxItem trong DB
+        foreach (var kvp in dropRates)
+        {
+            var dto = kvp.Key;
+            var newRate = kvp.Value;
+
+            var target = items.FirstOrDefault(x => x.ProductId == dto.ProductId);
+            if (target != null)
+            {
+                target.DropRate = newRate;
+                await _unitOfWork.BlindBoxItems.Update(target);
+            }
+        }
+
+        // 6. Lưu thay đổi DropRate vào DB
+        await _unitOfWork.SaveChangesAsync();
+    }
+
 
     private async Task NotifyOutOfStockAsync(BlindBox blindBox, BlindBoxItem item)
     {

@@ -205,7 +205,6 @@ public class SystemController : ControllerBase
         try
         {
             User? user;
-
             if (userId.HasValue)
             {
                 user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
@@ -214,8 +213,6 @@ public class SystemController : ControllerBase
                     _logger.Warn($"[SeedUserInventory] Không tìm thấy user với Id: {userId}");
                     return NotFound($"Không tìm thấy user với Id: {userId}");
                 }
-
-                _logger.Info($"[SeedUserInventory] Bắt đầu seed inventory cho user Id: {userId}");
             }
             else
             {
@@ -226,8 +223,6 @@ public class SystemController : ControllerBase
                     _logger.Warn($"[SeedUserInventory] Không tìm thấy user với email: {email}");
                     return NotFound($"Không tìm thấy user với email: {email}");
                 }
-
-                _logger.Info($"[SeedUserInventory] Bắt đầu seed inventory cho user: {email}");
             }
 
             // Lấy tất cả CustomerBlindBoxes chưa mở của user
@@ -237,8 +232,6 @@ public class SystemController : ControllerBase
 
             if (unopenedBoxes.Count < 2)
             {
-                _logger.Warn(
-                    $"[SeedUserInventory] User {user.Email} không có đủ hộp chưa mở. Cần ít nhất 2 hộp, hiện có {unopenedBoxes.Count}");
                 return BadRequest(
                     $"User không có đủ hộp chưa mở. Cần ít nhất 2 hộp, hiện có {unopenedBoxes.Count} hộp.");
             }
@@ -252,41 +245,18 @@ public class SystemController : ControllerBase
 
             _logger.Info($"[SeedUserInventory] Đã chọn {selectedBoxes.Count} hộp để unbox");
 
-            // Tạo UnboxingService với mock ClaimsService
-            var mockClaimsService = new MockClaimsService(user.Id);
-
-            // Lấy các dependencies cần thiết từ DI container
-            var loggerService = HttpContext.RequestServices.GetRequiredService<ILoggerService>();
-            var unitOfWork = HttpContext.RequestServices.GetRequiredService<IUnitOfWork>();
-            var currentTime = HttpContext.RequestServices.GetRequiredService<ICurrentTime>();
-            var notificationService = HttpContext.RequestServices.GetRequiredService<INotificationService>();
-            var notificationHub = HttpContext.RequestServices.GetRequiredService<IHubContext<UnboxingHub>>();
-            var userService = HttpContext.RequestServices.GetRequiredService<IUserService>();
-            // Tạo instance UnboxingService mới với đầy đủ tham số
-            var unboxingService = new UnboxingService(
-                loggerService,
-                unitOfWork,
-                mockClaimsService,
-                currentTime,
-                notificationService,
-                notificationHub,
-                userService // Thêm tham số mới
-            );
-
             var unboxResults = new List<UnboxResultDto>();
 
             // Unbox từng hộp đã chọn
             foreach (var box in selectedBoxes)
                 try
                 {
-                    _logger.Info($"[SeedUserInventory] Đang unbox hộp Id: {box.Id}");
-                    var result = await unboxingService.UnboxAsync(box.Id);
+                    var result = await _unboxService.UnboxAsync(box.Id);
                     unboxResults.Add(result);
                 }
                 catch (Exception ex)
                 {
                     _logger.Error($"[SeedUserInventory] Lỗi khi unbox hộp Id {box.Id}: {ex.Message}");
-                    // Tiếp tục với hộp tiếp theo nếu có lỗi
                 }
 
             if (!unboxResults.Any()) return BadRequest("Không thể unbox bất kỳ hộp nào. Vui lòng kiểm tra lại.");
