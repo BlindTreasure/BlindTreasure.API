@@ -292,6 +292,9 @@ public class BlindBoxService : IBlindBoxService
 
         ValidateBlindBoxItemsFullRule(items);
 
+        // validate số lượng stock dựa trên TotalQuantity
+        await ValidateProductStockForBlindBoxAsync(blindBox, items);
+        
         var products = await _unitOfWork.Products.GetAllAsync(p =>
             items.Select(i => i.ProductId).Contains(p.Id) && p.SellerId == seller.Id && !p.IsDeleted);
 
@@ -415,7 +418,7 @@ public class BlindBoxService : IBlindBoxService
             // Kiểm tra AvailableToSell thay vì Stock
             if (item.Quantity > product.AvailableToSell)
                 throw ErrorHelper.BadRequest(
-                    $"Sản phẩm '{product.Name}' không đủ tồn kho khả dụng để submit BlindBox.");
+                    $"Sản phẩm '{product.Name}' không đủ số lượng khả dụng để submit BlindBox.");
 
             // Reserve stock thay vì trừ TotalStockQuantity
             product.ReservedInBlindBox += item.Quantity;
@@ -650,6 +653,34 @@ public class BlindBoxService : IBlindBoxService
 
     #region private methods
 
+    private async Task ValidateProductStockForBlindBoxAsync(
+        BlindBox blindBox,
+        List<BlindBoxItemRequestDto> items)
+    {
+        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
+        var products = await _unitOfWork.Products
+            .GetAllAsync(p => productIds.Contains(p.Id) && !p.IsDeleted);
+
+        foreach (var item in items)
+        {
+            var product = products.FirstOrDefault(p => p.Id == item.ProductId);
+            if (product == null)
+                throw ErrorHelper.BadRequest($"Không tìm thấy sản phẩm {item.ProductId}.");
+
+            // Tổng số lượng cần thiết cho product này
+            var requiredQuantity = item.Quantity * blindBox.TotalQuantity;
+
+            if (requiredQuantity > product.TotalStockQuantity)
+            {
+                throw ErrorHelper.BadRequest(
+                        $"Sản phẩm '{product.Name}' không đủ số lượng hiện có. " +
+                        $"Cần {requiredQuantity}, nhưng chỉ có {product.TotalStockQuantity}."
+                    );
+            }
+        }
+    }
+
+    
     private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemRequestDto> items)
     {
         if (items.Count != 6 && items.Count != 12)
