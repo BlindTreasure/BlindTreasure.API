@@ -1159,7 +1159,6 @@ public class SystemController : ControllerBase
                 {
                     () => context.ChatMessages.ExecuteDeleteAsync(),
                     () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),
-                    () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerFavourites.ExecuteDeleteAsync(),
                     () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
@@ -1172,6 +1171,7 @@ public class SystemController : ControllerBase
                     () => context.Listings.ExecuteDeleteAsync(),
                     () => context.InventoryItems.ExecuteDeleteAsync(),
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
+                    () => context.GroupPaymentSessions.ExecuteDeleteAsync(),
 
                     () => context.TradeHistories.ExecuteDeleteAsync(),
                     () => context.TradeRequests.ExecuteDeleteAsync(),
@@ -1184,6 +1184,7 @@ public class SystemController : ControllerBase
 
                     () => context.Orders.ExecuteDeleteAsync(),
                     () => context.Payments.ExecuteDeleteAsync(),
+                    () => context.PromotionUserUsages.ExecuteDeleteAsync(),
                     () => context.Promotions.ExecuteDeleteAsync(),
                     () => context.PromotionParticipants.ExecuteDeleteAsync(),
                     () => context.Addresses.ExecuteDeleteAsync(),
