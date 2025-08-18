@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 using BlindTreasure.Application.Cronjobs;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
@@ -188,8 +189,11 @@ public static class IocContainer
                 options.HandshakeTimeout = TimeSpan.FromSeconds(15);
                 options.StreamBufferCapacity = 10;
             })
-            .AddJsonProtocol(options => { options.PayloadSerializerOptions.PropertyNamingPolicy = null; });
-
+            .AddJsonProtocol(options =>
+            {
+                options.PayloadSerializerOptions.PropertyNamingPolicy = null;
+                options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()); // thêm dòng này
+            });
 
         services.AddHttpContextAccessor();
 

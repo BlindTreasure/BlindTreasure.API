@@ -468,7 +468,7 @@ public class BlindBoxService : IBlindBoxService
                 BlindBoxItemId = item.Id,
                 Probability = item.DropRate,
                 EffectiveFrom = now,
-                EffectiveTo = now.AddYears(1), // ✅ FIX: 1 năm từ bây giờ, không phải ReleaseDate
+                EffectiveTo = now.AddYears(1),
                 ApprovedBy = currentUserId,
                 ApprovedAt = now,
                 CreatedAt = now,
@@ -673,13 +673,13 @@ public class BlindBoxService : IBlindBoxService
             if (requiredQuantity > product.TotalStockQuantity)
             {
                 throw ErrorHelper.BadRequest(
-                        $"Sản phẩm '{product.Name}' không đủ số lượng hiện có. " +
-                        $"Cần {requiredQuantity}, nhưng chỉ có {product.TotalStockQuantity}."
-                    );
+                    $"Sản phẩm '{product.Name}' không đủ số lượng hiện có. " +
+                    $"Do BlindBox có {blindBox.TotalQuantity} hộp, mỗi hộp cần {item.Quantity} sản phẩm, " +
+                    $"nên tổng cộng cần {requiredQuantity}, nhưng chỉ có {product.TotalStockQuantity}."
+                );
             }
         }
     }
-
     
     private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemRequestDto> items)
     {
