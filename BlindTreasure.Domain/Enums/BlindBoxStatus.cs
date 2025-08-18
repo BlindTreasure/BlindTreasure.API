@@ -5,5 +5,6 @@ public enum BlindBoxStatus
     Draft,
     PendingApproval,
     Approved,
-    Rejected
+    Rejected,
+    Disabled
 }

@@ -294,7 +294,7 @@ public class BlindBoxService : IBlindBoxService
 
         // validate số lượng stock dựa trên TotalQuantity
         await ValidateProductStockForBlindBoxAsync(blindBox, items);
-        
+
         var products = await _unitOfWork.Products.GetAllAsync(p =>
             items.Select(i => i.ProductId).Contains(p.Id) && p.SellerId == seller.Id && !p.IsDeleted);
 
@@ -651,6 +651,32 @@ public class BlindBoxService : IBlindBoxService
         return result;
     }
 
+    public Dictionary<BlindBoxItemRequestDto, decimal> CalculateDropRates(List<BlindBoxItemRequestDto> items)
+    {
+        var result = new Dictionary<BlindBoxItemRequestDto, decimal>();
+        var total = items.Sum(i => i.Quantity * i.Weight);
+
+        var temp = items.Select(i => new
+        {
+            Item = i,
+            RawRate = (decimal)(i.Quantity * i.Weight) / total * 100m
+        }).ToList();
+
+        foreach (var t in temp) result[t.Item] = Math.Round(t.RawRate, 2, MidpointRounding.AwayFromZero);
+
+        var diff = 100.00m - result.Values.Sum();
+        if (Math.Abs(diff) >= 0.01m)
+        {
+            var target = diff > 0
+                ? result.OrderByDescending(x => x.Value).First()
+                : result.OrderBy(x => x.Value).First();
+
+            result[target.Key] = Math.Round(target.Value + diff, 2);
+        }
+
+        return result;
+    }
+
     #region private methods
 
     private async Task ValidateProductStockForBlindBoxAsync(
@@ -671,16 +697,14 @@ public class BlindBoxService : IBlindBoxService
             var requiredQuantity = item.Quantity * blindBox.TotalQuantity;
 
             if (requiredQuantity > product.TotalStockQuantity)
-            {
                 throw ErrorHelper.BadRequest(
                     $"Sản phẩm '{product.Name}' không đủ số lượng hiện có. " +
                     $"Do BlindBox có {blindBox.TotalQuantity} hộp, mỗi hộp cần {item.Quantity} sản phẩm, " +
                     $"nên tổng cộng cần {requiredQuantity}, nhưng chỉ có {product.TotalStockQuantity}."
                 );
-            }
         }
     }
-    
+
     private void ValidateBlindBoxItemsFullRule(List<BlindBoxItemRequestDto> items)
     {
         if (items.Count != 6 && items.Count != 12)
@@ -741,31 +765,6 @@ public class BlindBoxService : IBlindBoxService
             }
     }
 
-    private Dictionary<BlindBoxItemRequestDto, decimal> CalculateDropRates(List<BlindBoxItemRequestDto> items)
-    {
-        var result = new Dictionary<BlindBoxItemRequestDto, decimal>();
-        var total = items.Sum(i => i.Quantity * i.Weight);
-
-        var temp = items.Select(i => new
-        {
-            Item = i,
-            RawRate = (decimal)(i.Quantity * i.Weight) / total * 100m
-        }).ToList();
-
-        foreach (var t in temp) result[t.Item] = Math.Round(t.RawRate, 2, MidpointRounding.AwayFromZero);
-
-        var diff = 100.00m - result.Values.Sum();
-        if (Math.Abs(diff) >= 0.01m)
-        {
-            var target = diff > 0
-                ? result.OrderByDescending(x => x.Value).First()
-                : result.OrderBy(x => x.Value).First();
-
-            result[target.Key] = Math.Round(target.Value + diff, 2);
-        }
-
-        return result;
-    }
 
     private async Task ValidateLeafCategoryAsync(Guid categoryId)
     {
