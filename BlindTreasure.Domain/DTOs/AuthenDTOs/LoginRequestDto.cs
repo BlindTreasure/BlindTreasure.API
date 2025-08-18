@@ -8,6 +8,9 @@ public class LoginRequestDto
     public string? Email { get; set; }
 
     [DefaultValue("1@")] public string? Password { get; set; }
+
+    [DefaultValue(false)]
+    public bool? IsLoginGoole { get; set; } = false;
 }
 
 public class GoogleLoginRequestDto
