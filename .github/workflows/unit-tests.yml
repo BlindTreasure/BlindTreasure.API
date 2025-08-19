@@ -42,16 +42,6 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore BlindTreasure.API.sln
 
-      - name: Build with documentation
-        run: |
-          dotnet build BlindTreasure.API.sln \
-            --no-restore \
-            --configuration Release \
-            /p:GenerateDocumentationFile=true
-          
-          # List generated XML files to verify they exist
-          find . -name "*.xml" -path "*/bin/*" | sort
-
       - name: Restore tools
         run: dotnet tool restore
 
@@ -132,7 +122,7 @@ jobs:
           
           def extract_from_cs():
               # Scan test source files; add more patterns if needed
-              patterns = ["./**/*Tests.cs", "./**/*Test.cs"]
+              patterns = ["./BlindTreasure.UnitTest/**/*Tests.cs", "./BlindTreasure.UnitTest/**/*Test.cs"]
               files = set()
               for p in patterns:
                   files.update(glob.glob(p, recursive=True))
