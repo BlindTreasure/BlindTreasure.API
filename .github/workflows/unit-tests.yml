@@ -2,7 +2,7 @@ name: Unit Tests with Excel Report (Functions + Statistics + Matrices)
 
 on:
   push:
-    branches: [devphuctrann]
+    branches: [unit-test]
 
 jobs:
   test:
