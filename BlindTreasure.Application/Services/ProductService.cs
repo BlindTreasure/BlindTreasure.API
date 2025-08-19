@@ -170,11 +170,7 @@ public class ProductService : IProductService
             }
             product.ListedPrice = dto.ListedPrice.Value;
         }
-        else
-        {
-                       // Nếu không có ListedPrice, mặc định sẽ bằng RealSellingPrice
-            product.ListedPrice = product.RealSellingPrice;
-        }
+
 
         // Cập nhật logic xác định status
         if (product.AvailableToSell == 0 && dto.Status != ProductStatus.InActive)
