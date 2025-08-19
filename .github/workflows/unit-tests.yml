@@ -72,18 +72,18 @@ jobs:
           import os, re, glob, xml.etree.ElementTree as ET
           from collections import defaultdict
           import pandas as pd
-          
+
           RE_CLASS = re.compile(r'^\s*(?:public|internal|protected|private)?\s*(?:sealed\s+|static\s+|abstract\s+)?class\s+(\w+)\b')
           RE_FACT  = re.compile(r'^\s*\[Fact(?:\s*\(.*?\))?\]\s*$')
           RE_METHOD= re.compile(r'^\s*(?:public|internal|protected|private)\s+(?:async\s+)?(?:Task|void)\s+(\w+)\s*\(')
           RE_DOC   = re.compile(r'^\s*///\s?(.*)$')
-          
+
           def sanitize_sheet_name(name):
               invalid = r'[]:*?/\\'
               for ch in invalid:
                   name = name.replace(ch, ' ')
               return name[:31] if len(name) > 31 else name
-          
+
           def parse_xml_doc_block(lines):
               # lines: just the comment payload after stripping leading '///'
               # Wrap to a root to use ET safely; ignore XML parse errors by fallback to text parsing.
@@ -94,7 +94,7 @@ jobs:
               scenario = ''
               expected = ''
               coverage = ''
-          
+
               try:
                   root = ET.fromstring(f"<root>\n{xml_text}\n</root>")
                   s = root.find('summary')
@@ -108,7 +108,7 @@ jobs:
               except ET.ParseError:
                   # fallback: plain text parse
                   remarks_text = xml_text
-          
+
               # Parse conventional tags inside remarks
               if remarks_text:
                   for raw_line in remarks_text.splitlines():
@@ -121,7 +121,7 @@ jobs:
                           precond = line[len('Pre-Condition:'):].strip()
                       elif line.startswith('Coverage:'):
                           coverage = line[len('Coverage:'):].strip()
-          
+
               return {
                   'summary': summary.strip(),
                   'scenario': scenario.strip(),
@@ -129,32 +129,39 @@ jobs:
                   'precond': precond.strip(),
                   'coverage': coverage.strip(),
               }
-          
+
           def extract_from_cs():
-              # Scan test source files; add more patterns if needed
-              patterns = ["./**/*Tests.cs", "./**/*Test.cs"]
+              # Chỉ scan trong project BlindTreaure.UnitTest
+              base_dir = "./BlindTreaure.UnitTest"
+              patterns = [os.path.join(base_dir, "**", "*.cs")]
+
               files = set()
               for p in patterns:
                   files.update(glob.glob(p, recursive=True))
-          
-              functions = []  # rows for Functions sheet
-              matrices = {}   # sheet_name -> rows for matrix
-              methods_index = {}  # (class, method) -> sheet_name
-          
+
+              print(f"🔍 Found {len(files)} .cs files in {base_dir}")
+
+              functions = []
+              matrices = {}
+              methods_index = {}
+
               for path in sorted(files):
-                  with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                  # Bỏ qua bin/obj
+                  if "bin" in path or "obj" in path:
+                      continue
+
+                  with open(path, "r", encoding="utf-8", errors="ignore") as f:
                       lines = f.readlines()
-          
+
                   current_class = None
                   i = 0
                   while i < len(lines):
                       mclass = RE_CLASS.match(lines[i])
                       if mclass:
                           current_class = mclass.group(1)
-          
-                      # Collect consecutive '///' lines immediately preceding a [Fact] + method
+
                       if RE_FACT.match(lines[i].rstrip()):
-                          # backtrack to gather xml doc before [Fact]
+                          # backtrack xml doc
                           j = i - 1
                           xml_lines = []
                           while j >= 0:
@@ -163,39 +170,34 @@ jobs:
                                   break
                               xml_lines.insert(0, mdoc.group(1))
                               j -= 1
-          
-                          # move forward to find method line
+
+                          # method line
                           k = i + 1
                           method_name = None
-                          while k < len(lines) and k <= i + 10:  # local window
+                          while k < len(lines) and k <= i + 10:
                               mm = RE_METHOD.match(lines[k])
                               if mm:
                                   method_name = mm.group(1)
                                   break
                               k += 1
-          
+
                           if method_name:
                               meta = parse_xml_doc_block(xml_lines) if xml_lines else {
-                                  'summary':'',
-                                  'scenario':'',
-                                  'expected':'',
-                                  'precond':'',
-                                  'coverage':'',
+                                  'summary':'','scenario':'','expected':'','precond':'','coverage':''
                               }
                               req_name = meta['summary'] or meta['scenario'] or method_name
                               desc     = meta['scenario'] or meta['summary']
                               precond  = meta['precond']
-          
+
                               sheet_name = sanitize_sheet_name(method_name)
-                              # ensure uniqueness across workbook
                               base = sheet_name
                               suffix = 1
                               while sheet_name in matrices:
                                   suffix += 1
                                   sheet_name = sanitize_sheet_name(f"{base}_{suffix}")
-          
+
                               functions.append({
-                                  'No': None,  # fill later
+                                  'No': None,
                                   'RequirementName': req_name,
                                   'Class Name': current_class or '',
                                   'Function Name': method_name,
@@ -203,7 +205,6 @@ jobs:
                                   'Description': desc,
                                   'Pre-Condition': precond
                               })
-                              # initial one-row matrix from doc; inputs often not present in XML -> leave blank
                               matrices[sheet_name] = [{
                                   'No': 1,
                                   'Input': '',
@@ -214,16 +215,16 @@ jobs:
                                   'Coverage': meta['coverage']
                               }]
                               methods_index[(current_class or '', method_name)] = sheet_name
-          
-                          i = k  # skip to method
+
+                          i = k
                       i += 1
-          
-              # Fill numbering for Functions
+
+              # Fill numbering
               for idx, row in enumerate(functions, start=1):
                   row['No'] = idx
-          
+
               return functions, matrices, methods_index
-          
+
           def parse_trx(trx_path):
               if not os.path.exists(trx_path):
                   return {}
@@ -238,7 +239,7 @@ jobs:
                       def tag(name): return f"{{{ns_uri}}}{name}"
                   else:
                       def tag(name): return name
-          
+
                   # Map test id -> (class, method, name)
                   unit_tests = {}
                   for ut in root.findall('.//'+tag('UnitTest')):
@@ -250,7 +251,7 @@ jobs:
                       nm  = ut.get('name') or ''
                       if tid:
                           unit_tests[tid] = (cls, mth, nm)
-          
+
                   # Results
                   status_by_method = defaultdict(lambda: {'Passed':0,'Failed':0})
                   for tr in root.findall('.//'+tag('UnitTestResult')):
@@ -265,7 +266,7 @@ jobs:
                   return status_by_method
               except Exception:
                   return {}
-          
+
           def build_statistics(functions, matrices, status_by_method):
               stats_rows = []
               for idx, f in enumerate(functions, start=1):
@@ -288,10 +289,10 @@ jobs:
                           bucketA += 1
                       elif cov == 'B':
                           bucketB += 1
-          
+
                   stats_rows.append({
                       'No': idx,
-                      'Function Code': f"=HYPERLINK(\"#'{sheet}'!A1\",\"Code\")",
+                      'Function Code': f"=HYPERLINK("#'{sheet}'!A1","Code")",
                       'Passed': passed,
                       'Failed': failed,
                       'Untested': untested,
@@ -301,11 +302,11 @@ jobs:
                       'Total Test Cases': total_matrix
                   })
               return stats_rows
-          
+
           def main():
               functions, matrices, methods_index = extract_from_cs()
               status_by_method = parse_trx('./TestResults/test-results.trx')
-          
+
               # DataFrames
               df_functions = pd.DataFrame(functions, columns=[
                   'No','RequirementName','Class Name','Function Name','Sheet Name','Description','Pre-Condition'
@@ -313,14 +314,14 @@ jobs:
               df_stats = pd.DataFrame(build_statistics(functions, matrices, status_by_method), columns=[
                   'No','Function Code','Passed','Failed','Untested','N','A','B','Total Test Cases'
               ])
-          
+
               out_path = './coveragereport/UnitTest_Document.xlsx'
               with pd.ExcelWriter(out_path, engine='xlsxwriter') as writer:
                   # Sheet: Functions
                   df_functions.to_excel(writer, sheet_name='Functions', index=False)
                   # Ensure formulas preserved in Statistics
                   df_stats.to_excel(writer, sheet_name='Statistics', index=False)
-          
+
                   # Matrix sheets per function
                   for f in functions:
                       sheet = f['Sheet Name']
@@ -351,7 +352,7 @@ jobs:
                       for rr, row in enumerate(rows, start=start_row+1):
                           for cc, col in enumerate(headers):
                               ws.write(rr, cc, row.get(col, ''))
-          
+
                   # Autofit-like widths
                   for sheet in ['Functions','Statistics']:
                       ws = writer.sheets[sheet]
@@ -359,14 +360,14 @@ jobs:
                       for i, col in enumerate(df.columns):
                           maxlen = max((len(str(x)) for x in [col] + df[col].astype(str).tolist()), default=10)
                           ws.set_column(i, i, min(maxlen + 2, 60))
-          
+
               print(f"Excel generated at {out_path}")
-          
+
           if __name__ == '__main__':
               main()
           PY
           python generate_excel_from_cs_docs.py
-          
+
       - name: Upload Unit Test Document
         uses: actions/upload-artifact@v4
         with:
