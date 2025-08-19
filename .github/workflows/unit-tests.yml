@@ -111,47 +111,60 @@ jobs:
               if 'notfound' in n: return 'Not found error'
               if 'badrequest' in n: return 'Bad request error'
               if 'unauthorized' in n: return 'Unauthorized access'
+              if 'nameexists' in n: return 'Name already exists'
+              if 'empty' in n or 'null' in n: return 'Input validation error'
               return ''
 
           def to_conditions_from_name(name: str):
-              """Parse điều kiện từ phần _When... của tên test."""
-              base = strip_params(name or '')
-          
-              # Parse from test method name structure
+              """Parse điều kiện từ tên test method."""
+              base = strip_params(name or '').lower()
               conditions = []
           
-              # Common patterns in test names
-              if 'validdata' in base.lower() or 'shouldcreate' in base.lower() or 'shouldupdate' in base.lower():
-                  conditions.append('Valid input data')
+              # Patterns for different test scenarios
+              if 'validdata' in base or ('should' in base and ('create' in base or 'update' in base) and 'when' not in base):
+                  conditions.append('Valid input data provided')
           
-              if 'invalid' in base.lower() or 'empty' in base.lower() or 'null' in base.lower():
-                  conditions.append('Invalid or empty input')
+              if 'empty' in base or 'null' in base:
+                  if 'name' in base:
+                      conditions.append('Name is null or empty')
+                  else:
+                      conditions.append('Required field is null or empty')
           
-              if 'notexists' in base.lower() or 'notfound' in base.lower():
+              if 'invalid' in base:
+                  conditions.append('Invalid input data')
+          
+              if 'notexists' in base or 'notfound' in base:
                   conditions.append('Entity does not exist')
           
-              if 'notadmin' in base.lower() or 'notauthorized' in base.lower() or 'forbidden' in base.lower():
-                  conditions.append('User not authorized')
+              if 'notadmin' in base or 'notauthorized' in base or 'forbidden' in base:
+                  conditions.append('User lacks required permissions')
           
-              if 'nameexists' in base.lower() or 'conflict' in base.lower():
-                  conditions.append('Name already exists')
+              if 'nameexists' in base or 'conflict' in base:
+                  conditions.append('Entity name already exists')
           
-              if 'hasproducts' in base.lower() or 'haschildren' in base.lower():
-                  conditions.append('Has dependent entities')
+              if 'hasproducts' in base:
+                  conditions.append('Category has associated products')
           
-              if 'nochildren' in base.lower() or 'validandno' in base.lower():
-                  conditions.append('No dependent entities')
+              if 'haschildren' in base:
+                  conditions.append('Category has subcategories')
+          
+              if 'nochildren' in base and 'validandno' in base:
+                  conditions.append('Category has no dependencies')
 
-              # If no conditions found from name, try to parse _When part
-              if not conditions and '_When' in base:
-                  cond = base.split('_When',1)[1]
-                  parts = [p for p in re.split(r'_And_|_', cond) if p]
-                  for p in parts:
-                      s = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', p).replace('_',' ').strip()
-                      s = s.replace('Api Key','API key').replace('Null Or','null or').replace(' Is ',' is ')
-                      conditions.append(s[0].upper()+s[1:] if s else s)
+              if 'invaliditemcount' in base:
+                  conditions.append('Invalid item count provided')
           
-              return conditions[:3]  # Limit to 3 conditions max
+              if 'nosecret' in base:
+                  conditions.append('No Secret rarity item included')
+
+              if 'notowns' in base:
+                  conditions.append('User does not own the entity')
+
+              # Default condition if none found
+              if not conditions:
+                  conditions.append('Standard test condition')
+          
+              return conditions[:4]  # Max 4 conditions
 
           def safe_sheet_name(name, existing_sheets):
               """Create a safe Excel sheet name (max 31 chars, unique)"""
@@ -306,7 +319,7 @@ jobs:
               ws = workbook.add_worksheet(sheet_name)
               writer.sheets[sheet_name] = ws
 
-              # Define formats following the sample image
+              # Define formats
               # Blue header format for UTCID columns
               blue_header = workbook.add_format({
                   "bold": True,
@@ -314,14 +327,13 @@ jobs:
                   "valign": "vcenter",
                   "border": 1,
                   "bg_color": "#1e1b4b",
-                  "font_color": "white",
-                  "rotation": 90  # Vertical text like in the image
+                  "font_color": "white"
               })
           
-              # Blue section headers (Condition, Confirm, Result)
+              # Blue section headers 
               blue_section = workbook.add_format({
                   "bold": True,
-                  "align": "center",
+                  "align": "left",
                   "valign": "vcenter",
                   "border": 1,
                   "bg_color": "#1e1b4b",
@@ -340,14 +352,6 @@ jobs:
                   "align": "center",
                   "valign": "vcenter",
                   "border": 1
-              })
-          
-              # Special format for return values (FALSE, TRUE)
-              return_label_format = workbook.add_format({
-                  "align": "right",
-                  "valign": "vcenter",
-                  "border": 1,
-                  "font_size": 8
               })
 
               # Process test data
@@ -372,103 +376,118 @@ jobs:
                           all_conditions.append(cond)
           
               if not all_conditions:
-                  all_conditions = ["No specific condition"]
+                  all_conditions = ["Standard test condition"]
 
               # Set column widths
-              ws.set_column(0, 0, 35)  # Label column
+              ws.set_column(0, 0, 45)  # Label column wider
               for j in range(len(cols)):
-                  ws.set_column(1+j, 1+j, 4)  # Narrow columns for test data
+                  ws.set_column(1+j, 1+j, 15)  # Test case columns
 
               r = 0
           
-              # Header row with UTCID columns (vertical text)
+              # Header row with UTCID columns
               ws.write(r, 0, "", data_format)
               for j, c in enumerate(cols):
                   ws.write(r, 1+j, c["id"], blue_header)
               r += 1
 
-              # Calculate section sizes to avoid overlap
-              condition_rows = 2 + len(all_conditions)  # Precondition + input conditions
-              confirm_rows = 5  # Return + FALSE + TRUE + Exception + Log message  
-              result_rows = 4   # Type + Passed/Failed + Executed Date + Defect ID
-
-              # CONDITION section
-              condition_start = r
-              condition_end = condition_start + condition_rows - 1
-              ws.merge_range(condition_start, 0, condition_end, 0, "Condition", blue_section)
+              # CONDITION section header
+              ws.write(r, 0, "Condition", blue_section)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", blue_section)
+              r += 1
           
               # Precondition row
-              ws.write(condition_start + 1, 0, "Precondition", label_format)
+              ws.write(r, 0, "Precondition", label_format)
               for j in range(len(cols)):
-                  ws.write(condition_start + 1, 1+j, "", data_format)
+                  ws.write(r, 1+j, "", data_format)
+              r += 1
           
               # Input conditions
-              for i, condition in enumerate(all_conditions):
-                  row = condition_start + 2 + i
-                  ws.write(row, 0, f"Input: {condition}", label_format)
+              for condition in all_conditions:
+                  ws.write(r, 0, f"Input: {condition}", label_format)
                   for j, c in enumerate(cols):
                       val = "O" if condition in c["conds"] else ""
-                      ws.write(row, 1+j, val, data_format)
-          
-              r = condition_end + 1
+                      ws.write(r, 1+j, val, data_format)
+                  r += 1
 
-              # CONFIRM section
-              confirm_start = r
-              confirm_end = confirm_start + confirm_rows - 1
-              ws.merge_range(confirm_start, 0, confirm_end, 0, "Confirm", blue_section)
+              # CONFIRM section header
+              ws.write(r, 0, "Confirm", blue_section)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", blue_section)
+              r += 1
           
               # Return subsection
-              ws.write(confirm_start + 1, 0, "Return", label_format)
+              ws.write(r, 0, "Return", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+              r += 1
           
               # FALSE row
-              ws.write(confirm_start + 2, 0, "FALSE", return_label_format)
+              ws.write(r, 0, "FALSE", label_format)
               for j, c in enumerate(cols):
                   val = "O" if c["exp"] == "FALSE" else ""
-                  ws.write(confirm_start + 2, 1+j, val, data_format)
+                  ws.write(r, 1+j, val, data_format)
+              r += 1
           
               # TRUE row  
-              ws.write(confirm_start + 3, 0, "TRUE", return_label_format)
+              ws.write(r, 0, "TRUE", label_format)
               for j, c in enumerate(cols):
                   val = "O" if c["exp"] == "TRUE" else ""
-                  ws.write(confirm_start + 3, 1+j, val, data_format)
+                  ws.write(r, 1+j, val, data_format)
+              r += 1
           
               # Exception subsection
-              ws.write(confirm_start + 4, 0, "Exception", label_format)
+              ws.write(r, 0, "Exception", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+              r += 1
           
               # Log message row
-              ws.write(confirm_start + 5, 0, "Log message", label_format)
+              ws.write(r, 0, "Log message", label_format)
               for j, c in enumerate(cols):
-                  msg = c["log_msg"] if c["exp"] == "EXCEPTION" else ""
-                  ws.write(confirm_start + 5, 1+j, msg, data_format)
-          
-              r = confirm_end + 1
+                  msg = c["log_msg"]
+                  ws.write(r, 1+j, msg, data_format)
+              r += 1
 
-              # RESULT section
-              result_start = r
-              result_end = result_start + result_rows - 1
-              ws.merge_range(result_start, 0, result_end, 0, "Result", blue_section)
+              # RESULT section header
+              ws.write(r, 0, "Result", blue_section)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", blue_section)
+              r += 1
           
               # Type row
-              ws.write(result_start + 1, 0, "Type(N : Normal, A : Abnormal, B : Boundary)", label_format)
+              ws.write(r, 0, "Type(N : Normal, A : Abnormal, B : Boundary)", label_format)
               for j, c in enumerate(cols):
-                  ws.write(result_start + 1, 1+j, c["type"], data_format)
+                  ws.write(r, 1+j, c["type"], data_format)
+              r += 1
           
               # Passed/Failed row
-              ws.write(result_start + 2, 0, "Passed/Failed", label_format)
+              ws.write(r, 0, "Passed/Failed", label_format)
               for j, c in enumerate(cols):
                   result_val = "P" if c["out"] == "Passed" else ("F" if c["out"] == "Failed" else "")
-                  ws.write(result_start + 2, 1+j, result_val, data_format)
+                  ws.write(r, 1+j, result_val, data_format)
+              r += 1
           
               # Executed Date row
-              ws.write(result_start + 3, 0, "Executed Date", label_format)
+              ws.write(r, 0, "Executed Date", label_format)
               for j, c in enumerate(cols):
                   date_str = c["dt"].split('T')[0] if 'T' in c["dt"] else c["dt"]
-                  ws.write(result_start + 3, 1+j, date_str, data_format)
+                  # Format date as DD/MM/YYYY if possible
+                  if date_str and len(date_str) >= 10:
+                      try:
+                          parts = date_str.split('-')
+                          if len(parts) == 3:
+                              date_str = f"{parts[2]}/{parts[1]}/{parts[0]}"
+                      except:
+                          pass
+                  ws.write(r, 1+j, date_str, data_format)
+              r += 1
           
               # Defect ID row
-              ws.write(result_start + 4, 0, "Defect ID", label_format)
+              ws.write(r, 0, "Defect ID", label_format)
               for j in range(len(cols)):
-                  ws.write(result_start + 4, 1+j, "", data_format)
+                  ws.write(r, 1+j, "", data_format)
 
               return sheet_name
 
