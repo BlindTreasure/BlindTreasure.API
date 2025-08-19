@@ -364,10 +364,20 @@ jobs:
                       "log_msg": extract_log_message_from_name(t["Display"] or t["Method"])
                   })
 
+              # Get unique conditions
+              all_conditions = []
+              for c in cols:
+                  for cond in c["conds"]:
+                      if cond and cond not in all_conditions:
+                          all_conditions.append(cond)
+          
+              if not all_conditions:
+                  all_conditions = ["No specific condition"]
+
               # Set column widths
-              ws.set_column(0, 0, 25)  # Label column
+              ws.set_column(0, 0, 35)  # Label column
               for j in range(len(cols)):
-                  ws.set_column(1+j, 1+j, 3)  # Narrow columns for test data
+                  ws.set_column(1+j, 1+j, 4)  # Narrow columns for test data
 
               r = 0
           
@@ -377,84 +387,88 @@ jobs:
                   ws.write(r, 1+j, c["id"], blue_header)
               r += 1
 
+              # Calculate section sizes to avoid overlap
+              condition_rows = 2 + len(all_conditions)  # Precondition + input conditions
+              confirm_rows = 5  # Return + FALSE + TRUE + Exception + Log message  
+              result_rows = 4   # Type + Passed/Failed + Executed Date + Defect ID
+
               # CONDITION section
-              ws.merge_range(r, 0, r+4+len(set([cond for c in cols for cond in c["conds"]])), 0, "Condition", blue_section)
+              condition_start = r
+              condition_end = condition_start + condition_rows - 1
+              ws.merge_range(condition_start, 0, condition_end, 0, "Condition", blue_section)
           
               # Precondition row
-              ws.write(r+1, 0, "Precondition", label_format)
+              ws.write(condition_start + 1, 0, "Precondition", label_format)
               for j in range(len(cols)):
-                  ws.write(r+1, 1+j, "", data_format)
+                  ws.write(condition_start + 1, 1+j, "", data_format)
           
               # Input conditions
-              all_conditions = []
-              for c in cols:
-                  for cond in c["conds"]:
-                      if cond not in all_conditions:
-                          all_conditions.append(cond)
-          
-              input_start_row = r + 2
               for i, condition in enumerate(all_conditions):
-                  ws.write(input_start_row + i, 0, f"Input: {condition}", label_format)
+                  row = condition_start + 2 + i
+                  ws.write(row, 0, f"Input: {condition}", label_format)
                   for j, c in enumerate(cols):
                       val = "O" if condition in c["conds"] else ""
-                      ws.write(input_start_row + i, 1+j, val, data_format)
+                      ws.write(row, 1+j, val, data_format)
           
-              r = input_start_row + len(all_conditions) + 1
+              r = condition_end + 1
 
               # CONFIRM section
               confirm_start = r
-              ws.merge_range(r, 0, r+4, 0, "Confirm", blue_section)
+              confirm_end = confirm_start + confirm_rows - 1
+              ws.merge_range(confirm_start, 0, confirm_end, 0, "Confirm", blue_section)
           
               # Return subsection
-              ws.write(r+1, 0, "Return", label_format)
+              ws.write(confirm_start + 1, 0, "Return", label_format)
           
               # FALSE row
-              ws.write(r+2, 0, "FALSE", return_label_format)
+              ws.write(confirm_start + 2, 0, "FALSE", return_label_format)
               for j, c in enumerate(cols):
                   val = "O" if c["exp"] == "FALSE" else ""
-                  ws.write(r+2, 1+j, val, data_format)
+                  ws.write(confirm_start + 2, 1+j, val, data_format)
           
               # TRUE row  
-              ws.write(r+3, 0, "TRUE", return_label_format)
+              ws.write(confirm_start + 3, 0, "TRUE", return_label_format)
               for j, c in enumerate(cols):
                   val = "O" if c["exp"] == "TRUE" else ""
-                  ws.write(r+3, 1+j, val, data_format)
+                  ws.write(confirm_start + 3, 1+j, val, data_format)
           
               # Exception subsection
-              ws.write(r+4, 0, "Exception", label_format)
+              ws.write(confirm_start + 4, 0, "Exception", label_format)
           
               # Log message row
-              ws.write(r+5, 0, "Log message", label_format)
+              ws.write(confirm_start + 5, 0, "Log message", label_format)
               for j, c in enumerate(cols):
-                  ws.write(r+5, 1+j, c["log_msg"] if c["exp"] == "EXCEPTION" else "", data_format)
+                  msg = c["log_msg"] if c["exp"] == "EXCEPTION" else ""
+                  ws.write(confirm_start + 5, 1+j, msg, data_format)
           
-              r += 7
+              r = confirm_end + 1
 
               # RESULT section
               result_start = r
-              ws.merge_range(r, 0, r+3, 0, "Result", blue_section)
+              result_end = result_start + result_rows - 1
+              ws.merge_range(result_start, 0, result_end, 0, "Result", blue_section)
           
               # Type row
-              ws.write(r+1, 0, "Type(N : Normal, A : Abnormal, B : Boundary)", label_format)
+              ws.write(result_start + 1, 0, "Type(N : Normal, A : Abnormal, B : Boundary)", label_format)
               for j, c in enumerate(cols):
-                  ws.write(r+1, 1+j, c["type"], data_format)
+                  ws.write(result_start + 1, 1+j, c["type"], data_format)
           
               # Passed/Failed row
-              ws.write(r+2, 0, "Passed/Failed", label_format)
+              ws.write(result_start + 2, 0, "Passed/Failed", label_format)
               for j, c in enumerate(cols):
                   result_val = "P" if c["out"] == "Passed" else ("F" if c["out"] == "Failed" else "")
-                  ws.write(r+2, 1+j, result_val, data_format)
+                  ws.write(result_start + 2, 1+j, result_val, data_format)
           
               # Executed Date row
-              ws.write(r+3, 0, "Executed Date", label_format)
+              ws.write(result_start + 3, 0, "Executed Date", label_format)
               for j, c in enumerate(cols):
                   date_str = c["dt"].split('T')[0] if 'T' in c["dt"] else c["dt"]
-                  ws.write(r+3, 1+j, date_str, data_format)
+                  ws.write(result_start + 3, 1+j, date_str, data_format)
           
               # Defect ID row
-              ws.write(r+4, 0, "Defect ID", label_format)
+              ws.write(result_start + 4, 0, "Defect ID", label_format)
               for j in range(len(cols)):
-                  ws.write(r+4, 1+j, "", data_format)
+                  ws.write(result_start + 4, 1+j, "", data_format)
 
               return sheet_name
 
