@@ -267,50 +267,59 @@ jobs:
 
           # ---------- Build "Functions" & "Statistics" ----------
           def build_core():
-              funcs = extract_functions()
-              trx = parse_trx()
-
-              # Index TRX by (Class, Base)
-              idx = defaultdict(list)
-              for t in trx:
-                  idx[(t["Class"], t["Base"])].append(t)
-
-              # Sheet 1: Functions (Sheet Name = function)
-              func_rows=[]
-              for i,f in enumerate(funcs,1):
-                  func_rows.append({
-                      "No": i,
-                      "RequirementName": f["Requirement"],
-                      "Class Name": f["Class"],
-                      "Function Name": f["Function"],
-                      "Function Code": f"Code_{i}",
-                      "Sheet Name": f["Function"],   # yêu cầu: đúng bằng method
-                      "Description": f["Description"],
-                      "Pre-Condition": f["PreCondition"]
-                  })
-
-              # Sheet 2: Statistics (aggregate theo function)
-              stat_rows=[]
-              for i,f in enumerate(funcs,1):
-                  tests = idx.get((f["Class"], f["Function"]), [])
-                  p=f_=u=0; N=A=B=0
-                  for t in tests:
-                      if t["Outcome"]=="Passed": p+=1
-                      elif t["Outcome"]=="Failed": f_+=1
-                      else: u+=1
-                      c = classify_case(t["Display"] or t["Method"])
-                      if c=='N': N+=1
-                      elif c=='A': A+=1
-                      elif c=='B': B+=1
-                  stat_rows.append({
-                      "No": i,
-                      "Function Code": f'=HYPERLINK("#{f["Function"]}!A1","Code_{i}")',
-                      "Passed": p, "Failed": f_, "Untested": u,
-                      "N": N, "A": A, "B": B,
-                      "Total Test Cases": p+f_+u
-                  })
-
-              return funcs, pd.DataFrame(func_rows), pd.DataFrame(stat_rows), idx
+            funcs = extract_functions()
+            trx = parse_trx()
+            
+            # Index TRX by (Class, Base)
+            idx = defaultdict(list)
+            for t in trx:
+              matched = False
+              for f in funcs:
+                if same_function(f["Function"], t["Base"]) and f["Class"] == t["Class"]:
+                  idx[(f["Class"], f["Function"])].append(t)
+                  matched = True
+                  break
+              if not matched:
+                # Gán vào một function giả để không bị mất
+                fake_func_name = f"{t['Base']}_{t['Class']}"
+                idx[(t["Class"], fake_func_name)].append(t)
+            
+            # Sheet 1: Functions
+            func_rows=[]
+            for i,(k,tests) in enumerate(idx.items(),1):
+              cls, funcname = k
+              func_rows.append({
+              "No": i,
+              "RequirementName": "",
+              "Class Name": cls,
+              "Function Name": funcname,
+              "Function Code": f"Code_{i}",
+              "Sheet Name": funcname,
+              "Description": "",
+              "Pre-Condition": ""
+            })
+            
+            # Sheet 2: Statistics
+            stat_rows=[]
+            for i,(k,tests) in enumerate(idx.items(),1):
+              p=f_=u=0; N=A=B=0
+              for t in tests:
+                if t["Outcome"]=="Passed": p+=1
+                elif t["Outcome"]=="Failed": f_+=1
+                else: u+=1
+                c = classify_case(t["Display"] or t["Method"])
+                if c=='N': N+=1
+                elif c=='A': A+=1
+                elif c=='B': B+=1
+              stat_rows.append({
+              "No": i,
+              "Function Code": f'=HYPERLINK("#{funcname}!A1","Code_{i}")',
+              "Passed": p, "Failed": f_, "Untested": u,
+              "N": N, "A": A, "B": B,
+              "Total Test Cases": p+f_+u
+            })
+            
+            return list(idx.keys()), pd.DataFrame(func_rows), pd.DataFrame(stat_rows), idx
 
           # ---------- Matrix writer (per function) ----------
           def write_matrix(workbook, writer, func, tests):
