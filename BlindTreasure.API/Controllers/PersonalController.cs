@@ -180,7 +180,7 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var result = await _addressService.GetByIdAsync(id);
+            var result = await _addressService.GetAddressByIdAsync(id);
             return Ok(ApiResult<AddressDto>.Success(result, "200", "Lấy địa chỉ thành công."));
         }
         catch (Exception ex)
@@ -203,7 +203,7 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var result = await _addressService.CreateAsync(dto);
+            var result = await _addressService.CreateAddressAsync(dto);
             return Ok(ApiResult<AddressDto>.Success(result, "200", "Thêm địa chỉ thành công."));
         }
         catch (Exception ex)
@@ -225,7 +225,7 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var result = await _addressService.UpdateAsync(id, dto);
+            var result = await _addressService.UpdateAddressAsync(id, dto);
             return Ok(ApiResult<AddressDto>.Success(result, "200", "Cập nhật địa chỉ thành công."));
         }
         catch (Exception ex)
@@ -247,7 +247,7 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var result = await _addressService.DeleteAsync(id);
+            var result = await _addressService.DeleteAddressAsync(id);
             if (result)
                 return Ok(ApiResult<object>.Success(null, "200", "Xóa địa chỉ thành công."));
             return NotFound(ApiResult<object>.Failure("404", "Không tìm thấy địa chỉ."));
@@ -271,7 +271,7 @@ public class PersonalController : ControllerBase
     {
         try
         {
-            var result = await _addressService.SetDefaultAsync(id);
+            var result = await _addressService.SetDefaultAddressAsync(id);
             return Ok(ApiResult<AddressDto>.Success(result, "200", "Cập nhật địa chỉ mặc định thành công."));
         }
         catch (Exception ex)

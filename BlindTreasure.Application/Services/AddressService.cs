@@ -37,7 +37,7 @@ public class AddressService : IAddressService
         return sorted.Select(ToAddressDto).ToList();
     }
 
-    public async Task<AddressDto> GetByIdAsync(Guid id)
+    public async Task<AddressDto> GetAddressByIdAsync(Guid id)
     {
         var cacheKey = $"address:{id}";
         var cached = await _cacheService.GetAsync<Address>(cacheKey);
@@ -59,7 +59,7 @@ public class AddressService : IAddressService
         return ToAddressDto(address);
     }
 
-    public async Task<AddressDto> CreateAsync(CreateAddressDto dto)
+    public async Task<AddressDto> CreateAddressAsync(CreateAddressDto dto)
     {
         var userId = _claimsService.CurrentUserId;
         _logger.Info($"[CreateAsync] User {userId} creates new address.");
@@ -109,7 +109,7 @@ public class AddressService : IAddressService
         return ToAddressDto(address);
     }
 
-    public async Task<AddressDto> UpdateAsync(Guid id, UpdateAddressDto dto)
+    public async Task<AddressDto> UpdateAddressAsync(Guid id, UpdateAddressDto dto)
     {
         var userId = _claimsService.CurrentUserId;
         var address = await _unitOfWork.Addresses.GetByIdAsync(id);
@@ -142,7 +142,7 @@ public class AddressService : IAddressService
         return ToAddressDto(address);
     }
 
-    public async Task<bool> DeleteAsync(Guid id)
+    public async Task<bool> DeleteAddressAsync(Guid id)
     {
         var userId = _claimsService.CurrentUserId;
         var address = await _unitOfWork.Addresses.GetByIdAsync(id);
@@ -160,7 +160,7 @@ public class AddressService : IAddressService
         return true;
     }
 
-    public async Task<AddressDto> SetDefaultAsync(Guid id)
+    public async Task<AddressDto> SetDefaultAddressAsync(Guid id)
     {
         var userId = _claimsService.CurrentUserId;
         var address = await _unitOfWork.Addresses.GetByIdAsync(id);

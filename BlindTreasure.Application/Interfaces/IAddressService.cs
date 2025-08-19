@@ -6,10 +6,10 @@ namespace BlindTreasure.Application.Interfaces;
 public interface IAddressService
 {
     Task<List<AddressDto>> GetCurrentUserAddressesAsync();
-    Task<AddressDto> GetByIdAsync(Guid id);
-    Task<AddressDto> CreateAsync(CreateAddressDto dto);
-    Task<AddressDto> UpdateAsync(Guid id, UpdateAddressDto dto);
-    Task<bool> DeleteAsync(Guid id);
-    Task<AddressDto> SetDefaultAsync(Guid id);
+    Task<AddressDto> GetAddressByIdAsync(Guid id);
+    Task<AddressDto> CreateAddressAsync(CreateAddressDto dto);
+    Task<AddressDto> UpdateAddressAsync(Guid id, UpdateAddressDto dto);
+    Task<bool> DeleteAddressAsync(Guid id);
+    Task<AddressDto> SetDefaultAddressAsync(Guid id);
     Task<Address?> GetDefaultShippingAddressAsync(Guid userId);
 }

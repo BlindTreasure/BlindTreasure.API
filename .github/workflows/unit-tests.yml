@@ -2,7 +2,7 @@ name: Unit Tests with Excel Report (Functions + Statistics + Matrices)
 
 on:
   push:
-    branches: [devphuctrann]
+    branches: [unit-test]
 
 jobs:
   test:
@@ -86,8 +86,26 @@ jobs:
               return m
 
           def same_function(doc_func: str, test_method: str) -> bool:
-              d = norm(doc_func); t = norm(base_function_from_test(test_method))
-              return d == t
+              """Improved matching logic - more flexible"""
+              d = norm(doc_func)
+              t = norm(base_function_from_test(test_method))
+          
+              # Exact match
+              if d == t:
+                  return True
+          
+              # Handle Async suffix
+              if d.endswith('async') and t == d[:-5]:
+                  return True
+              if t.endswith('async') and d == t[:-5]:
+                  return True
+          
+              # Substring matching for partial names
+              if len(d) > 3 and len(t) > 3:
+                  if d in t or t in d:
+                      return True
+          
+              return False
 
           def classify_case(name: str) -> str:
               n = (name or '').lower()
@@ -198,20 +216,33 @@ jobs:
           def extract_functions():
               xml_files = glob.glob('./BlindTreasure.UnitTest/bin/**/*.xml', recursive=True)
               agg = {}  # key=(Class, Func) -> data
+          
+              print(f"Found {len(xml_files)} XML files")
+          
               for f in xml_files:
                   try:
                       root = ET.parse(f).getroot()
-                  except Exception:
+                  except Exception as e:
+                      print(f"Error parsing {f}: {e}")
                       continue
+          
                   for m in root.findall('.//member'):
                       name = m.get('name','')
-                      if not name.startswith('M:'): continue
-                      if not name.startswith(XML_PREFIX): continue
+                      print(f"Processing XML member name: {name}")
+                      if not name.startswith('M:'): 
+                          print(f"Skipping {name}: Does not start with M:")
+                          continue
+                      if not name.startswith(XML_PREFIX): 
+                          print(f"Skipping {name}: Does not start with XML_PREFIX ({XML_PREFIX})")
+                          continue
                       parts = name.split('.')
-                      if len(parts) < 2: continue
+                      if len(parts) < 2: 
+                          print(f"Skipping {name}: Not enough parts after splitting by '.'")
+                          continue
                       cls = parts[-2]
                       test_method = strip_params(parts[-1])
                       func = base_function_from_test(test_method)
+                      print(f"Extracted: Class={cls}, Test Method={test_method}, Function={func}")
 
                       desc = ''
                       pre  = ''
@@ -232,28 +263,46 @@ jobs:
                           if not agg[key]["Description"] and desc: agg[key]["Description"]=desc
                           if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"]=pre
                           if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"]=cov
+          
+              print(f"Extracted {len(agg)} functions from XML")
               return list(agg.values())
 
           # ---------- TRX robust parse ----------
           def parse_trx():
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
-              if not trx_files: return []
+              if not trx_files: 
+                  print("No TRX files found")
+                  return []
+          
+              print(f"Parsing TRX file: {trx_files[0]}")
+          
               with open(trx_files[0],'r',encoding='utf-8') as f:
                   soup = BeautifulSoup(f.read(),'xml')
 
               id_map={}
+              total_unit_tests = 0
               for ut in soup.find_all('UnitTest'):
+                  total_unit_tests += 1
                   ut_id = ut.get('id') or ut.get('testId')
-                  tm = ut.find('TestMethod')
-                  if not ut_id or tm is None: continue
+                  tm = ut.find('TestMethod');
+                  if not ut_id or tm is None: 
+                      print(f"Skipping UnitTest: id={ut_id}, tm_found={tm is not None}")
+                      continue
                   class_full = tm.get('className','')
                   method_name = strip_params(tm.get('name',''))
                   id_map[ut_id]=(short_class(class_full), method_name)
 
+              print(f"Total UnitTest elements found: {total_unit_tests}")
+              print(f"Found {len(id_map)} test definitions in TRX id_map")
+
               out=[]
+              total_unit_test_results = 0
               for res in soup.find_all('UnitTestResult'):
+                  total_unit_test_results += 1
                   tid = res.get('testId')
-                  if not tid or tid not in id_map: continue
+                  if not tid or tid not in id_map: 
+                      print(f"Skipping UnitTestResult: testId={tid}, id_map_contains={tid in id_map}")
+                      continue
                   cls, mth = id_map[tid]
                   out.append({
                       "Class": cls,
@@ -263,6 +312,9 @@ jobs:
                       "Display": strip_params(res.get('testName','')),
                       "ExecutedAt": res.get('endTime') or res.get('startTime') or ''
                   })
+          
+              print(f"Total UnitTestResult elements found: {total_unit_test_results}")
+              print(f"Parsed {len(out)} test results from TRX")
               return out
 
           # ---------- Build "Functions" & "Statistics" ----------
@@ -270,27 +322,61 @@ jobs:
               funcs = extract_functions()
               trx = parse_trx()
           
+              # Debug: Print all test cases
+              print("\n=== ALL TEST CASES FROM TRX ===")
+              for i, t in enumerate(trx, 1):
+                  print(f"{i}. Class: {t['Class']}, Method: {t['Method']}, Base: {t['Base']}")
+          
               # Index TRX by (Class, Base)
               idx = defaultdict(list)
+              unmatched_tests = []
+          
               for t in trx:
                   matched = False
-                  for f in funcs:
-                      if same_function(f["Function"], t["Base"]) and f["Class"] == t["Class"]:
-                          idx[(f["Class"], f["Function"])].append(t)
+                  for f_existing in funcs: # Renamed loop variable to avoid shadowing
+                      if same_function(f_existing["Function"], t["Base"]) and f_existing["Class"] == t["Class"]:
+                          idx[(f_existing["Class"], f_existing["Function"])].append(t)
                           matched = True
                           break
+          
                   if not matched:
-                      # Gán vào một function giả để không bị mất
-                      fake_func_name = f"{t['Base']}_{t['Class']}"
-                      idx[(t["Class"], fake_func_name)].append(t)
-                      # Thêm function giả vào danh sách funcs
-                      funcs.append({
+                      unmatched_tests.append(t)
+                      # Create a synthetic function for unmatched tests
+                      synthetic_func = {
                           "Class": t["Class"],
-                          "Function": fake_func_name,
-                          "Description": f"Auto-generated for {t['Base']}",
+                          "Function": t["Base"],  # Use Base directly
+                          "Description": f"Auto-generated for {t['Method']}",
                           "PreCondition": "",
                           "Requirement": ""
-                      })
+                      }
+          
+                      # Check if we already have this synthetic function
+                      exists = False
+                      for f_existing in funcs: # Renamed loop variable to avoid shadowing
+                          if f_existing["Class"] == synthetic_func["Class"] and f_existing["Function"] == synthetic_func["Function"]:
+                              exists = True
+                              break
+          
+                      if not exists:
+                          funcs.append(synthetic_func)
+          
+                      # Add test to index
+                      idx[(t["Class"], t["Base"])].append(t)
+              
+              print(f"\nTotal functions after processing: {len(funcs)}")
+              print(f"Total test results from parse_trx: {len(trx)}")
+              print(f"Total tests indexed (should match total test results): {sum(len(tests) for tests in idx.values())}")
+              print(f"Number of functions before creating DataFrame: {len(funcs)}") # Added this line
+
+              print(f"\nUnmatched tests: {len(unmatched_tests)}")
+              if unmatched_tests:
+                  print("Unmatched test details (first 10):")
+                  for t in unmatched_tests[:10]:  # Show first 10
+                      print(f"  - {t['Class']}.{t['Method']}")
+          
+              # Verify total test count
+              total_indexed = sum(len(tests) for tests in idx.values())
+              print(f"Total tests indexed: {total_indexed} (should be {len(trx)})")
           
               # Sheet 1: Functions
               func_rows=[]
@@ -545,6 +631,12 @@ jobs:
                           stats_ws.write(i+1, 1, hyperlink_formula)
 
               print(f"Report generated: {out}")
+          
+              # Final summary
+              total_tests_in_report = sum([row["Total Test Cases"] for _, row in df_stats.iterrows()])
+              print(f"\n=== FINAL SUMMARY ===")
+              print(f"Total functions: {len(funcs)}")
+              print(f"Total test cases in report: {total_tests_in_report}")
 
           if __name__ == "__main__":
               main()

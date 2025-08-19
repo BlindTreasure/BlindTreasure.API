@@ -799,8 +799,8 @@ public class BlindBoxServiceTests
         _productRepoMock.Verify(x => x.UpdateRange(It.IsAny<List<Product>>()), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
     }
-    #endregion
 
+    #endregion
 
 
     #region DeleteBlindBoxAsync Tests
@@ -879,7 +879,8 @@ public class BlindBoxServiceTests
         Assert.NotNull(result);
         Assert.Equal(blindBoxId, result.Id);
         _blindBoxRepoMock.Verify(x => x.SoftRemove(It.IsAny<BlindBox>()), Times.Once);
-        _productRepoMock.Verify(x => x.UpdateRange(It.Is<List<Product>>(l => l[0].TotalStockQuantity == 15)), Times.Once);
+        _productRepoMock.Verify(x => x.UpdateRange(It.Is<List<Product>>(l => l[0].TotalStockQuantity == 15)),
+            Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
     }
 
