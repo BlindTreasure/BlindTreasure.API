@@ -27,7 +27,11 @@ public class ProductSellerCreateDto
     [Required]
     [Range(0.01, double.MaxValue)]
     [DefaultValue(499000)]
-    public decimal Price { get; set; }
+    public decimal RealSellingPrice { get; set; } // Đây là giá bán thực tế, có thể khác với giá niêm yết
+
+    [Range(0.01, double.MaxValue)]
+    [DefaultValue(499000)]
+    public decimal? ListedPrice { get; set; } // Đây là giá niêm yết, có thể khác với giá bán thực tế
 
     [Required]
     [Range(0, int.MaxValue)]

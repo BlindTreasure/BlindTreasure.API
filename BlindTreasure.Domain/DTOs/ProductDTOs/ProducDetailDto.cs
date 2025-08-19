@@ -17,8 +17,10 @@ public class ProducDetailDto
     public Guid SellerId { get; set; }
     
     // Pricing
-    public decimal Price { get; set; }
-    
+    public decimal RealSellingPrice { get; set; }
+    public decimal? ListedPrice { get; set; } // Đây là giá niêm yết, có thể khác với giá bán thực tế
+
+
     // Stock Management (grouped together)
     public int TotalStockQuantity { get; set; }
     public int ReservedInBlindBox { get; set; }
