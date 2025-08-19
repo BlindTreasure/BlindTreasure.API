@@ -66,7 +66,7 @@ public class AddressServiceTests
             .ReturnsAsync((Address a) => a);
 
         // Act
-        await _addressService.CreateAsync(createDto);
+        await _addressService.CreateAddressAsync(createDto);
 
         // Assert
         capturedAddress.Should().NotBeNull();
@@ -95,7 +95,7 @@ public class AddressServiceTests
             .ReturnsAsync(existingAddresses);
 
         // Act
-        await _addressService.CreateAsync(createDto);
+        await _addressService.CreateAddressAsync(createDto);
 
         // Assert
         oldDefault.IsDefault.Should().BeFalse();
@@ -130,7 +130,7 @@ public class AddressServiceTests
             .ReturnsAsync((Address a) => a);
 
         // Act
-        await _addressService.CreateAsync(createDto);
+        await _addressService.CreateAddressAsync(createDto);
 
         // Assert
         capturedAddress.Should().NotBeNull();
@@ -162,7 +162,7 @@ public class AddressServiceTests
             .ReturnsAsync(existingAddress);
 
         // Act
-        var result = await _addressService.UpdateAsync(addressId, updateDto);
+        var result = await _addressService.UpdateAddressAsync(addressId, updateDto);
 
         // Assert
         result.Should().NotBeNull();
@@ -188,7 +188,7 @@ public class AddressServiceTests
             .ReturnsAsync((Address)null!);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.UpdateAsync(addressId, updateDto));
+        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.UpdateAddressAsync(addressId, updateDto));
         ExceptionUtils.ExtractStatusCode(exception).Should().Be(404);
     }
 
@@ -211,7 +211,7 @@ public class AddressServiceTests
             .ReturnsAsync(existingAddress);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.UpdateAsync(addressId, updateDto));
+        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.UpdateAddressAsync(addressId, updateDto));
         ExceptionUtils.ExtractStatusCode(exception).Should().Be(404);
     }
 
@@ -236,7 +236,7 @@ public class AddressServiceTests
         _addressRepoMock.Setup(x => x.GetByIdAsync(addressId)).ReturnsAsync(address);
 
         // Act
-        var result = await _addressService.DeleteAsync(addressId);
+        var result = await _addressService.DeleteAddressAsync(addressId);
 
         // Assert
         result.Should().BeTrue();
@@ -261,7 +261,7 @@ public class AddressServiceTests
         _addressRepoMock.Setup(x => x.GetByIdAsync(addressId)).ReturnsAsync(address);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.DeleteAsync(addressId));
+        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.DeleteAddressAsync(addressId));
         ExceptionUtils.ExtractStatusCode(exception).Should().Be(404);
     }
 
@@ -281,7 +281,7 @@ public class AddressServiceTests
         _addressRepoMock.Setup(x => x.GetByIdAsync(addressId)).ReturnsAsync((Address)null);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.DeleteAsync(addressId));
+        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.DeleteAddressAsync(addressId));
         ExceptionUtils.ExtractStatusCode(exception).Should().Be(404);
     }
 
@@ -312,7 +312,7 @@ public class AddressServiceTests
             .ReturnsAsync(new List<Address> { oldDefault });
 
         // Act
-        var result = await _addressService.SetDefaultAsync(newDefaultId);
+        var result = await _addressService.SetDefaultAddressAsync(newDefaultId);
 
         // Assert
         result.Should().NotBeNull();
@@ -340,7 +340,7 @@ public class AddressServiceTests
         _addressRepoMock.Setup(x => x.GetByIdAsync(addressId)).ReturnsAsync(address);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.SetDefaultAsync(addressId));
+        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.SetDefaultAddressAsync(addressId));
         ExceptionUtils.ExtractStatusCode(exception).Should().Be(404);
     }
 
@@ -365,7 +365,7 @@ public class AddressServiceTests
             .ReturnsAsync(new List<Address>()); // No *other* default addresses are found
 
         // Act
-        await _addressService.SetDefaultAsync(addressId);
+        await _addressService.SetDefaultAddressAsync(addressId);
 
         // Assert
         // Verify that no other addresses were updated because none needed to be
