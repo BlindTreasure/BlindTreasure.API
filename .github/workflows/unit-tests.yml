@@ -75,7 +75,10 @@ jobs:
 
           RE_CLASS = re.compile(r'^\\s*(?:public|internal|protected|private)?\\s*(?:sealed\\s+|static\\s+|abstract\\s+)?class\\s+(\\w+)\\b')
           RE_FACT  = re.compile(r'^\\s*\\[Fact(?:\\s*\\(.*?\\))?\\]\\s*$')
-          RE_METHOD= re.compile(r'^\\s*(?:public|internal|protected|private)\\s+(?:async\\s+)?(?:Task|void)\\s+(\\w+)\\s*\\(')
+          RE_METHOD = re.compile(
+                r'^\s*(?:public|internal|protected|private)\s+'
+                r'(?:async\s+)?(?:Task|void)\s+(\w+)\s*\('
+            )
           RE_DOC   = re.compile(r'^\\s*///\\s?(.*)$')
 
           def sanitize_sheet_name(name):
