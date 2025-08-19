@@ -52,17 +52,22 @@ public class SellerStatisticsService : ISellerStatisticsService
         var (start, end) = GetStatisticsDateRange(req);
         _loggerService.Info($"[SellerStatistics] Date range: {start:O} - {end:O}");
 
-        // Query all PAID orders for this seller in the time range
-        var ordersQuery = _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == sellerId
-                        && o.Status == OrderStatus.PAID.ToString()
-                        && o.CompletedAt >= start
-                        && o.CompletedAt < end
-                        && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .AsNoTracking();
 
-        var orders = await ordersQuery.ToListAsync(ct);
+
+        var orders = await _unitOfWork.Orders.GetQueryable()
+    .Where(o => o.SellerId == sellerId
+                && o.Status == OrderStatus.PAID.ToString()
+                && o.CompletedAt >= start
+                && o.CompletedAt < end
+                && !o.IsDeleted)
+    .Include(o => o.OrderDetails)
+    .ThenInclude(od => od.Product) // Đảm bảo include Product
+    .Include(o => o.OrderDetails)
+    .ThenInclude(od => od.BlindBox) // Đảm bảo include BlindBox
+    .Include(o => o.OrderDetails)
+    .ThenInclude(od => od.Order) // Đảm bảo include Order cho TimeSeries
+    .AsNoTracking()
+    .ToListAsync(ct);
 
         // Flatten all order details, filter out cancelled
         var orderDetails = orders
@@ -71,7 +76,7 @@ public class SellerStatisticsService : ISellerStatisticsService
             .ToList();
 
         // Build statistics
-        var overview = await BuildOverviewStatisticsAsync(orders, orderDetails, req, start, end, ct);
+        var overview = await BuildOverviewStatisticsAsync(orders, orderDetails, req, start, end, ct, sellerId);
         var topProducts = BuildTopProducts(orderDetails);
         var topBlindBoxes = BuildTopBlindBoxes(orderDetails);
         var orderStatusStats = BuildOrderStatusStatistics(orderDetails);
@@ -97,15 +102,15 @@ public class SellerStatisticsService : ISellerStatisticsService
         SellerStatisticsRequestDto req,
         DateTime start,
         DateTime end,
-        CancellationToken ct)
+        CancellationToken ct,
+        Guid sellerId) // Thêm sellerId
     {
         var totalOrders = orders.Count;
         var totalProductsSold = orderDetails.Sum(od => od.Quantity);
 
         var grossRevenue = orderDetails.Sum(od => od.TotalPrice);
         var totalDiscount = orderDetails.Sum(od => od.DetailDiscountPromotion ?? 0m);
-        var netRevenue =
-            orderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice - (od.DetailDiscountPromotion ?? 0m));
+        var netRevenue = orderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
 
         // Refunds: Only from payments of these orders
         var orderIds = orders.Select(o => o.Id).ToList();
@@ -120,7 +125,7 @@ public class SellerStatisticsService : ISellerStatisticsService
         // Previous period for growth calculation
         var (lastStart, lastEnd) = GetPreviousDateRange(req.Range, start, end);
         var lastOrders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == orders.FirstOrDefault().SellerId
+            .Where(o => o.SellerId == sellerId
                         && o.Status == OrderStatus.PAID.ToString()
                         && o.CompletedAt >= lastStart
                         && o.CompletedAt < lastEnd
@@ -136,8 +141,7 @@ public class SellerStatisticsService : ISellerStatisticsService
 
         var lastOrdersCount = lastOrders.Count;
         var lastProductsSold = lastOrderDetails.Sum(od => od.Quantity);
-        var lastRevenue =
-            lastOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice - (od.DetailDiscountPromotion ?? 0m));
+        var lastRevenue = lastOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
         var lastAOV = lastOrdersCount > 0 ? Math.Round(lastRevenue / lastOrdersCount, 2) : 0m;
 
         var revenueGrowth = lastRevenue > 0 ? Math.Round((netRevenue - lastRevenue) * 100 / lastRevenue, 2) : 0m;
@@ -399,7 +403,7 @@ public class SellerStatisticsService : ISellerStatisticsService
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
             .ToList();
 
-        return await BuildOverviewStatisticsAsync(orders, orderDetails, req, start, end, ct);
+        return await BuildOverviewStatisticsAsync(orders, orderDetails, req, start, end, ct, sellerId);
     }
 
     public async Task<List<TopSellingProductDto>> GetTopProductsAsync(

@@ -24,6 +24,8 @@ public class OrderDetail : BaseEntity
     public OrderDetailItemStatus Status { get; set; }
     public string? Logs { get; set; } = string.Empty; // Lưu trữ nhật ký trạng thái
 
+    //public bool? IsCompleted { get; set; } = false; // Đã hoàn thành xong flow chưa
+
 
     // Many → Shipments
     public ICollection<Shipment>? Shipments { get; set; } = new List<Shipment>();
