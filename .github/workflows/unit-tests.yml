@@ -30,7 +30,7 @@ jobs:
           cache: true
           cache-dependency-path: '**/*.csproj'
 
-      - name: Setup Python for Excel generation
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
@@ -42,14 +42,13 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore BlindTreasure.API.sln
 
-      - name: Build with XML documentation
+      - name: Build with XML docs
         run: |
           dotnet build BlindTreasure.API.sln \
             --no-restore \
             --configuration Release \
             /p:GenerateDocumentationFile=true
-          # Liệt kê XML của đúng project UnitTest
-          find ./BlindTreaure.UnitTest/bin -name "*.xml" | sort
+          find ./BlindTreaure.UnitTest/bin -name "*.xml" | sort || true
 
       - name: Run unit tests with coverage
         run: |
@@ -60,6 +59,7 @@ jobs:
             --collect:"XPlat Code Coverage" \
             --results-directory ./TestResults/ \
             --logger "trx;LogFileName=test-results.trx"
+          find ./TestResults -name "test-results.trx" | sort || true
 
       - name: Generate Excel Report (Functions + Statistics)
         run: |
@@ -71,18 +71,20 @@ jobs:
           from collections import defaultdict
           import glob, re
 
-          UNITTEST_NAMESPACE_PREFIX = "BlindTreaure.UnitTest.Services."
+          # Chấp nhận cả 2 cách viết (phòng sai chính tả Treasure/Treaure)
+          XML_NAMESPACE_PREFIXES = (
+              "M:BlindTreaure.UnitTest.Services.",
+              "M:BlindTreasure.UnitTest.Services.",
+          )
 
           def short_class(full_class: str) -> str:
               return full_class.split('.')[-1] if full_class else ""
 
           def strip_params(name: str) -> str:
-              # Cắt phần tham số của Theory/inline data: Method(arg1, arg2)
               return name.split('(')[0] if name else name
 
-          # ---------------- XML: functions (source of truth for Functions sheet) ----------------
+          # ---------- XML: lấy Functions (nguồn chuẩn cho sheet Functions) ----------
           def extract_functions_from_xml():
-              """Đọc XML docs chỉ của project UnitTest và namespace Services"""
               xml_files = glob.glob('./BlindTreaure.UnitTest/bin/**/*.xml', recursive=True)
               funcs = []
               for f in xml_files:
@@ -93,11 +95,9 @@ jobs:
                           name = m.get('name', '')
                           if not name.startswith('M:'):
                               continue
-                          # Giữ đúng namespace UnitTest.Services
-                          if not name.startswith(f"M:{UNITTEST_NAMESPACE_PREFIX}"):
+                          if not any(name.startswith(pref) for pref in XML_NAMESPACE_PREFIXES):
                               continue
 
-                          # name dạng: M:BlindTreaure.UnitTest.Services.AddressServiceTests.RegisterUserAsync(...)
                           parts = name.split('.')
                           if len(parts) < 2:
                               continue
@@ -105,7 +105,6 @@ jobs:
                           met = parts[-1]
                           method_base = strip_params(met)
 
-                          # summary/remarks
                           summary = ""
                           scenario = ""
                           coverage = ""
@@ -131,14 +130,15 @@ jobs:
                               "Sheet": f"{cls}Management"
                           })
                   except Exception:
-                      # Bỏ qua file XML lỗi
                       pass
               return funcs
 
-          # ---------------- TRX: real results (source of truth for Statistics) ----------------
-          def parse_trx_results():
-              """Liên kết UnitTestResult (testId) với UnitTest/TestMethod để lấy Class + Method base + Outcome.
-                 Chỉ giữ test thuộc namespace UnitTest.Services."""
+          # ---------- TRX: lấy kết quả thực tế ----------
+          def parse_trx_results(target_classes_short):
+              """
+              Map UnitTestResult(testId) -> UnitTest(TestMethod class/name) để lấy class & method chuẩn.
+              Không lọc theo prefix namespace cứng; chỉ giữ test có class short trùng với Functions.
+              """
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
               if not trx_files:
                   return []
@@ -146,33 +146,27 @@ jobs:
               with open(trx_files[0], 'r', encoding='utf-8') as f:
                   s = BeautifulSoup(f.read(), 'xml')
 
-              # Map UnitTest id -> (className, methodName)
+              # Map UnitTest id -> (classFull, methodBase)
               id_to_method = {}
               for ut in s.find_all('UnitTest'):
                   ut_id = ut.get('id') or ut.get('testId')
                   tm = ut.find('TestMethod')
                   if not ut_id or tm is None:
                       continue
-                  class_name = tm.get('className', '')
-                  method_name = tm.get('name', '')
-                  if not class_name.startswith(UNITTEST_NAMESPACE_PREFIX):
-                      continue
-                  id_to_method[ut_id] = (class_name, strip_params(method_name))
+                  class_full = tm.get('className', '')
+                  method_base = strip_params(tm.get('name', ''))
+                  cls_short = short_class(class_full)
+                  if cls_short in target_classes_short:
+                      id_to_method[ut_id] = (class_full, method_base)
 
-              # Collect results
               results = []
               for r in s.find_all('UnitTestResult'):
                   test_id = r.get('testId') or r.get('testId')
-                  outcome = r.get('outcome', 'Unknown')
-                  # Fallback: testName (display) để strip params nếu thiếu map
-                  display = strip_params(r.get('testName', ''))
-
-                  if test_id in id_to_method:
-                      class_full, method_base = id_to_method[test_id]
-                  else:
-                      # Không tìm thấy id -> bỏ qua test ngoài scope
+                  if not test_id or test_id not in id_to_method:
                       continue
-
+                  outcome = r.get('outcome', 'Unknown')
+                  display = strip_params(r.get('testName', ''))
+                  class_full, method_base = id_to_method[test_id]
                   results.append({
                       "ClassFull": class_full,
                       "Class": short_class(class_full),
@@ -182,46 +176,44 @@ jobs:
                   })
               return results
 
-          # ---------------- Match & aggregate ----------------
+          # ---------- Match method ----------
           def normalize_for_match(s: str) -> str:
               return re.sub(r'[^A-Za-z0-9_]', '', s or '').lower()
 
           def is_same_function(doc_method: str, trx_method: str) -> bool:
-              """Match chặt chẽ nhưng chịu được pattern _Should/_When và tham số."""
               d = normalize_for_match(doc_method)
               t = normalize_for_match(trx_method)
               if d == t:
                   return True
-              # MethodName_Should..., MethodName_When...
+              # Method_Should..., Method_When...
               if t.startswith(d + 'should') or t.startswith(d + '_should'):
                   return True
               if t.startswith(d + 'when') or t.startswith(d + '_when'):
                   return True
-              # Prefix strict
               if t.startswith(d + '_'):
                   return True
               return False
 
-          def classify_case(method_name: str) -> str:
-              m = method_name or ""
-              if "_Normal" in m or "_NORMAL" in m or m.endswith("Normal"):
-                  return "N"
-              if "_Abnormal" in m or "_ABNORMAL" in m or m.endswith("Abnormal"):
-                  return "A"
-              if "_Boundary" in m or "_BOUNDARY" in m or m.endswith("Boundary"):
+          def classify_case(name: str) -> str:
+              n = (name or "").lower()
+              if "boundary" in n or "_boundary" in n:
                   return "B"
+              if "abnormal" in n or "_abnormal" in n:
+                  return "A"
+              if "normal" in n or "_normal" in n:
+                  return "N"
               return "N"
 
+          # ---------- Build report ----------
           def build_report():
               funcs = extract_functions_from_xml()
-              trx = parse_trx_results()
+              if not funcs:
+                  return pd.DataFrame(), pd.DataFrame()
 
-              # Index TRX by (Class -> list of tests)
-              class_to_tests = defaultdict(list)
-              for t in trx:
-                  class_to_tests[t["Class"]].append(t)
+              target_classes_short = { f["Class"] for f in funcs }
+              trx = parse_trx_results(target_classes_short)
 
-              # FUNCTIONS sheet rows
+              # FUNCTIONS
               funcs_rows = []
               for i, f in enumerate(funcs, start=1):
                   funcs_rows.append({
@@ -235,7 +227,12 @@ jobs:
                       "Pre-Condition": f["PreCondition"]
                   })
 
-              # STATISTICS per function (not per class)
+              # Index TRX by class short
+              class_to_tests = defaultdict(list)
+              for t in trx:
+                  class_to_tests[t["Class"]].append(t)
+
+              # STATISTICS per function (aggregate all matched tests of that function)
               stats_rows = []
               for i, f in enumerate(funcs, start=1):
                   cls = f["Class"]
@@ -245,37 +242,29 @@ jobs:
                   passed = failed = untested = 0
                   n_cnt = a_cnt = b_cnt = 0
 
-                  matched = False
                   for t in tests:
                       if is_same_function(method, t["Method"]) or is_same_function(method, t["Display"]):
-                          matched = True
                           if t["Outcome"] == "Passed":
                               passed += 1
                           elif t["Outcome"] == "Failed":
                               failed += 1
                           else:
                               untested += 1
-                          # case type theo tên method hiển thị (ưu tiên display), fallback base
-                          case_type = classify_case(t["Display"] or t["Method"])
-                          if case_type == "N": n_cnt += 1
-                          elif case_type == "A": a_cnt += 1
-                          elif case_type == "B": b_cnt += 1
+                          case = classify_case(t["Display"] or t["Method"])
+                          if case == "N": n_cnt += 1
+                          elif case == "A": a_cnt += 1
+                          elif case == "B": b_cnt += 1
 
-                  # Nếu không match cái nào, coi như untested = 1 để hiển thị (giúp phát hiện mapping sai)
-                  total = passed + failed + untested
-                  if not matched:
-                      untested = 1
-                      total = 1
-
+                  total = passed + failed + untested  # không ép Untested=1 nếu không match
                   stats_rows.append({
                       "No": i,
                       "Function Code": f'=HYPERLINK("#{f["Sheet"]}!A1","Code")',
                       "Passed": passed,
                       "Failed": failed,
                       "Untested": untested,
-                      "N": n_cnt if matched else 0,
-                      "A": a_cnt if matched else 0,
-                      "B": b_cnt if matched else 0,
+                      "N": n_cnt,
+                      "A": a_cnt,
+                      "B": b_cnt,
                       "Total Test Cases": total
                   })
 
