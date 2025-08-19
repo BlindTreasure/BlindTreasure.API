@@ -48,7 +48,6 @@ jobs:
             --no-restore \
             --configuration Release \
             /p:GenerateDocumentationFile=true
-          # Đúng project UnitTest
           find ./BlindTreasure.UnitTest/bin -name "*.xml" | sort || true
 
       - name: Run unit tests with coverage
@@ -70,406 +69,305 @@ jobs:
           import xml.etree.ElementTree as ET
           from bs4 import BeautifulSoup
           from collections import defaultdict
-          import glob, re, datetime
+          import glob, re
 
-          XML_NAMESPACE_PREFIX = "M:BlindTreasure.UnitTest.Services."
+          XML_PREFIX = "M:BlindTreasure.UnitTest.Services."
 
-          # ---------------- helpers ----------------
-          def sanitize_sheet_name(name: str) -> str:
-              invalid = '[]:*?/\\'
-              for ch in invalid:
-                  name = name.replace(ch, ' ')
-              return name[:31]
+          # ---------- helpers ----------
+          def strip_params(s): return s.split('(')[0] if s else s
+          def short_class(fq): return fq.split('.')[-1] if fq else ''
+          def norm(s): return re.sub(r'[^A-Za-z0-9_]', '', (s or '')).lower()
 
-          def short_class(full_class: str) -> str:
-              return full_class.split('.')[-1] if full_class else ""
+          def base_function_from_test(method_name: str) -> str:
+              """Lấy function-under-test từ test method: RegisterCustomerAsync_Should... -> RegisterCustomerAsync"""
+              m = strip_params(method_name or '')
+              if '_Should' in m: return m.split('_Should',1)[0]
+              if '_When'   in m: return m.split('_When',1)[0]
+              return m
 
-          def strip_params(name: str) -> str:
-              return name.split('(')[0] if name else name
-
-          def norm(s: str) -> str:
-              return re.sub(r'[^A-Za-z0-9_]', '', (s or '')).lower()
-
-          def is_same_function(doc_method: str, trx_method: str) -> bool:
-              d = norm(doc_method); t = norm(trx_method)
-              if d == t: return True
-              return t.startswith(d+'_') or t.startswith(d+'should') or t.startswith(d+'_should') \
-                     or t.startswith(d+'when') or t.startswith(d+'_when')
+          def same_function(doc_func: str, test_method: str) -> bool:
+              d = norm(doc_func); t = norm(base_function_from_test(test_method))
+              return d == t
 
           def classify_case(name: str) -> str:
               n = (name or '').lower()
-              if 'boundary' in n or '_boundary' in n: return 'B'
-              if 'abnormal' in n or '_abnormal' in n: return 'A'
-              if 'normal'   in n or '_normal'   in n: return 'N'
+              if 'boundary' in n: return 'B'
+              if 'abnormal' in n: return 'A'
+              if 'normal'   in n: return 'N'
               return 'N'
 
-          def humanize_phrase(token: str) -> str:
-              # ApiKeyIsNullOrEmpty -> API key is null or empty
-              s = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', token)
-              s = s.replace('_', ' ').strip()
-              # common replacements
-              s = s.replace('Api Key', 'API key')
-              s = s.replace('Subdomain', 'Subdomain')
-              s = s.replace(' Null Or Empty', ' null or empty')
-              s = s.replace(' Is ', ' is ')
-              s = s.replace(' Invalid ', ' invalid ')
-              s = s.replace(' Valid ', ' valid ')
-              return s[0].upper() + s[1:] if s else s
+          def expected_from_name(name: str) -> str:
+              n = (name or '').lower()
+              if 'shouldreturntrue'  in n or 'should_be_true' in n:  return 'TRUE'
+              if 'shouldreturnfalse' in n or 'should_be_false' in n: return 'FALSE'
+              return ''
 
-          def extract_conditions_from_name(name: str):
-              """
-              Lấy phần sau _When... từ tên test, tách thành các điều kiện input.
-              Ví dụ: ValidateApiKey_ShouldReturnFalse_WhenApiKeyIsNullOrEmpty
-              -> ['API key is null or empty']
-              """
+          def to_conditions_from_name(name: str):
+              """Parse điều kiện từ phần _When... của tên test."""
               base = strip_params(name or '')
-              if '_When' in base:
-                  cond = base.split('_When', 1)[1]
-              else:
-                  return []
-              # tách theo _And_ hoặc _
-              parts = re.split(r'_And_|_', cond)
-              parts = [p for p in parts if p]
-              # gộp cụm phổ biến
-              # nếu chuỗi chứa "ApiKeyIsNullOrEmpty" giữ nguyên làm 1 điều kiện
-              joined = '_'.join(parts)
-              buckets = []
-              if 'ApiKeyIsNullOrEmpty' in joined:
-                  buckets.append('ApiKeyIsNullOrEmpty')
-                  joined = joined.replace('ApiKeyIsNullOrEmpty','')
-              if 'SubdomainIsNullOrEmpty' in joined:
-                  buckets.append('SubdomainIsNullOrEmpty')
-                  joined = joined.replace('SubdomainIsNullOrEmpty','')
-              if 'ApiKeyIsInvalid' in joined or 'Invalid' in joined:
-                  buckets.append('ApiKeyIsInvalidWithProvidedSubdomain' if 'Subdomain' in joined else 'ApiKeyIsInvalid')
-                  joined = joined.replace('ApiKeyIsInvalid','').replace('Invalid','')
-              if 'ApiKeyIsValid' in joined or 'Valid' in joined:
-                  buckets.append('ApiKeyIsValidWithProvidedSubdomain' if 'Subdomain' in joined else 'ApiKeyIsValid')
-                  joined = joined.replace('ApiKeyIsValid','').replace('Valid','')
-
-              # Phần còn lại: tách camel-case còn sót
+              if '_When' not in base: return []
+              cond = base.split('_When',1)[1]
+              parts = [p for p in re.split(r'_And_|_', cond) if p]
+              # humanize
+              out=[]
               for p in parts:
-                  if p and all(p not in b for b in buckets):
-                      buckets.append(p)
+                  s = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', p).replace('_',' ').strip()
+                  s = s.replace('Api Key','API key').replace('Null Or','null or').replace(' Is ',' is ')
+                  s = s.replace('Subdomain','Subdomain').replace('Valid','valid').replace('Invalid','invalid')
+                  out.append(s[0].upper()+s[1:] if s else s)
+              # unique
+              seen=set(); res=[]
+              for x in out:
+                  k=norm(x)
+                  if k and k not in seen:
+                      seen.add(k); res.append(x)
+              return res
 
-              # Humanize và lọc trùng
-              out = []
-              seen = set()
-              for b in buckets:
-                  label = humanize_phrase(b)
-                  key = norm(label)
-                  if key and key not in seen:
-                      seen.add(key)
-                      out.append(label)
-              return out
-
-          def expected_return_from_name(name: str):
-              n = (name or '').lower()
-              if 'shouldreturntrue' in n or 'should_be_true' in n or 'shouldbetrue' in n:
-                  return 'TRUE'
-              if 'shouldreturnfalse' in n or 'should_be_false' in n or 'shouldbefalse' in n:
-                  return 'FALSE'
-              return ''
-
-          def log_message_from_name(name: str):
-              n = (name or '').lower()
-              if 'missing' in n or 'nullor' in n or 'null_or' in n:
-                  return 'Subdomain or API key is missing.'
-              if 'invalid' in n:
-                  return 'Invalid API Key for subdomain'
-              if 'valid' in n:
-                  return 'API Key validated successfully for subdomain'
-              return ''
-
-          # ---------------- read XML -> functions ----------------
-          def extract_functions_from_xml():
+          # ---------- XML -> functions (group by class + function-under-test) ----------
+          def extract_functions():
               xml_files = glob.glob('./BlindTreasure.UnitTest/bin/**/*.xml', recursive=True)
-              funcs = []
+              agg = {}  # key=(Class, Func) -> data
               for f in xml_files:
                   try:
                       root = ET.parse(f).getroot()
                   except Exception:
                       continue
                   for m in root.findall('.//member'):
-                      name = m.get('name', '')
+                      name = m.get('name','')
                       if not name.startswith('M:'): continue
-                      if not name.startswith(XML_NAMESPACE_PREFIX): continue
-
+                      if not name.startswith(XML_PREFIX): continue
                       parts = name.split('.')
                       if len(parts) < 2: continue
                       cls = parts[-2]
-                      method = strip_params(parts[-1])
+                      test_method = strip_params(parts[-1])
+                      func = base_function_from_test(test_method)
 
-                      summary = ""; scenario = ""; coverage = ""
+                      desc = ''
+                      pre  = ''
+                      cov  = ''
                       s = m.find('summary')
-                      if s is not None and s.text:
-                          summary = ' '.join(s.text.split())
+                      if s is not None and s.text: desc = ' '.join(s.text.split())
                       r = m.find('remarks')
                       if r is not None and r.text:
                           for line in r.text.splitlines():
-                              line = line.strip()
-                              if line.startswith('Scenario:'):
-                                  scenario = line.replace('Scenario:','').strip()
-                              elif line.startswith('Coverage:'):
-                                  coverage = line.replace('Coverage:','').strip()
+                              line=line.strip()
+                              if line.startswith('Scenario:'): pre = line.replace('Scenario:','').strip() or pre
+                              elif line.startswith('Coverage:'): cov = line.replace('Coverage:','').strip() or cov
 
-                      funcs.append({
-                          "Class": cls,
-                          "Method": method,
-                          "Description": summary,
-                          "PreCondition": scenario,
-                          "Requirement": coverage,
-                          "Sheet": sanitize_sheet_name(f"{cls}Management")
-                      })
-              return funcs
+                      key=(cls,func)
+                      if key not in agg:
+                          agg[key]={"Class":cls,"Function":func,"Description":desc,"PreCondition":pre,"Requirement":cov}
+                      else:
+                          if not agg[key]["Description"] and desc: agg[key]["Description"]=desc
+                          if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"]=pre
+                          if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"]=cov
+              return list(agg.values())
 
-          # ---------------- read TRX -> results ----------------
-          def parse_trx_results(target_classes_short):
+          # ---------- TRX robust parse ----------
+          def parse_trx():
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
               if not trx_files: return []
+              with open(trx_files[0],'r',encoding='utf-8') as f:
+                  soup = BeautifulSoup(f.read(),'xml')
 
-              with open(trx_files[0], 'r', encoding='utf-8') as f:
-                  soup = BeautifulSoup(f.read(), 'xml')
-
-              # id -> (classFull, methodBase)
-              id_to_method = {}
+              id_map={}
               for ut in soup.find_all('UnitTest'):
                   ut_id = ut.get('id') or ut.get('testId')
                   tm = ut.find('TestMethod')
                   if not ut_id or tm is None: continue
                   class_full = tm.get('className','')
-                  method_base = strip_params(tm.get('name',''))
-                  cls_short = short_class(class_full)
-                  if cls_short in target_classes_short:
-                      id_to_method[ut_id] = (class_full, method_base)
+                  method_name = strip_params(tm.get('name',''))
+                  id_map[ut_id]=(short_class(class_full), method_name)
 
-              results = []
-              for r in soup.find_all('UnitTestResult'):
-                  test_id = r.get('testId')
-                  if not test_id or test_id not in id_to_method:
-                      continue
-                  outcome = r.get('outcome','Unknown')
-                  display = strip_params(r.get('testName',''))
-                  end_time = r.get('endTime') or r.get('startTime') or ''
-                  class_full, method_base = id_to_method[test_id]
-                  results.append({
-                      "ClassFull": class_full,
-                      "Class": short_class(class_full),
-                      "Method": method_base,
-                      "Outcome": outcome,
-                      "Display": display,
-                      "ExecutedAt": end_time
+              out=[]
+              for res in soup.find_all('UnitTestResult'):
+                  tid = res.get('testId')
+                  if not tid or tid not in id_map: continue
+                  cls, mth = id_map[tid]
+                  out.append({
+                      "Class": cls,
+                      "Method": mth,               # test method name
+                      "Base": base_function_from_test(mth),  # function-under-test
+                      "Outcome": res.get('outcome','Unknown'),
+                      "Display": strip_params(res.get('testName','')),
+                      "ExecutedAt": res.get('endTime') or res.get('startTime') or ''
                   })
-              return results
+              return out
 
-          # ---------------- build core sheets ----------------
+          # ---------- Build "Functions" & "Statistics" ----------
           def build_core():
-              funcs = extract_functions_from_xml()
-              target_classes_short = { f['Class'] for f in funcs }
-              trx = parse_trx_results(target_classes_short)
+              funcs = extract_functions()
+              trx = parse_trx()
 
-              # Functions sheet rows
-              funcs_rows = []
+              # Index TRX by (Class, Base)
+              idx = defaultdict(list)
+              for t in trx:
+                  idx[(t["Class"], t["Base"])].append(t)
+
+              # Sheet 1: Functions (Sheet Name = function)
+              func_rows=[]
               for i,f in enumerate(funcs,1):
-                  funcs_rows.append({
+                  func_rows.append({
                       "No": i,
                       "RequirementName": f["Requirement"],
                       "Class Name": f["Class"],
-                      "Function Name": f["Method"],
+                      "Function Name": f["Function"],
                       "Function Code": f"Code_{i}",
-                      "Sheet Name": f["Sheet"],
+                      "Sheet Name": f["Function"],   # yêu cầu: đúng bằng method
                       "Description": f["Description"],
                       "Pre-Condition": f["PreCondition"]
                   })
 
-              # Statistics aggregated per function (Class+Method)
-              class_to_tests = defaultdict(list)
-              for t in trx:
-                  class_to_tests[t["Class"]].append(t)
-
-              stats_rows = []
+              # Sheet 2: Statistics (aggregate theo function)
+              stat_rows=[]
               for i,f in enumerate(funcs,1):
-                  cls = f["Class"]; method=f["Method"]
-                  tests = class_to_tests.get(cls, [])
-                  passed=failed=untested=0; N=A=B=0
+                  tests = idx.get((f["Class"], f["Function"]), [])
+                  p=f_=u=0; N=A=B=0
                   for t in tests:
-                      if is_same_function(method, t["Method"]) or is_same_function(method, t["Display"]):
-                          if t["Outcome"]=="Passed": passed+=1
-                          elif t["Outcome"]=="Failed": failed+=1
-                          else: untested+=1
-                          ct = classify_case(t["Display"] or t["Method"])
-                          if ct=='N': N+=1
-                          elif ct=='A': A+=1
-                          elif ct=='B': B+=1
-                  stats_rows.append({
+                      if t["Outcome"]=="Passed": p+=1
+                      elif t["Outcome"]=="Failed": f_+=1
+                      else: u+=1
+                      c = classify_case(t["Display"] or t["Method"])
+                      if c=='N': N+=1
+                      elif c=='A': A+=1
+                      elif c=='B': B+=1
+                  stat_rows.append({
                       "No": i,
-                      "Function Code": f'=HYPERLINK("#{f["Sheet"]}!A1","Code")',
-                      "Passed": passed,
-                      "Failed": failed,
-                      "Untested": untested,
-                      "N": N,
-                      "A": A,
-                      "B": B,
-                      "Total Test Cases": passed+failed+untested
+                      "Function Code": f'=HYPERLINK("#{f["Function"]}!A1","Code")',
+                      "Passed": p, "Failed": f_, "Untested": u,
+                      "N": N, "A": A, "B": B,
+                      "Total Test Cases": p+f_+u
                   })
 
-              return funcs, pd.DataFrame(funcs_rows), pd.DataFrame(stats_rows), trx
+              return funcs, pd.DataFrame(func_rows), pd.DataFrame(stat_rows), idx
 
-          # ---------------- write matrix sheets ----------------
-          def write_matrix_for_function(w, workbook, func, tests):
-              """
-              Tạo sheet matrix theo cấu trúc yêu cầu.
-              tests: list các test của function đó (đã match Class + Method).
-              """
-              sheet_name = func["Sheet"]
-              ws = w.book.add_worksheet(sheet_name) if sheet_name not in w.sheets else w.sheets[sheet_name]
+          # ---------- Matrix writer (per function) ----------
+          def write_matrix(workbook, writer, func, tests):
+              ws_name = func["Function"]
+              # tránh trùng tên sheet (hiếm). Nếu trùng, thêm suffix số nhỏ.
+              final_name = ws_name
+              i = 2
+              while final_name in writer.sheets:
+                  final_name = f"{ws_name} ({i})"; i+=1
+              ws = workbook.add_worksheet(final_name)
+              writer.sheets[final_name]=ws
 
               # Formats
-              head = workbook.add_format({"bold": True, "align": "center", "valign": "vcenter", "border":1})
-              cell = workbook.add_format({"align": "center", "valign": "vcenter", "border":1})
-              left = workbook.add_format({"align": "left", "valign": "vcenter", "border":1})
-              section = workbook.add_format({"bold": True, "align": "left", "valign": "vcenter", "border":1})
-              okfmt = workbook.add_format({"align": "center", "valign": "vcenter", "border":1})
+              head = workbook.add_format({"bold": True,"align":"center","valign":"vcenter","border":1,"bg_color":"#1F4E78","font_color":"white"})
+              sec  = workbook.add_format({"bold": True,"align":"left","valign":"vcenter","border":1})
+              left = workbook.add_format({"align":"left","valign":"vcenter","border":1})
+              cell = workbook.add_format({"align":"center","valign":"vcenter","border":1})
 
-              # Derive test cases for columns
+              # Columns: UTCIDxx
               cols = []
-              for idx,t in enumerate(tests,1):
+              for k,t in enumerate(tests,1):
                   cols.append({
-                      "id": f"UTCID{idx:02d}",
+                      "id": f"UTCID{k:02d}",
                       "name": t["Display"] or t["Method"],
-                      "outcome": t["Outcome"],
+                      "exp": expected_from_name(t["Display"] or t["Method"]),
                       "type": classify_case(t["Display"] or t["Method"]),
-                      "executed": t["ExecutedAt"],
-                      "expected": expected_return_from_name(t["Display"] or t["Method"]),
-                      "logmsg": log_message_from_name(t["Display"] or t["Method"]),
-                      "conditions": extract_conditions_from_name(t["Display"] or t["Method"])
+                      "out": t["Outcome"],
+                      "dt" : t["ExecutedAt"],
+                      "conds": to_conditions_from_name(t["Display"] or t["Method"])
                   })
 
-              # Nếu không có test -> vẫn render khung tối thiểu
-              if not cols:
-                  cols = [{"id":"UTCID01","name":func["Method"],"outcome":"","type":"N","executed":"","expected":"","logmsg":"","conditions":[]}]
-
-              # Collect all unique input conditions from all tests
-              all_conditions = []
-              seen = set()
+              # Unique conditions across tests
+              all_conds=[]; seen=set()
               for c in cols:
-                  for cond in c["conditions"]:
-                      key = norm(cond)
-                      if key and key not in seen:
-                          seen.add(key)
-                          all_conditions.append(cond)
+                  for s in c["conds"]:
+                      k=norm(s)
+                      if k and k not in seen:
+                          seen.add(k); all_conds.append(s)
+              if not all_conds:
+                  all_conds=["<No condition parsed>"]
 
-              # Dimensions
-              start_row = 0; start_col = 0
-              ws.set_column(start_col, start_col, 28)  # first column wider
+              # Column widths
+              ws.set_column(0,0,40)               # label column
               for j in range(len(cols)):
-                  ws.set_column(start_col+1+j, start_col+1+j, 20)
+                  ws.set_column(1+j,1+j,18)
 
-              # Header row: IDs
-              ws.write(start_row, start_col, "", head)
+              r=0
+              # Header: UTCIDs
+              ws.write(r,0,"",head)
               for j,c in enumerate(cols):
-                  ws.write(start_row, start_col+1+j, c["id"], head)
+                  ws.write(r,1+j,c["id"],head)
+              r+=1
 
-              r = start_row + 1
+              # CONDITION block
+              ws.write(r,0,"Condition",sec); r+=1
+              ws.write(r,0,"Precondition",left)
+              # Không ghi precondition theo cột (theo yêu cầu). Để trống.
+              for j in range(len(cols)): ws.write(r,1+j,"",cell)
+              r+=2
 
-              # Section: Condition / Precondition
-              ws.write(r, start_col, "Condition", section); r += 1
-              ws.write(r, start_col, "Precondition", left)
-              for j,c in enumerate(cols):
-                  ws.write(r, start_col+1+j, func["PreCondition"] or "", cell)
-              r += 2  # blank line slot like sample spacing
-
-              # Subsection: Input:
-              ws.write(r, start_col, "Input:", section); r += 1
-              if not all_conditions:
-                  all_conditions = ["<No condition parsed from test names>"]
-              for cond in all_conditions:
-                  ws.write(r, start_col, f"{cond}", left)
+              ws.write(r,0,"Input:",sec); r+=1
+              for cond in all_conds:
+                  ws.write(r,0,f"Input: {cond}",left)
                   for j,c in enumerate(cols):
-                      mark = "O" if cond in c["conditions"] else ""
-                      ws.write(r, start_col+1+j, mark, okfmt)
-                  r += 1
+                      ws.write(r,1+j, "O" if cond in c["conds"] else "", cell)
+                  r+=1
 
-              r += 2  # spacing
+              r+=1
 
-              # Section: Confirm / Return
-              ws.write(r, start_col, "Confirm", section); r += 1
-              ws.write(r, start_col, "Return", left)
-              # Row for FALSE
-              ws.write(r, start_col, "        FALSE", left)
-              for j,c in enumerate(cols):
-                  ws.write(r, start_col+1+j, "O" if c["expected"]=="FALSE" else "", cell)
-              r += 1
-              # Row for TRUE
-              ws.write(r, start_col, "        TRUE", left)
-              for j,c in enumerate(cols):
-                  ws.write(r, start_col+1+j, "O" if c["expected"]=="TRUE" else "", cell)
-              r += 1
+              # CONFIRM block
+              ws.write(r,0,"Confirm",sec); r+=1
+              ws.write(r,0,"Return",left); r+=1
+              ws.write(r,0,"        FALSE",left)
+              for j,c in enumerate(cols): ws.write(r,1+j,"O" if c["exp"]=="FALSE" else "",cell)
+              r+=1
+              ws.write(r,0,"        TRUE",left)
+              for j,c in enumerate(cols): ws.write(r,1+j,"O" if c["exp"]=="TRUE" else "",cell)
+              r+=1
 
-              # Section: Exception (placeholder)
-              ws.write(r, start_col, "Exception", section); r += 1
-              # Row: Log message
-              ws.write(r, start_col, "Log message", left)
-              for j,c in enumerate(cols):
-                  ws.write(r, start_col+1+j, c["logmsg"], cell)
-              r += 2
+              ws.write(r,0,"Exception",sec); r+=1
+              ws.write(r,0,"Log message",left)
+              for j,_ in enumerate(cols): ws.write(r,1+j,"",cell)  # placeholder, không suy luận log chung
+              r+=2
 
-              # Section: Result
-              ws.write(r, start_col, "Result", section); r += 1
-              # Type
-              ws.write(r, start_col, "Type(N : Normal, A : Abnormal, B : Boundary)", left)
-              for j,c in enumerate(cols):
-                  ws.write(r, start_col+1+j, c["type"], cell)
-              r += 1
-              # Passed/Failed
-              ws.write(r, start_col, "Passed/Failed", left)
-              for j,c in enumerate(cols):
-                  ws.write(r, start_col+1+j, "P" if c["outcome"]=="Passed" else ("F" if c["outcome"]=="Failed" else ""), cell)
-              r += 1
-              # Executed Date
-              ws.write(r, start_col, "Executed Date", left)
-              for j,c in enumerate(cols):
-                  # Format to yyyy-MM-dd HH:mm:ss if available
-                  dt = ""
-                  if c["executed"]:
-                      try:
-                          dt = pd.to_datetime(c["executed"]).strftime("%Y-%m-%d %H:%M:%S")
-                      except Exception:
-                          dt = c["executed"]
-                  ws.write(r, start_col+1+j, dt, cell)
-              r += 1
-              # Defect ID
-              ws.write(r, start_col, "Defect ID", left)
-              for j,_ in enumerate(cols):
-                  ws.write(r, start_col+1+j, "", cell)
+              # RESULT block
+              ws.write(r,0,"Result",sec); r+=1
+              ws.write(r,0,"Type(N : Normal, A : Abnormal, B : Boundary)",left)
+              for j,c in enumerate(cols): ws.write(r,1+j,c["type"],cell)
+              r+=1
 
-          # ---------------- main ----------------
+              ws.write(r,0,"Passed/Failed",left)
+              for j,c in enumerate(cols): ws.write(r,1+j,"P" if c["out"]=="Passed" else ("F" if c["out"]=="Failed" else ""),cell)
+              r+=1
+
+              ws.write(r,0,"Executed Date",left)
+              for j,c in enumerate(cols): ws.write(r,1+j,c["dt"],cell)
+              r+=1
+
+              ws.write(r,0,"Defect ID",left)
+              for j,_ in enumerate(cols): ws.write(r,1+j,"",cell)
+
+              return final_name  # sheet actual name (in case of suffix)
+
+          # ---------- main ----------
           def main():
-              funcs, df_funcs, df_stats, trx = build_core()
-              out_file = "./coveragereport/Functions_Statistics_Report.xlsx"
-              with pd.ExcelWriter(out_file, engine="xlsxwriter") as w:
-                  # 1) Core sheets
+              funcs, df_funcs, df_stats, idx = build_core()
+              out = "./coveragereport/Functions_Statistics_Report.xlsx"
+              with pd.ExcelWriter(out, engine="xlsxwriter") as w:
+                  # Core sheets
                   df_funcs.to_excel(w, sheet_name="Functions", index=False)
                   df_stats.to_excel(w, sheet_name="Statistics", index=False)
 
                   wb = w.book
-                  header = wb.add_format({"bold": True, "bg_color": "#4472C4", "font_color": "white", "border": 1})
-                  for sheet, df in [("Functions", df_funcs), ("Statistics", df_stats)]:
+                  hdr = wb.add_format({"bold": True,"bg_color":"#1F4E78","font_color":"white","border":1})
+                  for sheet,df in [("Functions",df_funcs),("Statistics",df_stats)]:
                       ws = w.sheets[sheet]
-                      for c, col in enumerate(df.columns):
-                          ws.write(0, c, col, header)
+                      for c,col in enumerate(df.columns):
+                          ws.write(0,c,col,hdr)
 
-                  # 2) Matrix sheets per function
-                  # Map TRX by class for quick filter
-                  class_to_tests = defaultdict(list)
-                  for t in trx:
-                      class_to_tests[t["Class"]].append(t)
+                  # Matrix per function (sheet name = function)
                   for f in funcs:
-                      tests = [t for t in class_to_tests.get(f["Class"], [])
-                               if is_same_function(f["Method"], t["Method"]) or is_same_function(f["Method"], t["Display"])]
-                      write_matrix_for_function(w, wb, f, tests)
+                      tests = idx.get((f["Class"], f["Function"]), [])
+                      actual = write_matrix(wb, w, f, tests)
 
-              print(out_file)
+                  # Update hyperlinks to actual sheet names if any were suffixed
+                  # (ở đây sheet name == function nên thường không trùng; bỏ qua.)
+
+              print(out)
 
           if __name__ == "__main__":
               main()
