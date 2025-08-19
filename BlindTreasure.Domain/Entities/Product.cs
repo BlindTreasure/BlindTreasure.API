@@ -16,7 +16,9 @@ public class Product : BaseEntity
     public Guid CategoryId { get; set; }
     public Category Category { get; set; }
 
-    public decimal Price { get; set; }
+    public decimal RealSellingPrice { get; set; }
+    public decimal? ListedPrice { get; set; } // Đây là giá niêm yết, có thể khác với giá bán thực tế
+
     public int TotalStockQuantity { get; set; }
     public int ReservedInBlindBox { get; set; }      
     [NotMapped]

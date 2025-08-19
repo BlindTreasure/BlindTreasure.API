@@ -406,7 +406,7 @@ public class OrderService : IOrderService
                     var p = prodById[item.ProductId.Value];
                     if (p.Status != ProductStatus.Active || p.TotalStockQuantity < item.Quantity)
                         throw ErrorHelper.BadRequest($"Product {p.Name} invalid or out of stock.");
-                    unitPrice = p.Price;
+                    unitPrice = p.RealSellingPrice;
                     itemName = p.Name;
                     p.TotalStockQuantity -= item.Quantity;
                     await _unitOfWork.Products.Update(p);
@@ -591,13 +591,17 @@ public class OrderService : IOrderService
 
         await _cartItemService.UpdateCartAfterCheckoutAsync(userId, groups.SelectMany(g => g.Items).ToList());
 
-        // Tạo link thanh toán tổng cho tất cả order
-        if (createdOrderIds.Count == 1)
-            // If only one order, use its payment URL
-            result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
-        else
-            // Multiple orders, create a general checkout session
-            result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
+
+        var groupSession = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
+        result.GeneralPaymentUrl = groupSession.PaymentUrl;
+        result.CheckOutSessionId= groupSession.StripeSessionId;
+        //// Tạo link thanh toán tổng cho tất cả order
+        //if (createdOrderIds.Count == 1)
+        //    // If only one order, use its payment URL
+        //    result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
+        //else
+        //    // Multiple orders, create a general checkout session
+        //    result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
 
         result.Message = $"Đã tạo {result.Orders.Count} đơn hàng, mỗi đơn một link thanh toán riêng.";
 
@@ -854,6 +858,9 @@ public class OrderService : IOrderService
                 }
         }
 
+        // Trả lại hàng tồn kho và khuyến mãi
+        await RollbackOrderInventoryAndPromotionAsync(order);
+
         await _unitOfWork.Orders.Update(order);
 
         // Vô hiệu hóa link/session thanh toán Stripe cho đơn lẻ
@@ -934,6 +941,7 @@ public class OrderService : IOrderService
                     }
             }
 
+            await RollbackOrderInventoryAndPromotionAsync(order);
             await _unitOfWork.Orders.Update(order);
 
             // Thông báo cho user và seller
@@ -983,5 +991,60 @@ public class OrderService : IOrderService
             .ToListAsync();
 
         return orders.Select(OrderDtoMapper.ToOrderDto).ToList();
+    }
+
+    /// <summary>
+    /// Rollback product, blindbox, promotion usage, and user usage count for a canceled or expired order.
+    /// </summary>
+    public async Task RollbackOrderInventoryAndPromotionAsync(Order order)
+    {
+        // 1. Rollback product quantity
+        foreach (var detail in order.OrderDetails)
+        {
+            if (detail.ProductId.HasValue)
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(detail.ProductId.Value);
+                if (product != null)
+                {
+                    product.TotalStockQuantity += detail.Quantity;
+                    await _unitOfWork.Products.Update(product);
+                }
+            }
+            else if (detail.BlindBoxId.HasValue)
+            {
+                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(detail.BlindBoxId.Value);
+                if (blindBox != null)
+                {
+                    blindBox.TotalQuantity += detail.Quantity;
+                    await _unitOfWork.BlindBoxes.Update(blindBox);
+                }
+            }
+        }
+
+        // 2. Rollback promotion usage limit and user usage count
+        foreach (var osp in order.OrderSellerPromotions)
+        {
+            // Rollback Promotion.UsageLimit
+            var promotion = await _unitOfWork.Promotions.GetByIdAsync(osp.PromotionId);
+            if (promotion != null && promotion.UsageLimit.HasValue)
+            {
+                promotion.UsageLimit += 1;
+                await _unitOfWork.Promotions.Update(promotion);
+            }
+
+            // Rollback PromotionUserUsage.UsageCount
+            var userUsage = await _unitOfWork.PromotionUserUsages.GetQueryable()
+                .Where(u => u.PromotionId == osp.PromotionId && u.UserId == order.UserId)
+                .FirstOrDefaultAsync();
+
+            if (userUsage != null && userUsage.UsageCount > 0)
+            {
+                userUsage.UsageCount -= 1;
+                userUsage.LastUsedAt = DateTime.UtcNow;
+                await _unitOfWork.PromotionUserUsages.Update(userUsage);
+            }
+        }
+
+       // await _unitOfWork.SaveChangesAsync();
     }
 }

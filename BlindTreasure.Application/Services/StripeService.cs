@@ -74,7 +74,7 @@ public class StripeService : IStripeService
         return loginLink.Url;
     }
 
-    public async Task<string> CreateGeneralCheckoutSessionForOrders(List<Guid> orderIds)
+    public async Task<GroupPaymentSession> CreateGeneralCheckoutSessionForOrders(List<Guid> orderIds)
     {
         var userId = _claimsService.CurrentUserId;
         var user = await _unitOfWork.Users.GetByIdAsync(userId)
@@ -198,7 +198,7 @@ public class StripeService : IStripeService
                 CouponId = couponId,
                 PaymentIntentId = session.PaymentIntentId
             };
-            await _unitOfWork.GroupPaymentSessions.AddAsync(groupSession);
+            groupSession= await _unitOfWork.GroupPaymentSessions.AddAsync(groupSession);
         }
         else
         {
@@ -211,7 +211,7 @@ public class StripeService : IStripeService
 
         await _unitOfWork.SaveChangesAsync();
 
-        return session.Url;
+        return groupSession;
     }
 
     public async Task<List<OrderPaymentInfo>> CreateCheckoutSessionsForOrders(List<Guid> orderIds)

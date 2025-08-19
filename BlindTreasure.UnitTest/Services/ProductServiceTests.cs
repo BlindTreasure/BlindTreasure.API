@@ -82,7 +82,7 @@ public class ProductServiceTests
         {
             Name = "New Product",
             Description = "Description",
-            Price = 100,
+            RealSellingPrice = 100,
             TotalStockQuantity = 10,
             CategoryId = categoryId,
             SellerId = sellerId,
@@ -129,7 +129,7 @@ public class ProductServiceTests
             Id = productId,
             Name = dto.Name,
             Description = dto.Description,
-            Price = dto.Price,
+            RealSellingPrice = dto.RealSellingPrice,
             TotalStockQuantity = dto.TotalStockQuantity,
             SellerId = sellerId,
             Seller = seller,
@@ -185,7 +185,7 @@ public class ProductServiceTests
         {
             Name = "New Product",
             Description = "Description",
-            Price = 100,
+            RealSellingPrice = 100,
             TotalStockQuantity = 10,
             CategoryId = Guid.NewGuid(),
             SellerId = sellerId
@@ -229,7 +229,7 @@ public class ProductServiceTests
         {
             Name = "Updated Product",
             Description = "Updated Description",
-            Price = 150,
+            RealSellingPrice = 150,
             TotalStockQuantity = 20
         };
 
@@ -238,7 +238,7 @@ public class ProductServiceTests
             Id = productId,
             Name = "Original Product",
             Description = "Original Description",
-            Price = 100,
+            RealSellingPrice = 100,
             TotalStockQuantity = 10,
             Status = ProductStatus.Active,
             IsDeleted = false,
@@ -583,7 +583,7 @@ public class ProductServiceTests
                 Id = Guid.NewGuid(),
                 Name = "Test Product",
                 CategoryId = childCategoryId,
-                Price = 100,
+                RealSellingPrice = 100,
                 TotalStockQuantity = 10,
                 Status = ProductStatus.Active,
                 ProductType = ProductSaleType.DirectSale,
@@ -595,7 +595,7 @@ public class ProductServiceTests
                 Id = Guid.NewGuid(),
                 Name = "Another Product",
                 CategoryId = Guid.NewGuid(),
-                Price = 200,
+                RealSellingPrice = 200,
                 TotalStockQuantity = 0,
                 Status = ProductStatus.Active,
                 ProductType = ProductSaleType.DirectSale,
@@ -666,7 +666,7 @@ public class ProductServiceTests
         {
             Name = "",
             Description = "Description",
-            Price = -100,
+            RealSellingPrice = -100,
             TotalStockQuantity = -1,
             CategoryId = Guid.NewGuid(),
             SellerId = sellerId

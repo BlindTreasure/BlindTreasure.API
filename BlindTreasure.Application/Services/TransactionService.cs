@@ -362,7 +362,7 @@ public class TransactionService : ITransactionService
             Name = od.Product.Name,
             Code = od.Product.Id.ToString(),
             Quantity = od.Quantity,
-            Price = Convert.ToInt32(od.Product.Price),
+            Price = Convert.ToInt32(od.Product.RealSellingPrice),
             Length = Convert.ToInt32(od.Product.Length ?? 10),
             Width = Convert.ToInt32(od.Product.Width ?? 10),
             Height = Convert.ToInt32(od.Product.Height ?? 10),
@@ -575,7 +575,6 @@ public class TransactionService : ITransactionService
 
             if (groupSession != null)
             {
-                //groupSession.ExpiresAt = DateTime.UtcNow; expire này set để biết khi nào hết hạn.
                 groupSession.IsCompleted = true;
                 groupSession.UpdatedAt = DateTime.UtcNow;
                 await _unitOfWork.GroupPaymentSessions.Update(groupSession);
@@ -588,6 +587,7 @@ public class TransactionService : ITransactionService
                     .Include(o => o.Payment)
                     .Include(o => o.Seller)
                     .ThenInclude(s => s.User)
+                    .Include(o => o.OrderSellerPromotions)
                     .ToListAsync();
 
                 foreach (var order in orders)
@@ -597,7 +597,7 @@ public class TransactionService : ITransactionService
                         order.Status == OrderStatus.PAID.ToString())
                     {
                         _logger.Warn($"[HandleFailedPaymentAsync] Order {order.Id} đã ở trạng thái không cần xử lý.");
-                        continue; // Skip already cancelled, expired or paid orders
+                        continue;
                     }
 
                     // Mark order as expired
@@ -641,6 +641,9 @@ public class TransactionService : ITransactionService
                                 await _unitOfWork.Shipments.Update(shipment);
                             }
                     }
+
+                    // Rollback inventory and promotion usage
+                    await _orderService.RollbackOrderInventoryAndPromotionAsync(order);
 
                     // Gửi email thông báo hết hạn/hủy cho user
                     if (order.User != null)
@@ -692,21 +695,26 @@ public class TransactionService : ITransactionService
                 .ThenInclude(o => o.Seller)
                 .Include(t => t.Payment)
                 .ThenInclude(p => p.Order).ThenInclude(o => o.User)
+                .Include(t => t.Payment)
+                .ThenInclude(p => p.Order).ThenInclude(o => o.OrderSellerPromotions)
                 .FirstOrDefaultAsync(t => t.ExternalRef == sessionId);
 
             if (transaction.Payment?.Order != null)
             {
-                var status = transaction.Payment.Order.Status;
+                var order = transaction.Payment.Order;
+                var status = order.Status;
                 if (status == OrderStatus.CANCELLED.ToString() || status == OrderStatus.EXPIRED.ToString() ||
                     status == OrderStatus.PAID.ToString())
                 {
                     _logger.Warn(
                         $"[HandleFailedPaymentAsync] Order {transaction.Payment.OrderId} đã ở trạng thái không cần xử lý.");
-                    return; // Skip already cancelled, expired or paid orders
+                    return;
                 }
 
-                transaction.Payment.Order.Status = OrderStatus.EXPIRED.ToString();
-                foreach (var detail in transaction.Payment.Order.OrderDetails)
+                order.Status = OrderStatus.EXPIRED.ToString();
+                order.UpdatedAt = DateTime.UtcNow;
+
+                foreach (var detail in order.OrderDetails)
                 {
                     detail.Status = OrderDetailItemStatus.CANCELLED;
                     detail.UpdatedAt = DateTime.UtcNow;
@@ -720,6 +728,11 @@ public class TransactionService : ITransactionService
                             await _unitOfWork.Shipments.Update(shipment);
                         }
                 }
+
+                // Rollback inventory and promotion usage
+                await _orderService.RollbackOrderInventoryAndPromotionAsync(order);
+
+                await _unitOfWork.Orders.Update(order);
             }
 
             if (transaction == null)

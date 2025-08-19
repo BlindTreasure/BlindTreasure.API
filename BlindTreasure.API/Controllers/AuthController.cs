@@ -73,6 +73,7 @@ public class AuthController : ControllerBase
     {
         try
         {
+            dto.IsLoginGoole = false; // Đặt mặc định là không đăng nhập bằng Google
             var result = await _authService.LoginAsync(dto, _configuration);
             return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập thành công. Chào mừng bạn trở lại!"));
         }
@@ -179,15 +180,8 @@ public class AuthController : ControllerBase
             if (string.IsNullOrWhiteSpace(dto.Token))
                 return BadRequest(ApiResult.Failure("400", "Token Google không hợp lệ. Vui lòng thử lại."));
 
-            var user = await _oAuthService.AuthenticateWithGoogle(dto.Token);
-            var loginDto = new LoginRequestDto
-            {
-                Email = user.Email,
-                Password = passwordCharacters, // Mật khẩu mặc định, có thể thay đổi sau khi đăng nhập
+            var result = await _oAuthService.AuthenticateWithGoogle(dto.Token);
 
-            };
-
-            var result = await _authService.LoginAsync(loginDto, _configuration);
 
             return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập bằng Google thành công. Chào mừng bạn trở lại!"));
         }
