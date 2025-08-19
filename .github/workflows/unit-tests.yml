@@ -82,4 +82,229 @@ jobs:
 
           # ---------------- XML: functions (source of truth for Functions sheet) ----------------
           def extract_functions_from_xml():
-              """Đọc XML docs chỉ củ
+              """Đọc XML docs chỉ của project UnitTest và namespace Services"""
+              xml_files = glob.glob('./BlindTreaure.UnitTest/bin/**/*.xml', recursive=True)
+              funcs = []
+              for f in xml_files:
+                  try:
+                      tree = ET.parse(f)
+                      root = tree.getroot()
+                      for m in root.findall('.//member'):
+                          name = m.get('name', '')
+                          if not name.startswith('M:'):
+                              continue
+                          # Giữ đúng namespace UnitTest.Services
+                          if not name.startswith(f"M:{UNITTEST_NAMESPACE_PREFIX}"):
+                              continue
+
+                          # name dạng: M:BlindTreaure.UnitTest.Services.AddressServiceTests.RegisterUserAsync(...)
+                          parts = name.split('.')
+                          if len(parts) < 2:
+                              continue
+                          cls = parts[-2]
+                          met = parts[-1]
+                          method_base = strip_params(met)
+
+                          # summary/remarks
+                          summary = ""
+                          scenario = ""
+                          coverage = ""
+                          sum_e = m.find('summary')
+                          if sum_e is not None and sum_e.text:
+                              summary = ' '.join(sum_e.text.split())
+
+                          rem_e = m.find('remarks')
+                          if rem_e is not None and rem_e.text:
+                              for line in rem_e.text.splitlines():
+                                  line = line.strip()
+                                  if line.startswith("Scenario:"):
+                                      scenario = line.replace("Scenario:", "").strip()
+                                  elif line.startswith("Coverage:"):
+                                      coverage = line.replace("Coverage:", "").strip()
+
+                          funcs.append({
+                              "Class": cls,
+                              "Method": method_base,
+                              "Description": summary,
+                              "PreCondition": scenario,
+                              "Requirement": coverage,
+                              "Sheet": f"{cls}Management"
+                          })
+                  except Exception:
+                      # Bỏ qua file XML lỗi
+                      pass
+              return funcs
+
+          # ---------------- TRX: real results (source of truth for Statistics) ----------------
+          def parse_trx_results():
+              """Liên kết UnitTestResult (testId) với UnitTest/TestMethod để lấy Class + Method base + Outcome.
+                 Chỉ giữ test thuộc namespace UnitTest.Services."""
+              trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
+              if not trx_files:
+                  return []
+
+              with open(trx_files[0], 'r', encoding='utf-8') as f:
+                  s = BeautifulSoup(f.read(), 'xml')
+
+              # Map UnitTest id -> (className, methodName)
+              id_to_method = {}
+              for ut in s.find_all('UnitTest'):
+                  ut_id = ut.get('id') or ut.get('testId')
+                  tm = ut.find('TestMethod')
+                  if not ut_id or tm is None:
+                      continue
+                  class_name = tm.get('className', '')
+                  method_name = tm.get('name', '')
+                  if not class_name.startswith(UNITTEST_NAMESPACE_PREFIX):
+                      continue
+                  id_to_method[ut_id] = (class_name, strip_params(method_name))
+
+              # Collect results
+              results = []
+              for r in s.find_all('UnitTestResult'):
+                  test_id = r.get('testId') or r.get('testId')
+                  outcome = r.get('outcome', 'Unknown')
+                  # Fallback: testName (display) để strip params nếu thiếu map
+                  display = strip_params(r.get('testName', ''))
+
+                  if test_id in id_to_method:
+                      class_full, method_base = id_to_method[test_id]
+                  else:
+                      # Không tìm thấy id -> bỏ qua test ngoài scope
+                      continue
+
+                  results.append({
+                      "ClassFull": class_full,
+                      "Class": short_class(class_full),
+                      "Method": method_base,
+                      "Outcome": outcome,
+                      "Display": display
+                  })
+              return results
+
+          # ---------------- Match & aggregate ----------------
+          def normalize_for_match(s: str) -> str:
+              return re.sub(r'[^A-Za-z0-9_]', '', s or '').lower()
+
+          def is_same_function(doc_method: str, trx_method: str) -> bool:
+              """Match chặt chẽ nhưng chịu được pattern _Should/_When và tham số."""
+              d = normalize_for_match(doc_method)
+              t = normalize_for_match(trx_method)
+              if d == t:
+                  return True
+              # MethodName_Should..., MethodName_When...
+              if t.startswith(d + 'should') or t.startswith(d + '_should'):
+                  return True
+              if t.startswith(d + 'when') or t.startswith(d + '_when'):
+                  return True
+              # Prefix strict
+              if t.startswith(d + '_'):
+                  return True
+              return False
+
+          def classify_case(method_name: str) -> str:
+              m = method_name or ""
+              if "_Normal" in m or "_NORMAL" in m or m.endswith("Normal"):
+                  return "N"
+              if "_Abnormal" in m or "_ABNORMAL" in m or m.endswith("Abnormal"):
+                  return "A"
+              if "_Boundary" in m or "_BOUNDARY" in m or m.endswith("Boundary"):
+                  return "B"
+              return "N"
+
+          def build_report():
+              funcs = extract_functions_from_xml()
+              trx = parse_trx_results()
+
+              # Index TRX by (Class -> list of tests)
+              class_to_tests = defaultdict(list)
+              for t in trx:
+                  class_to_tests[t["Class"]].append(t)
+
+              # FUNCTIONS sheet rows
+              funcs_rows = []
+              for i, f in enumerate(funcs, start=1):
+                  funcs_rows.append({
+                      "No": i,
+                      "RequirementName": f["Requirement"],
+                      "Class Name": f["Class"],
+                      "Function Name": f["Method"],
+                      "Function Code": f"Code_{i}",
+                      "Sheet Name": f["Sheet"],
+                      "Description": f["Description"],
+                      "Pre-Condition": f["PreCondition"]
+                  })
+
+              # STATISTICS per function (not per class)
+              stats_rows = []
+              for i, f in enumerate(funcs, start=1):
+                  cls = f["Class"]
+                  method = f["Method"]
+                  tests = class_to_tests.get(cls, [])
+
+                  passed = failed = untested = 0
+                  n_cnt = a_cnt = b_cnt = 0
+
+                  matched = False
+                  for t in tests:
+                      if is_same_function(method, t["Method"]) or is_same_function(method, t["Display"]):
+                          matched = True
+                          if t["Outcome"] == "Passed":
+                              passed += 1
+                          elif t["Outcome"] == "Failed":
+                              failed += 1
+                          else:
+                              untested += 1
+                          # case type theo tên method hiển thị (ưu tiên display), fallback base
+                          case_type = classify_case(t["Display"] or t["Method"])
+                          if case_type == "N": n_cnt += 1
+                          elif case_type == "A": a_cnt += 1
+                          elif case_type == "B": b_cnt += 1
+
+                  # Nếu không match cái nào, coi như untested = 1 để hiển thị (giúp phát hiện mapping sai)
+                  total = passed + failed + untested
+                  if not matched:
+                      untested = 1
+                      total = 1
+
+                  stats_rows.append({
+                      "No": i,
+                      "Function Code": f'=HYPERLINK("#{f["Sheet"]}!A1","Code")',
+                      "Passed": passed,
+                      "Failed": failed,
+                      "Untested": untested,
+                      "N": n_cnt if matched else 0,
+                      "A": a_cnt if matched else 0,
+                      "B": b_cnt if matched else 0,
+                      "Total Test Cases": total
+                  })
+
+              return pd.DataFrame(funcs_rows), pd.DataFrame(stats_rows)
+
+          def main():
+              df_funcs, df_stats = build_report()
+              out_file = "./coveragereport/Functions_Statistics_Report.xlsx"
+              with pd.ExcelWriter(out_file, engine="xlsxwriter") as w:
+                  df_funcs.to_excel(w, sheet_name="Functions", index=False)
+                  df_stats.to_excel(w, sheet_name="Statistics", index=False)
+
+                  wb = w.book
+                  hdr = wb.add_format({"bold": True, "bg_color": "#4472C4", "font_color": "white", "border": 1})
+                  for sheet, df in [("Functions", df_funcs), ("Statistics", df_stats)]:
+                      ws = w.sheets[sheet]
+                      for c, col in enumerate(df.columns):
+                          ws.write(0, c, col, hdr)
+              print(out_file)
+
+          if __name__ == "__main__":
+              main()
+          EOF
+          python generate_excel_report.py
+
+      - name: Upload Excel coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: excel-functions-statistics-report
+          path: ./coveragereport/Functions_Statistics_Report.xlsx
+          retention-days: 30
