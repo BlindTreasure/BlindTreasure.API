@@ -134,6 +134,8 @@ jobs:
               }
 
           def extract_from_cs():
+              base_dir = "./BlindTreaure.UnitTest"
+
               # Scan test source files; add more patterns if needed
               patterns = ["./**/*Tests.cs", "./**/*Test.cs"]
               files = set()
