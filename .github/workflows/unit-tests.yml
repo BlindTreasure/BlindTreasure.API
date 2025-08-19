@@ -50,7 +50,7 @@ jobs:
             /p:GenerateDocumentationFile=true
           
           # Verify XML docs are generated
-          find . -name "*.xml" -path "*/bin/*" | sort
+          find ./BlindTreaure.UnitTest/Services -name "*.xml" -path "*/bin/*" | sort
 
       - name: Run unit tests with coverage
         run: |
@@ -68,12 +68,12 @@ jobs:
           cat > generate_excel_report.py << 'EOF'
           import pandas as pd
           import xml.etree.ElementTree as ET
-          import glob, os, re
+          import glob, os
           from bs4 import BeautifulSoup
 
           def extract_xml_docs():
-              """Đọc XML documentation từ csproj build ra"""
-              xml_files = glob.glob('./**/bin/**/*.xml', recursive=True)
+              """Chỉ đọc XML trong UnitTest\\Services"""
+              xml_files = glob.glob('./BlindTreaure.UnitTest/Services/**/bin/**/*.xml', recursive=True)
               docs = []
               for xml_file in xml_files:
                   try:
@@ -110,12 +110,12 @@ jobs:
                                   "PreCondition": remarks.get("Scenario",""),
                                   "Requirement": remarks.get("Coverage","")
                               })
-                  except Exception as e:
+                  except Exception:
                       continue
               return docs
 
           def parse_test_results():
-              """Đọc file TRX để đếm pass/fail theo method"""
+              """Đọc file TRX để lấy kết quả test"""
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
               results = {}
               if trx_files:
@@ -124,18 +124,25 @@ jobs:
                   for ut in soup.find_all('UnitTestResult'):
                       testname = ut.get("testName","Unknown")
                       outcome = ut.get("outcome","Unknown")
-                      method = testname.split('.')[-1]
+                      method = testname.split('.')[-1]   # method ngắn
                       results[method] = outcome
               return results
+
+          def normalize_method(m):
+              """Chuẩn hóa tên method để match giữa XML và TRX"""
+              if "_Should" in m:
+                  return m.split("_Should")[0]
+              return m
 
           def create_excel():
               docs = extract_xml_docs()
               test_results = parse_test_results()
 
-              # Sheet Functions
               funcs = []
+              stats = []
               for i, d in enumerate(docs, start=1):
                   sheet_name = f"{d['Class']}Management"
+
                   funcs.append({
                       "No": i,
                       "RequirementName": d['Requirement'],
@@ -146,14 +153,19 @@ jobs:
                       "Description": d['Summary'],
                       "Pre-Condition": d['PreCondition']
                   })
-              df_funcs = pd.DataFrame(funcs)
 
-              # Sheet Statistics
-              stats = []
-              for i, d in enumerate(docs, start=1):
-                  sheet_name = f"{d['Class']}Management"
+                  # match outcome
                   method = d['Method']
-                  outcome = test_results.get(method,"Untested")
+                  outcome = test_results.get(method)
+                  if not outcome:
+                      norm = normalize_method(method)
+                      for k,v in test_results.items():
+                          if norm in k or k in norm:
+                              outcome = v
+                              break
+                  if not outcome:
+                      outcome = "Untested"
+
                   passed = 1 if outcome=="Passed" else 0
                   failed = 1 if outcome=="Failed" else 0
                   untested = 1 if outcome not in ["Passed","Failed"] else 0
@@ -169,6 +181,8 @@ jobs:
                       "B": 0,
                       "Total Test Cases": passed+failed+untested
                   })
+
+              df_funcs = pd.DataFrame(funcs)
               df_stats = pd.DataFrame(stats)
 
               out_file = "./coveragereport/Functions_Statistics_Report.xlsx"
@@ -179,9 +193,9 @@ jobs:
                   workbook = writer.book
                   header_fmt = workbook.add_format({"bold": True,"bg_color":"#4472C4","font_color":"white","border":1})
 
-                  for sheet in ["Functions","Statistics"]:
+                  for sheet, df in [("Functions", df_funcs), ("Statistics", df_stats)]:
                       ws = writer.sheets[sheet]
-                      for col_num, value in enumerate(df_funcs.columns if sheet=="Functions" else df_stats.columns):
+                      for col_num, value in enumerate(df.columns):
                           ws.write(0,col_num,value,header_fmt)
               print("✅ Excel report generated:", out_file)
 
