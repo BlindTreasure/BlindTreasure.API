@@ -31,11 +31,11 @@ public class UnboxingService : IUnboxingService
     private readonly IHubContext<UnboxingHub> _notificationHub;
     private readonly IUserService _userService;
     private readonly IBlindBoxService _blindBoxService;
-
+    private readonly IEmailService _emailService;
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
         ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub,
-        IUserService userService, IBlindBoxService blindBoxService)
+        IUserService userService, IBlindBoxService blindBoxService, IEmailService emailService)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
@@ -45,6 +45,7 @@ public class UnboxingService : IUnboxingService
         _notificationHub = notificationHub;
         _userService = userService;
         _blindBoxService = blindBoxService;
+        _emailService = emailService;
     }
 
     public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
@@ -122,7 +123,6 @@ public class UnboxingService : IUnboxingService
             UnboxedAt = now
         };
     }
-
 
     public async Task<MemoryStream> ExportToExcelStream(ExportUnboxLogRequest request)
     {
@@ -501,8 +501,7 @@ public class UnboxingService : IUnboxingService
             throw ErrorHelper.BadRequest(msg);
         }
 
-        // Load thêm RarityConfig cho từng BlindBoxItem (manual)
-        var itemIds = customerBox.BlindBox.BlindBoxItems.Select(i => i.Id).ToList();
+        var itemIds = customerBox.BlindBox!.BlindBoxItems.Select(i => i.Id).ToList();
         var rarities = await _unitOfWork.RarityConfigs.GetQueryable()
             .Where(r => itemIds.Contains(r.BlindBoxItemId))
             .ToListAsync();
@@ -572,11 +571,17 @@ public class UnboxingService : IUnboxingService
     /// <summary>
     /// Cập nhật DropRate cho tất cả item trong BlindBox sau khi stock thay đổi
     /// </summary>
+    /// <summary>
+    /// Cập nhật DropRate cho tất cả item trong BlindBox sau khi stock thay đổi
+    /// - Nếu có item Common hết hàng => disable box + gửi email cho Seller
+    /// - Nếu còn stock => tính toán lại DropRate dựa trên Quantity và Weight
+    /// </summary>
     private async Task UpdateDropRatesAfterUnboxingAsync(BlindBox blindBox)
     {
-        // 1. Load toàn bộ items trong box (bao gồm RarityConfig)
+        // 1. Load toàn bộ items trong box (bao gồm RarityConfig + Product để log)
         var items = await _unitOfWork.BlindBoxItems.GetQueryable()
             .Include(i => i.RarityConfig)
+            .Include(i => i.Product)
             .Where(i => i.BlindBoxId == blindBox.Id && !i.IsDeleted)
             .ToListAsync();
 
@@ -584,17 +589,49 @@ public class UnboxingService : IUnboxingService
             return;
 
         // 2. Check rule: nếu có item Common mà hết hàng (Quantity == 0) → disable box
-        if (items.Any(i => i.RarityConfig != null
-                           && i.RarityConfig.Name == RarityName.Common
-                           && i.Quantity == 0))
+        var commonItem = items.FirstOrDefault(i => i.RarityConfig != null
+                                                   && i.RarityConfig.Name == RarityName.Common
+                                                   && i.Quantity == 0);
+        if (commonItem != null)
         {
             blindBox.Status = BlindBoxStatus.Disabled;
             await _unitOfWork.BlindBoxes.Update(blindBox);
             await _unitOfWork.SaveChangesAsync();
+
+            // Lấy seller để gửi email thông báo cập nhật stock
+            var sellerUser = await _unitOfWork.Users
+                .FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
+
+            if (sellerUser != null)
+            {
+                await _emailService.SendCommonItemOutOfStockAsync(
+                    sellerUser.Email,
+                    sellerUser.FullName ?? sellerUser.Email,
+                    blindBox.Name,
+                    commonItem.Product?.Name ?? "Unknown Product"
+                );
+            }
+
+            _loggerService.Warn(
+                $"[DropRate] BlindBox {blindBox.Id} bị disable vì Common '{commonItem.Product?.Name}' hết hàng."
+            );
             return;
         }
 
-        // 3. Convert sang DTO để gọi CalculateDropRates trong BlindBoxService
+        // 3. Log DropRate trước khi cập nhật
+        var sbBefore = new StringBuilder();
+        sbBefore.AppendLine($"[DropRate-BEFORE] BlindBox {blindBox.Id}:");
+        foreach (var item in items.OrderByDescending(x => x.DropRate))
+        {
+            sbBefore.AppendLine($"- {item.Product?.Name ?? "Unknown"} | " +
+                                $"Rarity: {item.RarityConfig?.Name} | " +
+                                $"Qty: {item.Quantity} | " +
+                                $"DropRate: {item.DropRate:N2}%");
+        }
+
+        _loggerService.Info(sbBefore.ToString());
+
+        // 4. Convert sang DTO để gọi CalculateDropRates trong BlindBoxService
         var dtoItems = items.Select(i => new BlindBoxItemRequestDto
         {
             ProductId = i.ProductId,
@@ -602,10 +639,10 @@ public class UnboxingService : IUnboxingService
             Weight = i.RarityConfig?.Weight ?? 1
         }).ToList();
 
-        // 4. Gọi BlindBoxService.CalculateDropRates để tính toán lại drop rates
+        // 5. Gọi BlindBoxService.CalculateDropRates để tính toán lại drop rates
         var dropRates = _blindBoxService.CalculateDropRates(dtoItems);
 
-        // 5. Map kết quả DropRate mới vào các BlindBoxItem trong DB
+        // 6. Map kết quả DropRate mới vào các BlindBoxItem trong DB
         foreach (var kvp in dropRates)
         {
             var dto = kvp.Key;
@@ -619,8 +656,20 @@ public class UnboxingService : IUnboxingService
             }
         }
 
-        // 6. Lưu thay đổi DropRate vào DB
         await _unitOfWork.SaveChangesAsync();
+
+        // 7. Log DropRate sau khi cập nhật
+        var sbAfter = new StringBuilder();
+        sbAfter.AppendLine($"[DropRate-AFTER] BlindBox {blindBox.Id}:");
+        foreach (var item in items.OrderByDescending(x => x.DropRate))
+        {
+            sbAfter.AppendLine($"- {item.Product?.Name ?? "Unknown"} | " +
+                               $"Rarity: {item.RarityConfig?.Name} | " +
+                               $"Qty: {item.Quantity} | " +
+                               $"DropRate: {item.DropRate:N2}%");
+        }
+
+        _loggerService.Info(sbAfter.ToString());
     }
 
 
