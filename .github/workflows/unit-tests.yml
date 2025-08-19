@@ -73,10 +73,10 @@ jobs:
           from collections import defaultdict
           import pandas as pd
 
-          RE_CLASS = re.compile(r'^\s*(?:public|internal|protected|private)?\s*(?:sealed\s+|static\s+|abstract\s+)?class\s+(\w+)\b')
-          RE_FACT  = re.compile(r'^\s*\[Fact(?:\s*\(.*?\))?\]\s*$')
-          RE_METHOD= re.compile(r'^\s*(?:public|internal|protected|private)\s+(?:async\s+)?(?:Task|void)\s+(\w+)\s*\(')
-          RE_DOC   = re.compile(r'^\s*///\s?(.*)$')
+          RE_CLASS = re.compile(r'^\\s*(?:public|internal|protected|private)?\\s*(?:sealed\\s+|static\\s+|abstract\\s+)?class\\s+(\\w+)\\b')
+          RE_FACT  = re.compile(r'^\\s*\\[Fact(?:\\s*\\(.*?\\))?\\]\\s*$')
+          RE_METHOD= re.compile(r'^\\s*(?:public|internal|protected|private)\\s+(?:async\\s+)?(?:Task|void)\\s+(\\w+)\\s*\\(')
+          RE_DOC   = re.compile(r'^\\s*///\\s?(.*)$')
 
           def sanitize_sheet_name(name):
               invalid = r'[]:*?/\\'
@@ -87,7 +87,7 @@ jobs:
           def parse_xml_doc_block(lines):
               # lines: just the comment payload after stripping leading '///'
               # Wrap to a root to use ET safely; ignore XML parse errors by fallback to text parsing.
-              xml_text = '\n'.join(lines)
+              xml_text = '\\n'.join(lines)
               summary = ''
               remarks_text = ''
               precond = ''
@@ -96,7 +96,7 @@ jobs:
               coverage = ''
 
               try:
-                  root = ET.fromstring(f"<root>\n{xml_text}\n</root>")
+                  root = ET.fromstring(f"<root>\\n{xml_text}\\n</root>")
                   s = root.find('summary')
                   if s is not None and s.text:
                       summary = s.text.strip()
@@ -131,26 +131,20 @@ jobs:
               }
 
           def extract_from_cs():
-              # Chỉ scan trong project BlindTreaure.UnitTest
-              base_dir = "./BlindTreaure.UnitTest"
-              patterns = [os.path.join(base_dir, "**", "*.cs")]
-
+              # Scan test source files; add more patterns if needed
+              patterns = ["./**/*Tests.cs", "./**/*Test.cs"]
               files = set()
               for p in patterns:
                   files.update(glob.glob(p, recursive=True))
 
               print(f"🔍 Found {len(files)} .cs files in {base_dir}")
 
-              functions = []
-              matrices = {}
-              methods_index = {}
+              functions = []  # rows for Functions sheet
+              matrices = {}   # sheet_name -> rows for matrix
+              methods_index = {}  # (class, method) -> sheet_name
 
               for path in sorted(files):
-                  # Bỏ qua bin/obj
-                  if "bin" in path or "obj" in path:
-                      continue
-
-                  with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                  with open(path, 'r', encoding='utf-8', errors='ignore') as f:
                       lines = f.readlines()
 
                   current_class = None
@@ -160,8 +154,9 @@ jobs:
                       if mclass:
                           current_class = mclass.group(1)
 
+                      # Collect consecutive '///' lines immediately preceding a [Fact] + method
                       if RE_FACT.match(lines[i].rstrip()):
-                          # backtrack xml doc
+                          # backtrack to gather xml doc before [Fact]
                           j = i - 1
                           xml_lines = []
                           while j >= 0:
@@ -171,10 +166,10 @@ jobs:
                               xml_lines.insert(0, mdoc.group(1))
                               j -= 1
 
-                          # method line
+                          # move forward to find method line
                           k = i + 1
                           method_name = None
-                          while k < len(lines) and k <= i + 10:
+                          while k < len(lines) and k <= i + 10:  # local window
                               mm = RE_METHOD.match(lines[k])
                               if mm:
                                   method_name = mm.group(1)
@@ -190,6 +185,7 @@ jobs:
                               precond  = meta['precond']
 
                               sheet_name = sanitize_sheet_name(method_name)
+                              # ensure uniqueness across workbook
                               base = sheet_name
                               suffix = 1
                               while sheet_name in matrices:
@@ -197,7 +193,7 @@ jobs:
                                   sheet_name = sanitize_sheet_name(f"{base}_{suffix}")
 
                               functions.append({
-                                  'No': None,
+                                  'No': None,  # fill later
                                   'RequirementName': req_name,
                                   'Class Name': current_class or '',
                                   'Function Name': method_name,
@@ -205,6 +201,7 @@ jobs:
                                   'Description': desc,
                                   'Pre-Condition': precond
                               })
+                              # initial one-row matrix from doc; inputs often not present in XML -> leave blank
                               matrices[sheet_name] = [{
                                   'No': 1,
                                   'Input': '',
@@ -216,10 +213,10 @@ jobs:
                               }]
                               methods_index[(current_class or '', method_name)] = sheet_name
 
-                          i = k
+                          i = k  # skip to method
                       i += 1
 
-              # Fill numbering
+              # Fill numbering for Functions
               for idx, row in enumerate(functions, start=1):
                   row['No'] = idx
 
@@ -292,7 +289,7 @@ jobs:
 
                   stats_rows.append({
                       'No': idx,
-                      'Function Code': f"=HYPERLINK("#'{sheet}'!A1","Code")",
+                      'Function Code': f"=HYPERLINK(\"#'{sheet}'!A1\",\"Code\")",
                       'Passed': passed,
                       'Failed': failed,
                       'Untested': untested,
