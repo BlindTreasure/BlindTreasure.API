@@ -23,6 +23,29 @@ public class EmailService : IEmailService
         _fromEmail = configuration["RESEND_FROM"] ?? "noreply@fpt-devteam.fun";
     }
 
+    public async Task SendCommonItemOutOfStockAsync(string toEmail, string userName, string boxName, string productName)
+    {
+        var html = $@"
+    <html style=""background-color:#ebeaea;margin:0;padding:0;"">
+      <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
+        <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #d02a2a;border-radius:8px;"">
+          <div style=""background-color:#d02a2a;padding:16px 24px;"">
+            <h1 style=""color:#ffffff;font-size:20px;margin:0;"">Cập nhật lại số lượng sản phẩm</h1>
+          </div>
+          <div style=""padding:24px;"">
+            <p>Chào {userName},</p>
+            <p>Trong BlindBox <strong>{boxName}</strong>, sản phẩm Common <strong>{productName}</strong> đã hết số lượng.</p>
+            <p>BlindBox đã bị tạm dừng. Vui lòng cập nhật lại số lượng sản phẩm để tiếp tục kinh doanh.</p>
+            <p>Nếu không cập nhật, BlindBox sẽ không thể được mở bởi khách hàng.</p>
+            <p style=""margin-top:24px;"">Trân trọng,<br/>Đội ngũ BlindTreasure</p>
+          </div>
+        </div>
+      </body>
+    </html>";
+        await SendEmailAsync(toEmail, $"BlindBox {boxName} bị tạm dừng do hết hàng Common", html);
+    }
+
+
     public async Task SendRegistrationSuccessEmailAsync(EmailRequestDto request)
     {
         var html = $@"
