@@ -71,7 +71,7 @@ jobs:
           from collections import defaultdict
           import glob, re
 
-          XML_PREFIX = "M:BlindTreasure.Application."
+          XML_PREFIX = "M:BlindTreasure.UnitTest.Services."
 
           # ---------- helpers ----------
           def strip_params(s): return s.split('(')[0] if s else s
