@@ -42,12 +42,28 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore BlindTreasure.API.sln
 
+      - name: Build with documentation
+        run: |
+          dotnet build BlindTreasure.API.sln \
+            --no-restore \
+            --configuration Release \
+            /p:GenerateDocumentationFile=true
+          
+          # List generated XML files to verify they exist
+          find . -name "*.xml" -path "*/bin/*" | sort
+
       - name: Restore tools
         run: dotnet tool restore
 
       - name: Run unit tests
-        run: dotnet test BlindTreasure.API.sln --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./TestResults/ --logger "trx;LogFileName=test-results.trx"
-        working-directory: ./BlindTreasure.API/
+        run: |
+          dotnet test BlindTreasure.API.sln \
+            --no-build \
+            --configuration Release \
+            --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults/ \
+            --logger "trx;LogFileName=test-results.trx"
 
       - name: Generate Excel Unit Test Document from .cs XML docs
         run: |
@@ -116,7 +132,7 @@ jobs:
           
           def extract_from_cs():
               # Scan test source files; add more patterns if needed
-              patterns = ["./BlindTreasure.UnitTest/**/*Tests.cs", "./BlindTreasure.UnitTest/**/*Test.cs"]
+              patterns = ["./**/*Tests.cs", "./**/*Test.cs"]
               files = set()
               for p in patterns:
                   files.update(glob.glob(p, recursive=True))
