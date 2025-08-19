@@ -272,20 +272,29 @@ jobs:
                   soup = BeautifulSoup(f.read(),'xml')
 
               id_map={}
+              total_unit_tests = 0
               for ut in soup.find_all('UnitTest'):
+                  total_unit_tests += 1
                   ut_id = ut.get('id') or ut.get('testId')
                   tm = ut.find('TestMethod')
-                  if not ut_id or tm is None: continue
+                  if not ut_id or tm is None: 
+                      print(f"Skipping UnitTest: id={ut_id}, tm_found={tm is not None}")
+                      continue
                   class_full = tm.get('className','')
                   method_name = strip_params(tm.get('name',''))
                   id_map[ut_id]=(short_class(class_full), method_name)
 
-              print(f"Found {len(id_map)} test definitions in TRX")
+              print(f"Total UnitTest elements found: {total_unit_tests}")
+              print(f"Found {len(id_map)} test definitions in TRX id_map")
 
               out=[]
+              total_unit_test_results = 0
               for res in soup.find_all('UnitTestResult'):
+                  total_unit_test_results += 1
                   tid = res.get('testId')
-                  if not tid or tid not in id_map: continue
+                  if not tid or tid not in id_map: 
+                      print(f"Skipping UnitTestResult: testId={tid}, id_map_contains={tid in id_map}")
+                      continue
                   cls, mth = id_map[tid]
                   out.append({
                       "Class": cls,
@@ -296,6 +305,7 @@ jobs:
                       "ExecutedAt": res.get('endTime') or res.get('startTime') or ''
                   })
           
+              print(f"Total UnitTestResult elements found: {total_unit_test_results}")
               print(f"Parsed {len(out)} test results from TRX")
               return out
 
@@ -334,8 +344,8 @@ jobs:
           
                       # Check if we already have this synthetic function
                       exists = False
-                      for f in funcs:
-                          if f["Class"] == synthetic_func["Class"] and f["Function"] == synthetic_func["Function"]:
+                      for f_existing in funcs: # Renamed loop variable to avoid shadowing
+                          if f_existing["Class"] == synthetic_func["Class"] and f_existing["Function"] == synthetic_func["Function"]:
                               exists = True
                               break
           
@@ -344,10 +354,14 @@ jobs:
           
                       # Add test to index
                       idx[(t["Class"], t["Base"])].append(t)
-          
+              
+              print(f"\nTotal functions after processing: {len(funcs)}")
+              print(f"Total test results from parse_trx: {len(trx)}")
+              print(f"Total tests indexed (should match total test results): {sum(len(tests) for tests in idx.values())}")
+
               print(f"\nUnmatched tests: {len(unmatched_tests)}")
               if unmatched_tests:
-                  print("Unmatched test details:")
+                  print("Unmatched test details (first 10):")
                   for t in unmatched_tests[:10]:  # Show first 10
                       print(f"  - {t['Class']}.{t['Method']}")
           
