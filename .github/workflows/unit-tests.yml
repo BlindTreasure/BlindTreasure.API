@@ -65,311 +65,311 @@ jobs:
             --results-directory ./TestResults/ \
             --logger "trx;LogFileName=test-results.trx"
 
-            - name: Generate Excel Unit Test Document from .cs XML docs
-            run: |
-              mkdir -p coveragereport
-              cat > generate_excel_from_cs_docs.py << 'PY'
-              import os, re, glob, xml.etree.ElementTree as ET
-              from collections import defaultdict
-              import pandas as pd
+      - name: Generate Excel Unit Test Document from .cs XML docs
+        run: |
+          mkdir -p coveragereport
+          cat > generate_excel_from_cs_docs.py << 'PY'
+          import os, re, glob, xml.etree.ElementTree as ET
+          from collections import defaultdict
+          import pandas as pd
           
-              RE_CLASS = re.compile(r'^\s*(?:public|internal|protected|private)?\s*(?:sealed\s+|static\s+|abstract\s+)?class\s+(\w+)\b')
-              RE_FACT  = re.compile(r'^\s*\[Fact(?:\s*\(.*?\))?\]\s*$')
-              RE_METHOD= re.compile(r'^\s*(?:public|internal|protected|private)\s+(?:async\s+)?(?:Task|void)\s+(\w+)\s*\(')
-              RE_DOC   = re.compile(r'^\s*///\s?(.*)$')
+          RE_CLASS = re.compile(r'^\s*(?:public|internal|protected|private)?\s*(?:sealed\s+|static\s+|abstract\s+)?class\s+(\w+)\b')
+          RE_FACT  = re.compile(r'^\s*\[Fact(?:\s*\(.*?\))?\]\s*$')
+          RE_METHOD= re.compile(r'^\s*(?:public|internal|protected|private)\s+(?:async\s+)?(?:Task|void)\s+(\w+)\s*\(')
+          RE_DOC   = re.compile(r'^\s*///\s?(.*)$')
           
-              def sanitize_sheet_name(name):
-                  invalid = r'[]:*?/\\'
-                  for ch in invalid:
-                      name = name.replace(ch, ' ')
-                  return name[:31] if len(name) > 31 else name
+          def sanitize_sheet_name(name):
+              invalid = r'[]:*?/\\'
+              for ch in invalid:
+                  name = name.replace(ch, ' ')
+              return name[:31] if len(name) > 31 else name
           
-              def parse_xml_doc_block(lines):
-                  # lines: just the comment payload after stripping leading '///'
-                  # Wrap to a root to use ET safely; ignore XML parse errors by fallback to text parsing.
-                  xml_text = '\n'.join(lines)
-                  summary = ''
-                  remarks_text = ''
-                  precond = ''
-                  scenario = ''
-                  expected = ''
-                  coverage = ''
+          def parse_xml_doc_block(lines):
+              # lines: just the comment payload after stripping leading '///'
+              # Wrap to a root to use ET safely; ignore XML parse errors by fallback to text parsing.
+              xml_text = '\n'.join(lines)
+              summary = ''
+              remarks_text = ''
+              precond = ''
+              scenario = ''
+              expected = ''
+              coverage = ''
           
-                  try:
-                      root = ET.fromstring(f"<root>\n{xml_text}\n</root>")
-                      s = root.find('summary')
-                      if s is not None and s.text:
-                          summary = s.text.strip()
-                      r = root.find('remarks')
-                      if r is not None and (r.text or list(r)):
-                          # remarks may contain text with lines "Scenario:", "Expected:", "Pre-Condition:", "Coverage:"
-                          raw = ''.join(r.itertext())
-                          remarks_text = raw
-                  except ET.ParseError:
-                      # fallback: plain text parse
-                      remarks_text = xml_text
+              try:
+                  root = ET.fromstring(f"<root>\n{xml_text}\n</root>")
+                  s = root.find('summary')
+                  if s is not None and s.text:
+                      summary = s.text.strip()
+                  r = root.find('remarks')
+                  if r is not None and (r.text or list(r)):
+                      # remarks may contain text with lines "Scenario:", "Expected:", "Pre-Condition:", "Coverage:"
+                      raw = ''.join(r.itertext())
+                      remarks_text = raw
+              except ET.ParseError:
+                  # fallback: plain text parse
+                  remarks_text = xml_text
           
-                  # Parse conventional tags inside remarks
-                  if remarks_text:
-                      for raw_line in remarks_text.splitlines():
-                          line = raw_line.strip()
-                          if line.startswith('Scenario:'):
-                              scenario = line[len('Scenario:'):].strip()
-                          elif line.startswith('Expected:'):
-                              expected = line[len('Expected:'):].strip()
-                          elif line.startswith('Pre-Condition:'):
-                              precond = line[len('Pre-Condition:'):].strip()
-                          elif line.startswith('Coverage:'):
-                              coverage = line[len('Coverage:'):].strip()
+              # Parse conventional tags inside remarks
+              if remarks_text:
+                  for raw_line in remarks_text.splitlines():
+                      line = raw_line.strip()
+                      if line.startswith('Scenario:'):
+                          scenario = line[len('Scenario:'):].strip()
+                      elif line.startswith('Expected:'):
+                          expected = line[len('Expected:'):].strip()
+                      elif line.startswith('Pre-Condition:'):
+                          precond = line[len('Pre-Condition:'):].strip()
+                      elif line.startswith('Coverage:'):
+                          coverage = line[len('Coverage:'):].strip()
           
-                  return {
-                      'summary': summary.strip(),
-                      'scenario': scenario.strip(),
-                      'expected': expected.strip(),
-                      'precond': precond.strip(),
-                      'coverage': coverage.strip(),
-                  }
+              return {
+                  'summary': summary.strip(),
+                  'scenario': scenario.strip(),
+                  'expected': expected.strip(),
+                  'precond': precond.strip(),
+                  'coverage': coverage.strip(),
+              }
           
-              def extract_from_cs():
-                  # Scan test source files; add more patterns if needed
-                  patterns = ["./**/*Tests.cs", "./**/*Test.cs"]
-                  files = set()
-                  for p in patterns:
-                      files.update(glob.glob(p, recursive=True))
+          def extract_from_cs():
+              # Scan test source files; add more patterns if needed
+              patterns = ["./**/*Tests.cs", "./**/*Test.cs"]
+              files = set()
+              for p in patterns:
+                  files.update(glob.glob(p, recursive=True))
           
-                  functions = []  # rows for Functions sheet
-                  matrices = {}   # sheet_name -> rows for matrix
-                  methods_index = {}  # (class, method) -> sheet_name
+              functions = []  # rows for Functions sheet
+              matrices = {}   # sheet_name -> rows for matrix
+              methods_index = {}  # (class, method) -> sheet_name
           
-                  for path in sorted(files):
-                      with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                          lines = f.readlines()
+              for path in sorted(files):
+                  with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                      lines = f.readlines()
           
-                      current_class = None
-                      i = 0
-                      while i < len(lines):
-                          mclass = RE_CLASS.match(lines[i])
-                          if mclass:
-                              current_class = mclass.group(1)
+                  current_class = None
+                  i = 0
+                  while i < len(lines):
+                      mclass = RE_CLASS.match(lines[i])
+                      if mclass:
+                          current_class = mclass.group(1)
           
-                          # Collect consecutive '///' lines immediately preceding a [Fact] + method
-                          if RE_FACT.match(lines[i].rstrip()):
-                              # backtrack to gather xml doc before [Fact]
-                              j = i - 1
-                              xml_lines = []
-                              while j >= 0:
-                                  mdoc = RE_DOC.match(lines[j])
-                                  if not mdoc:
-                                      break
-                                  xml_lines.insert(0, mdoc.group(1))
-                                  j -= 1
+                      # Collect consecutive '///' lines immediately preceding a [Fact] + method
+                      if RE_FACT.match(lines[i].rstrip()):
+                          # backtrack to gather xml doc before [Fact]
+                          j = i - 1
+                          xml_lines = []
+                          while j >= 0:
+                              mdoc = RE_DOC.match(lines[j])
+                              if not mdoc:
+                                  break
+                              xml_lines.insert(0, mdoc.group(1))
+                              j -= 1
           
-                              # move forward to find method line
-                              k = i + 1
-                              method_name = None
-                              while k < len(lines) and k <= i + 10:  # local window
-                                  mm = RE_METHOD.match(lines[k])
-                                  if mm:
-                                      method_name = mm.group(1)
-                                      break
-                                  k += 1
+                          # move forward to find method line
+                          k = i + 1
+                          method_name = None
+                          while k < len(lines) and k <= i + 10:  # local window
+                              mm = RE_METHOD.match(lines[k])
+                              if mm:
+                                  method_name = mm.group(1)
+                                  break
+                              k += 1
           
-                              if method_name:
-                                  meta = parse_xml_doc_block(xml_lines) if xml_lines else {
-                                      'summary':'',
-                                      'scenario':'',
-                                      'expected':'',
-                                      'precond':'',
-                                      'coverage':'',
-                                  }
-                                  req_name = meta['summary'] or meta['scenario'] or method_name
-                                  desc     = meta['scenario'] or meta['summary']
-                                  precond  = meta['precond']
+                          if method_name:
+                              meta = parse_xml_doc_block(xml_lines) if xml_lines else {
+                                  'summary':'',
+                                  'scenario':'',
+                                  'expected':'',
+                                  'precond':'',
+                                  'coverage':'',
+                              }
+                              req_name = meta['summary'] or meta['scenario'] or method_name
+                              desc     = meta['scenario'] or meta['summary']
+                              precond  = meta['precond']
           
-                                  sheet_name = sanitize_sheet_name(method_name)
-                                  # ensure uniqueness across workbook
-                                  base = sheet_name
-                                  suffix = 1
-                                  while sheet_name in matrices:
-                                      suffix += 1
-                                      sheet_name = sanitize_sheet_name(f"{base}_{suffix}")
+                              sheet_name = sanitize_sheet_name(method_name)
+                              # ensure uniqueness across workbook
+                              base = sheet_name
+                              suffix = 1
+                              while sheet_name in matrices:
+                                  suffix += 1
+                                  sheet_name = sanitize_sheet_name(f"{base}_{suffix}")
           
-                                  functions.append({
-                                      'No': None,  # fill later
-                                      'RequirementName': req_name,
-                                      'Class Name': current_class or '',
-                                      'Function Name': method_name,
-                                      'Sheet Name': sheet_name,
-                                      'Description': desc,
-                                      'Pre-Condition': precond
-                                  })
-                                  # initial one-row matrix from doc; inputs often not present in XML -> leave blank
-                                  matrices[sheet_name] = [{
-                                      'No': 1,
-                                      'Input': '',
-                                      'Expected Output': meta['expected'],
-                                      'Condition': meta['scenario'],
-                                      'Description': meta['summary'],
-                                      'Pre-Condition': meta['precond'],
-                                      'Coverage': meta['coverage']
-                                  }]
-                                  methods_index[(current_class or '', method_name)] = sheet_name
+                              functions.append({
+                                  'No': None,  # fill later
+                                  'RequirementName': req_name,
+                                  'Class Name': current_class or '',
+                                  'Function Name': method_name,
+                                  'Sheet Name': sheet_name,
+                                  'Description': desc,
+                                  'Pre-Condition': precond
+                              })
+                              # initial one-row matrix from doc; inputs often not present in XML -> leave blank
+                              matrices[sheet_name] = [{
+                                  'No': 1,
+                                  'Input': '',
+                                  'Expected Output': meta['expected'],
+                                  'Condition': meta['scenario'],
+                                  'Description': meta['summary'],
+                                  'Pre-Condition': meta['precond'],
+                                  'Coverage': meta['coverage']
+                              }]
+                              methods_index[(current_class or '', method_name)] = sheet_name
           
-                              i = k  # skip to method
-                          i += 1
+                          i = k  # skip to method
+                      i += 1
           
-                  # Fill numbering for Functions
-                  for idx, row in enumerate(functions, start=1):
-                      row['No'] = idx
+              # Fill numbering for Functions
+              for idx, row in enumerate(functions, start=1):
+                  row['No'] = idx
           
-                  return functions, matrices, methods_index
+              return functions, matrices, methods_index
           
-              def parse_trx(trx_path):
-                  if not os.path.exists(trx_path):
-                      return {}
-                  ns = {}
-                  try:
-                      tree = ET.parse(trx_path)
-                      root = tree.getroot()
-                      # Capture namespaces if any
-                      if root.tag.startswith('{'):
-                          ns_uri = root.tag.split('}', 1)[0][1:]
-                          ns['ns'] = ns_uri
-                          def tag(name): return f"{{{ns_uri}}}{name}"
-                      else:
-                          def tag(name): return name
+          def parse_trx(trx_path):
+              if not os.path.exists(trx_path):
+                  return {}
+              ns = {}
+              try:
+                  tree = ET.parse(trx_path)
+                  root = tree.getroot()
+                  # Capture namespaces if any
+                  if root.tag.startswith('{'):
+                      ns_uri = root.tag.split('}', 1)[0][1:]
+                      ns['ns'] = ns_uri
+                      def tag(name): return f"{{{ns_uri}}}{name}"
+                  else:
+                      def tag(name): return name
           
-                      # Map test id -> (class, method, name)
-                      unit_tests = {}
-                      for ut in root.findall('.//'+tag('UnitTest')):
-                          tid = ut.get('id') or ut.attrib.get('{http://www.w3.org/2001/XMLSchema-instance}id')
-                          # method/class under TestMethod
-                          tm = ut.find('.//'+tag('TestMethod'))
-                          cls = tm.get('className') if tm is not None else ''
-                          mth = tm.get('name') if tm is not None else ''
-                          nm  = ut.get('name') or ''
-                          if tid:
-                              unit_tests[tid] = (cls, mth, nm)
+                  # Map test id -> (class, method, name)
+                  unit_tests = {}
+                  for ut in root.findall('.//'+tag('UnitTest')):
+                      tid = ut.get('id') or ut.attrib.get('{http://www.w3.org/2001/XMLSchema-instance}id')
+                      # method/class under TestMethod
+                      tm = ut.find('.//'+tag('TestMethod'))
+                      cls = tm.get('className') if tm is not None else ''
+                      mth = tm.get('name') if tm is not None else ''
+                      nm  = ut.get('name') or ''
+                      if tid:
+                          unit_tests[tid] = (cls, mth, nm)
           
-                      # Results
-                      status_by_method = defaultdict(lambda: {'Passed':0,'Failed':0})
-                      for tr in root.findall('.//'+tag('UnitTestResult')):
-                          tid = tr.get('testId')
-                          outcome = tr.get('outcome','').lower()
-                          cls, mth, _ = unit_tests.get(tid, ('','', ''))
-                          key = (cls.split('.')[-1], mth)  # class shortname
-                          if outcome == 'passed':
-                              status_by_method[key]['Passed'] += 1
-                          elif outcome in ('failed','timeout','aborted'):
-                              status_by_method[key]['Failed'] += 1
-                      return status_by_method
-                  except Exception:
-                      return {}
+                  # Results
+                  status_by_method = defaultdict(lambda: {'Passed':0,'Failed':0})
+                  for tr in root.findall('.//'+tag('UnitTestResult')):
+                      tid = tr.get('testId')
+                      outcome = tr.get('outcome','').lower()
+                      cls, mth, _ = unit_tests.get(tid, ('','', ''))
+                      key = (cls.split('.')[-1], mth)  # class shortname
+                      if outcome == 'passed':
+                          status_by_method[key]['Passed'] += 1
+                      elif outcome in ('failed','timeout','aborted'):
+                          status_by_method[key]['Failed'] += 1
+                  return status_by_method
+              except Exception:
+                  return {}
           
-              def build_statistics(functions, matrices, status_by_method):
-                  stats_rows = []
-                  for idx, f in enumerate(functions, start=1):
-                      cls = f['Class Name'] or ''
-                      mth = f['Function Name']
+          def build_statistics(functions, matrices, status_by_method):
+              stats_rows = []
+              for idx, f in enumerate(functions, start=1):
+                  cls = f['Class Name'] or ''
+                  mth = f['Function Name']
+                  sheet = f['Sheet Name']
+                  st = status_by_method.get((cls, mth), {'Passed':0,'Failed':0})
+                  total_matrix = len(matrices.get(sheet, []))
+                  passed = st.get('Passed', 0)
+                  failed = st.get('Failed', 0)
+                  # If no TRX entry but we have matrix rows, mark as Untested
+                  untested = max(0, total_matrix - (passed + failed))
+                  # N/A/B buckets from Coverage single-letter if present
+                  bucketN = bucketA = bucketB = 0
+                  for r in matrices.get(sheet, []):
+                      cov = (r.get('Coverage') or '').strip().upper()
+                      if cov == 'N':
+                          bucketN += 1
+                      elif cov == 'A':
+                          bucketA += 1
+                      elif cov == 'B':
+                          bucketB += 1
+          
+                  stats_rows.append({
+                      'No': idx,
+                      'Function Code': f"=HYPERLINK(\"#'{sheet}'!A1\",\"Code\")",
+                      'Passed': passed,
+                      'Failed': failed,
+                      'Untested': untested,
+                      'N': bucketN,
+                      'A': bucketA,
+                      'B': bucketB,
+                      'Total Test Cases': total_matrix
+                  })
+              return stats_rows
+          
+          def main():
+              functions, matrices, methods_index = extract_from_cs()
+              status_by_method = parse_trx('./TestResults/test-results.trx')
+          
+              # DataFrames
+              df_functions = pd.DataFrame(functions, columns=[
+                  'No','RequirementName','Class Name','Function Name','Sheet Name','Description','Pre-Condition'
+              ])
+              df_stats = pd.DataFrame(build_statistics(functions, matrices, status_by_method), columns=[
+                  'No','Function Code','Passed','Failed','Untested','N','A','B','Total Test Cases'
+              ])
+          
+              out_path = './coveragereport/UnitTest_Document.xlsx'
+              with pd.ExcelWriter(out_path, engine='xlsxwriter') as writer:
+                  # Sheet: Functions
+                  df_functions.to_excel(writer, sheet_name='Functions', index=False)
+                  # Ensure formulas preserved in Statistics
+                  df_stats.to_excel(writer, sheet_name='Statistics', index=False)
+          
+                  # Matrix sheets per function
+                  for f in functions:
                       sheet = f['Sheet Name']
-                      st = status_by_method.get((cls, mth), {'Passed':0,'Failed':0})
-                      total_matrix = len(matrices.get(sheet, []))
-                      passed = st.get('Passed', 0)
-                      failed = st.get('Failed', 0)
-                      # If no TRX entry but we have matrix rows, mark as Untested
-                      untested = max(0, total_matrix - (passed + failed))
-                      # N/A/B buckets from Coverage single-letter if present
-                      bucketN = bucketA = bucketB = 0
-                      for r in matrices.get(sheet, []):
-                          cov = (r.get('Coverage') or '').strip().upper()
-                          if cov == 'N':
-                              bucketN += 1
-                          elif cov == 'A':
-                              bucketA += 1
-                          elif cov == 'B':
-                              bucketB += 1
+                      rows = matrices.get(sheet, [])
+                      df = pd.DataFrame(rows, columns=[
+                          'No','Input','Expected Output','Condition','Description','Pre-Condition','Coverage'
+                      ])
+                      # Write a small header block with metadata at top
+                      ws = writer.book.add_worksheet(sheet)
+                      # Metadata header
+                      meta = [
+                          ('RequirementName', f['RequirementName']),
+                          ('Class Name', f['Class Name']),
+                          ('Function Name', f['Function Name']),
+                          ('Description', f['Description']),
+                          ('Pre-Condition', f['Pre-Condition']),
+                      ]
+                      for r, (k, v) in enumerate(meta, start=1):
+                          ws.write(r-1, 0, k)
+                          ws.write(r-1, 1, v)
+                      # Leave one empty row then table
+                      start_row = len(meta) + 1
+                      # Write table header
+                      headers = ['No','Input','Expected Output','Condition','Description','Pre-Condition','Coverage']
+                      for c, col in enumerate(headers):
+                          ws.write(start_row, c, col)
+                      # Write data
+                      for rr, row in enumerate(rows, start=start_row+1):
+                          for cc, col in enumerate(headers):
+                              ws.write(rr, cc, row.get(col, ''))
           
-                      stats_rows.append({
-                          'No': idx,
-                          'Function Code': f"=HYPERLINK(\"#'{sheet}'!A1\",\"Code\")",
-                          'Passed': passed,
-                          'Failed': failed,
-                          'Untested': untested,
-                          'N': bucketN,
-                          'A': bucketA,
-                          'B': bucketB,
-                          'Total Test Cases': total_matrix
-                      })
-                  return stats_rows
+                  # Autofit-like widths
+                  for sheet in ['Functions','Statistics']:
+                      ws = writer.sheets[sheet]
+                      df = df_functions if sheet == 'Functions' else df_stats
+                      for i, col in enumerate(df.columns):
+                          maxlen = max((len(str(x)) for x in [col] + df[col].astype(str).tolist()), default=10)
+                          ws.set_column(i, i, min(maxlen + 2, 60))
           
-              def main():
-                  functions, matrices, methods_index = extract_from_cs()
-                  status_by_method = parse_trx('./TestResults/test-results.trx')
+              print(f"Excel generated at {out_path}")
           
-                  # DataFrames
-                  df_functions = pd.DataFrame(functions, columns=[
-                      'No','RequirementName','Class Name','Function Name','Sheet Name','Description','Pre-Condition'
-                  ])
-                  df_stats = pd.DataFrame(build_statistics(functions, matrices, status_by_method), columns=[
-                      'No','Function Code','Passed','Failed','Untested','N','A','B','Total Test Cases'
-                  ])
+          if __name__ == '__main__':
+              main()
+          PY
+          python generate_excel_from_cs_docs.py
           
-                  out_path = './coveragereport/UnitTest_Document.xlsx'
-                  with pd.ExcelWriter(out_path, engine='xlsxwriter') as writer:
-                      # Sheet: Functions
-                      df_functions.to_excel(writer, sheet_name='Functions', index=False)
-                      # Ensure formulas preserved in Statistics
-                      df_stats.to_excel(writer, sheet_name='Statistics', index=False)
-          
-                      # Matrix sheets per function
-                      for f in functions:
-                          sheet = f['Sheet Name']
-                          rows = matrices.get(sheet, [])
-                          df = pd.DataFrame(rows, columns=[
-                              'No','Input','Expected Output','Condition','Description','Pre-Condition','Coverage'
-                          ])
-                          # Write a small header block with metadata at top
-                          ws = writer.book.add_worksheet(sheet)
-                          # Metadata header
-                          meta = [
-                              ('RequirementName', f['RequirementName']),
-                              ('Class Name', f['Class Name']),
-                              ('Function Name', f['Function Name']),
-                              ('Description', f['Description']),
-                              ('Pre-Condition', f['Pre-Condition']),
-                          ]
-                          for r, (k, v) in enumerate(meta, start=1):
-                              ws.write(r-1, 0, k)
-                              ws.write(r-1, 1, v)
-                          # Leave one empty row then table
-                          start_row = len(meta) + 1
-                          # Write table header
-                          headers = ['No','Input','Expected Output','Condition','Description','Pre-Condition','Coverage']
-                          for c, col in enumerate(headers):
-                              ws.write(start_row, c, col)
-                          # Write data
-                          for rr, row in enumerate(rows, start=start_row+1):
-                              for cc, col in enumerate(headers):
-                                  ws.write(rr, cc, row.get(col, ''))
-          
-                      # Autofit-like widths
-                      for sheet in ['Functions','Statistics']:
-                          ws = writer.sheets[sheet]
-                          df = df_functions if sheet == 'Functions' else df_stats
-                          for i, col in enumerate(df.columns):
-                              maxlen = max((len(str(x)) for x in [col] + df[col].astype(str).tolist()), default=10)
-                              ws.set_column(i, i, min(maxlen + 2, 60))
-          
-                  print(f"Excel generated at {out_path}")
-          
-              if __name__ == '__main__':
-                  main()
-              PY
-              python generate_excel_from_cs_docs.py
-          
-          - name: Upload Unit Test Document
-            uses: actions/upload-artifact@v4
-            with:
-              name: unit-test-document
-              path: ./coveragereport/UnitTest_Document.xlsx
-              retention-days: 30
+      - name: Upload Unit Test Document
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-document
+          path: ./coveragereport/UnitTest_Document.xlsx
+          retention-days: 30
