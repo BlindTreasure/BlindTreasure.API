@@ -86,8 +86,26 @@ jobs:
               return m
 
           def same_function(doc_func: str, test_method: str) -> bool:
-              d = norm(doc_func); t = norm(base_function_from_test(test_method))
-              return d == t
+              """Improved matching logic - more flexible"""
+              d = norm(doc_func)
+              t = norm(base_function_from_test(test_method))
+          
+              # Exact match
+              if d == t:
+                  return True
+          
+              # Handle Async suffix
+              if d.endswith('async') and t == d[:-5]:
+                  return True
+              if t.endswith('async') and d == t[:-5]:
+                  return True
+          
+              # Substring matching for partial names
+              if len(d) > 3 and len(t) > 3:
+                  if d in t or t in d:
+                      return True
+          
+              return False
 
           def classify_case(name: str) -> str:
               n = (name or '').lower()
@@ -198,11 +216,16 @@ jobs:
           def extract_functions():
               xml_files = glob.glob('./BlindTreasure.UnitTest/bin/**/*.xml', recursive=True)
               agg = {}  # key=(Class, Func) -> data
+          
+              print(f"Found {len(xml_files)} XML files")
+          
               for f in xml_files:
                   try:
                       root = ET.parse(f).getroot()
-                  except Exception:
+                  except Exception as e:
+                      print(f"Error parsing {f}: {e}")
                       continue
+          
                   for m in root.findall('.//member'):
                       name = m.get('name','')
                       if not name.startswith('M:'): continue
@@ -232,12 +255,19 @@ jobs:
                           if not agg[key]["Description"] and desc: agg[key]["Description"]=desc
                           if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"]=pre
                           if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"]=cov
+          
+              print(f"Extracted {len(agg)} functions from XML")
               return list(agg.values())
 
           # ---------- TRX robust parse ----------
           def parse_trx():
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
-              if not trx_files: return []
+              if not trx_files: 
+                  print("No TRX files found")
+                  return []
+          
+              print(f"Parsing TRX file: {trx_files[0]}")
+          
               with open(trx_files[0],'r',encoding='utf-8') as f:
                   soup = BeautifulSoup(f.read(),'xml')
 
@@ -249,6 +279,8 @@ jobs:
                   class_full = tm.get('className','')
                   method_name = strip_params(tm.get('name',''))
                   id_map[ut_id]=(short_class(class_full), method_name)
+
+              print(f"Found {len(id_map)} test definitions in TRX")
 
               out=[]
               for res in soup.find_all('UnitTestResult'):
@@ -263,6 +295,8 @@ jobs:
                       "Display": strip_params(res.get('testName','')),
                       "ExecutedAt": res.get('endTime') or res.get('startTime') or ''
                   })
+          
+              print(f"Parsed {len(out)} test results from TRX")
               return out
 
           # ---------- Build "Functions" & "Statistics" ----------
@@ -270,8 +304,15 @@ jobs:
               funcs = extract_functions()
               trx = parse_trx()
           
+              # Debug: Print all test cases
+              print("\n=== ALL TEST CASES FROM TRX ===")
+              for i, t in enumerate(trx, 1):
+                  print(f"{i}. Class: {t['Class']}, Method: {t['Method']}, Base: {t['Base']}")
+          
               # Index TRX by (Class, Base)
               idx = defaultdict(list)
+              unmatched_tests = []
+          
               for t in trx:
                   matched = False
                   for f in funcs:
@@ -279,18 +320,40 @@ jobs:
                           idx[(f["Class"], f["Function"])].append(t)
                           matched = True
                           break
+          
                   if not matched:
-                      # Gán vào một function giả để không bị mất
-                      fake_func_name = f"{t['Base']}_{t['Class']}"
-                      idx[(t["Class"], fake_func_name)].append(t)
-                      # Thêm function giả vào danh sách funcs
-                      funcs.append({
+                      unmatched_tests.append(t)
+                      # Create a synthetic function for unmatched tests
+                      synthetic_func = {
                           "Class": t["Class"],
-                          "Function": fake_func_name,
-                          "Description": f"Auto-generated for {t['Base']}",
+                          "Function": t["Base"],  # Use Base directly
+                          "Description": f"Auto-generated for {t['Method']}",
                           "PreCondition": "",
                           "Requirement": ""
-                      })
+                      }
+          
+                      # Check if we already have this synthetic function
+                      exists = False
+                      for f in funcs:
+                          if f["Class"] == synthetic_func["Class"] and f["Function"] == synthetic_func["Function"]:
+                              exists = True
+                              break
+          
+                      if not exists:
+                          funcs.append(synthetic_func)
+          
+                      # Add test to index
+                      idx[(t["Class"], t["Base"])].append(t)
+          
+              print(f"\nUnmatched tests: {len(unmatched_tests)}")
+              if unmatched_tests:
+                  print("Unmatched test details:")
+                  for t in unmatched_tests[:10]:  # Show first 10
+                      print(f"  - {t['Class']}.{t['Method']}")
+          
+              # Verify total test count
+              total_indexed = sum(len(tests) for tests in idx.values())
+              print(f"\nTotal tests indexed: {total_indexed} (should be {len(trx)})")
           
               # Sheet 1: Functions
               func_rows=[]
@@ -545,6 +608,12 @@ jobs:
                           stats_ws.write(i+1, 1, hyperlink_formula)
 
               print(f"Report generated: {out}")
+          
+              # Final summary
+              total_tests_in_report = sum([row["Total Test Cases"] for _, row in df_stats.iterrows()])
+              print(f"\n=== FINAL SUMMARY ===")
+              print(f"Total functions: {len(funcs)}")
+              print(f"Total test cases in report: {total_tests_in_report}")
 
           if __name__ == "__main__":
               main()
