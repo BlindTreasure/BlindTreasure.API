@@ -14,7 +14,7 @@ using MockQueryable.Moq;
 using Moq;
 using Resend;
 
-namespace BlindTreaure.UnitTest.Services;
+namespace BlindTreasure.UnitTest.Services;
 
 public class CategoryServiceTests
 {

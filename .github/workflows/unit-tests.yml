@@ -1,4 +1,4 @@
-name: Unit Tests with Excel Report
+name: Unit Tests with Excel Report (Functions + Statistics + Matrices)
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
           cache: true
           cache-dependency-path: '**/*.csproj'
 
-      - name: Setup Python for Excel generation
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
@@ -42,20 +42,15 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore BlindTreasure.API.sln
 
-      - name: Build with documentation
+      - name: Build with XML docs
         run: |
           dotnet build BlindTreasure.API.sln \
             --no-restore \
             --configuration Release \
             /p:GenerateDocumentationFile=true
-          
-          # List generated XML files to verify they exist
-          find . -name "*.xml" -path "*/bin/*" | sort
+          find ./BlindTreasure.UnitTest/bin -name "*.xml" | sort || true
 
-      - name: Restore tools
-        run: dotnet tool restore
-
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         run: |
           dotnet test BlindTreasure.API.sln \
             --no-build \
@@ -64,527 +59,502 @@ jobs:
             --collect:"XPlat Code Coverage" \
             --results-directory ./TestResults/ \
             --logger "trx;LogFileName=test-results.trx"
+          find ./TestResults -name "test-results.trx" | sort || true
 
-      - name: Create Excel coverage report with XML Documentation
+      - name: Generate Excel Report (Functions + Statistics + Matrices)
         run: |
           mkdir -p coveragereport
           cat > generate_excel_report.py << 'EOF'
           import pandas as pd
-          import json
           import xml.etree.ElementTree as ET
-          from datetime import datetime
-          import os
-          import glob
-          import re
           from bs4 import BeautifulSoup
+          from collections import defaultdict
+          import glob, re
+
+          XML_PREFIX = "M:BlindTreasure.UnitTest.Services."
+
+          # ---------- helpers ----------
+          def strip_params(s): return s.split('(')[0] if s else s
+          def short_class(fq): return fq.split('.')[-1] if fq else ''
+          def norm(s): return re.sub(r'[^A-Za-z0-9_]', '', (s or '')).lower()
+
+          def base_function_from_test(method_name: str) -> str:
+              """Lấy function-under-test từ test method: RegisterCustomerAsync_Should... -> RegisterCustomerAsync"""
+              m = strip_params(method_name or '')
+              if '_Should' in m: return m.split('_Should',1)[0]
+              if '_When'   in m: return m.split('_When',1)[0]
+              return m
+
+          def same_function(doc_func: str, test_method: str) -> bool:
+              d = norm(doc_func); t = norm(base_function_from_test(test_method))
+              return d == t
+
+          def classify_case(name: str) -> str:
+              n = (name or '').lower()
+              if 'boundary' in n: return 'B'
+              if 'abnormal' in n: return 'A'
+              if 'normal'   in n: return 'N'
+              return 'N'
+
+          def expected_from_name(name: str) -> str:
+              n = (name or '').lower()
+              if 'shouldreturntrue'  in n or 'should_be_true' in n:  return 'TRUE'
+              if 'shouldreturnfalse' in n or 'should_be_false' in n: return 'FALSE'
+              if 'shouldthrow' in n or 'exception' in n: return 'EXCEPTION'
+              return ''
+
+          def extract_log_message_from_name(name: str) -> str:
+              """Extract expected log message or error from test name"""
+              n = (name or '').lower()
+              if 'conflict' in n: return 'Conflict error'
+              if 'forbidden' in n: return 'Forbidden access'
+              if 'notfound' in n: return 'Not found error'
+              if 'badrequest' in n: return 'Bad request error'
+              if 'unauthorized' in n: return 'Unauthorized access'
+              if 'nameexists' in n: return 'Name already exists'
+              if 'empty' in n or 'null' in n: return 'Input validation error'
+              return ''
+
+          def to_conditions_from_name(name: str):
+              """Parse điều kiện từ tên test method."""
+              base = strip_params(name or '').lower()
+              conditions = []
           
-          def extract_xml_documentation():
-              """Trích xuất XML documentation từ các file .xml được generate"""
-              # Direct path to test project XML documentation
-              test_project_xml = glob.glob('./BlindTreaure.UnitTest/bin/Release/net8.0/BlindTreaure.UnitTest.xml')
-              # Fallback to general search if specific file not found
-              xml_files = test_project_xml if test_project_xml else glob.glob('./**/bin/**/*.xml', recursive=True)
-              
-              print(f"🔍 Starting search for XML documentation files in bin directories")
-              docs = {}
+              # Patterns for different test scenarios
+              if 'validdata' in base or ('should' in base and ('create' in base or 'update' in base) and 'when' not in base):
+                  conditions.append('Valid input data provided')
           
-              print(f"🔍 Tìm thấy {len(xml_files)} file XML documentation")
-          
-              for xml_file in xml_files:
-                  try:
-                      print(f"📖 Đang đọc XML documentation từ: {xml_file}")
-                      tree = ET.parse(xml_file)
-                      root = tree.getroot()
-          
-                      for member in root.findall('.//member'):
-                          name = member.get('name', '')
-          
-                          # Chỉ lấy methods có chứa từ 'Test'
-                          if name.startswith('M:') and 'Test' in name:
-                              summary = member.find('summary')
-                              remarks = member.find('remarks')
-          
-                              doc_info = {
-                                  "summary": "",
-                                  "scenario": "",
-                                  "expected": "",
-                                  "coverage": ""
-                              }
-          
-                              # Lấy summary
-                              if summary is not None and summary.text:
-                                  doc_info["summary"] = summary.text.strip()
-          
-                              # Lấy chi tiết từ remarks
-                              if remarks is not None and remarks.text:
-                                  remarks_text = remarks.text.strip()
-                                  # Parse the remarks section
-                                  lines = remarks_text.split('\n')
-                                  for line in lines:
-                                      line = line.strip()
-                                      if line.startswith("Scenario:"):
-                                          doc_info["scenario"] = line.replace("Scenario:", "").strip()
-                                      elif line.startswith("Expected:"):
-                                          doc_info["expected"] = line.replace("Expected:", "").strip()
-                                      elif line.startswith("Coverage:"):
-                                          doc_info["coverage"] = line.replace("Coverage:", "").strip()
-          
-                              if doc_info["summary"] or doc_info["scenario"] or doc_info["expected"]:
-                                  # Extract method name từ full name
-                                  method_parts = name.split('.')
-                                  if len(method_parts) > 0:
-                                      method_name = method_parts[-1].split('(')[0]  # Bỏ parameters
-                                      
-                                      # Store both original method name and without "_Should" pattern
-                                      docs[method_name] = doc_info
-                                      
-                                      # Handle special case for test methods with common patterns
-                                      if "_Should" in method_name:
-                                          test_parts = method_name.split('_Should')
-                                          if len(test_parts) == 2:
-                                              simple_name = test_parts[0]
-                                              suffix = test_parts[1]
-                                              docs[f"{simple_name}_Should{suffix}"] = doc_info
-                                      
-                                      print(f"📝 Tìm thấy documentation cho method: {method_name}")
-          
-                      print(f"✅ Đã xử lý xong file: {xml_file}")
-          
-                  except Exception as e:
-                      print(f"⚠️ Lỗi khi đọc file XML {xml_file}: {e}")
-                      continue
-          
-              print(f"📚 Tổng cộng tìm thấy {len(docs)} method có documentation")
-              return docs
-          
-          def parse_cobertura_xml():
-              xml_files = glob.glob('./TestResults/**/coverage.cobertura.xml', recursive=True)
-              print(f"🔍 Found {len(xml_files)} coverage.cobertura.xml files")
-              if not xml_files:
-                  return None
-              tree = ET.parse(xml_files[0])
-              root = tree.getroot()
-              line_rate = float(root.get('line-rate', 0)) * 100
-              branch_rate = float(root.get('branch-rate', 0)) * 100
-              classes_data = []
-              packages = root.findall('.//package')
-              for package in packages:
-                  package_name = package.get('name', 'Unknown')
-                  classes = package.findall('.//class')
-                  for cls in classes:
-                      class_name = cls.get('name', 'Unknown')
-                      filename = cls.get('filename', 'Unknown')
-                      class_line_rate = float(cls.get('line-rate', 0)) * 100
-                      class_branch_rate = float(cls.get('branch-rate', 0)) * 100
-                      lines = cls.findall('.//line')
-                      total_lines = len(lines)
-                      covered_lines = len([l for l in lines if l.get('hits', '0') != '0'])
-                      classes_data.append({
-                          'Package': package_name,
-                          'Class': class_name,
-                          'File': filename,
-                          'Line Coverage (%)': round(class_line_rate, 2),
-                          'Branch Coverage (%)': round(class_branch_rate, 2),
-                          'Total Lines': total_lines,
-                          'Covered Lines': covered_lines,
-                          'Uncovered Lines': total_lines - covered_lines
-                      })
-              return {
-                  'summary': {
-                      'line_coverage': round(line_rate, 2),
-                      'branch_coverage': round(branch_rate, 2)
-                  },
-                  'classes': classes_data
-              }
-          
-          def extract_test_class_name(test_name):
-              """Trích xuất tên class từ tên test"""
-              parts = test_name.split('.')
-              if len(parts) >= 3:
-                  class_name = parts[-2]
-                  if class_name.endswith('Test') or class_name.endswith('Tests'):
-                      return class_name
-              return 'OtherTests'
-          
-          def convert_to_management_name(test_class_name):
-              """Chuyển đổi tên class test thành tên sheet Management"""
-              if test_class_name.endswith('Test'):
-                  base_name = test_class_name[:-4]
-              elif test_class_name.endswith('Tests'):
-                  base_name = test_class_name[:-5]
-              else:
-                  base_name = test_class_name
-          
-              if base_name.endswith('Service'):
-                  base_name = base_name[:-7]
-          
-              return f"{base_name}Management"
-          
-          def get_test_description_from_name(test_method):
-              """Tạo mô tả từ tên phương thức test (fallback)"""
-              if '_' in test_method:
-                  words = test_method.split('_')
-                  return 'Test method: ' + ' '.join(words)
-          
-              words = re.findall(r'[A-Z](?:[a-z]+|[A-Z]*(?=[A-Z]|$))', test_method)
-              if words:
-                  return 'Test method: ' + ' '.join(words)
-          
-              return 'Test method: ' + test_method
-          
-          def get_enhanced_description(test_method, xml_docs):
-              """Lấy mô tả từ XML documentation hoặc fallback về tên method"""
-              # Format documentation text to be a clean paragraph
-              def format_text(text):
-                  # Remove line breaks, extra spaces and normalize whitespace
-                  if text is None:
-                      return ""
-                  clean_text = ' '.join(text.replace('\n', ' ').replace('\r', ' ').split())
-                  # Limit text length for Excel cell
-                  if len(clean_text) > 300:
-                      clean_text = clean_text[:297] + "..."
-                  return clean_text
-              
-              # Default empty result
-              result = {
-                  "description": "",
-                  "procedure": "",
-                  "expected": ""
-              }
-              
-              # Tìm trong XML documentation trước
-              if test_method in xml_docs:
-                  doc_info = xml_docs[test_method]
-                  result["description"] = format_text(doc_info.get("summary", ""))
-                  result["procedure"] = format_text(doc_info.get("scenario", ""))
-                  result["expected"] = format_text(doc_info.get("expected", ""))
-                  return result
-              
-              # Try alternate name formats for better matching with test method names
-              # For methods like "GetByIdAsync_ShouldReturnEntity_WhenEntityExists"
-              if "_Should" in test_method:
-                  parts = test_method.split("_Should")
-                  if len(parts) >= 2:
-                      # Try matching with the base method name
-                      base_name = parts[0]
-                      if base_name in xml_docs:
-                          doc_info = xml_docs[base_name]
-                          result["description"] = format_text(doc_info.get("summary", ""))
-                          result["procedure"] = format_text(doc_info.get("scenario", ""))
-                          result["expected"] = format_text(doc_info.get("expected", ""))
-                          return result
-              
-              # Look through all keys in xml_docs for potential match
-              for doc_key in xml_docs.keys():
-                  # Check if the test method is a substring of a documented method
-                  # or if a documented method is a substring of the test method
-                  if test_method in doc_key or doc_key in test_method:
-                      doc_info = xml_docs[doc_key]
-                      result["description"] = format_text(doc_info.get("summary", ""))
-                      result["procedure"] = format_text(doc_info.get("scenario", ""))
-                      result["expected"] = format_text(doc_info.get("expected", ""))
-                      return result
-          
-              # Fallback về mô tả từ tên method
-              fallback_desc = get_test_description_from_name(test_method)
-              result["description"] = format_text(fallback_desc)
-              # Extract expected results from method name if possible
-              if "_Should" in test_method and "_When" in test_method:
-                  parts = test_method.split("_Should")
-                  if len(parts) > 1:
-                      expected_part = parts[1].split("_When")[0]
-                      result["expected"] = format_text(f"Should {expected_part}")
-                      
-                  when_parts = test_method.split("_When")
-                  if len(when_parts) > 1:
-                      procedure_part = when_parts[1]
-                      result["procedure"] = format_text(f"When {procedure_part}")
-              
-              return result
-          
-          def parse_test_results():
-              trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
-              test_data_by_class = {}
-              xml_docs = extract_xml_documentation()  # Lấy XML documentation
-          
-              if trx_files:
-                  try:
-                      with open(trx_files[0], 'r', encoding='utf-8') as f:
-                          content = f.read()
-                          soup = BeautifulSoup(content, 'xml')
-                      test_results = soup.find_all('UnitTestResult')
-          
-                      for result in test_results:
-                          test_name = result.get('testName', 'Unknown')
-                          outcome = result.get('outcome', 'Unknown')
-                          duration = result.get('duration', '00:00:00')
-          
-                          error_info = result.find('ErrorInfo')
-                          error_message = ""
-                          if error_info:
-                              message_elem = error_info.find('Message')
-                              if message_elem:
-                                  error_message = message_elem.get_text()
-          
-                          # Lấy tên phương thức test từ testName
-                          test_method = test_name.split('.')[-1]
-          
-                          # Lấy tên class test và chuyển đổi thành tên sheet Management
-                          test_class = extract_test_class_name(test_name)
-                          sheet_name = convert_to_management_name(test_class)
-          
-                          # Sử dụng enhanced description với XML documentation
-                          description_data = get_enhanced_description(test_method, xml_docs)
-          
-                          # Tạo đối tượng test case với thông tin chi tiết
-                          test_case = {
-                              'ID': f"TC_{len(test_data_by_class.get(sheet_name, [])) + 1:03d}",
-                              'Test Method': test_method,
-                              'Test Case Description': description_data["description"],
-                              'Test Case Procedure': description_data["procedure"],
-                              'Expected Results': description_data["expected"] or "Test should pass successfully",
-                              'Actual Result': outcome,
-                              'Status': 'Pass' if outcome == 'Passed' else 'Fail',
-                              'Duration': duration,
-                              'Error Message': error_message if error_message else 'N/A'
-                          }
-          
-                          if sheet_name not in test_data_by_class:
-                              test_data_by_class[sheet_name] = []
-          
-                          test_data_by_class[sheet_name].append(test_case)
-          
-                  except Exception as e:
-                      print(f"❌ Error parsing TRX file: {e}")
-          
-              return test_data_by_class
-          
-          def create_excel_report():
-              print("🚀 Bắt đầu tạo Excel report...")
-          
-              coverage_data = parse_cobertura_xml()
-              test_data_by_class = parse_test_results()
-              timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-              excel_file = f'./coveragereport/Coverage_Report_{timestamp}.xlsx'
-          
-              with pd.ExcelWriter(excel_file, engine='xlsxwriter') as writer:
-                  workbook = writer.book
-          
-                  # Định dạng cho các header và cell
-                  header_format = workbook.add_format({
-                      'bold': True,
-                      'text_wrap': True,
-                      'valign': 'top',
-                      'fg_color': '#4472C4',
-                      'font_color': 'white',
-                      'border': 1
-                  })
-          
-                  cell_format = workbook.add_format({
-                      'text_wrap': True,
-                      'valign': 'top',
-                      'border': 1
-                  })
-          
-                  pass_format = workbook.add_format({
-                      'text_wrap': True,
-                      'valign': 'top',
-                      'border': 1,
-                      'bg_color': '#E2EFDA'
-                  })
-          
-                  fail_format = workbook.add_format({
-                      'text_wrap': True,
-                      'valign': 'top',
-                      'border': 1,
-                      'bg_color': '#FFE6E6'
-                  })
-          
-                  # Standard format for descriptions
-                  description_format = workbook.add_format({
-                      'text_wrap': True,
-                      'valign': 'top',
-                      'border': 1
-                  })
-          
-                  # Tạo sheet Summary
-                  summary_data = []
-                  if coverage_data:
-                      total_tests = sum(len(tests) for tests in test_data_by_class.values())
-                      passed_tests = sum(len([t for t in tests if t['Status'] == 'Pass']) for tests in test_data_by_class.values())
-                      # Count tests that have documentation (not using emojis anymore)
-                      xml_doc_tests = sum(len([t for t in tests if 'Description' in t and t['Description']]) for tests in test_data_by_class.values())
-          
-                      summary_data = [
-                          ['Metric', 'Value', 'Status'],
-                          ['Line Coverage', f"{coverage_data['summary']['line_coverage']}%", 
-                           'Pass' if coverage_data['summary']['line_coverage'] >= 70 else 'Fail'],
-                          ['Branch Coverage', f"{coverage_data['summary']['branch_coverage']}%", ''],
-                          ['Total Tests', total_tests, ''],
-                          ['Passed Tests', passed_tests, ''],
-                          ['Failed Tests', total_tests - passed_tests, ''],
-                          ['Tests with Documentation', xml_doc_tests, f'{(xml_doc_tests/total_tests*100):.0f}%' if total_tests > 0 else '0%'],
-                          ['Test Pass Rate', f"{(passed_tests / total_tests * 100) if total_tests > 0 else 0:.2f}%", ''],
-                          ['Test Run Date', datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ''],
-                          ['Minimum Coverage Threshold', '70%', ''],
-                      ]
+              if 'empty' in base or 'null' in base:
+                  if 'name' in base:
+                      conditions.append('Name is null or empty')
                   else:
-                      summary_data = [
-                          ['Metric', 'Value', 'Status'],
-                          ['Line Coverage', 'N/A', 'No data available'],
-                      ]
+                      conditions.append('Required field is null or empty')
           
-                  df_summary = pd.DataFrame(summary_data[1:], columns=summary_data[0])
-                  df_summary.to_excel(writer, sheet_name='Summary', index=False)
-                  worksheet_summary = writer.sheets['Summary']
-                  worksheet_summary.set_column('A:A', 25)
-                  worksheet_summary.set_column('B:B', 20)
-                  worksheet_summary.set_column('C:C', 15)
+              if 'invalid' in base:
+                  conditions.append('Invalid input data')
           
-                  for row_num in range(len(df_summary) + 1):
-                      for col_num in range(len(df_summary.columns)):
-                          if row_num == 0:
-                              worksheet_summary.write(row_num, col_num, df_summary.columns[col_num], header_format)
-                          else:
-                              worksheet_summary.write(row_num, col_num, df_summary.iloc[row_num-1, col_num], cell_format)
+              if 'notexists' in base or 'notfound' in base:
+                  conditions.append('Entity does not exist')
           
-                  # Tạo sheet Coverage Details
-                  if coverage_data and coverage_data['classes']:
-                      df_classes = pd.DataFrame(coverage_data['classes'])
-                      df_classes.to_excel(writer, sheet_name='Coverage Details', index=False)
-                      worksheet_details = writer.sheets['Coverage Details']
-                      worksheet_details.set_column('A:A', 25)
-                      worksheet_details.set_column('B:B', 30)
-                      worksheet_details.set_column('C:C', 40)
-                      worksheet_details.set_column('D:D', 18)
-                      worksheet_details.set_column('E:E', 18)
-                      worksheet_details.set_column('F:F', 12)
-                      worksheet_details.set_column('G:G', 15)
-                      worksheet_details.set_column('H:H', 15)
+              if 'notadmin' in base or 'notauthorized' in base or 'forbidden' in base:
+                  conditions.append('User lacks required permissions')
           
-                      for row_num in range(len(df_classes) + 1):
-                          for col_num in range(len(df_classes.columns)):
-                              if row_num == 0:
-                                  worksheet_details.write(row_num, col_num, df_classes.columns[col_num], header_format)
-                              else:
-                                  worksheet_details.write(row_num, col_num, df_classes.iloc[row_num-1, col_num], cell_format)
+              if 'nameexists' in base or 'conflict' in base:
+                  conditions.append('Entity name already exists')
           
-                  # Tạo các sheet cho từng class test với enhanced formatting
-                  for sheet_name, test_cases in test_data_by_class.items():
-                      if len(sheet_name) > 31:
-                          sheet_name = sheet_name[:28] + "..."
+              if 'hasproducts' in base:
+                  conditions.append('Category has associated products')
           
-                      df_tests = pd.DataFrame(test_cases)
-                      df_tests.to_excel(writer, sheet_name=sheet_name, index=False)
+              if 'haschildren' in base:
+                  conditions.append('Category has subcategories')
           
-                      worksheet = writer.sheets[sheet_name]
-                      worksheet.set_column('A:A', 10)  # ID
-                      worksheet.set_column('B:B', 30)  # Test Method
-                      worksheet.set_column('C:C', 40)  # Test Case Description
-                      worksheet.set_column('D:D', 40)  # Test Case Procedure
-                      worksheet.set_column('E:E', 40)  # Expected Results
-                      worksheet.set_column('F:F', 15)  # Actual Result
-                      worksheet.set_column('G:G', 15)  # Status
-                      worksheet.set_column('H:H', 15)  # Duration
-                      worksheet.set_column('I:I', 40)  # Error Message
+              if 'nochildren' in base and 'validandno' in base:
+                  conditions.append('Category has no dependencies')
+
+              if 'invaliditemcount' in base:
+                  conditions.append('Invalid item count provided')
           
-                      for row_num in range(len(df_tests) + 1):
-                          for col_num in range(len(df_tests.columns)):
-                              if row_num == 0:
-                                  worksheet.write(row_num, col_num, df_tests.columns[col_num], header_format)
-                              else:
-                                  cell_value = df_tests.iloc[row_num-1, col_num]
+              if 'nosecret' in base:
+                  conditions.append('No Secret rarity item included')
+
+              if 'notowns' in base:
+                  conditions.append('User does not own the entity')
+
+              # Default condition if none found
+              if not conditions:
+                  conditions.append('Standard test condition')
           
-                                  # Áp dụng định dạng khác nhau dựa trên nội dung
-                                  if col_num == 5:  # Status column
-                                      if str(cell_value) == 'Pass':
-                                          worksheet.write(row_num, col_num, cell_value, pass_format)
-                                      else:
-                                          worksheet.write(row_num, col_num, cell_value, fail_format)
-                                  elif col_num == 2:  # Description column
-                                      worksheet.write(row_num, col_num, cell_value, description_format)
-                                  else:
-                                      worksheet.write(row_num, col_num, cell_value, cell_format)
+              return conditions[:4]  # Max 4 conditions
+
+          def safe_sheet_name(name, existing_sheets):
+              """Create a safe Excel sheet name (max 31 chars, unique)"""
+              if not name:
+                  name = "Sheet"
           
-              print(f"✅ Excel report generated: {excel_file}")
-              return excel_file
+              # Clean invalid characters for Excel sheet names
+              safe_name = re.sub(r'[\\/*\[\]:?]', '_', str(name))
           
+              # Truncate to fit within Excel's 31 character limit, leaving room for suffix
+              max_base_length = 25  # Leave room for " (999)" suffix
+              if len(safe_name) > max_base_length:
+                  safe_name = safe_name[:max_base_length]
+          
+              # Handle duplicates
+              final_name = safe_name
+              counter = 1
+              while final_name in existing_sheets:
+                  counter += 1
+                  suffix = f" ({counter})"
+                  # Ensure total length doesn't exceed 31 characters
+                  if len(safe_name) + len(suffix) > 31:
+                      truncated = safe_name[:31-len(suffix)]
+                      final_name = f"{truncated}{suffix}"
+                  else:
+                      final_name = f"{safe_name}{suffix}"
+          
+              return final_name
+
+          # ---------- XML -> functions (group by class + function-under-test) ----------
+          def extract_functions():
+              xml_files = glob.glob('./BlindTreasure.UnitTest/bin/**/*.xml', recursive=True)
+              agg = {}  # key=(Class, Func) -> data
+              for f in xml_files:
+                  try:
+                      root = ET.parse(f).getroot()
+                  except Exception:
+                      continue
+                  for m in root.findall('.//member'):
+                      name = m.get('name','')
+                      if not name.startswith('M:'): continue
+                      if not name.startswith(XML_PREFIX): continue
+                      parts = name.split('.')
+                      if len(parts) < 2: continue
+                      cls = parts[-2]
+                      test_method = strip_params(parts[-1])
+                      func = base_function_from_test(test_method)
+
+                      desc = ''
+                      pre  = ''
+                      cov  = ''
+                      s = m.find('summary')
+                      if s is not None and s.text: desc = ' '.join(s.text.split())
+                      r = m.find('remarks')
+                      if r is not None and r.text:
+                          for line in r.text.splitlines():
+                              line=line.strip()
+                              if line.startswith('Scenario:'): pre = line.replace('Scenario:','').strip() or pre
+                              elif line.startswith('Coverage:'): cov = line.replace('Coverage:','').strip() or cov
+
+                      key=(cls,func)
+                      if key not in agg:
+                          agg[key]={"Class":cls,"Function":func,"Description":desc,"PreCondition":pre,"Requirement":cov}
+                      else:
+                          if not agg[key]["Description"] and desc: agg[key]["Description"]=desc
+                          if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"]=pre
+                          if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"]=cov
+              return list(agg.values())
+
+          # ---------- TRX robust parse ----------
+          def parse_trx():
+              trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
+              if not trx_files: return []
+              with open(trx_files[0],'r',encoding='utf-8') as f:
+                  soup = BeautifulSoup(f.read(),'xml')
+
+              id_map={}
+              for ut in soup.find_all('UnitTest'):
+                  ut_id = ut.get('id') or ut.get('testId')
+                  tm = ut.find('TestMethod')
+                  if not ut_id or tm is None: continue
+                  class_full = tm.get('className','')
+                  method_name = strip_params(tm.get('name',''))
+                  id_map[ut_id]=(short_class(class_full), method_name)
+
+              out=[]
+              for res in soup.find_all('UnitTestResult'):
+                  tid = res.get('testId')
+                  if not tid or tid not in id_map: continue
+                  cls, mth = id_map[tid]
+                  out.append({
+                      "Class": cls,
+                      "Method": mth,               # test method name
+                      "Base": base_function_from_test(mth),  # function-under-test
+                      "Outcome": res.get('outcome','Unknown'),
+                      "Display": strip_params(res.get('testName','')),
+                      "ExecutedAt": res.get('endTime') or res.get('startTime') or ''
+                  })
+              return out
+
+          # ---------- Build "Functions" & "Statistics" ----------
+          def build_core():
+              funcs = extract_functions()
+              trx = parse_trx()
+          
+              # Index TRX by (Class, Base)
+              idx = defaultdict(list)
+              for t in trx:
+                  matched = False
+                  for f in funcs:
+                      if same_function(f["Function"], t["Base"]) and f["Class"] == t["Class"]:
+                          idx[(f["Class"], f["Function"])].append(t)
+                          matched = True
+                          break
+                  if not matched:
+                      # Gán vào một function giả để không bị mất
+                      fake_func_name = f"{t['Base']}_{t['Class']}"
+                      idx[(t["Class"], fake_func_name)].append(t)
+                      # Thêm function giả vào danh sách funcs
+                      funcs.append({
+                          "Class": t["Class"],
+                          "Function": fake_func_name,
+                          "Description": f"Auto-generated for {t['Base']}",
+                          "PreCondition": "",
+                          "Requirement": ""
+                      })
+          
+              # Sheet 1: Functions
+              func_rows=[]
+              for i, f in enumerate(funcs, 1):
+                  func_rows.append({
+                      "No": i,
+                      "RequirementName": f["Requirement"],
+                      "Class Name": f["Class"],
+                      "Function Name": f["Function"],
+                      "Function Code": f"Code_{i}",
+                      "Sheet Name": f["Function"],
+                      "Description": f["Description"],
+                      "Pre-Condition": f["PreCondition"]
+                  })
+          
+              # Sheet 2: Statistics
+              stat_rows=[]
+              for i, f in enumerate(funcs, 1):
+                  tests = idx.get((f["Class"], f["Function"]), [])
+                  p=f_=u=0; N=A=B=0
+                  for t in tests:
+                      if t["Outcome"]=="Passed": p+=1
+                      elif t["Outcome"]=="Failed": f_+=1
+                      else: u+=1
+                      c = classify_case(t["Display"] or t["Method"])
+                      if c=='N': N+=1
+                      elif c=='A': A+=1
+                      elif c=='B': B+=1
+                  stat_rows.append({
+                      "No": i,
+                      "Function Code": f'=HYPERLINK("#{f["Function"]}!A1","Code_{i}")',
+                      "Passed": p, "Failed": f_, "Untested": u,
+                      "N": N, "A": A, "B": B,
+                      "Total Test Cases": p+f_+u
+                  })
+          
+              return funcs, pd.DataFrame(func_rows), pd.DataFrame(stat_rows), idx
+
+          # ---------- Matrix writer (per function) ----------
+          def write_matrix(workbook, writer, func, tests):
+              # Create safe sheet name that respects Excel's 31 character limit
+              sheet_name = safe_sheet_name(func["Function"], writer.sheets.keys())
+              ws = workbook.add_worksheet(sheet_name)
+              writer.sheets[sheet_name] = ws
+
+              # Define formats
+              # Blue header format for UTCID columns
+              blue_header = workbook.add_format({
+                  "bold": True,
+                  "align": "center",
+                  "valign": "vcenter",
+                  "border": 1,
+                  "bg_color": "#1e1b4b",
+                  "font_color": "white"
+              })
+          
+              # Blue section headers 
+              blue_section = workbook.add_format({
+                  "bold": True,
+                  "align": "left",
+                  "valign": "vcenter",
+                  "border": 1,
+                  "bg_color": "#1e1b4b",
+                  "font_color": "white"
+              })
+          
+              # Regular label format
+              label_format = workbook.add_format({
+                  "align": "left",
+                  "valign": "vcenter",
+                  "border": 1
+              })
+          
+              # Data cell format (white background with border)
+              data_format = workbook.add_format({
+                  "align": "center",
+                  "valign": "vcenter",
+                  "border": 1
+              })
+
+              # Process test data
+              cols = []
+              for k,t in enumerate(tests,1):
+                  cols.append({
+                      "id": f"UTCID{k:02d}",
+                      "name": t["Display"] or t["Method"],
+                      "exp": expected_from_name(t["Display"] or t["Method"]),
+                      "type": classify_case(t["Display"] or t["Method"]),
+                      "out": t["Outcome"],
+                      "dt": t["ExecutedAt"],
+                      "conds": to_conditions_from_name(t["Display"] or t["Method"]),
+                      "log_msg": extract_log_message_from_name(t["Display"] or t["Method"])
+                  })
+
+              # Get unique conditions
+              all_conditions = []
+              for c in cols:
+                  for cond in c["conds"]:
+                      if cond and cond not in all_conditions:
+                          all_conditions.append(cond)
+          
+              if not all_conditions:
+                  all_conditions = ["Standard test condition"]
+
+              # Set column widths
+              ws.set_column(0, 0, 45)  # Label column wider
+              for j in range(len(cols)):
+                  ws.set_column(1+j, 1+j, 15)  # Test case columns
+
+              r = 0
+          
+              # Header row with UTCID columns
+              ws.write(r, 0, "", data_format)
+              for j, c in enumerate(cols):
+                  ws.write(r, 1+j, c["id"], blue_header)
+              r += 1
+
+              # CONDITION section header
+              ws.write(r, 0, "Condition", blue_section)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", blue_section)
+              r += 1
+          
+              # Precondition row
+              ws.write(r, 0, "Precondition", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+              r += 1
+          
+              # Input conditions
+              for condition in all_conditions:
+                  ws.write(r, 0, f"Input: {condition}", label_format)
+                  for j, c in enumerate(cols):
+                      val = "O" if condition in c["conds"] else ""
+                      ws.write(r, 1+j, val, data_format)
+                  r += 1
+
+              # CONFIRM section header
+              ws.write(r, 0, "Confirm", blue_section)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", blue_section)
+              r += 1
+          
+              # Return subsection
+              ws.write(r, 0, "Return", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+              r += 1
+          
+              # FALSE row
+              ws.write(r, 0, "FALSE", label_format)
+              for j, c in enumerate(cols):
+                  val = "O" if c["exp"] == "FALSE" else ""
+                  ws.write(r, 1+j, val, data_format)
+              r += 1
+          
+              # TRUE row  
+              ws.write(r, 0, "TRUE", label_format)
+              for j, c in enumerate(cols):
+                  val = "O" if c["exp"] == "TRUE" else ""
+                  ws.write(r, 1+j, val, data_format)
+              r += 1
+          
+              # Exception subsection
+              ws.write(r, 0, "Exception", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+              r += 1
+          
+              # Log message row
+              ws.write(r, 0, "Log message", label_format)
+              for j, c in enumerate(cols):
+                  msg = c["log_msg"]
+                  ws.write(r, 1+j, msg, data_format)
+              r += 1
+
+              # RESULT section header
+              ws.write(r, 0, "Result", blue_section)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", blue_section)
+              r += 1
+          
+              # Type row
+              ws.write(r, 0, "Type(N : Normal, A : Abnormal, B : Boundary)", label_format)
+              for j, c in enumerate(cols):
+                  ws.write(r, 1+j, c["type"], data_format)
+              r += 1
+          
+              # Passed/Failed row
+              ws.write(r, 0, "Passed/Failed", label_format)
+              for j, c in enumerate(cols):
+                  result_val = "P" if c["out"] == "Passed" else ("F" if c["out"] == "Failed" else "")
+                  ws.write(r, 1+j, result_val, data_format)
+              r += 1
+          
+              # Executed Date row
+              ws.write(r, 0, "Executed Date", label_format)
+              for j, c in enumerate(cols):
+                  date_str = c["dt"].split('T')[0] if 'T' in c["dt"] else c["dt"]
+                  # Format date as DD/MM/YYYY if possible
+                  if date_str and len(date_str) >= 10:
+                      try:
+                          parts = date_str.split('-')
+                          if len(parts) == 3:
+                              date_str = f"{parts[2]}/{parts[1]}/{parts[0]}"
+                      except:
+                          pass
+                  ws.write(r, 1+j, date_str, data_format)
+              r += 1
+          
+              # Defect ID row
+              ws.write(r, 0, "Defect ID", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+
+              return sheet_name
+
+          # ---------- main ----------
+          def main():
+              funcs, df_funcs, df_stats, idx = build_core()
+              out = "./coveragereport/Functions_Statistics_Report.xlsx"
+          
+              # Track actual sheet names created (for hyperlink updates)
+              sheet_name_mapping = {}
+          
+              with pd.ExcelWriter(out, engine="xlsxwriter") as w:
+                  # Core sheets
+                  df_funcs.to_excel(w, sheet_name="Functions", index=False)
+                  df_stats.to_excel(w, sheet_name="Statistics", index=False)
+
+                  wb = w.book
+                  hdr = wb.add_format({"bold": True,"bg_color":"#1F4E78","font_color":"white","border":1})
+          
+                  for sheet,df in [("Functions",df_funcs),("Statistics",df_stats)]:
+                      ws = w.sheets[sheet]
+                      for c,col in enumerate(df.columns):
+                          ws.write(0,c,col,hdr)
+
+                  # Matrix per function
+                  for f in funcs:
+                      tests = idx.get((f["Class"], f["Function"]), [])
+                      if tests:  # Only create matrix if there are tests
+                          actual_sheet_name = write_matrix(wb, w, f, tests)
+                          sheet_name_mapping[f["Function"]] = actual_sheet_name
+
+                  # Update hyperlinks in Statistics sheet
+                  stats_ws = w.sheets["Statistics"]
+                  for i, f in enumerate(funcs):
+                      if f["Function"] in sheet_name_mapping:
+                          actual_name = sheet_name_mapping[f["Function"]]
+                          hyperlink_formula = f'=HYPERLINK("#{actual_name}!A1","Code_{i+1}")'
+                          stats_ws.write(i+1, 1, hyperlink_formula)
+
+              print(f"Report generated: {out}")
+
           if __name__ == "__main__":
-              excel_file = create_excel_report()
+              main()
           EOF
           python generate_excel_report.py
-
-      - name: Display coverage summary
-        run: |
-          echo "## Code Coverage Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Extract coverage and test data from the XML file
-          if [ -d "./TestResults" ]; then
-            # Get line and branch coverage
-            COVERAGE_XML=$(find ./TestResults -name "coverage.cobertura.xml" -type f | head -1)
-            if [ -n "$COVERAGE_XML" ]; then
-              LINE_RATE=$(grep -o 'line-rate="[0-9.]*"' $COVERAGE_XML | head -1 | grep -o '[0-9.]*')
-              BRANCH_RATE=$(grep -o 'branch-rate="[0-9.]*"' $COVERAGE_XML | head -1 | grep -o '[0-9.]*')
-          
-              # Calculate percentages
-              LINE_PERCENT=$(awk "BEGIN {print $LINE_RATE * 100}")
-              BRANCH_PERCENT=$(awk "BEGIN {print $BRANCH_RATE * 100}")
-          
-              # Status indicators
-              if (( $(echo "$LINE_PERCENT >= 70" | bc -l) )); then
-                LINE_STATUS="PASS"
-              else
-                LINE_STATUS="FAIL"
-              fi
-          
-              echo "### Coverage Metrics" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "| Metric | Coverage | Status |" >> $GITHUB_STEP_SUMMARY
-              echo "| ------ | -------- | ------ |" >> $GITHUB_STEP_SUMMARY
-              echo "| Line Coverage | $(printf "%.2f" $LINE_PERCENT)% | $LINE_STATUS |" >> $GITHUB_STEP_SUMMARY
-              echo "| Branch Coverage | $(printf "%.2f" $BRANCH_PERCENT)% | |" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-            fi
-          
-            # Get test results
-            TRX_FILE=$(find ./TestResults -name "test-results.trx" -type f | head -1)
-            if [ -n "$TRX_FILE" ]; then
-              TOTAL_TESTS=$(grep -c "<UnitTestResult" $TRX_FILE)
-              PASSED_TESTS=$(grep -c "outcome=\"Passed\"" $TRX_FILE)
-              FAILED_TESTS=$((TOTAL_TESTS - PASSED_TESTS))
-              PASS_RATE=$(awk "BEGIN {print ($PASSED_TESTS / $TOTAL_TESTS) * 100}")
-          
-              echo "### Test Results" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "| Metric | Value | Status |" >> $GITHUB_STEP_SUMMARY
-              echo "| ------ | ----- | ------ |" >> $GITHUB_STEP_SUMMARY
-              echo "| Total Tests | $TOTAL_TESTS | |" >> $GITHUB_STEP_SUMMARY
-              echo "| Passed Tests | $PASSED_TESTS | |" >> $GITHUB_STEP_SUMMARY
-                                    echo "| Failed Tests | $FAILED_TESTS | $([ "$FAILED_TESTS" -eq 0 ] && echo "PASS" || echo "FAIL") |" >> $GITHUB_STEP_SUMMARY
-              echo "| Pass Rate | $(printf "%.2f" $PASS_RATE)% | |" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-            fi
-          
-            # Count XML documentation coverage
-            XML_FILES=$(find . -name "*.xml" -path "*/bin/*" | wc -l)
-            echo "### Documentation Coverage" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "| ------ | ----- |" >> $GITHUB_STEP_SUMMARY
-            echo "| XML Documentation Files Found | $XML_FILES |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ **No test data found**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "**Excel Report Available**: Download the detailed Excel report with documentation from artifacts below" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Excel coverage reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: excel-coverage-report-with-docs
-          path: ./coveragereport/Coverage_Report_*.xlsx
+          name: excel-functions-statistics-report
+          path: ./coveragereport/Functions_Statistics_Report.xlsx
           retention-days: 30
