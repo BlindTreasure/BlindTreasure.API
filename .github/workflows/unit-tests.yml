@@ -100,28 +100,58 @@ jobs:
               n = (name or '').lower()
               if 'shouldreturntrue'  in n or 'should_be_true' in n:  return 'TRUE'
               if 'shouldreturnfalse' in n or 'should_be_false' in n: return 'FALSE'
+              if 'shouldthrow' in n or 'exception' in n: return 'EXCEPTION'
+              return ''
+
+          def extract_log_message_from_name(name: str) -> str:
+              """Extract expected log message or error from test name"""
+              n = (name or '').lower()
+              if 'conflict' in n: return 'Conflict error'
+              if 'forbidden' in n: return 'Forbidden access'
+              if 'notfound' in n: return 'Not found error'
+              if 'badrequest' in n: return 'Bad request error'
+              if 'unauthorized' in n: return 'Unauthorized access'
               return ''
 
           def to_conditions_from_name(name: str):
               """Parse điều kiện từ phần _When... của tên test."""
               base = strip_params(name or '')
-              if '_When' not in base: return []
-              cond = base.split('_When',1)[1]
-              parts = [p for p in re.split(r'_And_|_', cond) if p]
-              # humanize
-              out=[]
-              for p in parts:
-                  s = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', p).replace('_',' ').strip()
-                  s = s.replace('Api Key','API key').replace('Null Or','null or').replace(' Is ',' is ')
-                  s = s.replace('Subdomain','Subdomain').replace('Valid','valid').replace('Invalid','invalid')
-                  out.append(s[0].upper()+s[1:] if s else s)
-              # unique
-              seen=set(); res=[]
-              for x in out:
-                  k=norm(x)
-                  if k and k not in seen:
-                      seen.add(k); res.append(x)
-              return res
+          
+              # Parse from test method name structure
+              conditions = []
+          
+              # Common patterns in test names
+              if 'validdata' in base.lower() or 'shouldcreate' in base.lower() or 'shouldupdate' in base.lower():
+                  conditions.append('Valid input data')
+          
+              if 'invalid' in base.lower() or 'empty' in base.lower() or 'null' in base.lower():
+                  conditions.append('Invalid or empty input')
+          
+              if 'notexists' in base.lower() or 'notfound' in base.lower():
+                  conditions.append('Entity does not exist')
+          
+              if 'notadmin' in base.lower() or 'notauthorized' in base.lower() or 'forbidden' in base.lower():
+                  conditions.append('User not authorized')
+          
+              if 'nameexists' in base.lower() or 'conflict' in base.lower():
+                  conditions.append('Name already exists')
+          
+              if 'hasproducts' in base.lower() or 'haschildren' in base.lower():
+                  conditions.append('Has dependent entities')
+          
+              if 'nochildren' in base.lower() or 'validandno' in base.lower():
+                  conditions.append('No dependent entities')
+
+              # If no conditions found from name, try to parse _When part
+              if not conditions and '_When' in base:
+                  cond = base.split('_When',1)[1]
+                  parts = [p for p in re.split(r'_And_|_', cond) if p]
+                  for p in parts:
+                      s = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', p).replace('_',' ').strip()
+                      s = s.replace('Api Key','API key').replace('Null Or','null or').replace(' Is ',' is ')
+                      conditions.append(s[0].upper()+s[1:] if s else s)
+          
+              return conditions[:3]  # Limit to 3 conditions max
 
           def safe_sheet_name(name, existing_sheets):
               """Create a safe Excel sheet name (max 31 chars, unique)"""
@@ -261,7 +291,7 @@ jobs:
                       elif c=='B': B+=1
                   stat_rows.append({
                       "No": i,
-                      "Function Code": f'=HYPERLINK("#{f["Function"]}!A1","Code")',
+                      "Function Code": f'=HYPERLINK("#{f["Function"]}!A1","Code_{i}")',
                       "Passed": p, "Failed": f_, "Untested": u,
                       "N": N, "A": A, "B": B,
                       "Total Test Cases": p+f_+u
@@ -276,13 +306,51 @@ jobs:
               ws = workbook.add_worksheet(sheet_name)
               writer.sheets[sheet_name] = ws
 
-              # Formats
-              head = workbook.add_format({"bold": True,"align":"center","valign":"vcenter","border":1,"bg_color":"#1F4E78","font_color":"white"})
-              sec  = workbook.add_format({"bold": True,"align":"left","valign":"vcenter","border":1})
-              left = workbook.add_format({"align":"left","valign":"vcenter","border":1})
-              cell = workbook.add_format({"align":"center","valign":"vcenter","border":1})
+              # Define formats following the sample image
+              # Blue header format for UTCID columns
+              blue_header = workbook.add_format({
+                  "bold": True,
+                  "align": "center",
+                  "valign": "vcenter",
+                  "border": 1,
+                  "bg_color": "#1e1b4b",
+                  "font_color": "white",
+                  "rotation": 90  # Vertical text like in the image
+              })
+          
+              # Blue section headers (Condition, Confirm, Result)
+              blue_section = workbook.add_format({
+                  "bold": True,
+                  "align": "center",
+                  "valign": "vcenter",
+                  "border": 1,
+                  "bg_color": "#1e1b4b",
+                  "font_color": "white"
+              })
+          
+              # Regular label format
+              label_format = workbook.add_format({
+                  "align": "left",
+                  "valign": "vcenter",
+                  "border": 1
+              })
+          
+              # Data cell format (white background with border)
+              data_format = workbook.add_format({
+                  "align": "center",
+                  "valign": "vcenter",
+                  "border": 1
+              })
+          
+              # Special format for return values (FALSE, TRUE)
+              return_label_format = workbook.add_format({
+                  "align": "right",
+                  "valign": "vcenter",
+                  "border": 1,
+                  "font_size": 8
+              })
 
-              # Columns: UTCIDxx
+              # Process test data
               cols = []
               for k,t in enumerate(tests,1):
                   cols.append({
@@ -291,81 +359,104 @@ jobs:
                       "exp": expected_from_name(t["Display"] or t["Method"]),
                       "type": classify_case(t["Display"] or t["Method"]),
                       "out": t["Outcome"],
-                      "dt" : t["ExecutedAt"],
-                      "conds": to_conditions_from_name(t["Display"] or t["Method"])
+                      "dt": t["ExecutedAt"],
+                      "conds": to_conditions_from_name(t["Display"] or t["Method"]),
+                      "log_msg": extract_log_message_from_name(t["Display"] or t["Method"])
                   })
 
-              # Unique conditions across tests
-              all_conds=[]; seen=set()
-              for c in cols:
-                  for s in c["conds"]:
-                      k=norm(s)
-                      if k and k not in seen:
-                          seen.add(k); all_conds.append(s)
-              if not all_conds:
-                  all_conds=["<No condition parsed>"]
-
-              # Column widths
-              ws.set_column(0,0,40)               # label column
+              # Set column widths
+              ws.set_column(0, 0, 25)  # Label column
               for j in range(len(cols)):
-                  ws.set_column(1+j,1+j,18)
+                  ws.set_column(1+j, 1+j, 3)  # Narrow columns for test data
 
-              r=0
-              # Header: UTCIDs
-              ws.write(r,0,"",head)
-              for j,c in enumerate(cols):
-                  ws.write(r,1+j,c["id"],head)
-              r+=1
+              r = 0
+          
+              # Header row with UTCID columns (vertical text)
+              ws.write(r, 0, "", data_format)
+              for j, c in enumerate(cols):
+                  ws.write(r, 1+j, c["id"], blue_header)
+              r += 1
 
-              # CONDITION block
-              ws.write(r,0,"Condition",sec); r+=1
-              ws.write(r,0,"Precondition",left)
-              # Không ghi precondition theo cột (theo yêu cầu). Để trống.
-              for j in range(len(cols)): ws.write(r,1+j,"",cell)
-              r+=2
+              # CONDITION section
+              ws.merge_range(r, 0, r+4+len(set([cond for c in cols for cond in c["conds"]])), 0, "Condition", blue_section)
+          
+              # Precondition row
+              ws.write(r+1, 0, "Precondition", label_format)
+              for j in range(len(cols)):
+                  ws.write(r+1, 1+j, "", data_format)
+          
+              # Input conditions
+              all_conditions = []
+              for c in cols:
+                  for cond in c["conds"]:
+                      if cond not in all_conditions:
+                          all_conditions.append(cond)
+          
+              input_start_row = r + 2
+              for i, condition in enumerate(all_conditions):
+                  ws.write(input_start_row + i, 0, f"Input: {condition}", label_format)
+                  for j, c in enumerate(cols):
+                      val = "O" if condition in c["conds"] else ""
+                      ws.write(input_start_row + i, 1+j, val, data_format)
+          
+              r = input_start_row + len(all_conditions) + 1
 
-              ws.write(r,0,"Input:",sec); r+=1
-              for cond in all_conds:
-                  ws.write(r,0,f"Input: {cond}",left)
-                  for j,c in enumerate(cols):
-                      ws.write(r,1+j, "O" if cond in c["conds"] else "", cell)
-                  r+=1
+              # CONFIRM section
+              confirm_start = r
+              ws.merge_range(r, 0, r+4, 0, "Confirm", blue_section)
+          
+              # Return subsection
+              ws.write(r+1, 0, "Return", label_format)
+          
+              # FALSE row
+              ws.write(r+2, 0, "FALSE", return_label_format)
+              for j, c in enumerate(cols):
+                  val = "O" if c["exp"] == "FALSE" else ""
+                  ws.write(r+2, 1+j, val, data_format)
+          
+              # TRUE row  
+              ws.write(r+3, 0, "TRUE", return_label_format)
+              for j, c in enumerate(cols):
+                  val = "O" if c["exp"] == "TRUE" else ""
+                  ws.write(r+3, 1+j, val, data_format)
+          
+              # Exception subsection
+              ws.write(r+4, 0, "Exception", label_format)
+          
+              # Log message row
+              ws.write(r+5, 0, "Log message", label_format)
+              for j, c in enumerate(cols):
+                  ws.write(r+5, 1+j, c["log_msg"] if c["exp"] == "EXCEPTION" else "", data_format)
+          
+              r += 7
 
-              r+=1
+              # RESULT section
+              result_start = r
+              ws.merge_range(r, 0, r+3, 0, "Result", blue_section)
+          
+              # Type row
+              ws.write(r+1, 0, "Type(N : Normal, A : Abnormal, B : Boundary)", label_format)
+              for j, c in enumerate(cols):
+                  ws.write(r+1, 1+j, c["type"], data_format)
+          
+              # Passed/Failed row
+              ws.write(r+2, 0, "Passed/Failed", label_format)
+              for j, c in enumerate(cols):
+                  result_val = "P" if c["out"] == "Passed" else ("F" if c["out"] == "Failed" else "")
+                  ws.write(r+2, 1+j, result_val, data_format)
+          
+              # Executed Date row
+              ws.write(r+3, 0, "Executed Date", label_format)
+              for j, c in enumerate(cols):
+                  date_str = c["dt"].split('T')[0] if 'T' in c["dt"] else c["dt"]
+                  ws.write(r+3, 1+j, date_str, data_format)
+          
+              # Defect ID row
+              ws.write(r+4, 0, "Defect ID", label_format)
+              for j in range(len(cols)):
+                  ws.write(r+4, 1+j, "", data_format)
 
-              # CONFIRM block
-              ws.write(r,0,"Confirm",sec); r+=1
-              ws.write(r,0,"Return",left); r+=1
-              ws.write(r,0,"        FALSE",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,"O" if c["exp"]=="FALSE" else "",cell)
-              r+=1
-              ws.write(r,0,"        TRUE",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,"O" if c["exp"]=="TRUE" else "",cell)
-              r+=1
-
-              ws.write(r,0,"Exception",sec); r+=1
-              ws.write(r,0,"Log message",left)
-              for j,_ in enumerate(cols): ws.write(r,1+j,"",cell)  # placeholder, không suy luận log chung
-              r+=2
-
-              # RESULT block
-              ws.write(r,0,"Result",sec); r+=1
-              ws.write(r,0,"Type(N : Normal, A : Abnormal, B : Boundary)",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,c["type"],cell)
-              r+=1
-
-              ws.write(r,0,"Passed/Failed",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,"P" if c["out"]=="Passed" else ("F" if c["out"]=="Failed" else ""),cell)
-              r+=1
-
-              ws.write(r,0,"Executed Date",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,c["dt"],cell)
-              r+=1
-
-              ws.write(r,0,"Defect ID",left)
-              for j,_ in enumerate(cols): ws.write(r,1+j,"",cell)
-
-              return sheet_name  # Return actual sheet name used
+              return sheet_name
 
           # ---------- main ----------
           def main():
@@ -373,7 +464,7 @@ jobs:
               out = "./coveragereport/Functions_Statistics_Report.xlsx"
           
               # Track actual sheet names created (for hyperlink updates)
-              sheet_name_mapping = {}  # original_function_name -> actual_sheet_name
+              sheet_name_mapping = {}
           
               with pd.ExcelWriter(out, engine="xlsxwriter") as w:
                   # Core sheets
@@ -382,23 +473,26 @@ jobs:
 
                   wb = w.book
                   hdr = wb.add_format({"bold": True,"bg_color":"#1F4E78","font_color":"white","border":1})
+          
                   for sheet,df in [("Functions",df_funcs),("Statistics",df_stats)]:
                       ws = w.sheets[sheet]
                       for c,col in enumerate(df.columns):
                           ws.write(0,c,col,hdr)
 
-                  # Matrix per function (sheet name = function, but safe for Excel)
+                  # Matrix per function
                   for f in funcs:
                       tests = idx.get((f["Class"], f["Function"]), [])
-                      actual_sheet_name = write_matrix(wb, w, f, tests)
-                      sheet_name_mapping[f["Function"]] = actual_sheet_name
+                      if tests:  # Only create matrix if there are tests
+                          actual_sheet_name = write_matrix(wb, w, f, tests)
+                          sheet_name_mapping[f["Function"]] = actual_sheet_name
 
-                  # Update hyperlinks in Statistics sheet to use actual sheet names
+                  # Update hyperlinks in Statistics sheet
                   stats_ws = w.sheets["Statistics"]
                   for i, f in enumerate(funcs):
-                      actual_name = sheet_name_mapping.get(f["Function"], f["Function"])
-                      hyperlink_formula = f'=HYPERLINK("#{actual_name}!A1","Code_{i+1}")'
-                      stats_ws.write(i+1, 1, hyperlink_formula)  # Column B (Function Code), starting from row 2
+                      if f["Function"] in sheet_name_mapping:
+                          actual_name = sheet_name_mapping[f["Function"]]
+                          hyperlink_formula = f'=HYPERLINK("#{actual_name}!A1","Code_{i+1}")'
+                          stats_ws.write(i+1, 1, hyperlink_formula)
 
               print(f"Report generated: {out}")
 
