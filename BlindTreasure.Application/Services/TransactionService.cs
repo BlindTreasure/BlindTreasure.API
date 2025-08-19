@@ -362,7 +362,7 @@ public class TransactionService : ITransactionService
             Name = od.Product.Name,
             Code = od.Product.Id.ToString(),
             Quantity = od.Quantity,
-            Price = Convert.ToInt32(od.Product.Price),
+            Price = Convert.ToInt32(od.Product.RealSellingPrice),
             Length = Convert.ToInt32(od.Product.Length ?? 10),
             Width = Convert.ToInt32(od.Product.Width ?? 10),
             Height = Convert.ToInt32(od.Product.Height ?? 10),

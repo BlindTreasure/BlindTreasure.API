@@ -111,7 +111,7 @@ public class CartItemService : ICartItemService
                 throw ErrorHelper.NotFound(ErrorMessages.CartItemProductNotFound);
             if (product.TotalStockQuantity < dto.Quantity)
                 throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOutOfStock);
-            unitPrice = product.Price;
+            unitPrice = product.RealSellingPrice;
         }
         else
         {
@@ -181,7 +181,7 @@ public class CartItemService : ICartItemService
                 throw ErrorHelper.NotFound(ErrorMessages.CartItemProductNotFound);
             if (product.TotalStockQuantity < dto.Quantity)
                 throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOutOfStock);
-            cartItem.UnitPrice = product.Price;
+            cartItem.UnitPrice = product.RealSellingPrice;
         }
         else if (cartItem.BlindBoxId.HasValue)
         {

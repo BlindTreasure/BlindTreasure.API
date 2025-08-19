@@ -406,7 +406,7 @@ public class OrderService : IOrderService
                     var p = prodById[item.ProductId.Value];
                     if (p.Status != ProductStatus.Active || p.TotalStockQuantity < item.Quantity)
                         throw ErrorHelper.BadRequest($"Product {p.Name} invalid or out of stock.");
-                    unitPrice = p.Price;
+                    unitPrice = p.RealSellingPrice;
                     itemName = p.Name;
                     p.TotalStockQuantity -= item.Quantity;
                     await _unitOfWork.Products.Update(p);

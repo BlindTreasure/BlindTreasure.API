@@ -157,7 +157,7 @@ public class CustomerFavouriteService : ICustomerFavouriteService
                     Id = cf.Product.Id,
                     Name = cf.Product.Name,
                     Description = cf.Product.Description,
-                    Price = cf.Product.Price,
+                    RealSellingPrice = cf.Product.RealSellingPrice,
                     CategoryId = cf.Product.CategoryId,
                     ImageUrls = cf.Product.ImageUrls,
                     SellerId = cf.Product.SellerId,

@@ -375,6 +375,7 @@ public class SellerService : ISellerService
         if (seller == null)
             throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
         var newProduct = _mapper.Map<ProductSellerCreateDto, ProductCreateDto>(dto);
+        
         newProduct.SellerId = seller.Id; // GÁN SELLER ID VÀO DTO ĐỂ NÉM QUA PRODUCT SERVICE ĐỂ TẠO
 
         var result = await _productService.CreateAsync(newProduct);

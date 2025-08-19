@@ -267,7 +267,7 @@ public class GhnShippingService : IGhnShippingService
                 Name = product.Name,
                 Code = product.Id.ToString(),
                 Quantity = getQuantity(item),
-                Price = Convert.ToInt32(product.Price),
+                Price = Convert.ToInt32(product.RealSellingPrice),
                 Length = length,
                 Width = width,
                 Height = height,

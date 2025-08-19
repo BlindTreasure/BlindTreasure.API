@@ -144,7 +144,7 @@ public class ProductService : IProductService
             Name = dto.Name.Trim(),
             Description = dto.Description.Trim(),
             CategoryId = dto.CategoryId,
-            Price = dto.Price,
+            RealSellingPrice = dto.RealSellingPrice,
             TotalStockQuantity = dto.TotalStockQuantity, // NEW
             ReservedInBlindBox = 0, // NEW - mặc định = 0
             Height = dto.Height,
@@ -159,6 +159,18 @@ public class ProductService : IProductService
             IsDeleted = false,
             Status = status
         };
+
+        if (dto.ListedPrice.HasValue)
+        {
+            if (dto.ListedPrice.Value < product.RealSellingPrice)
+            {
+                _logger.Warn(string.Format("Listed Price can not be lower than Real Selling Price. Listed Price: {0}, Real Selling Price: {1}",
+                    dto.ListedPrice.Value, product.RealSellingPrice));
+                throw ErrorHelper.BadRequest("Listed Price can not be lower than Real Selling Price.");
+            }
+            product.ListedPrice = dto.ListedPrice.Value;
+        }
+
 
         // Cập nhật logic xác định status
         if (product.AvailableToSell == 0 && dto.Status != ProductStatus.InActive)
@@ -212,9 +224,19 @@ public class ProductService : IProductService
             product.Description = dto.Description.Trim();
         if (dto.CategoryId.HasValue)
             product.CategoryId = dto.CategoryId.Value;
-        if (dto.Price.HasValue)
-            product.Price = dto.Price.Value;
-        if (dto.TotalStockQuantity.HasValue)
+        if (dto.RealSellingPrice.HasValue)
+            product.RealSellingPrice = dto.RealSellingPrice.Value;
+        if (dto.ListedPrice.HasValue)
+        {
+            if (dto.ListedPrice.Value < product.RealSellingPrice)
+            {
+                _logger.Warn(string.Format("Listed Price can not be lower than Real Selling Price. Listed Price: {0}, Real Selling Price: {1}",
+                    dto.ListedPrice.Value, product.RealSellingPrice));
+                throw ErrorHelper.BadRequest("Listed Price can not be lower than Real Selling Price.");
+            }
+            product.ListedPrice = dto.ListedPrice.Value;
+        }
+            if (dto.TotalStockQuantity.HasValue)
         {
             product.TotalStockQuantity = dto.TotalStockQuantity.Value;
             // Tự động cập nhật status khi stock = 0
@@ -382,10 +404,10 @@ public class ProductService : IProductService
             query = query.Where(p => p.SellerId == param.SellerId.Value);
 
         if (param.MinPrice.HasValue)
-            query = query.Where(p => p.Price >= param.MinPrice.Value);
+            query = query.Where(p => p.RealSellingPrice >= param.MinPrice.Value);
 
         if (param.MaxPrice.HasValue)
-            query = query.Where(p => p.Price <= param.MaxPrice.Value);
+            query = query.Where(p => p.RealSellingPrice <= param.MaxPrice.Value);
 
         if (param.ReleaseDateFrom.HasValue)
             query = query.Where(p => p.CreatedAt >= param.ReleaseDateFrom.Value);
@@ -397,7 +419,7 @@ public class ProductService : IProductService
         if (param.SortBy == null)
             query = query
                 .OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0) // AvailableToSell == 0
-                .ThenBy(p => p.Price);
+                .ThenBy(p => p.RealSellingPrice);
         else
             query = param.SortBy switch
             {
@@ -409,9 +431,9 @@ public class ProductService : IProductService
 
                 ProductSortField.Price => param.Desc
                     ? query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
-                        .ThenByDescending(p => p.Price)
+                        .ThenByDescending(p => p.RealSellingPrice)
                     : query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
-                        .ThenBy(p => p.Price),
+                        .ThenBy(p => p.RealSellingPrice),
 
                 ProductSortField.Stock => param.Desc
                     ? query.OrderBy(p => p.TotalStockQuantity - p.ReservedInBlindBox == 0)
@@ -438,7 +460,7 @@ public class ProductService : IProductService
     private async Task ValidateProductDto(ProductCreateDto dto)
     {
         _logger.Info(
-            $"[ValidateProductDto] Start validating product: Name='{dto.Name}', Description='{dto.Description}', Price={dto.Price}, Stock={dto.TotalStockQuantity}, CategoryId={dto.CategoryId}");
+            $"[ValidateProductDto] Start validating product: Name='{dto.Name}', Description='{dto.Description}', Price={dto.RealSellingPrice}, Stock={dto.TotalStockQuantity}, CategoryId={dto.CategoryId}");
 
         if (string.IsNullOrWhiteSpace(dto.Name))
         {
@@ -452,9 +474,9 @@ public class ProductService : IProductService
             throw ErrorHelper.BadRequest("Mô tả không được để trống.");
         }
 
-        if (dto.Price <= 0)
+        if (dto.RealSellingPrice <= 0)
         {
-            _logger.Warn($"[ValidateProductDto] Validation failed: 'Price' must be > 0. Input value: {dto.Price}");
+            _logger.Warn($"[ValidateProductDto] Validation failed: 'Price' must be > 0. Input value: {dto.RealSellingPrice}");
             throw ErrorHelper.BadRequest("Giá sản phẩm phải lớn hơn 0.");
         }
 

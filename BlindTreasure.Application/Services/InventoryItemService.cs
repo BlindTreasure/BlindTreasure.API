@@ -313,7 +313,7 @@ public class InventoryItemService : IInventoryItemService
                         Name = p.Name,
                         Code = p.Id.ToString(),
                         Quantity = g.Count(),
-                        Price = Convert.ToInt32(p.Price),
+                        Price = Convert.ToInt32(p.RealSellingPrice),
                         Length = length,
                         Width = width,
                         Height = height,
@@ -496,7 +496,7 @@ public class InventoryItemService : IInventoryItemService
                     {
                         Name = p.Name,
                         Code = p.Id.ToString(),
-                        Price = Convert.ToInt32(p.Price),
+                        Price = Convert.ToInt32(p.RealSellingPrice),
                         Length = length,
                         Width = width,
                         Height = height,

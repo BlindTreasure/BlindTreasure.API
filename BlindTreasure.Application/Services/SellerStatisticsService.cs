@@ -178,7 +178,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                 ProductImageUrl = g.First().Product!.ImageUrls?.FirstOrDefault() ?? string.Empty,
                 QuantitySold = g.Sum(x => x.Quantity),
                 Revenue = g.Sum(x => x.FinalDetailPrice ?? x.TotalPrice - (x.DetailDiscountPromotion ?? 0m)),
-                Price = g.First().Product!.Price
+                Price = g.First().Product!.RealSellingPrice
             })
             .OrderByDescending(x => x.QuantitySold)
             .Take(5)
