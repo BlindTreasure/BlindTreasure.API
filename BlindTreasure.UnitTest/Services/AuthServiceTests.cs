@@ -13,7 +13,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Moq;
 
-namespace BlindTreaure.UnitTest.Services;
+namespace BlindTreasure.UnitTest.Services;
 
 public class AuthServiceTests
 {

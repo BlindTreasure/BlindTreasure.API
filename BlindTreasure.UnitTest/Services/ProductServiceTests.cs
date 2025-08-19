@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.Http;
 using MockQueryable.Moq;
 using Moq;
 
-namespace BlindTreaure.UnitTest.Services;
+namespace BlindTreasure.UnitTest.Services;
 
 public class ProductServiceTests
 {

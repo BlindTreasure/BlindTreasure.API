@@ -13,7 +13,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlindTreasure.Application",
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{81DDED9D-158B-E303-5F62-77A2896D2A5A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlindTreaure.UnitTest", "BlindTreaure.UnitTest\BlindTreaure.UnitTest.csproj", "{2AD9A039-3434-4E28-863C-066A18C55B09}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlindTreasure.UnitTest", "BlindTreasure.UnitTest\BlindTreasure.UnitTest.csproj", "{2AD9A039-3434-4E28-863C-066A18C55B09}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

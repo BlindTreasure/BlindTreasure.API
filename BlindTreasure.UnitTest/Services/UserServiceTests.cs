@@ -18,7 +18,7 @@ using System.IO;
 using System.Linq;
 using BlindTreasure.Application.Interfaces.Commons;
 
-namespace BlindTreaure.UnitTest.Services;
+namespace BlindTreasure.UnitTest.Services;
 
 public class UserServiceTests
 {
