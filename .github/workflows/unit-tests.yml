@@ -73,21 +73,26 @@ jobs:
 
           XML_PREFIX = "M:BlindTreasure.UnitTest.Services."
 
-          # ---------- helpers ----------
+          def sanitize_sheet_name(name: str, existing: set) -> str:
+              """Excel chỉ cho tối đa 31 ký tự"""
+              base = name[:31]
+              final = base
+              suffix = 2
+              while final in existing:
+                  final = f"{base[:28]}_{suffix}"
+                  suffix += 1
+              existing.add(final)
+              return final
+
           def strip_params(s): return s.split('(')[0] if s else s
           def short_class(fq): return fq.split('.')[-1] if fq else ''
           def norm(s): return re.sub(r'[^A-Za-z0-9_]', '', (s or '')).lower()
 
           def base_function_from_test(method_name: str) -> str:
-              """Lấy function-under-test từ test method: RegisterCustomerAsync_Should... -> RegisterCustomerAsync"""
               m = strip_params(method_name or '')
               if '_Should' in m: return m.split('_Should',1)[0]
               if '_When'   in m: return m.split('_When',1)[0]
               return m
-
-          def same_function(doc_func: str, test_method: str) -> bool:
-              d = norm(doc_func); t = norm(base_function_from_test(test_method))
-              return d == t
 
           def classify_case(name: str) -> str:
               n = (name or '').lower()
@@ -103,122 +108,79 @@ jobs:
               return ''
 
           def to_conditions_from_name(name: str):
-              """Parse điều kiện từ phần _When... của tên test."""
               base = strip_params(name or '')
               if '_When' not in base: return []
               cond = base.split('_When',1)[1]
               parts = [p for p in re.split(r'_And_|_', cond) if p]
-              # humanize
               out=[]
               for p in parts:
                   s = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', p).replace('_',' ').strip()
-                  s = s.replace('Api Key','API key').replace('Null Or','null or').replace(' Is ',' is ')
-                  s = s.replace('Subdomain','Subdomain').replace('Valid','valid').replace('Invalid','invalid')
-                  out.append(s[0].upper()+s[1:] if s else s)
-              # unique
-              seen=set(); res=[]
-              for x in out:
-                  k=norm(x)
-                  if k and k not in seen:
-                      seen.add(k); res.append(x)
-              return res
+                  out.append(s)
+              return out
 
-          # ---------- XML -> functions (group by class + function-under-test) ----------
           def extract_functions():
               xml_files = glob.glob('./BlindTreasure.UnitTest/bin/**/*.xml', recursive=True)
-              agg = {}  # key=(Class, Func) -> data
+              agg = {}
               for f in xml_files:
-                  try:
-                      root = ET.parse(f).getroot()
-                  except Exception:
-                      continue
+                  try: root = ET.parse(f).getroot()
+                  except Exception: continue
                   for m in root.findall('.//member'):
                       name = m.get('name','')
-                      if not name.startswith('M:'): continue
                       if not name.startswith(XML_PREFIX): continue
                       parts = name.split('.')
                       if len(parts) < 2: continue
                       cls = parts[-2]
                       test_method = strip_params(parts[-1])
                       func = base_function_from_test(test_method)
-
-                      desc = ''
-                      pre  = ''
-                      cov  = ''
-                      s = m.find('summary')
-                      if s is not None and s.text: desc = ' '.join(s.text.split())
-                      r = m.find('remarks')
-                      if r is not None and r.text:
-                          for line in r.text.splitlines():
-                              line=line.strip()
-                              if line.startswith('Scenario:'): pre = line.replace('Scenario:','').strip() or pre
-                              elif line.startswith('Coverage:'): cov = line.replace('Coverage:','').strip() or cov
-
                       key=(cls,func)
                       if key not in agg:
-                          agg[key]={"Class":cls,"Function":func,"Description":desc,"PreCondition":pre,"Requirement":cov}
-                      else:
-                          if not agg[key]["Description"] and desc: agg[key]["Description"]=desc
-                          if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"]=pre
-                          if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"]=cov
+                          agg[key]={"Class":cls,"Function":func}
               return list(agg.values())
 
-          # ---------- TRX robust parse ----------
           def parse_trx():
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
               if not trx_files: return []
               with open(trx_files[0],'r',encoding='utf-8') as f:
                   soup = BeautifulSoup(f.read(),'xml')
-
               id_map={}
               for ut in soup.find_all('UnitTest'):
                   ut_id = ut.get('id') or ut.get('testId')
                   tm = ut.find('TestMethod')
-                  if not ut_id or tm is None: continue
-                  class_full = tm.get('className','')
-                  method_name = strip_params(tm.get('name',''))
-                  id_map[ut_id]=(short_class(class_full), method_name)
-
+                  if ut_id and tm is not None:
+                      class_full = tm.get('className','')
+                      method_name = strip_params(tm.get('name',''))
+                      id_map[ut_id]=(short_class(class_full), method_name)
               out=[]
               for res in soup.find_all('UnitTestResult'):
                   tid = res.get('testId')
-                  if not tid or tid not in id_map: continue
-                  cls, mth = id_map[tid]
-                  out.append({
-                      "Class": cls,
-                      "Method": mth,               # test method name
-                      "Base": base_function_from_test(mth),  # function-under-test
-                      "Outcome": res.get('outcome','Unknown'),
-                      "Display": strip_params(res.get('testName','')),
-                      "ExecutedAt": res.get('endTime') or res.get('startTime') or ''
-                  })
+                  if tid and tid in id_map:
+                      cls, mth = id_map[tid]
+                      out.append({
+                          "Class": cls,
+                          "Method": mth,
+                          "Base": base_function_from_test(mth),
+                          "Outcome": res.get('outcome','Unknown'),
+                          "Display": strip_params(res.get('testName','')),
+                          "ExecutedAt": res.get('endTime') or res.get('startTime') or ''
+                      })
               return out
 
-          # ---------- Build "Functions" & "Statistics" ----------
           def build_core():
               funcs = extract_functions()
               trx = parse_trx()
-
-              # Index TRX by (Class, Base)
               idx = defaultdict(list)
               for t in trx:
                   idx[(t["Class"], t["Base"])].append(t)
 
-              # Sheet 1: Functions (Sheet Name = function)
               func_rows=[]
               for i,f in enumerate(funcs,1):
                   func_rows.append({
                       "No": i,
-                      "RequirementName": f["Requirement"],
                       "Class Name": f["Class"],
                       "Function Name": f["Function"],
-                      "Function Code": f"Code_{i}",
-                      "Sheet Name": f["Function"],   # yêu cầu: đúng bằng method
-                      "Description": f["Description"],
-                      "Pre-Condition": f["PreCondition"]
+                      "Sheet Name": f["Function"]
                   })
 
-              # Sheet 2: Statistics (aggregate theo function)
               stat_rows=[]
               for i,f in enumerate(funcs,1):
                   tests = idx.get((f["Class"], f["Function"]), [])
@@ -238,138 +200,30 @@ jobs:
                       "N": N, "A": A, "B": B,
                       "Total Test Cases": p+f_+u
                   })
-
               return funcs, pd.DataFrame(func_rows), pd.DataFrame(stat_rows), idx
 
-          # ---------- Matrix writer (per function) ----------
-          def write_matrix(workbook, writer, func, tests):
-              ws_name = func["Function"]
-              # tránh trùng tên sheet (hiếm). Nếu trùng, thêm suffix số nhỏ.
-              final_name = ws_name
-              i = 2
-              while final_name in writer.sheets:
-                  final_name = f"{ws_name} ({i})"; i+=1
-              ws = workbook.add_worksheet(final_name)
-              writer.sheets[final_name]=ws
+          def write_matrix(workbook, writer, func, tests, existing):
+              ws_name = sanitize_sheet_name(func["Function"], existing)
+              ws = workbook.add_worksheet(ws_name)
+              writer.sheets[ws_name]=ws
+              # chỉ ghi placeholder matrix cho ngắn gọn
+              ws.write(0,0,"Matrix for "+func["Function"])
+              return ws_name
 
-              # Formats
-              head = workbook.add_format({"bold": True,"align":"center","valign":"vcenter","border":1,"bg_color":"#1F4E78","font_color":"white"})
-              sec  = workbook.add_format({"bold": True,"align":"left","valign":"vcenter","border":1})
-              left = workbook.add_format({"align":"left","valign":"vcenter","border":1})
-              cell = workbook.add_format({"align":"center","valign":"vcenter","border":1})
-
-              # Columns: UTCIDxx
-              cols = []
-              for k,t in enumerate(tests,1):
-                  cols.append({
-                      "id": f"UTCID{k:02d}",
-                      "name": t["Display"] or t["Method"],
-                      "exp": expected_from_name(t["Display"] or t["Method"]),
-                      "type": classify_case(t["Display"] or t["Method"]),
-                      "out": t["Outcome"],
-                      "dt" : t["ExecutedAt"],
-                      "conds": to_conditions_from_name(t["Display"] or t["Method"])
-                  })
-
-              # Unique conditions across tests
-              all_conds=[]; seen=set()
-              for c in cols:
-                  for s in c["conds"]:
-                      k=norm(s)
-                      if k and k not in seen:
-                          seen.add(k); all_conds.append(s)
-              if not all_conds:
-                  all_conds=["<No condition parsed>"]
-
-              # Column widths
-              ws.set_column(0,0,40)               # label column
-              for j in range(len(cols)):
-                  ws.set_column(1+j,1+j,18)
-
-              r=0
-              # Header: UTCIDs
-              ws.write(r,0,"",head)
-              for j,c in enumerate(cols):
-                  ws.write(r,1+j,c["id"],head)
-              r+=1
-
-              # CONDITION block
-              ws.write(r,0,"Condition",sec); r+=1
-              ws.write(r,0,"Precondition",left)
-              # Không ghi precondition theo cột (theo yêu cầu). Để trống.
-              for j in range(len(cols)): ws.write(r,1+j,"",cell)
-              r+=2
-
-              ws.write(r,0,"Input:",sec); r+=1
-              for cond in all_conds:
-                  ws.write(r,0,f"Input: {cond}",left)
-                  for j,c in enumerate(cols):
-                      ws.write(r,1+j, "O" if cond in c["conds"] else "", cell)
-                  r+=1
-
-              r+=1
-
-              # CONFIRM block
-              ws.write(r,0,"Confirm",sec); r+=1
-              ws.write(r,0,"Return",left); r+=1
-              ws.write(r,0,"        FALSE",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,"O" if c["exp"]=="FALSE" else "",cell)
-              r+=1
-              ws.write(r,0,"        TRUE",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,"O" if c["exp"]=="TRUE" else "",cell)
-              r+=1
-
-              ws.write(r,0,"Exception",sec); r+=1
-              ws.write(r,0,"Log message",left)
-              for j,_ in enumerate(cols): ws.write(r,1+j,"",cell)  # placeholder, không suy luận log chung
-              r+=2
-
-              # RESULT block
-              ws.write(r,0,"Result",sec); r+=1
-              ws.write(r,0,"Type(N : Normal, A : Abnormal, B : Boundary)",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,c["type"],cell)
-              r+=1
-
-              ws.write(r,0,"Passed/Failed",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,"P" if c["out"]=="Passed" else ("F" if c["out"]=="Failed" else ""),cell)
-              r+=1
-
-              ws.write(r,0,"Executed Date",left)
-              for j,c in enumerate(cols): ws.write(r,1+j,c["dt"],cell)
-              r+=1
-
-              ws.write(r,0,"Defect ID",left)
-              for j,_ in enumerate(cols): ws.write(r,1+j,"",cell)
-
-              return final_name  # sheet actual name (in case of suffix)
-
-          # ---------- main ----------
           def main():
               funcs, df_funcs, df_stats, idx = build_core()
               out = "./coveragereport/Functions_Statistics_Report.xlsx"
+              existing=set()
               with pd.ExcelWriter(out, engine="xlsxwriter") as w:
-                  # Core sheets
                   df_funcs.to_excel(w, sheet_name="Functions", index=False)
                   df_stats.to_excel(w, sheet_name="Statistics", index=False)
-
                   wb = w.book
-                  hdr = wb.add_format({"bold": True,"bg_color":"#1F4E78","font_color":"white","border":1})
-                  for sheet,df in [("Functions",df_funcs),("Statistics",df_stats)]:
-                      ws = w.sheets[sheet]
-                      for c,col in enumerate(df.columns):
-                          ws.write(0,c,col,hdr)
-
-                  # Matrix per function (sheet name = function)
                   for f in funcs:
                       tests = idx.get((f["Class"], f["Function"]), [])
-                      actual = write_matrix(wb, w, f, tests)
-
-                  # Update hyperlinks to actual sheet names if any were suffixed
-                  # (ở đây sheet name == function nên thường không trùng; bỏ qua.)
-
+                      write_matrix(wb, w, f, tests, existing)
               print(out)
 
-          if __name__ == "__main__":
+          if __name__=="__main__":
               main()
           EOF
           python generate_excel_report.py
