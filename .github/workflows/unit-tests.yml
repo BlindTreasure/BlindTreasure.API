@@ -46,14 +46,8 @@ jobs:
         run: dotnet tool restore
 
       - name: Run unit tests
-        run: |
-          dotnet test BlindTreasure.API.sln \
-            --no-build \
-            --configuration Release \
-            --verbosity normal \
-            --collect:"XPlat Code Coverage" \
-            --results-directory ./TestResults/ \
-            --logger "trx;LogFileName=test-results.trx"
+        run: dotnet test BlindTreasure.API.sln --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./TestResults/ --logger "trx;LogFileName=test-results.trx"
+        working-directory: ./BlindTreasure.API/
 
       - name: Generate Excel Unit Test Document from .cs XML docs
         run: |
