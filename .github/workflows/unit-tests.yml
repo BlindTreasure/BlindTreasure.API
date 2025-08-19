@@ -49,8 +49,8 @@ jobs:
             --configuration Release \
             /p:GenerateDocumentationFile=true
           
-          # Verify XML docs are generated
-          find ./BlindTreaure.UnitTest/Services -name "*.xml" -path "*/bin/*" | sort
+          # Verify XML docs
+          find ./BlindTreaure.UnitTest/bin -name "*.xml" | sort
 
       - name: Run unit tests with coverage
         run: |
@@ -68,12 +68,12 @@ jobs:
           cat > generate_excel_report.py << 'EOF'
           import pandas as pd
           import xml.etree.ElementTree as ET
-          import glob, os
+          import glob
           from bs4 import BeautifulSoup
 
           def extract_xml_docs():
-              """Chỉ đọc XML trong UnitTest\\Services"""
-              xml_files = glob.glob('./BlindTreaure.UnitTest/Services/**/bin/**/*.xml', recursive=True)
+              """Đọc XML docs trong bin/, lọc class thuộc namespace Services"""
+              xml_files = glob.glob('./BlindTreaure.UnitTest/bin/**/*.xml', recursive=True)
               docs = []
               for xml_file in xml_files:
                   try:
@@ -81,7 +81,7 @@ jobs:
                       root = tree.getroot()
                       for member in root.findall('.//member'):
                           name = member.get('name', '')
-                          if name.startswith("M:"):
+                          if name.startswith("M:") and ".Services." in name:
                               method_parts = name.split('.')
                               class_name = method_parts[-2]
                               method_name = method_parts[-1].split('(')[0]
@@ -115,7 +115,7 @@ jobs:
               return docs
 
           def parse_test_results():
-              """Đọc file TRX để lấy kết quả test"""
+              """Đọc TRX để lấy kết quả test"""
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
               results = {}
               if trx_files:
@@ -124,12 +124,11 @@ jobs:
                   for ut in soup.find_all('UnitTestResult'):
                       testname = ut.get("testName","Unknown")
                       outcome = ut.get("outcome","Unknown")
-                      method = testname.split('.')[-1]   # method ngắn
+                      method = testname.split('.')[-1]
                       results[method] = outcome
               return results
 
           def normalize_method(m):
-              """Chuẩn hóa tên method để match giữa XML và TRX"""
               if "_Should" in m:
                   return m.split("_Should")[0]
               return m
@@ -154,7 +153,6 @@ jobs:
                       "Pre-Condition": d['PreCondition']
                   })
 
-                  # match outcome
                   method = d['Method']
                   outcome = test_results.get(method)
                   if not outcome:
