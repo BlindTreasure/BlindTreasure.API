@@ -52,7 +52,7 @@ public class AddressServiceTests
     /// Coverage: Logic for handling the first address addition.
     /// </remarks>
     [Fact]
-    public async Task CreateAsync_ShouldCreateAddressAndSetAsDefault_WhenItIsTheFirstAddress()
+    public async Task CreateAddressAsync_ShouldCreateAddressAndSetAsDefault_WhenItIsTheFirstAddress()
     {
         // Arrange
         var createDto = new CreateAddressDto
@@ -83,7 +83,7 @@ public class AddressServiceTests
     /// Coverage: The logic for switching the default address when a new one is added.
     /// </remarks>
     [Fact]
-    public async Task CreateAsync_ShouldCreateAddressAndUnsetPreviousDefault_WhenNewAddressIsDefault()
+    public async Task CreateAddressAsync_ShouldCreateAddressAndUnsetPreviousDefault_WhenNewAddressIsDefault()
     {
         // Arrange
         var userId = _currentUserId;
@@ -113,7 +113,7 @@ public class AddressServiceTests
     /// Coverage: Logic for adding additional, non-default addresses.
     /// </remarks>
     [Fact]
-    public async Task CreateAsync_ShouldCreateNonDefaultAddress_WhenAnotherDefaultExists()
+    public async Task CreateAddressAsync_ShouldCreateNonDefaultAddress_WhenAnotherDefaultExists()
     {
         // Arrange
         var userId = _currentUserId;
@@ -152,7 +152,7 @@ public class AddressServiceTests
     /// Coverage: The basic address update functionality.
     /// </remarks>
     [Fact]
-    public async Task UpdateAsync_ShouldUpdateAddress_WhenDataIsValidAndUserIsOwner()
+    public async Task UpdateAddressAsync_ShouldUpdateAddress_WhenDataIsValidAndUserIsOwner()
     {
         // Arrange
         var addressId = Guid.NewGuid();
@@ -179,7 +179,7 @@ public class AddressServiceTests
     /// Coverage: Error handling for updating a non-existent address.
     /// </remarks>
     [Fact]
-    public async Task UpdateAsync_ShouldThrowNotFound_WhenAddressDoesNotExist()
+    public async Task UpdateAddressAsync_ShouldThrowNotFound_WhenAddressDoesNotExist()
     {
         // Arrange
         var addressId = Guid.NewGuid();
@@ -201,7 +201,7 @@ public class AddressServiceTests
     /// Coverage: Security check to ensure users can only update their own addresses.
     /// </remarks>
     [Fact]
-    public async Task UpdateAsync_ShouldThrowNotFound_WhenUserIsNotOwner()
+    public async Task UpdateAddressAsync_ShouldThrowNotFound_WhenUserIsNotOwner()
     {
         // Arrange
         var addressId = Guid.NewGuid();
@@ -228,7 +228,7 @@ public class AddressServiceTests
     /// Coverage: The address deletion functionality.
     /// </remarks>
     [Fact]
-    public async Task DeleteAsync_ShouldSoftDeleteAddress_WhenAddressExistsAndUserIsOwner()
+    public async Task DeleteAddressAsync_ShouldSoftDeleteAddress_WhenAddressExistsAndUserIsOwner()
     {
         // Arrange
         var addressId = Guid.NewGuid();
@@ -253,7 +253,7 @@ public class AddressServiceTests
     /// Coverage: Security check to ensure users can only delete their own addresses.
     /// </remarks>
     [Fact]
-    public async Task DeleteAsync_ShouldThrowNotFound_WhenUserIsNotOwner()
+    public async Task DeleteAddressAsync_ShouldThrowNotFound_WhenUserIsNotOwner()
     {
         // Arrange
         var addressId = Guid.NewGuid();
@@ -274,7 +274,7 @@ public class AddressServiceTests
     /// Coverage: Error handling for deleting a non-existent address.
     /// </remarks>
     [Fact]
-    public async Task DeleteAsync_ShouldThrowNotFound_WhenAddressDoesNotExist()
+    public async Task DeleteAddressAsync_ShouldThrowNotFound_WhenAddressDoesNotExist()
     {
         // Arrange
         var addressId = Guid.NewGuid();
@@ -298,7 +298,7 @@ public class AddressServiceTests
     /// Coverage: The logic for changing a user's default address.
     /// </remarks>
     [Fact]
-    public async Task SetDefaultAsync_ShouldSetAddressAsDefaultAndUnsetOthers_WhenSuccessful()
+    public async Task SetDefaultAddressAsync_ShouldSetAddressAsDefaultAndUnsetOthers_WhenSuccessful()
     {
         // Arrange
         var userId = _currentUserId;
@@ -332,7 +332,7 @@ public class AddressServiceTests
     /// Coverage: Security check to ensure users can only set their own addresses as default.
     /// </remarks>
     [Fact]
-    public async Task SetDefaultAsync_ShouldThrowNotFound_WhenUserIsNotOwner()
+    public async Task SetDefaultAddressAsync_ShouldThrowNotFound_WhenUserIsNotOwner()
     {
         // Arrange
         var addressId = Guid.NewGuid();
@@ -353,7 +353,7 @@ public class AddressServiceTests
     /// Coverage: Graceful handling of redundant default-setting actions.
     /// </remarks>
     [Fact]
-    public async Task SetDefaultAsync_ShouldDoNothing_WhenAddressIsAlreadyDefault()
+    public async Task SetDefaultAddressAsync_ShouldDoNothing_WhenAddressIsAlreadyDefault()
     {
         // Arrange
         var userId = _currentUserId;
