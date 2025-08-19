@@ -10,7 +10,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,14 +42,13 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore BlindTreasure.API.sln
 
-      - name: Build with documentation
+      - name: Build with XML documentation
         run: |
           dotnet build BlindTreasure.API.sln \
             --no-restore \
             --configuration Release \
             /p:GenerateDocumentationFile=true
-          
-          # Verify XML docs only in UnitTest project
+          # Liệt kê XML của đúng project UnitTest
           find ./BlindTreaure.UnitTest/bin -name "*.xml" | sort
 
       - name: Run unit tests with coverage
@@ -68,161 +67,19 @@ jobs:
           cat > generate_excel_report.py << 'EOF'
           import pandas as pd
           import xml.etree.ElementTree as ET
-          import glob
           from bs4 import BeautifulSoup
+          from collections import defaultdict
+          import glob, re
 
-          def extract_xml_docs():
-              """Chỉ lấy XML docs trong project UnitTest"""
-              xml_files = glob.glob('./BlindTreaure.UnitTest/bin/**/*.xml', recursive=True)
-              docs = []
-              for xml_file in xml_files:
-                  try:
-                      tree = ET.parse(xml_file)
-                      root = tree.getroot()
-                      for member in root.findall('.//member'):
-                          name = member.get('name', '')
-                          if name.startswith("M:"):
-                              # chỉ lấy test trong UnitTest.Services
-                              if ".Services." not in name:
-                                  continue
-                              method_parts = name.split('.')
-                              class_name = method_parts[-2]
-                              method_name = method_parts[-1].split('(')[0]
+          UNITTEST_NAMESPACE_PREFIX = "BlindTreaure.UnitTest.Services."
 
-                              summary = ""
-                              remarks = {}
-                              sum_elem = member.find('summary')
-                              if sum_elem is not None and sum_elem.text:
-                                  summary = sum_elem.text.strip()
+          def short_class(full_class: str) -> str:
+              return full_class.split('.')[-1] if full_class else ""
 
-                              rem_elem = member.find('remarks')
-                              if rem_elem is not None and rem_elem.text:
-                                  for line in rem_elem.text.splitlines():
-                                      line=line.strip()
-                                      if line.startswith("Scenario:"):
-                                          remarks["Scenario"] = line.replace("Scenario:","").strip()
-                                      elif line.startswith("Expected:"):
-                                          remarks["Expected"] = line.replace("Expected:","").strip()
-                                      elif line.startswith("Coverage:"):
-                                          remarks["Coverage"] = line.replace("Coverage:","").strip()
+          def strip_params(name: str) -> str:
+              # Cắt phần tham số của Theory/inline data: Method(arg1, arg2)
+              return name.split('(')[0] if name else name
 
-                              docs.append({
-                                  "Class": class_name,
-                                  "Method": method_name,
-                                  "Summary": summary,
-                                  "PreCondition": remarks.get("Scenario",""),
-                                  "Requirement": remarks.get("Coverage","")
-                              })
-                  except Exception:
-                      continue
-              return docs
-
-          def parse_test_results():
-              trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
-              results = {}
-              if trx_files:
-                  with open(trx_files[0],'r',encoding='utf-8') as f:
-                      soup = BeautifulSoup(f.read(),'xml')
-                  for ut in soup.find_all('UnitTestResult'):
-                      testname = ut.get("testName","Unknown")
-                      outcome = ut.get("outcome","Unknown")
-                      method = testname.split('.')[-1]
-                      results[method] = outcome
-              return results
-
-          def normalize_method(m):
-              if "_Should" in m:
-                  return m.split("_Should")[0]
-              return m
-
-          def classify_case(method):
-              if "_Normal" in method:
-                  return "N"
-              if "_Abnormal" in method:
-                  return "A"
-              if "_Boundary" in method:
-                  return "B"
-              return "N"
-
-          def create_excel():
-              docs = extract_xml_docs()
-              test_results = parse_test_results()
-
-              funcs = []
-              stats = []
-              for i, d in enumerate(docs, start=1):
-                  sheet_name = f"{d['Class']}Management"
-
-                  funcs.append({
-                      "No": i,
-                      "RequirementName": d['Requirement'],
-                      "Class Name": d['Class'],
-                      "Function Name": d['Method'],
-                      "Function Code": f"Code_{i}",
-                      "Sheet Name": sheet_name,
-                      "Description": d['Summary'],
-                      "Pre-Condition": d['PreCondition']
-                  })
-
-                  method = d['Method']
-                  outcome = test_results.get(method)
-                  if not outcome:
-                      norm = normalize_method(method)
-                      for k,v in test_results.items():
-                          if norm in k or k in norm:
-                              outcome = v
-                              break
-                  if not outcome:
-                      outcome = "Untested"
-
-                  passed = 1 if outcome=="Passed" else 0
-                  failed = 1 if outcome=="Failed" else 0
-                  untested = 1 if outcome not in ["Passed","Failed"] else 0
-
-                  # count case type
-                  case_type = classify_case(method)
-                  N = 1 if case_type=="N" else 0
-                  A = 1 if case_type=="A" else 0
-                  B = 1 if case_type=="B" else 0
-
-                  stats.append({
-                      "No": i,
-                      "Function Code": f'=HYPERLINK("#{sheet_name}!A1","Code")',
-                      "Passed": passed,
-                      "Failed": failed,
-                      "Untested": untested,
-                      "N": N,
-                      "A": A,
-                      "B": B,
-                      "Total Test Cases": passed+failed+untested
-                  })
-
-              df_funcs = pd.DataFrame(funcs)
-              df_stats = pd.DataFrame(stats)
-
-              out_file = "./coveragereport/Functions_Statistics_Report.xlsx"
-              with pd.ExcelWriter(out_file, engine="xlsxwriter") as writer:
-                  df_funcs.to_excel(writer, sheet_name="Functions", index=False)
-                  df_stats.to_excel(writer, sheet_name="Statistics", index=False)
-
-                  workbook = writer.book
-                  header_fmt = workbook.add_format({"bold": True,"bg_color":"#4472C4","font_color":"white","border":1})
-
-                  for sheet, df in [("Functions", df_funcs), ("Statistics", df_stats)]:
-                      ws = writer.sheets[sheet]
-                      for col_num, value in enumerate(df.columns):
-                          ws.write(0,col_num,value,header_fmt)
-              print("✅ Excel report generated:", out_file)
-
-          if __name__=="__main__":
-              create_excel()
-          EOF
-          python generate_excel_report.py
-
-      - name: Upload Excel coverage reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: excel-functions-statistics-report
-          path: ./coveragereport/Functions_Statistics_Report.xlsx
-          retention-days: 30
+          # ---------------- XML: functions (source of truth for Functions sheet) ----------------
+          def extract_functions_from_xml():
+              """Đọc XML docs chỉ củ
