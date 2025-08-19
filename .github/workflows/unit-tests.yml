@@ -49,7 +49,7 @@ jobs:
             --configuration Release \
             /p:GenerateDocumentationFile=true
           
-          # Verify XML docs
+          # Verify XML docs only in UnitTest project
           find ./BlindTreaure.UnitTest/bin -name "*.xml" | sort
 
       - name: Run unit tests with coverage
@@ -72,7 +72,7 @@ jobs:
           from bs4 import BeautifulSoup
 
           def extract_xml_docs():
-              """Đọc XML docs trong bin/, lọc class thuộc namespace Services"""
+              """Chỉ lấy XML docs trong project UnitTest"""
               xml_files = glob.glob('./BlindTreaure.UnitTest/bin/**/*.xml', recursive=True)
               docs = []
               for xml_file in xml_files:
@@ -81,7 +81,10 @@ jobs:
                       root = tree.getroot()
                       for member in root.findall('.//member'):
                           name = member.get('name', '')
-                          if name.startswith("M:") and ".Services." in name:
+                          if name.startswith("M:"):
+                              # chỉ lấy test trong UnitTest.Services
+                              if ".Services." not in name:
+                                  continue
                               method_parts = name.split('.')
                               class_name = method_parts[-2]
                               method_name = method_parts[-1].split('(')[0]
@@ -115,7 +118,6 @@ jobs:
               return docs
 
           def parse_test_results():
-              """Đọc TRX để lấy kết quả test"""
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
               results = {}
               if trx_files:
@@ -132,6 +134,15 @@ jobs:
               if "_Should" in m:
                   return m.split("_Should")[0]
               return m
+
+          def classify_case(method):
+              if "_Normal" in method:
+                  return "N"
+              if "_Abnormal" in method:
+                  return "A"
+              if "_Boundary" in method:
+                  return "B"
+              return "N"
 
           def create_excel():
               docs = extract_xml_docs()
@@ -168,15 +179,21 @@ jobs:
                   failed = 1 if outcome=="Failed" else 0
                   untested = 1 if outcome not in ["Passed","Failed"] else 0
 
+                  # count case type
+                  case_type = classify_case(method)
+                  N = 1 if case_type=="N" else 0
+                  A = 1 if case_type=="A" else 0
+                  B = 1 if case_type=="B" else 0
+
                   stats.append({
                       "No": i,
                       "Function Code": f'=HYPERLINK("#{sheet_name}!A1","Code")',
                       "Passed": passed,
                       "Failed": failed,
                       "Untested": untested,
-                      "N": 0,
-                      "A": 0,
-                      "B": 0,
+                      "N": N,
+                      "A": A,
+                      "B": B,
                       "Total Test Cases": passed+failed+untested
                   })
 
