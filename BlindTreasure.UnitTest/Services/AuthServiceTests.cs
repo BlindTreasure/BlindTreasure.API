@@ -54,13 +54,21 @@ public class AuthServiceTests
         );
     }
 
+    #region Register Customer
+
     /// <summary>
-    /// Tests if a user can be successfully registered when their email does not already exist.
+    /// Tests successful customer registration with a non-existing email.
     /// </summary>
     /// <remarks>
-    /// Scenario: A new user attempts to register with an email address that is not already in the system.
-    /// Expected: The user is successfully registered, added to the database, an OTP verification email is sent, and an OTP verification record is created.
-    /// Coverage: User registration, email uniqueness check, OTP generation and email sending.
+    /// Scenario: New customer registers with an email not present in cache or DB.
+    /// Expected: User created; OTP generated and emailed; OTP verification record inserted.
+    /// Coverage: Email uniqueness check; user creation; OTP generation & email; OTP audit record.
+    /// TestType: Normal
+    /// InputConditions: Email not in cache; Users.FirstOrDefaultAsync returns null; SaveChanges succeeds.
+    /// ExpectedResult: New user entity persisted and returned.
+    /// ExpectedReturnValue: User
+    /// ExceptionExpected: false
+    /// LogMessage: Registration initiated, OTP sent.
     /// </remarks>
     [Fact]
     public async Task RegisterUserAsync_ShouldRegisterUser_WhenEmailNotExists()
@@ -97,13 +105,23 @@ public class AuthServiceTests
         _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
     }
 
+    #endregion
+
+    #region Login
+
     /// <summary>
-    /// Tests if a user can successfully log in and receive access/refresh tokens with valid credentials.
+    /// Tests login returns access/refresh tokens for valid credentials.
     /// </summary>
     /// <remarks>
-    /// Scenario: A user provides correct email and password for an active, verified account.
-    /// Expected: A `LoginResponseDto` containing non-null and non-empty access and refresh tokens is returned, and the user's cache is updated.
-    /// Coverage: User authentication, password hashing verification, token generation, and cache updates.
+    /// Scenario: Active, verified user logs in with correct password.
+    /// Expected: Non-empty access/refresh tokens returned; user cache updated.
+    /// Coverage: Password verification; token issuance; cache update.
+    /// TestType: Normal
+    /// InputConditions: User exists; status Active; password hash valid; cache miss.
+    /// ExpectedResult: LoginResponseDto populated with tokens and user info.
+    /// ExpectedReturnValue: LoginResponseDto
+    /// ExceptionExpected: false
+    /// LogMessage: Login succeeded.
     /// </remarks>
     [Fact]
     public async Task LoginAsync_ShouldReturnTokens_WhenCredentialsAreValid()
@@ -148,366 +166,71 @@ public class AuthServiceTests
     }
 
     /// <summary>
-    /// Tests if a user's refresh token is cleared and cache is removed upon logout.
+    /// Tests forbidden when user is not active.
     /// </summary>
     /// <remarks>
-    /// Scenario: A user requests to log out.
-    /// Expected: The user's refresh token in the database is null, and the user's data is removed from the cache.
-    /// Coverage: User logout, refresh token invalidation, and cache management.
+    /// Scenario: Pending user attempts to log in.
+    /// Expected: Exception with 403 status; no updates or notifications occur.
+    /// Coverage: Status gate before authentication success path.
+    /// TestType: Abnormal
+    /// InputConditions: User exists; Status != Active; IsEmailVerified false.
+    /// ExpectedResult: Exception thrown with status 403.
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Login blocked due to inactive status.
     /// </remarks>
     [Fact]
-    public async Task LogoutAsync_ShouldClearRefreshToken_AndCache()
+    public async Task LoginAsync_ShouldThrowForbidden_WhenUserNotActive()
     {
         // Arrange
-        var userId = Guid.NewGuid();
-        var user = new User
+        var loginDto = new LoginRequestDto
         {
-            Id = userId,
-            Email = "test@example.com",
-            Status = UserStatus.Active,
-            IsDeleted = false,
-            RefreshToken = "refresh-token",
-            FullName = "Test User",
-            RoleName = RoleType.Customer,
-            DateOfBirth = new DateTime(2000, 1, 1)
+            Email = "pending@example.com",
+            Password = "Password123!"
         };
-
-        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-        _unitOfWorkMock.Setup(x => x.Users.Update(It.IsAny<User>()))
-            .ReturnsAsync(true);
-        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
-            .ReturnsAsync(1);
-        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
-            .Returns(Task.CompletedTask);
-
-        // Act
-        var result = await _authService.LogoutAsync(userId);
-
-        // Assert
-        result.Should().BeTrue();
-        _cacheServiceMock.Verify(x => x.RemoveAsync($"user:{user.Email}"), Times.Once);
-    }
-
-    /// <summary>
-    /// Tests if new access and refresh tokens are returned when a valid refresh token is provided.
-    /// </summary>
-    /// <remarks>
-    /// Scenario: A user requests to refresh their tokens using a valid and unexpired refresh token.
-    /// Expected: New access and refresh tokens are generated and returned.
-    /// Coverage: Token refreshing mechanism, refresh token validation.
-    /// </remarks>
-    [Fact]
-    public async Task RefreshTokenAsync_ShouldReturnNewTokens_WhenRefreshTokenIsValid()
-    {
-        // Arrange
-        var refreshToken = "valid-refresh-token";
         var user = new User
         {
             Id = Guid.NewGuid(),
-            Email = "test@example.com",
-            Status = UserStatus.Active,
-            IsDeleted = false,
-            RefreshToken = refreshToken,
-            RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(1),
-            RoleName = RoleType.Customer,
-            FullName = "Test User",
-            DateOfBirth = new DateTime(2000, 1, 1)
-        };
-
-        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-        _unitOfWorkMock.Setup(x => x.Users.Update(It.IsAny<User>()))
-            .ReturnsAsync(true);
-        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
-            .ReturnsAsync(1);
-
-        // Act
-        var result = await _authService.RefreshTokenAsync(new TokenRefreshRequestDto { RefreshToken = refreshToken },
-            _configMock.Object);
-
-        // Assert
-        result.Should().NotBeNull();
-        result!.AccessToken.Should().NotBeNullOrEmpty();
-        result.RefreshToken.Should().NotBeNullOrEmpty();
-    }
-
-    /// <summary>
-    /// Tests if a user's email is verified and their account is activated when a valid OTP is provided.
-    /// </summary>
-    /// <remarks>
-    /// Scenario: A user provides a correct OTP for email verification.
-    /// Expected: The user's `IsEmailVerified` status is set to `true`, `Status` is set to `Active`, and a registration success email is sent.
-    /// Coverage: OTP verification, user status update, and email confirmation.
-    /// </remarks>
-    [Fact]
-    public async Task VerifyEmailOtpAsync_ShouldActivateUser_WhenOtpIsValid()
-    {
-        // Arrange
-        var email = "test@example.com";
-        var otp = "123456";
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = email,
+            Email = loginDto.Email!,
+            Password = new PasswordHasher().HashPassword(loginDto.Password!),
+            FullName = "Pending User",
             Status = UserStatus.Pending,
+            RoleName = RoleType.Customer,
             IsEmailVerified = false,
-            FullName = "Test User",
-            RoleName = RoleType.Customer,
             DateOfBirth = new DateTime(2000, 1, 1)
         };
 
-        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-        _unitOfWorkMock.Setup(x => x.Users.Update(It.IsAny<User>()))
-            .ReturnsAsync(true);
-        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
-            .ReturnsAsync(1);
-        _cacheServiceMock.Setup(x => x.GetAsync<string>(It.IsAny<string>()))
-            .ReturnsAsync(otp);
-        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
-            .Returns(Task.CompletedTask);
-        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<User>(), It.IsAny<TimeSpan>()))
-            .Returns(Task.CompletedTask);
-        _emailServiceMock.Setup(x => x.SendRegistrationSuccessEmailAsync(It.IsAny<EmailRequestDto>()))
-            .Returns(Task.CompletedTask);
-
-        // Act
-        var result = await _authService.VerifyEmailOtpAsync(email, otp);
-
-        // Assert
-        result.Should().BeTrue();
-        _emailServiceMock.Verify(x => x.SendRegistrationSuccessEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
-    }
-
-    /// <summary>
-    /// Tests if a user's password is successfully updated when a valid OTP is provided for password reset.
-    /// </summary>
-    /// <remarks>
-    /// Scenario: A user requests to reset their password and provides a correct OTP.
-    /// Expected: The user's password is updated with the new password, and a password change confirmation email is sent.
-    /// Coverage: Password reset functionality, OTP validation for password reset, and email notification.
-    /// </remarks>
-    [Fact]
-    public async Task ResetPasswordAsync_ShouldUpdatePassword_WhenOtpIsValid()
-    {
-        // Arrange
-        var email = "test@example.com";
-        var otp = "654321";
-        var newPassword = "NewPassword123!";
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = email,
-            Status = UserStatus.Active,
-            IsEmailVerified = true,
-            FullName = "Test User",
-            RoleName = RoleType.Customer,
-            DateOfBirth = new DateTime(2000, 1, 1)
-        };
-
-        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-        _unitOfWorkMock.Setup(x => x.Users.Update(It.IsAny<User>()))
-            .ReturnsAsync(true);
-        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
-            .ReturnsAsync(1);
-        _cacheServiceMock.Setup(x => x.GetAsync<string>(It.IsAny<string>()))
-            .ReturnsAsync(otp);
-        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
-            .Returns(Task.CompletedTask);
-        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<User>(), It.IsAny<TimeSpan>()))
-            .Returns(Task.CompletedTask);
-        _emailServiceMock.Setup(x => x.SendPasswordChangeEmailAsync(It.IsAny<EmailRequestDto>()))
-            .Returns(Task.CompletedTask);
-
-        // Act
-        var result = await _authService.ResetPasswordAsync(email, otp, newPassword);
-
-        // Assert
-        result.Should().BeTrue();
-        _emailServiceMock.Verify(x => x.SendPasswordChangeEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
-    }
-
-    /// <summary>
-    /// Tests if a new OTP is sent for registration when the OTP type is 'Register'.
-    /// </summary>
-    /// <remarks>
-    /// Scenario: A user requests to resend an OTP for registration purposes.
-    /// Expected: A new OTP is generated and sent via email, and a new OTP verification record is added.
-    /// Coverage: OTP resend functionality for registration.
-    /// </remarks>
-    [Fact]
-    public async Task ResendOtpAsync_ShouldCallResendRegisterOtp_WhenTypeIsRegister()
-    {
-        // Arrange
-        var email = "test@example.com";
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = email,
-            Status = UserStatus.Pending,
-            IsEmailVerified = false,
-            FullName = "Test User",
-            RoleName = RoleType.Customer,
-            DateOfBirth = new DateTime(2000, 1, 1)
-        };
-
-        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-        _cacheServiceMock.Setup(x => x.ExistsAsync(It.IsAny<string>())).ReturnsAsync(false);
-        _emailServiceMock.Setup(x => x.SendOtpVerificationEmailAsync(It.IsAny<EmailRequestDto>()))
-            .Returns(Task.CompletedTask);
-        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()))
-            .Returns(Task.CompletedTask);
-
-        // Act
-        var result = await _authService.ResendOtpAsync(email, OtpType.Register);
-
-        // Assert
-        result.Should().BeTrue();
-        _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
-    }
-
-    /// <summary>
-    /// Tests if a seller can be successfully registered when their email does not already exist.
-    /// </summary>
-    /// <remarks>
-    /// Scenario: A new seller attempts to register with an email address that is not already in the system.
-    /// Expected: The seller is successfully registered, both user and seller records are added to the database, an OTP verification email is sent, and an OTP verification record is created.
-    /// Coverage: Seller registration, email uniqueness check, OTP generation and email sending for sellers.
-    /// </remarks>
-    [Fact]
-    public async Task RegisterSellerAsync_ShouldRegisterSeller_WhenEmailNotExists()
-    {
-        // Arrange
-        var registrationDto = new SellerRegistrationDto
-        {
-            Email = "seller@example.com",
-            Password = "Password123!",
-            FullName = "Test Seller",
-            DateOfBirth = new DateTime(2000, 1, 1),
-            PhoneNumber = "0987654321",
-            CompanyName = "Test Company",
-            TaxId = "1234567890",
-            CompanyAddress = "123 Test Street"
-        };
-
-        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
+        _cacheServiceMock.Setup(x => x.GetAsync<User>(It.IsAny<string>()))
             .ReturnsAsync((User)null!);
-        _unitOfWorkMock.Setup(x => x.Users.AddAsync(It.IsAny<User>()))
-            .ReturnsAsync((User u) => u);
-        _unitOfWorkMock.Setup(x => x.Sellers.AddAsync(It.IsAny<Seller>()))
-            .ReturnsAsync((Seller s) => s);
-        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
-            .ReturnsAsync(1);
-        _emailServiceMock.Setup(x => x.SendOtpVerificationEmailAsync(It.IsAny<EmailRequestDto>()))
-            .Returns(Task.CompletedTask);
-
-        // Act
-        var result = await _authService.RegisterSellerAsync(registrationDto);
-
-        // Assert
-        result.Should().NotBeNull();
-        result!.Email.Should().Be(registrationDto.Email);
-        result.RoleName.Should().Be(RoleType.Seller);
-        _unitOfWorkMock.Verify(x => x.Users.AddAsync(It.IsAny<User>()), Times.Once);
-        _unitOfWorkMock.Verify(x => x.Sellers.AddAsync(It.IsAny<Seller>()), Times.Once);
-        _emailServiceMock.Verify(x => x.SendOtpVerificationEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
-        _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
-    }
-
-    /// <summary>
-    /// Tests if an OTP is sent for a forgot password request when the user is valid.
-    /// </summary>
-    /// <remarks>
-    /// Scenario: A valid user requests an OTP to reset their password, and the maximum attempt limit has not been exceeded.
-    /// Expected: A new OTP is generated and sent via email, and the OTP attempt count in cache is updated.
-    /// Coverage: Forgot password OTP generation and sending, and attempt tracking.
-    /// </remarks>
-    [Fact]
-    public async Task SendForgotPasswordOtpRequestAsync_ShouldSendOtp_WhenUserValid()
-    {
-        // Arrange
-        var email = "test@example.com";
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = email,
-            RoleName = RoleType.Customer,
-            FullName = "Test User",
-            Status = UserStatus.Active,
-            IsEmailVerified = true,
-            IsDeleted = false
-        };
-
         _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
             .ReturnsAsync(user);
-        _cacheServiceMock.Setup(x => x.GetAsync<int?>($"forgot-otp-count:{email}"))
-            .ReturnsAsync(0);
-        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()))
-            .Returns(Task.CompletedTask);
-        _otpVerificationRepoMock.Setup(x => x.AddAsync(It.IsAny<OtpVerification>()))
-            .ReturnsAsync((OtpVerification o) => o);
-        _emailServiceMock.Setup(x => x.SendForgotPasswordOtpEmailAsync(It.IsAny<EmailRequestDto>()))
-            .Returns(Task.CompletedTask);
-
-        // Act
-        var result = await _authService.ResendOtpAsync(email, OtpType.ForgotPassword);
-
-        // Assert
-        result.Should().BeTrue();
-        _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
-        _emailServiceMock.Verify(x => x.SendForgotPasswordOtpEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
-        _cacheServiceMock.Verify(x => x.SetAsync($"forgot-otp-count:{email}", 1, It.IsAny<TimeSpan>()), Times.Once);
-    }
-
-    /// <summary>
-    /// Tests if a `BadRequest` exception is thrown when a user exceeds the maximum attempts for sending a forgot password OTP.
-    /// </summary>
-    /// <remarks>
-    /// Scenario: A user requests to resend a forgot password OTP after already exceeding the maximum allowed attempts.
-    /// Expected: An `Exception` with a 400 (Bad Request) status code is thrown, and no new OTP is generated or email sent.
-    /// Coverage: Rate limiting for OTP requests and error handling for exceeding attempts.
-    /// </remarks>
-    [Fact]
-    public async Task SendForgotPasswordOtpRequestAsync_ShouldThrowBadRequest_WhenExceedMaxAttempts()
-    {
-        // Arrange
-        var email = "test@example.com";
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = email,
-            RoleName = RoleType.Customer,
-            FullName = "Test User",
-            Status = UserStatus.Active,
-            IsEmailVerified = true,
-            IsDeleted = false
-        };
-
-        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-        _cacheServiceMock.Setup(x => x.GetAsync<int?>($"forgot-otp-count:{email}"))
-            .ReturnsAsync(3); // Đã gửi 3 lần, vượt quá giới hạn
 
         // Act & Assert
         var exception =
-            await Assert.ThrowsAsync<Exception>(() => _authService.ResendOtpAsync(email, OtpType.ForgotPassword));
+            await Assert.ThrowsAsync<Exception>(() => _authService.LoginAsync(loginDto, _configMock.Object));
 
         var statusCode = ExceptionUtils.ExtractStatusCode(exception);
-        statusCode.Should().Be(400);
-        _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Never);
-        _emailServiceMock.Verify(x => x.SendForgotPasswordOtpEmailAsync(It.IsAny<EmailRequestDto>()), Times.Never);
+        statusCode.Should().Be(403);
+        _unitOfWorkMock.Verify(x => x.Users.Update(It.IsAny<User>()), Times.Never);
+        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Never);
+        _notiService.Verify(x => x.PushNotificationToUser(
+                It.IsAny<Guid>(), It.IsAny<NotificationDto>()),
+            Times.Never);
     }
 
     /// <summary>
-    /// Tests if a welcome notification is sent to a user upon their first successful login.
+    /// Tests welcome notification on first successful login.
     /// </summary>
     /// <remarks>
-    /// Scenario: A user logs in for the first time.
-    /// Expected: A welcome notification is pushed to the user, and a flag is set in cache to prevent sending duplicate welcome notifications.
-    /// Coverage: First-time login experience, notification system integration, and cache management for notification state.
+    /// Scenario: First login for a user.
+    /// Expected: System notification pushed; idempotency flag set in cache.
+    /// Coverage: Noti integration and one-time guard.
+    /// TestType: Boundary
+    /// InputConditions: Cache key noti:welcome:{userId} does not exist.
+    /// ExpectedResult: Notification sent once.
+    /// ExpectedReturnValue: LoginResponseDto
+    /// ExceptionExpected: false
+    /// LogMessage: Welcome notification sent.
     /// </remarks>
     [Fact]
     public async Task LoginAsync_ShouldSendWelcomeNotification_OnFirstLogin()
@@ -539,7 +262,7 @@ public class AuthServiceTests
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
             .ReturnsAsync(1);
         _cacheServiceMock.Setup(x => x.ExistsAsync($"noti:welcome:{user.Id}"))
-            .ReturnsAsync(false); // Chưa gửi thông báo welcome
+            .ReturnsAsync(false);
         _notiService.Setup(x => x.PushNotificationToUser(
                 It.IsAny<Guid>(), It.IsAny<NotificationDto>()))
             .ReturnsAsync(new Notification
@@ -569,12 +292,18 @@ public class AuthServiceTests
     }
 
     /// <summary>
-    /// Tests if seller-specific information is included in the login response when the logged-in user is a seller.
+    /// Tests login response includes seller info for seller account.
     /// </summary>
     /// <remarks>
-    /// Scenario: A user with the `Seller` role logs in.
-    /// Expected: The `LoginResponseDto` contains the `SellerId` and `RoleName` is correctly identified as `Seller`.
-    /// Coverage: Role-based login handling and inclusion of associated entity information.
+    /// Scenario: User has Seller role.
+    /// Expected: LoginResponseDto.User contains SellerId; RoleName == Seller.
+    /// Coverage: Role-based augmentation of login response.
+    /// TestType: Boundary
+    /// InputConditions: Seller entity exists and linked to user.
+    /// ExpectedResult: SellerId populated in response.
+    /// ExpectedReturnValue: LoginResponseDto
+    /// ExceptionExpected: false
+    /// LogMessage: Seller context attached to login response.
     /// </remarks>
     [Fact]
     public async Task LoginAsync_ShouldIncludeSellerInfo_WhenUserIsSeller()
@@ -631,13 +360,182 @@ public class AuthServiceTests
         result.User.RoleName.Should().Be(RoleType.Seller);
     }
 
+    #endregion
+
+    #region Logout
+
     /// <summary>
-    /// Tests if a seller verification email is sent when a seller user's email is verified with OTP.
+    /// Tests logout clears refresh token and removes cache.
     /// </summary>
     /// <remarks>
-    /// Scenario: A seller user provides a correct OTP to verify their email.
-    /// Expected: A seller-specific email verification success email is sent, and the user's status and email verification status are updated.
-    /// Coverage: Seller-specific email verification flow and differentiation from customer verification.
+    /// Scenario: User triggers logout.
+    /// Expected: RefreshToken set to null; user cache removed.
+    /// Coverage: Token invalidation and cache eviction.
+    /// TestType: Normal
+    /// InputConditions: User exists; SaveChanges succeeds.
+    /// ExpectedResult: true
+    /// ExpectedReturnValue: bool
+    /// ExceptionExpected: false
+    /// LogMessage: Logout completed; cache cleared.
+    /// </remarks>
+    [Fact]
+    public async Task LogoutAsync_ShouldClearRefreshToken_AndCache()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var user = new User
+        {
+            Id = userId,
+            Email = "test@example.com",
+            Status = UserStatus.Active,
+            IsDeleted = false,
+            RefreshToken = "refresh-token",
+            FullName = "Test User",
+            RoleName = RoleType.Customer,
+            DateOfBirth = new DateTime(2000, 1, 1)
+        };
+
+        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
+            .ReturnsAsync(user);
+        _unitOfWorkMock.Setup(x => x.Users.Update(It.IsAny<User>()))
+            .ReturnsAsync(true);
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.LogoutAsync(userId);
+
+        // Assert
+        result.Should().BeTrue();
+        _cacheServiceMock.Verify(x => x.RemoveAsync($"user:{user.Email}"), Times.Once);
+    }
+
+    #endregion
+
+    #region Refresh Token
+
+    /// <summary>
+    /// Tests refresh token flow returns new tokens when refresh token valid.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: User provides valid, unexpired refresh token.
+    /// Expected: New access and refresh tokens generated and returned.
+    /// Coverage: Refresh token validation and re-issuance.
+    /// TestType: Normal
+    /// InputConditions: User has matching RefreshToken and future RefreshTokenExpiryTime.
+    /// ExpectedResult: Non-empty AccessToken and RefreshToken in response.
+    /// ExpectedReturnValue: TokenResponseDto
+    /// ExceptionExpected: false
+    /// LogMessage: Tokens refreshed successfully.
+    /// </remarks>
+    [Fact]
+    public async Task RefreshTokenAsync_ShouldReturnNewTokens_WhenRefreshTokenIsValid()
+    {
+        // Arrange
+        var refreshToken = "valid-refresh-token";
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = "test@example.com",
+            Status = UserStatus.Active,
+            IsDeleted = false,
+            RefreshToken = refreshToken,
+            RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(1),
+            RoleName = RoleType.Customer,
+            FullName = "Test User",
+            DateOfBirth = new DateTime(2000, 1, 1)
+        };
+
+        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
+            .ReturnsAsync(user);
+        _unitOfWorkMock.Setup(x => x.Users.Update(It.IsAny<User>()))
+            .ReturnsAsync(true);
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(new TokenRefreshRequestDto { RefreshToken = refreshToken },
+            _configMock.Object);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.AccessToken.Should().NotBeNullOrEmpty();
+        result.RefreshToken.Should().NotBeNullOrEmpty();
+    }
+
+    #endregion
+
+    #region Email Verification & Password Reset
+
+    /// <summary>
+    /// Tests email OTP verification activates user.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Correct OTP submitted for email verification.
+    /// Expected: IsEmailVerified true; Status Active; registration success email sent.
+    /// Coverage: OTP validation, user activation, notification email.
+    /// TestType: Normal
+    /// InputConditions: OTP in cache matches; SaveChanges succeeds.
+    /// ExpectedResult: true
+    /// ExpectedReturnValue: bool
+    /// ExceptionExpected: false
+    /// LogMessage: Email verified, user activated.
+    /// </remarks>
+    [Fact]
+    public async Task VerifyEmailOtpAsync_ShouldActivateUser_WhenOtpIsValid()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var otp = "123456";
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            Status = UserStatus.Pending,
+            IsEmailVerified = false,
+            FullName = "Test User",
+            RoleName = RoleType.Customer,
+            DateOfBirth = new DateTime(2000, 1, 1)
+        };
+
+        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
+            .ReturnsAsync(user);
+        _unitOfWorkMock.Setup(x => x.Users.Update(It.IsAny<User>()))
+            .ReturnsAsync(true);
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+        _cacheServiceMock.Setup(x => x.GetAsync<string>(It.IsAny<string>()))
+            .ReturnsAsync(otp);
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<User>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+        _emailServiceMock.Setup(x => x.SendRegistrationSuccessEmailAsync(It.IsAny<EmailRequestDto>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.VerifyEmailOtpAsync(email, otp);
+
+        // Assert
+        result.Should().BeTrue();
+        _emailServiceMock.Verify(x => x.SendRegistrationSuccessEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests seller email OTP path sends seller-specific email.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Seller verifies email with correct OTP.
+    /// Expected: Seller verification email sent; Status Active; IsEmailVerified true.
+    /// Coverage: Role-specific verification branch.
+    /// TestType: Boundary
+    /// InputConditions: User role Seller; OTP matches.
+    /// ExpectedResult: true and seller email sent.
+    /// ExpectedReturnValue: bool
+    /// ExceptionExpected: false
+    /// LogMessage: Seller email verified.
     /// </remarks>
     [Fact]
     public async Task VerifyEmailOtpAsync_ShouldSendSellerVerificationEmail_WhenUserIsSeller()
@@ -684,12 +582,277 @@ public class AuthServiceTests
     }
 
     /// <summary>
-    /// Tests if a `Conflict` exception is thrown when a customer attempts to register with an email that already exists.
+    /// Tests password reset with valid OTP updates password and sends email.
     /// </summary>
     /// <remarks>
-    /// Scenario: A new customer attempts to register with an email address that is already associated with an existing user.
-    /// Expected: An `Exception` with a 409 (Conflict) status code is thrown, and no new user or OTP record is created.
-    /// Coverage: Email uniqueness validation during customer registration and error handling for conflicts.
+    /// Scenario: User resets password with correct OTP.
+    /// Expected: Password updated; password-change email sent.
+    /// Coverage: OTP validation for reset; password hashing; email notify.
+    /// TestType: Normal
+    /// InputConditions: OTP in cache matches; SaveChanges succeeds.
+    /// ExpectedResult: true
+    /// ExpectedReturnValue: bool
+    /// ExceptionExpected: false
+    /// LogMessage: Password reset successful.
+    /// </remarks>
+    [Fact]
+    public async Task ResetPasswordAsync_ShouldUpdatePassword_WhenOtpIsValid()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var otp = "654321";
+        var newPassword = "NewPassword123!";
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            Status = UserStatus.Active,
+            IsEmailVerified = true,
+            FullName = "Test User",
+            RoleName = RoleType.Customer,
+            DateOfBirth = new DateTime(2000, 1, 1)
+        };
+
+        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
+            .ReturnsAsync(user);
+        _unitOfWorkMock.Setup(x => x.Users.Update(It.IsAny<User>()))
+            .ReturnsAsync(true);
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+        _cacheServiceMock.Setup(x => x.GetAsync<string>(It.IsAny<string>()))
+            .ReturnsAsync(otp);
+        _cacheServiceMock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<User>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+        _emailServiceMock.Setup(x => x.SendPasswordChangeEmailAsync(It.IsAny<EmailRequestDto>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.ResetPasswordAsync(email, otp, newPassword);
+
+        // Assert
+        result.Should().BeTrue();
+        _emailServiceMock.Verify(x => x.SendPasswordChangeEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
+    }
+
+    #endregion
+
+    #region Resend OTP
+
+    /// <summary>
+    /// Tests resend OTP for Register type.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Pending user requests OTP resend for registration.
+    /// Expected: New OTP generated; email sent; OTP verification record added.
+    /// Coverage: OTP resend path for Register.
+    /// TestType: Normal
+    /// InputConditions: Cache.Exists false; user exists and pending.
+    /// ExpectedResult: true
+    /// ExpectedReturnValue: bool
+    /// ExceptionExpected: false
+    /// LogMessage: Registration OTP resent.
+    /// </remarks>
+    [Fact]
+    public async Task ResendOtpAsync_ShouldCallResendRegisterOtp_WhenTypeIsRegister()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            Status = UserStatus.Pending,
+            IsEmailVerified = false,
+            FullName = "Test User",
+            RoleName = RoleType.Customer,
+            DateOfBirth = new DateTime(2000, 1, 1)
+        };
+
+        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
+            .ReturnsAsync(user);
+        _cacheServiceMock.Setup(x => x.ExistsAsync(It.IsAny<string>())).ReturnsAsync(false);
+        _emailServiceMock.Setup(x => x.SendOtpVerificationEmailAsync(It.IsAny<EmailRequestDto>()))
+            .Returns(Task.CompletedTask);
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.ResendOtpAsync(email, OtpType.Register);
+
+        // Assert
+        result.Should().BeTrue();
+        _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests forgot password OTP send when user valid and under attempt limit.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Valid user requests forgot-password OTP, attempts below limit.
+    /// Expected: OTP generated; email sent; attempt count increased.
+    /// Coverage: Rate-limited OTP generation for forgot password.
+    /// TestType: Normal
+    /// InputConditions: forgot-otp-count is 0 or below threshold.
+    /// ExpectedResult: true
+    /// ExpectedReturnValue: bool
+    /// ExceptionExpected: false
+    /// LogMessage: Forgot-password OTP sent.
+    /// </remarks>
+    [Fact]
+    public async Task SendForgotPasswordOtpRequestAsync_ShouldSendOtp_WhenUserValid()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            RoleName = RoleType.Customer,
+            FullName = "Test User",
+            Status = UserStatus.Active,
+            IsEmailVerified = true,
+            IsDeleted = false
+        };
+
+        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
+            .ReturnsAsync(user);
+        _cacheServiceMock.Setup(x => x.GetAsync<int?>($"forgot-otp-count:{email}"))
+            .ReturnsAsync(0);
+        _cacheServiceMock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan>()))
+            .Returns(Task.CompletedTask);
+        _otpVerificationRepoMock.Setup(x => x.AddAsync(It.IsAny<OtpVerification>()))
+            .ReturnsAsync((OtpVerification o) => o);
+        _emailServiceMock.Setup(x => x.SendForgotPasswordOtpEmailAsync(It.IsAny<EmailRequestDto>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.ResendOtpAsync(email, OtpType.ForgotPassword);
+
+        // Assert
+        result.Should().BeTrue();
+        _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
+        _emailServiceMock.Verify(x => x.SendForgotPasswordOtpEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
+        _cacheServiceMock.Verify(x => x.SetAsync($"forgot-otp-count:{email}", 1, It.IsAny<TimeSpan>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests exceeding forgot-password OTP attempt limit throws BadRequest.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: User already exceeded max resend attempts for forgot-password OTP.
+    /// Expected: Exception with 400 status; no OTP generated; no email sent.
+    /// Coverage: Rate limit enforcement and error handling.
+    /// TestType: Abnormal
+    /// InputConditions: forgot-otp-count at or above limit (e.g., 3).
+    /// ExpectedResult: Exception thrown with 400 status.
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Exceeded forgot-password OTP attempts.
+    /// </remarks>
+    [Fact]
+    public async Task SendForgotPasswordOtpRequestAsync_ShouldThrowBadRequest_WhenExceedMaxAttempts()
+    {
+        // Arrange
+        var email = "test@example.com";
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            RoleName = RoleType.Customer,
+            FullName = "Test User",
+            Status = UserStatus.Active,
+            IsEmailVerified = true,
+            IsDeleted = false
+        };
+
+        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
+            .ReturnsAsync(user);
+        _cacheServiceMock.Setup(x => x.GetAsync<int?>($"forgot-otp-count:{email}"))
+            .ReturnsAsync(3);
+
+        // Act & Assert
+        var exception =
+            await Assert.ThrowsAsync<Exception>(() => _authService.ResendOtpAsync(email, OtpType.ForgotPassword));
+
+        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
+        statusCode.Should().Be(400);
+        _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Never);
+        _emailServiceMock.Verify(x => x.SendForgotPasswordOtpEmailAsync(It.IsAny<EmailRequestDto>()), Times.Never);
+    }
+
+    #endregion
+
+    #region Register Seller
+
+    /// <summary>
+    /// Tests successful seller registration with a non-existing email.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: New seller registers with unique email.
+    /// Expected: User and Seller created; OTP emailed; OTP record inserted.
+    /// Coverage: Cross-entity creation and OTP flow for Seller.
+    /// TestType: Normal
+    /// InputConditions: Email not in DB; SaveChanges succeeds.
+    /// ExpectedResult: User entity with RoleName Seller returned.
+    /// ExpectedReturnValue: User
+    /// ExceptionExpected: false
+    /// LogMessage: Seller registration initiated, OTP sent.
+    /// </remarks>
+    [Fact]
+    public async Task RegisterSellerAsync_ShouldRegisterSeller_WhenEmailNotExists()
+    {
+        // Arrange
+        var registrationDto = new SellerRegistrationDto
+        {
+            Email = "seller@example.com",
+            Password = "Password123!",
+            FullName = "Test Seller",
+            DateOfBirth = new DateTime(2000, 1, 1),
+            PhoneNumber = "0987654321",
+            CompanyName = "Test Company",
+            TaxId = "1234567890",
+            CompanyAddress = "123 Test Street"
+        };
+
+        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
+            .ReturnsAsync((User)null!);
+        _unitOfWorkMock.Setup(x => x.Users.AddAsync(It.IsAny<User>()))
+            .ReturnsAsync((User u) => u);
+        _unitOfWorkMock.Setup(x => x.Sellers.AddAsync(It.IsAny<Seller>()))
+            .ReturnsAsync((Seller s) => s);
+        _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
+            .ReturnsAsync(1);
+        _emailServiceMock.Setup(x => x.SendOtpVerificationEmailAsync(It.IsAny<EmailRequestDto>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _authService.RegisterSellerAsync(registrationDto);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Email.Should().Be(registrationDto.Email);
+        result.RoleName.Should().Be(RoleType.Seller);
+        _unitOfWorkMock.Verify(x => x.Users.AddAsync(It.IsAny<User>()), Times.Once);
+        _unitOfWorkMock.Verify(x => x.Sellers.AddAsync(It.IsAny<Seller>()), Times.Once);
+        _emailServiceMock.Verify(x => x.SendOtpVerificationEmailAsync(It.IsAny<EmailRequestDto>()), Times.Once);
+        _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests conflict when registering customer with an existing email.
+    /// </summary>
+    /// <remarks>
+    /// Scenario: Email already exists in cache/DB.
+    /// Expected: Exception with 409 status; no new user; no OTP.
+    /// Coverage: Email uniqueness guard.
+    /// TestType: Abnormal
+    /// InputConditions: Cache has user with same email.
+    /// ExpectedResult: Exception thrown with 409 status.
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Email already exists.
     /// </remarks>
     [Fact]
     public async Task RegisterCustomerAsync_ShouldThrowConflict_WhenEmailAlreadyExists()
@@ -727,50 +890,5 @@ public class AuthServiceTests
         _otpVerificationRepoMock.Verify(x => x.AddAsync(It.IsAny<OtpVerification>()), Times.Never);
     }
 
-    /// <summary>
-    /// Tests if a `Forbidden` exception is thrown when an inactive user attempts to log in.
-    /// </summary>
-    /// <remarks>
-    /// Scenario: A user with `Pending` or other inactive status attempts to log in.
-    /// Expected: An `Exception` with a 403 (Forbidden) status code is thrown, and no user data or notifications are updated.
-    /// Coverage: User status validation during login and access control.
-    /// </remarks>
-    [Fact]
-    public async Task LoginAsync_ShouldThrowForbidden_WhenUserNotActive()
-    {
-        // Arrange
-        var loginDto = new LoginRequestDto
-        {
-            Email = "pending@example.com",
-            Password = "Password123!"
-        };
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Email = loginDto.Email!,
-            Password = new PasswordHasher().HashPassword(loginDto.Password!),
-            FullName = "Pending User",
-            Status = UserStatus.Pending, // Người dùng chưa kích hoạt
-            RoleName = RoleType.Customer,
-            IsEmailVerified = false,
-            DateOfBirth = new DateTime(2000, 1, 1)
-        };
-
-        _cacheServiceMock.Setup(x => x.GetAsync<User>(It.IsAny<string>()))
-            .ReturnsAsync((User)null!);
-        _unitOfWorkMock.Setup(x => x.Users.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
-            .ReturnsAsync(user);
-
-        // Act & Assert
-        var exception =
-            await Assert.ThrowsAsync<Exception>(() => _authService.LoginAsync(loginDto, _configMock.Object));
-
-        var statusCode = ExceptionUtils.ExtractStatusCode(exception);
-        statusCode.Should().Be(403);
-        _unitOfWorkMock.Verify(x => x.Users.Update(It.IsAny<User>()), Times.Never);
-        _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Never);
-        _notiService.Verify(x => x.PushNotificationToUser(
-                It.IsAny<Guid>(), It.IsAny<NotificationDto>()),
-            Times.Never);
-    }
+    #endregion
 }
