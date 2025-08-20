@@ -5,23 +5,17 @@ on:
     branches: [unit-test]
 
 jobs:
-  test:
+  analyze-tests:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-
+    outputs:
+      test-matrix: ${{ steps.generate-matrix.outputs.matrix }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            nuget-${{ runner.os }}-
+          python-version: '3.11'
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -30,6 +24,135 @@ jobs:
           cache: true
           cache-dependency-path: '**/*.csproj'
 
+      - name: Install Python dependencies
+        run: |
+          pip install pandas openpyxl xlsxwriter lxml beautifulsoup4
+
+      - name: Build with XML docs
+        run: |
+          dotnet build BlindTreasure.API.sln \
+            --configuration Release \
+            /p:GenerateDocumentationFile=true
+
+      - name: Generate Test Matrix
+        id: generate-matrix
+        run: |
+          python - << EOF
+          import xml.etree.ElementTree as ET
+          import json
+          import glob
+          from bs4 import BeautifulSoup
+          
+          def extract_test_info(xml_content):
+              soup = BeautifulSoup(xml_content, 'xml')
+              test_cases = []
+              
+              for member in soup.find_all('member'):
+                  remarks = member.find('remarks')
+                  if not remarks:
+                      continue
+                  
+                  # Extract all test metadata from remarks
+                  lines = remarks.text.strip().split('\n')
+                  test_info = {}
+                  
+                  for line in lines:
+                      line = line.strip()
+                      if ':' in line:
+                          key, value = line.split(':', 1)
+                          test_info[key.strip()] = value.strip()
+                  
+                  if test_info:
+                      test_info['MemberName'] = member.get('name', '').split('.')[-1]
+                      test_cases.append(test_info)
+              
+              return test_cases
+          
+          # Find all XML documentation files
+          xml_files = glob.glob("**/bin/Release/**/*.xml", recursive=True)
+          all_tests = []
+          
+          for xml_file in xml_files:
+              try:
+                  with open(xml_file, 'r', encoding='utf-8') as f:
+                      xml_content = f.read()
+                      tests = extract_test_info(xml_content)
+                      all_tests.extend(tests)
+              except Exception as e:
+                  print(f"Error processing {xml_file}: {str(e)}")
+          
+          # Generate matrix
+          matrix = {
+              'include': [{
+                  'test_name': test['MemberName'],
+                  'scenario': test.get('Scenario', 'N/A'),
+                  'test_type': test.get('TestType', 'Normal'),
+                  'expected_result': test.get('ExpectedResult', 'N/A'),
+                  'exception_expected': test.get('ExceptionExpected', 'false'),
+                  'coverage': test.get('Coverage', 'N/A')
+              } for test in all_tests]
+          }
+          
+          # Output the matrix in GitHub Actions format
+          print(f"::set-output name=matrix::{json.dumps(matrix)}")
+          
+          # Generate detailed Excel report
+          import pandas as pd
+          
+          df = pd.DataFrame(all_tests)
+          df.to_excel('test-analysis.xlsx', index=False)
+          EOF
+
+      - name: Upload Test Analysis
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-analysis
+          path: test-analysis.xlsx
+
+  run-tests:
+    needs: analyze-tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{fromJson(needs.analyze-tests.outputs.test-matrix)}}
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run Test
+        run: |
+          echo "Running test: ${{ matrix.test_name }}"
+          echo "Scenario: ${{ matrix.scenario }}"
+          echo "Type: ${{ matrix.test_type }}"
+          echo "Expected Result: ${{ matrix.expected_result }}"
+          echo "Exception Expected: ${{ matrix.exception_expected }}"
+          echo "Coverage: ${{ matrix.coverage }}"
+          
+          dotnet test BlindTreasure.API.sln \
+            --filter "FullyQualifiedName~${{ matrix.test_name }}" \
+            --logger "trx;LogFileName=${{ matrix.test_name }}.trx"
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.test_name }}
+          path: "**/*.trx"
+
+  generate-report:
+    needs: [run-tests]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Download All Test Results
+        uses: actions/download-artifact@v3
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -37,17 +160,69 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install pandas openpyxl xlsxwriter lxml beautifulsoup4
+          pip install pandas openpyxl xlsxwriter
 
-      - name: Restore dependencies
-        run: dotnet restore BlindTreasure.API.sln
-
-      - name: Build with XML docs
+      - name: Generate Final Report
         run: |
-          dotnet build BlindTreasure.API.sln \
-            --no-restore \
-            --configuration Release \
-            /p:GenerateDocumentationFile=true
+          python - << EOF
+          import pandas as pd
+          import glob
+          import xml.etree.ElementTree as ET
+          
+          def parse_trx(file_path):
+              tree = ET.parse(file_path)
+              root = tree.getroot()
+              ns = {'ns': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
+              
+              results = []
+              for test in root.findall('.//ns:UnitTestResult', ns):
+                  result = {
+                      'TestName': test.get('testName'),
+                      'Outcome': test.get('outcome'),
+                      'Duration': test.get('duration'),
+                      'ErrorMessage': test.find('ns:Output/ns:ErrorInfo/ns:Message', ns).text if test.find('ns:Output/ns:ErrorInfo/ns:Message', ns) is not None else None
+                  }
+                  results.append(result)
+              
+              return results
+          
+          # Process all TRX files
+          all_results = []
+          for trx_file in glob.glob('**/*.trx', recursive=True):
+              try:
+                  results = parse_trx(trx_file)
+                  all_results.extend(results)
+              except Exception as e:
+                  print(f"Error processing {trx_file}: {str(e)}")
+          
+          # Create detailed report
+          df = pd.DataFrame(all_results)
+          
+          # Add test analysis data
+          test_analysis = pd.read_excel('test-analysis/test-analysis.xlsx')
+          df = df.merge(test_analysis, left_on='TestName', right_on='MemberName', how='left')
+          
+          # Generate statistics
+          stats = {
+              'Total Tests': len(df),
+              'Passed': len(df[df['Outcome'] == 'Passed']),
+              'Failed': len(df[df['Outcome'] == 'Failed']),
+              'By Test Type': df['TestType'].value_counts().to_dict(),
+              'By Coverage Area': df['Coverage'].value_counts().to_dict()
+          }
+          
+          # Save reports
+          df.to_excel('detailed-test-report.xlsx', index=False)
+          pd.DataFrame([stats]).to_excel('test-statistics.xlsx')
+          EOF
+
+      - name: Upload Final Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: final-test-reports
+          path: |
+            detailed-test-report.xlsx
+            test-statistics.xlsx
           find ./BlindTreasure.UnitTest/bin -name "*.xml" | sort || true
 
       - name: Run unit tests with coverage
@@ -79,9 +254,8 @@ jobs:
           def norm(s): return re.sub(r'[^A-Za-z0-9_]', '', (s or '')).lower()
 
           def base_function_from_test(method_name: str) -> str:
-              """Extract function-under-test from test method: RegisterCustomerAsync_Should... -> RegisterCustomerAsync"""
+              """Lấy function-under-test từ test method: RegisterCustomerAsync_Should... -> RegisterCustomerAsync"""
               m = strip_params(method_name or '')
-              if '_Should_' in m: return m.split('_Should_',1)[0]
               if '_Should' in m: return m.split('_Should',1)[0]
               if '_When'   in m: return m.split('_When',1)[0]
               return m
@@ -108,104 +282,98 @@ jobs:
           
               return False
 
-          def extract_xml_tag_value(remarks_text: str, tag: str) -> str:
-              """Extract value from XML tag in remarks"""
-              if not remarks_text:
-                  return ''
+          def classify_case(name: str) -> str:
+              n = (name or '').lower()
+              if 'boundary' in n: return 'B'
+              if 'abnormal' in n: return 'A'
+              if 'normal'   in n: return 'N'
+              return 'N'
+
+          def expected_from_name(name: str) -> str:
+              """Parse expected result from test name"""
+              n = (name or '').lower()
+              if 'shouldreturntrue'  in n or 'should_be_true' in n:  return 'TRUE'
+              if 'shouldreturnfalse' in n or 'should_be_false' in n: return 'FALSE'
+              if 'shouldthrow' in n or 'exception' in n or 'shouldthrownotfound' in n or 'shouldthrowconflict' in n or 'shouldthrowbadrequest' in n: return 'EXCEPTION'
           
-              lines = remarks_text.splitlines()
-              for line in lines:
-                  line = line.strip()
-                  if line.startswith(f'{tag}:'):
-                      return line.replace(f'{tag}:', '').strip()
+              # Specific patterns for different outcomes
+              if 'shouldcreateuser' in n or 'shouldupdateprofile' in n or 'shoulduploadavatar' in n or 'shouldupdatestatus' in n: return 'TRUE'
+              if 'shouldreactivateuser' in n: return 'TRUE'
+          
               return ''
 
-          def parse_input_conditions(input_conditions_text: str) -> list:
-              """Parse input conditions from XML tag"""
-              if not input_conditions_text:
-                  return []
-          
-              # Split by common delimiters
-              conditions = []
-              for delimiter in [';', ',', '|', '\n']:
-                  if delimiter in input_conditions_text:
-                      conditions = [c.strip() for c in input_conditions_text.split(delimiter) if c.strip()]
-                      break
-          
-              # If no delimiters found, treat as single condition
-              if not conditions and input_conditions_text.strip():
-                  conditions = [input_conditions_text.strip()]
-          
-              return conditions[:4]  # Max 4 conditions
-
-          def get_test_type_from_xml(remarks_text: str) -> str:
-              """Get test type from XML remarks"""
-              test_type = extract_xml_tag_value(remarks_text, 'TestType')
-              if test_type.lower() in ['normal', 'abnormal', 'boundary']:
-                  return test_type[0].upper()  # N, A, B
-              return 'N'  # Default to Normal
-
-          def get_expected_result_from_xml(remarks_text: str) -> str:
-              """Get expected result type from XML"""
-              expected_result = extract_xml_tag_value(remarks_text, 'ExpectedResult').lower()
-              exception_expected = extract_xml_tag_value(remarks_text, 'ExceptionExpected').lower()
-          
-              if exception_expected == 'true' or 'exception' in expected_result:
-                  return 'EXCEPTION'
-              elif 'true' in expected_result or 'success' in expected_result:
-                  return 'TRUE'
-              elif 'false' in expected_result:
-                  return 'FALSE'
-              return ''
-
-          def fallback_from_name(name: str) -> dict:
-              """Fallback parsing from test method name if XML tags not available"""
+          def get_expected_return_value(name: str) -> str:
+              """Get specific return value expected from test name"""
               n = (name or '').lower()
           
-              # Test type classification
-              test_type = 'N'
-              if 'boundary' in n: test_type = 'B'
-              elif 'abnormal' in n or 'invalid' in n or 'error' in n: test_type = 'A'
+              # For successful operations
+              if 'shouldcreateuser' in n: return 'UserDto object'
+              if 'shouldupdateprofile' in n: return 'Updated UserDto'
+              if 'shoulduploadavatar' in n: return 'UserDto with avatar URL'
+              if 'shouldupdatestatus' in n: return 'Updated UserDto'
+              if 'shouldreactivateuser' in n: return 'Reactivated UserDto'
           
-              # Expected result
-              expected_result = ''
-              if 'shouldthrow' in n or 'exception' in n: expected_result = 'EXCEPTION'
-              elif 'shouldreturn' in n and 'true' in n: expected_result = 'TRUE'
-              elif 'shouldreturn' in n and 'false' in n: expected_result = 'FALSE'
-              elif 'should' in n and ('create' in n or 'update' in n or 'upload' in n): expected_result = 'TRUE'
+              # For boolean returns
+              if 'shouldreturntrue' in n: return 'true'
+              if 'shouldreturnfalse' in n: return 'false'
           
-              # Return value
-              return_value = ''
-              if 'shouldcreate' in n: return_value = 'Created object'
-              elif 'shouldupdate' in n: return_value = 'Updated object'
-              elif 'shouldupload' in n: return_value = 'Object with URL'
-              elif 'shouldreturn' in n and 'true' in n: return_value = 'true'
-              elif 'shouldreturn' in n and 'false' in n: return_value = 'false'
-          
-              # Log message
-              log_message = ''
-              if 'conflict' in n or 'exists' in n: log_message = 'Already exists'
-              elif 'notfound' in n: log_message = 'Not found'
-              elif 'invalid' in n or 'empty' in n: log_message = 'Invalid input'
-              elif 'unauthorized' in n: log_message = 'Unauthorized access'
-              elif 'forbidden' in n: log_message = 'Forbidden access'
-          
-              # Input conditions
+              return ''
+
+          def extract_log_message_from_name(name: str) -> str:
+              """Extract expected log message or error from test name"""
+              n = (name or '').lower()
+              if 'conflict' in n or 'emailexists' in n: return 'Email already exists'
+              if 'forbidden' in n: return 'Forbidden access'
+              if 'notfound' in n or 'usernotexists' in n: return 'User not found'
+              if 'badrequest' in n or 'fileisempty' in n: return 'Invalid input data'
+              if 'unauthorized' in n: return 'Unauthorized access'
+              if 'nameexists' in n: return 'Name already exists'
+              if 'empty' in n or 'null' in n: return 'Input validation error'
+              return ''
+
+          def to_conditions_from_name(name: str):
+              """Parse điều kiện từ tên test method."""
+              base = strip_params(name or '').lower()
               conditions = []
-              if 'valid' in n and 'data' in n: conditions.append('Valid input data provided')
-              if 'exists' in n: conditions.append('Entity exists in system')
-              if 'notexists' in n: conditions.append('Entity does not exist')
-              if 'empty' in n: conditions.append('Required field is empty')
-              if 'invalid' in n: conditions.append('Invalid input provided')
-              if not conditions: conditions.append('Standard test condition')
           
-              return {
-                  'test_type': test_type,
-                  'expected_result': expected_result,
-                  'return_value': return_value,
-                  'log_message': log_message,
-                  'conditions': conditions
-              }
+              # Patterns for different test scenarios
+              if 'validdata' in base or ('should' in base and ('create' in base or 'update' in base) and 'when' not in base):
+                  conditions.append('Valid input data provided')
+          
+              if 'validfile' in base:
+                  conditions.append('Valid file provided')
+          
+              if 'empty' in base or 'null' in base:
+                  if 'file' in base:
+                      conditions.append('File is null or empty')
+                  elif 'name' in base:
+                      conditions.append('Name is null or empty')
+                  else:
+                      conditions.append('Required field is null or empty')
+          
+              if 'invalid' in base:
+                  conditions.append('Invalid input data')
+          
+              if 'notexists' in base or 'notfound' in base:
+                  conditions.append('Entity does not exist')
+          
+              if 'notadmin' in base or 'notauthorized' in base or 'forbidden' in base:
+                  conditions.append('User lacks required permissions')
+          
+              if 'emailexists' in base or 'conflict' in base:
+                  conditions.append('Email already exists')
+          
+              if 'userexists' in base:
+                  conditions.append('User exists in system')
+          
+              if 'statusisactive' in base:
+                  conditions.append('Status is set to Active')
+
+              # Default condition if none found
+              if not conditions:
+                  conditions.append('Standard test condition')
+          
+              return conditions[:4]  # Max 4 conditions
 
           def safe_sheet_name(name, existing_sheets):
               """Create a safe Excel sheet name (max 31 chars, unique)"""
@@ -235,7 +403,7 @@ jobs:
           
               return final_name
 
-          # ---------- Enhanced XML parsing ----------
+          # ---------- XML -> functions (group by class + function-under-test) ----------
           def extract_functions():
               xml_files = glob.glob('./BlindTreasure.UnitTest/bin/**/*.xml', recursive=True)
               agg = {}  # key=(Class, Func) -> data
@@ -267,63 +435,25 @@ jobs:
                       func = base_function_from_test(test_method)
                       print(f"Extracted: Class={cls}, Test Method={test_method}, Function={func}")
 
-                      # Extract basic information
                       desc = ''
-                      scenario = ''
-                      expected = ''
-                      coverage = ''
-          
+                      pre  = ''
+                      cov  = ''
                       s = m.find('summary')
-                      if s is not None and s.text: 
-                          desc = ' '.join(s.text.split())
-          
+                      if s is not None and s.text: desc = ' '.join(s.text.split())
                       r = m.find('remarks')
-                      remarks_text = ''
                       if r is not None and r.text:
-                          remarks_text = r.text
-                          for line in remarks_text.splitlines():
-                              line = line.strip()
-                              if line.startswith('Scenario:'): 
-                                  scenario = line.replace('Scenario:','').strip()
-                              elif line.startswith('Expected:'): 
-                                  expected = line.replace('Expected:','').strip()
-                              elif line.startswith('Coverage:'): 
-                                  coverage = line.replace('Coverage:','').strip()
+                          for line in r.text.splitlines():
+                              line=line.strip()
+                              if line.startswith('Scenario:'): pre = line.replace('Scenario:','').strip() or pre
+                              elif line.startswith('Coverage:'): cov = line.replace('Coverage:','').strip() or cov
 
-                      # Store test-specific XML data for matrix generation
-                      test_xml_data = {
-                          'test_type': extract_xml_tag_value(remarks_text, 'TestType'),
-                          'input_conditions': extract_xml_tag_value(remarks_text, 'InputConditions'),
-                          'expected_result': extract_xml_tag_value(remarks_text, 'ExpectedResult'),
-                          'expected_return_value': extract_xml_tag_value(remarks_text, 'ExpectedReturnValue'),
-                          'exception_expected': extract_xml_tag_value(remarks_text, 'ExceptionExpected'),
-                          'log_message': extract_xml_tag_value(remarks_text, 'LogMessage'),
-                          'remarks_text': remarks_text
-                      }
-
-                      key = (cls, func)
+                      key=(cls,func)
                       if key not in agg:
-                          agg[key] = {
-                              "Class": cls,
-                              "Function": func,
-                              "Description": desc,
-                              "PreCondition": scenario,
-                              "Expected": expected,
-                              "Requirement": coverage,
-                              "test_data": {}  # Store per-test XML data
-                          }
+                          agg[key]={"Class":cls,"Function":func,"Description":desc,"PreCondition":pre,"Requirement":cov}
                       else:
-                          if not agg[key]["Description"] and desc: 
-                              agg[key]["Description"] = desc
-                          if not agg[key]["PreCondition"] and scenario: 
-                              agg[key]["PreCondition"] = scenario
-                          if not agg[key]["Expected"] and expected: 
-                              agg[key]["Expected"] = expected
-                          if not agg[key]["Requirement"] and coverage:  
-                              agg[key]["Requirement"] = coverage
-          
-                      # Store test-specific data
-                      agg[key]["test_data"][test_method] = test_xml_data
+                          if not agg[key]["Description"] and desc: agg[key]["Description"]=desc
+                          if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"]=pre
+                          if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"]=cov
           
               print(f"Extracted {len(agg)} functions from XML")
               return list(agg.values())
@@ -391,67 +521,331 @@ jobs:
               # Index TRX by (Class, Base)
               idx = defaultdict(list)
               unmatched_tests = []
+          
+              for t in trx:
+                  matched = False
+                  for f_existing in funcs: # Renamed loop variable to avoid shadowing
+                      if same_function(f_existing["Function"], t["Base"]) and f_existing["Class"] == t["Class"]:
+                          idx[(f_existing["Class"], f_existing["Function"])].append(t)
+                          matched = True
+                          break
+          
+                  if not matched:
+                      unmatched_tests.append(t)
+                      # Create a synthetic function for unmatched tests
+                      synthetic_func = {
+                          "Class": t["Class"],
+                          "Function": t["Base"],  # Use Base directly
+                          "Description": f"Auto-generated for {t['Method']}",
+                          "PreCondition": "",
+                          "Requirement": ""
+                      }
+          
+                      # Check if we already have this synthetic function
+                      exists = False
+                      for f_existing in funcs: # Renamed loop variable to avoid shadowing
+                          if f_existing["Class"] == synthetic_func["Class"] and f_existing["Function"] == synthetic_func["Function"]:
+                              exists = True
+                              break
+          
+                      if not exists:
+                          funcs.append(synthetic_func)
+          
+                      # Add test to index
+                      idx[(t["Class"], t["Base"])].append(t)
+          
+              print(f"\nTotal functions after processing: {len(funcs)}")
+              print(f"Total test results from parse_trx: {len(trx)}")
+              print(f"Total tests indexed (should match total test results): {sum(len(tests) for tests in idx.values())}")
+              print(f"Number of functions before creating DataFrame: {len(funcs)}") # Added this line
+
+              print(f"\nUnmatched tests: {len(unmatched_tests)}")
+              if unmatched_tests:
+                  print("Unmatched test details (first 10):")
+                  for t in unmatched_tests[:10]:  # Show first 10
+                      print(f"  - {t['Class']}.{t['Method']}")
+          
+              # Verify total test count
+              total_indexed = sum(len(tests) for tests in idx.values())
+              print(f"Total tests indexed: {total_indexed} (should be {len(trx)})")
+          
+              # Sheet 1: Functions
+              func_rows=[]
+              for i, f in enumerate(funcs, 1):
+                  func_rows.append({
+                      "No": i,
+                      "RequirementName": f["Requirement"],
+                      "Class Name": f["Class"],
+                      "Function Name": f["Function"],
+                      "Function Code": f"Code_{i}",
+                      "Sheet Name": f["Function"],
+                      "Description": f["Description"],
+                      "Pre-Condition": f["PreCondition"]
+                  })
+          
+              # Sheet 2: Statistics
+              stat_rows=[]
+              for i, f in enumerate(funcs, 1):
+                  tests = idx.get((f["Class"], f["Function"]), [])
+                  p=f_=u=0; N=A=B=0
+                  for t in tests:
+                      if t["Outcome"]=="Passed": p+=1
+                      elif t["Outcome"]=="Failed": f_+=1
+                      else: u+=1
+                      c = classify_case(t["Display"] or t["Method"])
+                      if c=='N': N+=1
+                      elif c=='A': A+=1
+                      elif c=='B': B+=1
+                  stat_rows.append({
+                      "No": i,
+                      "Function Code": f'=HYPERLINK("#{f["Function"]}!A1","Code_{i}")',
+                      "Passed": p, "Failed": f_, "Untested": u,
+                      "N": N, "A": A, "B": B,
+                      "Total Test Cases": p+f_+u
+                  })
+          
+              return funcs, pd.DataFrame(func_rows), pd.DataFrame(stat_rows), idx
+
+          # ---------- Matrix writer (per function) ----------
+          def write_matrix(workbook, writer, func, tests):
+              # Create safe sheet name that respects Excel's 31 character limit
+              sheet_name = safe_sheet_name(func["Function"], writer.sheets.keys())
+              ws = workbook.add_worksheet(sheet_name)
+              writer.sheets[sheet_name] = ws
+
+              # Define formats
+              # Blue header format for UTCID columns
+              blue_header = workbook.add_format({
+                  "bold": True,
+                  "align": "center",
+                  "valign": "vcenter",
+                  "border": 1,
+                  "bg_color": "#1e1b4b",
+                  "font_color": "white"
+              })
+          
+              # Blue section headers 
+              blue_section = workbook.add_format({
+                  "bold": True,
+                  "align": "left",
+                  "valign": "vcenter",
+                  "border": 1,
+                  "bg_color": "#1e1b4b",
+                  "font_color": "white"
+              })
+          
+              # Regular label format
+              label_format = workbook.add_format({
+                  "align": "left",
+                  "valign": "vcenter",
+                  "border": 1
+              })
+          
+              # Data cell format (white background with border)
+              data_format = workbook.add_format({
+                  "align": "center",
+                  "valign": "vcenter",
+                  "border": 1
+              })
+
+              # Process test data
+              cols = []
+              for k,t in enumerate(tests,1):
+                  cols.append({
+                      "id": f"UTCID{k:02d}",
+                      "name": t["Display"] or t["Method"],
+                      "exp": expected_from_name(t["Display"] or t["Method"]),
+                      "return_value": get_expected_return_value(t["Display"] or t["Method"]),
+                      "type": classify_case(t["Display"] or t["Method"]),
+                      "out": t["Outcome"],
+                      "dt": t["ExecutedAt"],
+                      "conds": to_conditions_from_name(t["Display"] or t["Method"]),
+                      "log_msg": extract_log_message_from_name(t["Display"] or t["Method"])
+                  })
+
+              # Get unique conditions
+              all_conditions = []
+              for c in cols:
+                  for cond in c["conds"]:
+                      if cond and cond not in all_conditions:
+                          all_conditions.append(cond)
+          
+              if not all_conditions:
+                  all_conditions = ["Standard test condition"]
+
+              # Set column widths
+              ws.set_column(0, 0, 45)  # Label column wider
+              for j in range(len(cols)):
+                  ws.set_column(1+j, 1+j, 15)  # Test case columns
+
+              r = 0
+          
+              # Header row with UTCID columns
+              ws.write(r, 0, "", data_format)
+              for j, c in enumerate(cols):
+                  ws.write(r, 1+j, c["id"], blue_header)
+              r += 1
+
+              # CONDITION section header
+              ws.write(r, 0, "Condition", blue_section)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", blue_section)
+              r += 1
+          
+              # Precondition row
+              ws.write(r, 0, "Precondition", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+              r += 1
+          
+              # Input conditions
+              for condition in all_conditions:
+                  ws.write(r, 0, f"Input: {condition}", label_format)
+                  for j, c in enumerate(cols):
+                      val = "O" if condition in c["conds"] else ""
+                      ws.write(r, 1+j, val, data_format)
+                  r += 1
+
+              # CONFIRM section header
+              ws.write(r, 0, "Confirm", blue_section)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", blue_section)
+              r += 1
+          
+              # Return subsection header
+              ws.write(r, 0, "Return", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+              r += 1
+          
+              # Expected return value row
+              ws.write(r, 0, "Expected Return Value", label_format)
+              for j, c in enumerate(cols):
+                  val = c["return_value"] if c["return_value"] else ""
+                  ws.write(r, 1+j, val, data_format)
+              r += 1
+          
+              # FALSE row
+              ws.write(r, 0, "FALSE", label_format)
+              for j, c in enumerate(cols):
+                  val = "O" if c["exp"] == "FALSE" else ""
+                  ws.write(r, 1+j, val, data_format)
+              r += 1
+          
+              # TRUE row  
+              ws.write(r, 0, "TRUE", label_format)
+              for j, c in enumerate(cols):
+                  val = "O" if c["exp"] == "TRUE" else ""
+                  ws.write(r, 1+j, val, data_format)
+              r += 1
+          
+              # Exception subsection header
+              ws.write(r, 0, "Exception", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+              r += 1
+          
+              # Exception expected row
+              ws.write(r, 0, "Exception Expected", label_format)
+              for j, c in enumerate(cols):
+                  val = "O" if c["exp"] == "EXCEPTION" else ""
+                  ws.write(r, 1+j, val, data_format)
+              r += 1
+          
+              # Log message row
+              ws.write(r, 0, "Log message", label_format)
+              for j, c in enumerate(cols):
+                  msg = c["log_msg"]
+                  ws.write(r, 1+j, msg, data_format)
+              r += 1
+
+              # RESULT section header
+              ws.write(r, 0, "Result", blue_section)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", blue_section)
+              r += 1
+          
+              # Type row
+              ws.write(r, 0, "Type(N : Normal, A : Abnormal, B : Boundary)", label_format)
+              for j, c in enumerate(cols):
+                  ws.write(r, 1+j, c["type"], data_format)
+              r += 1
+          
+              # Passed/Failed row
+              ws.write(r, 0, "Passed/Failed", label_format)
+              for j, c in enumerate(cols):
+                  result_val = "P" if c["out"] == "Passed" else ("F" if c["out"] == "Failed" else "")
+                  ws.write(r, 1+j, result_val, data_format)
+              r += 1
+          
+              # Executed Date row
+              ws.write(r, 0, "Executed Date", label_format)
+              for j, c in enumerate(cols):
+                  date_str = c["dt"].split('T')[0] if 'T' in c["dt"] else c["dt"]
+                  # Format date as DD/MM/YYYY if possible
+                  if date_str and len(date_str) >= 10:
+                      try:
+                          parts = date_str.split('-')
+                          if len(parts) == 3:
+                              date_str = f"{parts[2]}/{parts[1]}/{parts[0]}"
+                      except:
+                          pass
+                  ws.write(r, 1+j, date_str, data_format)
+              r += 1
+          
+              # Defect ID row
+              ws.write(r, 0, "Defect ID", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, "", data_format)
+
+              return sheet_name
+
           # ---------- main ----------
           def main():
-            funcs, df_funcs, df_stats, idx = build_core()
-            out = "./coveragereport/Functions_Statistics_Report.xlsx"
-            
-            # Track actual sheet names created (for hyperlink updates)
-            sheet_name_mapping = {}
-            
-            with pd.ExcelWriter(out, engine="xlsxwriter") as w:
-              # Core sheets
-              df_funcs.to_excel(w, sheet_name="Functions", index=False)
-              df_stats.to_excel(w, sheet_name="Statistics", index=False)
-              
-              wb = w.book
-              hdr = wb.add_format({"bold": True,"bg_color":"#1F4E78","font_color":"white","border":1})
-              
-              for sheet,df in [("Functions",df_funcs),("Statistics",df_stats)]:
-                ws = w.sheets[sheet]
-                for c,col in enumerate(df.columns):
-                  ws.write(0,c,col,hdr)
-              
-              # Matrix per function
-              for f in funcs:
-                tests = idx.get((f["Class"], f["Function"]), [])
-                if tests:  # Only create matrix if there are tests
-                  actual_sheet_name = write_matrix(wb, w, f, tests)
-                  sheet_name_mapping[f["Function"]] = actual_sheet_name
-              
-              # Update hyperlinks in Statistics sheet
-              stats_ws = w.sheets["Statistics"]
-              for i, f in enumerate(funcs):
-                if f["Function"] in sheet_name_mapping:
-                  actual_name = sheet_name_mapping[f["Function"]]
-                  hyperlink_formula = f'=HYPERLINK("#{actual_name}!A1","Code_{i+1}")'
-                  stats_ws.write(i+1, 1, hyperlink_formula)
-            
-            print(f"Report generated: {out}")
-         
-             # Final summary with enhanced XML parsing statistics
-             total_tests_in_report = sum([row["Total Test Cases"] for _, row in df_stats.iterrows()])
-            xml_parsed_tests = 0
-            fallback_parsed_tests = 0
-            
-            for f in funcs:
-              tests = idx.get((f["Class"], f["Function"]), [])
-              for t in tests:
-                test_xml_data = f.get("test_data", {}).get(t["Method"], {})
-                if test_xml_data and any(test_xml_data.values()):
-                  xml_parsed_tests += 1
-                else:
-                  fallback_parsed_tests += 1
-            
-            print(f"\n=== FINAL SUMMARY ===")
-            print(f"Total functions: {len(funcs)}")
-             print(f"Total test cases in report: {total_tests_in_report}")
-             print(f"Tests parsed from XML tags: {xml_parsed_tests}")
-             print(f"Tests parsed from method names (fallback): {fallback_parsed_tests}")
-             print(f"XML parsing coverage: {(xml_parsed_tests/total_tests_in_report*100):.1f}%" if total_tests_in_report > 0 else "XML parsing coverage: 0%")
+              funcs, df_funcs, df_stats, idx = build_core()
+              out = "./coveragereport/Functions_Statistics_Report.xlsx"
           
+              # Track actual sheet names created (for hyperlink updates)
+              sheet_name_mapping = {}
+          
+              with pd.ExcelWriter(out, engine="xlsxwriter") as w:
+                  # Core sheets
+                  df_funcs.to_excel(w, sheet_name="Functions", index=False)
+                  df_stats.to_excel(w, sheet_name="Statistics", index=False)
+
+                  wb = w.book
+                  hdr = wb.add_format({"bold": True,"bg_color":"#1F4E78","font_color":"white","border":1})
+          
+                  for sheet,df in [("Functions",df_funcs),("Statistics",df_stats)]:
+                      ws = w.sheets[sheet]
+                      for c,col in enumerate(df.columns):
+                          ws.write(0,c,col,hdr)
+
+                  # Matrix per function
+                  for f in funcs:
+                      tests = idx.get((f["Class"], f["Function"]), [])
+                      if tests:  # Only create matrix if there are tests
+                          actual_sheet_name = write_matrix(wb, w, f, tests)
+                          sheet_name_mapping[f["Function"]] = actual_sheet_name
+
+                  # Update hyperlinks in Statistics sheet
+                  stats_ws = w.sheets["Statistics"]
+                  for i, f in enumerate(funcs):
+                      if f["Function"] in sheet_name_mapping:
+                          actual_name = sheet_name_mapping[f["Function"]]
+                          hyperlink_formula = f'=HYPERLINK("#{actual_name}!A1","Code_{i+1}")'
+                          stats_ws.write(i+1, 1, hyperlink_formula)
+
+              print(f"Report generated: {out}")
+          
+              # Final summary
+              total_tests_in_report = sum([row["Total Test Cases"] for _, row in df_stats.iterrows()])
+              print(f"\n=== FINAL SUMMARY ===")
+              print(f"Total functions: {len(funcs)}")
+              print(f"Total test cases in report: {total_tests_in_report}")
+
           if __name__ == "__main__":
-            main()
+              main()
           EOF
           python generate_excel_report.py
 
