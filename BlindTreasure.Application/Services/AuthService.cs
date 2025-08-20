@@ -65,7 +65,13 @@ public class AuthService : IAuthService
         };
 
         await _unitOfWork.Users.AddAsync(user);
-        await _unitOfWork.SaveChangesAsync();
+        var saveResult = await _unitOfWork.SaveChangesAsync();
+        
+        if (saveResult == 0)
+        {
+            _logger.Error($"[RegisterUserAsync] Failed to save user {user.Email} to database.");
+            throw new Exception("Failed to save user to database.");
+        }
 
         _logger.Success($"[RegisterUserAsync] User {user.Email} created successfully.");
 
@@ -97,7 +103,13 @@ public class AuthService : IAuthService
         };
 
         await _unitOfWork.Users.AddAsync(user);
-        await _unitOfWork.SaveChangesAsync();
+        var userSaveResult = await _unitOfWork.SaveChangesAsync();
+        
+        if (userSaveResult == 0)
+        {
+            _logger.Error($"[RegisterSellerAsync] Failed to save user {user.Email} to database.");
+            throw new Exception("Failed to save user to database.");
+        }
 
         var seller = new Seller
         {
@@ -111,7 +123,13 @@ public class AuthService : IAuthService
         };
 
         await _unitOfWork.Sellers.AddAsync(seller);
-        await _unitOfWork.SaveChangesAsync();
+        var sellerSaveResult = await _unitOfWork.SaveChangesAsync();
+        
+        if (sellerSaveResult == 0)
+        {
+            _logger.Error($"[RegisterSellerAsync] Failed to save seller for user {user.Email} to database.");
+            throw new Exception("Failed to save seller to database.");
+        }
 
         await GenerateAndSendOtpAsync(user, OtpPurpose.Register, "register-otp");
 
@@ -488,7 +506,14 @@ public class AuthService : IAuthService
         };
 
         await _unitOfWork.OtpVerifications.AddAsync(otp);
-        await _unitOfWork.SaveChangesAsync();
+        var saveResult = await _unitOfWork.SaveChangesAsync();
+        
+        if (saveResult == 0)
+        {
+            _logger.Error($"[GenerateAndSendOtpAsync] Failed to save OTP verification for {user.Email} to database.");
+            throw new Exception("Failed to save OTP verification to database.");
+        }
+        
         await _cacheService.SetAsync($"{otpCachePrefix}:{user.Email}", otpToken.Code, TimeSpan.FromMinutes(10));
 
         // Send the correct email based on OTP purpose
