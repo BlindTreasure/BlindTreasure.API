@@ -50,19 +50,24 @@ public class UserServiceTests
         );
     }
 
-
     #region UpdateProfileAsync Tests
 
     /// <summary>
-    /// Tests if a user's profile can be updated successfully with valid data.
+    /// Tests successful user profile update with valid input data
     /// </summary>
     /// <remarks>
-    /// Scenario: A user provides valid information to update their profile (e.g., full name, phone number).
-    /// Expected: The user's profile is updated in the database, and the updated user details are returned.
-    /// Coverage: Basic profile update functionality.
+    /// Scenario: User provides valid profile information including full name and phone number for profile update
+    /// Expected: Profile is successfully updated and returns updated UserDto object with new information
+    /// Coverage: Normal case testing for profile update functionality with valid data validation
+    /// TestType: Normal
+    /// InputConditions: Valid user ID exists in system, Valid UpdateProfileDto with FullName and PhoneNumber provided, User is not deleted, User has Customer role
+    /// ExpectedResult: Updated UserDto object with new profile information
+    /// ExpectedReturnValue: UserDto object containing updated profile data
+    /// ExceptionExpected: false
+    /// LogMessage: Profile updated successfully
     /// </remarks>
     [Fact]
-    public async Task UpdateProfileAsync_ShouldUpdateProfile_WhenValidData()
+    public async Task UpdateProfileAsync_Should_UpdateProfile_When_ValidData()
     {
         var userId = Guid.NewGuid();
         var user = new User
@@ -83,15 +88,21 @@ public class UserServiceTests
     }
 
     /// <summary>
-    /// Tests if an exception is thrown when attempting to update a profile for a user that does not exist.
+    /// Tests exception handling when updating profile for non-existent user
     /// </summary>
     /// <remarks>
-    /// Scenario: An attempt is made to update a profile for a user ID that does not exist in the system.
-    /// Expected: An `Exception` is thrown, indicating that the user was not found.
-    /// Coverage: Error handling for updating a non-existent user's profile.
+    /// Scenario: Attempt to update profile using a user ID that does not exist in the database
+    /// Expected: Exception is thrown indicating user not found
+    /// Coverage: Abnormal case testing for profile update with invalid user ID
+    /// TestType: Abnormal  
+    /// InputConditions: User ID does not exist in database, Valid UpdateProfileDto provided
+    /// ExpectedResult: Exception thrown
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: User not found
     /// </remarks>
     [Fact]
-    public async Task UpdateProfileAsync_ShouldThrowNotFound_WhenUserNotExists()
+    public async Task UpdateProfileAsync_Should_ThrowException_When_UserNotExists()
     {
         var userId = Guid.NewGuid();
         _userRepoMock.Setup(x => x.GetByIdAsync(userId)).ReturnsAsync((User)null!);
@@ -104,15 +115,21 @@ public class UserServiceTests
     #region UploadAvatarAsync Tests
 
     /// <summary>
-    /// Tests if a user's avatar can be uploaded successfully with a valid file.
+    /// Tests successful avatar upload with valid image file
     /// </summary>
     /// <remarks>
-    /// Scenario: A user provides a valid image file to upload as their avatar.
-    /// Expected: The avatar is uploaded to blob storage, the user's avatar URL is updated in the database, and the new avatar URL is returned.
-    /// Coverage: Avatar upload functionality and integration with blob storage.
+    /// Scenario: User uploads a valid image file as their profile avatar
+    /// Expected: Avatar is successfully uploaded to blob storage and user record is updated with new avatar URL
+    /// Coverage: Normal case testing for avatar upload functionality with blob storage integration
+    /// TestType: Normal
+    /// InputConditions: Valid user ID exists in system, Valid IFormFile with image content provided, File size is greater than 0, User is not deleted
+    /// ExpectedResult: UserDto object with updated avatar URL
+    /// ExpectedReturnValue: UserDto object containing avatar URL
+    /// ExceptionExpected: false
+    /// LogMessage: Avatar uploaded successfully
     /// </remarks>
     [Fact]
-    public async Task UploadAvatarAsync_ShouldUploadAvatar_WhenValidFile()
+    public async Task UploadAvatarAsync_Should_UploadAvatar_When_ValidFile()
     {
         var userId = Guid.NewGuid();
         var user = new User
@@ -136,15 +153,21 @@ public class UserServiceTests
     }
 
     /// <summary>
-    /// Tests if a `BadRequest` exception is thrown when attempting to upload an empty avatar file.
+    /// Tests exception handling when uploading empty avatar file
     /// </summary>
     /// <remarks>
-    /// Scenario: A user attempts to upload an empty file (e.g., 0 bytes) as their avatar.
-    /// Expected: An `Exception` is thrown, indicating a bad request due to the empty file.
-    /// Coverage: Input validation for avatar file uploads (empty file check).
+    /// Scenario: User attempts to upload an empty file or file with zero bytes as avatar
+    /// Expected: Exception is thrown due to invalid file input
+    /// Coverage: Boundary case testing for avatar upload with empty file validation
+    /// TestType: Boundary
+    /// InputConditions: Valid user ID exists in system, IFormFile with zero length provided, File is empty
+    /// ExpectedResult: Exception thrown
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Invalid input data
     /// </remarks>
     [Fact]
-    public async Task UploadAvatarAsync_ShouldThrowBadRequest_WhenFileIsEmpty()
+    public async Task UploadAvatarAsync_Should_ThrowException_When_FileIsEmpty()
     {
         var userId = Guid.NewGuid();
         var user = new User
@@ -160,15 +183,21 @@ public class UserServiceTests
     #region CreateUserAsync Tests
 
     /// <summary>
-    /// Tests if a new user can be created successfully when the provided email does not already exist.
+    /// Tests successful user creation with unique email address
     /// </summary>
     /// <remarks>
-    /// Scenario: A new user attempts to register with an email address that is not already in the system.
-    /// Expected: The user is successfully created in the database, and the new user details are returned.
-    /// Coverage: User creation functionality and email uniqueness check.
+    /// Scenario: New user registration with email address that does not exist in the system
+    /// Expected: User is successfully created in database and returns new UserDto object
+    /// Coverage: Normal case testing for user creation functionality with email uniqueness validation
+    /// TestType: Normal
+    /// InputConditions: Email does not exist in cache, Email does not exist in database, Valid UserCreateDto with all required fields, Password meets requirements
+    /// ExpectedResult: UserDto object with new user information
+    /// ExpectedReturnValue: UserDto object
+    /// ExceptionExpected: false
+    /// LogMessage: User created successfully
     /// </remarks>
     [Fact]
-    public async Task CreateUserAsync_ShouldCreateUser_WhenEmailNotExists()
+    public async Task CreateUserAsync_Should_CreateUser_When_EmailNotExists()
     {
         var dto = new UserCreateDto
         {
@@ -191,15 +220,21 @@ public class UserServiceTests
     }
 
     /// <summary>
-    /// Tests if a `Conflict` exception is thrown when attempting to create a user with an email that already exists.
+    /// Tests exception handling when creating user with existing email
     /// </summary>
     /// <remarks>
-    /// Scenario: An attempt is made to create a user with an email address that is already registered.
-    /// Expected: An `Exception` is thrown, indicating a conflict due to the existing email.
-    /// Coverage: Email uniqueness validation during user creation.
+    /// Scenario: Attempt to create new user with email address that already exists in the system
+    /// Expected: Exception is thrown indicating email conflict
+    /// Coverage: Abnormal case testing for user creation with duplicate email validation
+    /// TestType: Abnormal
+    /// InputConditions: Email already exists in cache, Valid UserCreateDto provided
+    /// ExpectedResult: Exception thrown
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Email already exists
     /// </remarks>
     [Fact]
-    public async Task CreateUserAsync_ShouldThrowConflict_WhenEmailExists()
+    public async Task CreateUserAsync_Should_ThrowException_When_EmailExists()
     {
         var dto = new UserCreateDto
             { Email = "existing@example.com", Password = "Password123!", FullName = "Existing User" };
@@ -214,15 +249,21 @@ public class UserServiceTests
     #region UpdateUserStatusAsync Tests
 
     /// <summary>
-    /// Tests if a user's status can be updated successfully when the user exists.
+    /// Tests successful user status update for existing user
     /// </summary>
     /// <remarks>
-    /// Scenario: An administrator updates the status of an existing user (e.g., from Active to Suspended).
-    /// Expected: The user's status is updated in the database, and the updated user details are returned.
-    /// Coverage: User status update functionality.
+    /// Scenario: Administrator updates the status of an existing user from Active to Suspended
+    /// Expected: User status is successfully updated in database and returns updated UserDto object
+    /// Coverage: Normal case testing for user status update functionality
+    /// TestType: Normal
+    /// InputConditions: Valid user ID exists in system, Valid UserStatus provided, User exists in database, Valid suspension reason provided
+    /// ExpectedResult: UserDto object with updated status
+    /// ExpectedReturnValue: Updated UserDto
+    /// ExceptionExpected: false
+    /// LogMessage: User status updated successfully
     /// </remarks>
     [Fact]
-    public async Task UpdateUserStatusAsync_ShouldUpdateStatus_WhenUserExists()
+    public async Task UpdateUserStatusAsync_Should_UpdateStatus_When_UserExists()
     {
         var userId = Guid.NewGuid();
         var user = new User
@@ -238,15 +279,21 @@ public class UserServiceTests
     }
 
     /// <summary>
-    /// Tests if a `NotFound` exception is thrown when attempting to update the status of a user that does not exist.
+    /// Tests exception handling when updating status for non-existent user
     /// </summary>
     /// <remarks>
-    /// Scenario: An attempt is made to update the status of a user ID that does not exist in the system.
-    /// Expected: An `Exception` is thrown, indicating that the user was not found.
-    /// Coverage: Error handling for updating the status of a non-existent user.
+    /// Scenario: Attempt to update status using a user ID that does not exist in the database
+    /// Expected: Exception is thrown indicating user not found
+    /// Coverage: Abnormal case testing for status update with invalid user ID
+    /// TestType: Abnormal
+    /// InputConditions: User ID does not exist in database, Valid UserStatus provided
+    /// ExpectedResult: Exception thrown
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: User not found
     /// </remarks>
     [Fact]
-    public async Task UpdateUserStatusAsync_ShouldThrowNotFound_WhenUserNotExists()
+    public async Task UpdateUserStatusAsync_Should_ThrowException_When_UserNotExists()
     {
         var userId = Guid.NewGuid();
         _userRepoMock.Setup(x => x.FirstOrDefaultAsync(It.IsAny<Expression<Func<User, bool>>>()))
@@ -256,15 +303,21 @@ public class UserServiceTests
     }
 
     /// <summary>
-    /// Tests if a user is reactivated (IsDeleted set to false) when their status is set to Active.
+    /// Tests user reactivation when status is set to Active
     /// </summary>
     /// <remarks>
-    /// Scenario: An administrator changes a user's status to `Active` when they were previously suspended or deleted.
-    /// Expected: The user's status is set to `Active`, and their `IsDeleted` flag is set to `false`.
-    /// Coverage: User reactivation logic.
+    /// Scenario: Administrator changes user status to Active for a previously suspended and deleted user
+    /// Expected: User status is set to Active and IsDeleted flag is set to false for reactivation
+    /// Coverage: Boundary case testing for user reactivation logic when status becomes Active
+    /// TestType: Boundary
+    /// InputConditions: User exists in database, User status is currently Suspended, User IsDeleted flag is true, Status is set to Active
+    /// ExpectedResult: UserDto object with Active status and user reactivated
+    /// ExpectedReturnValue: Reactivated UserDto
+    /// ExceptionExpected: false
+    /// LogMessage: User reactivated successfully
     /// </remarks>
     [Fact]
-    public async Task UpdateUserStatusAsync_ShouldReactivateUser_WhenStatusIsActive()
+    public async Task UpdateUserStatusAsync_Should_ReactivateUser_When_StatusIsActive()
     {
         var userId = Guid.NewGuid();
         var user = new User
@@ -287,7 +340,6 @@ public class UserServiceTests
     }
 
     #endregion
-
 
     #region Helper Methods
 
