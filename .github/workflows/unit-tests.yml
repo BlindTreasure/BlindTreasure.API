@@ -64,7 +64,7 @@ jobs:
       - name: Generate Excel Report (Functions + Statistics + Matrices)
         run: |
           mkdir -p coveragereport
-          cat > generate_excel_report.py << 'EOF'
+          cat << 'EOF' | sed 's/^\s\{10\}//' > generate_excel_report.py
           import pandas as pd
           import xml.etree.ElementTree as ET
           from bs4 import BeautifulSoup
