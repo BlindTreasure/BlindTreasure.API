@@ -74,153 +74,129 @@ jobs:
           XML_PREFIX = "M:BlindTreasure.UnitTest.Services."
 
           # ---------- helpers ----------
-          def strip_params(s): return s.split('(')[0] if s else s
-          def short_class(fq): return fq.split('.')[-1] if fq else ''
-          def norm(s): return re.sub(r'[^A-Za-z0-9_]', '', (s or '')).lower()
+          def strip_params(s):
+              return s.split('(')[0] if s else s
+
+          def short_class(fq):
+              return fq.split('.')[-1] if fq else ''
+
+          def norm(s):
+              return re.sub(r'[^A-Za-z0-9_]', '', (s or '')).lower()
 
           def base_function_from_test(method_name: str) -> str:
               """Lấy function-under-test từ test method: RegisterCustomerAsync_Should... -> RegisterCustomerAsync"""
               m = strip_params(method_name or '')
-              if '_Should' in m: return m.split('_Should',1)[0]
-              if '_When'   in m: return m.split('_When',1)[0]
+              if '_Should' in m:
+                  return m.split('_Should', 1)[0]
+              if '_When' in m:
+                  return m.split('_When', 1)[0]
               return m
 
           def same_function(doc_func: str, test_method: str) -> bool:
               """Improved matching logic - more flexible"""
               d = norm(doc_func)
               t = norm(base_function_from_test(test_method))
-          
+
               # Exact match
               if d == t:
                   return True
-          
+
               # Handle Async suffix
               if d.endswith('async') and t == d[:-5]:
                   return True
               if t.endswith('async') and d == t[:-5]:
                   return True
-          
+
               # Substring matching for partial names
               if len(d) > 3 and len(t) > 3:
                   if d in t or t in d:
                       return True
-          
+
               return False
 
           def classify_case(name: str) -> str:
               n = (name or '').lower()
-              if 'boundary' in n: return 'B'
-              if 'abnormal' in n: return 'A'
-              if 'normal'   in n: return 'N'
-                      desc = ''
-                      pre  = ''
-                      cov  = ''
-                      exp  = ''
-                      test_type = ''
-                      input_conditions = ''
-                      expected_result = ''
-                      expected_return_value = ''
-                      exception_expected = ''
-                      log_msg_func = ''
-                      s = m.find('summary')
-                      if s is not None and s.text: desc = ' '.join(s.text.split())
-                      r = m.find('remarks')
-                      if r is not None and r.text:
-                          for line in r.text.splitlines():
-                              line = line.strip()
-                              if not line: continue
-                              # Support flexible key parsing: "Key: value" lines
-                              if ':' in line:
-                                  k, v = line.split(':', 1)
-                                  k = k.strip().lower()
-                                  v = v.strip()
-                                  if k == 'scenario':
-                                      pre = v or pre
-                                  elif k == 'coverage':
-                                      cov = v or cov
-                                  elif k == 'expected':
-                                      exp = v or exp
-                                  elif k == 'testtype':
-                                      test_type = v or test_type
-                                  elif k == 'inputconditions':
-                                      input_conditions = v or input_conditions
-                                  elif k == 'expectedresult':
-                                      expected_result = v or expected_result
-                                  elif k == 'expectedreturnvalue':
-                                      expected_return_value = v or expected_return_value
-                                  elif k == 'exceptionexpected':
-                                      exception_expected = v or exception_expected
-                                  elif k == 'logmessage':
-                                      log_msg_func = v or log_msg_func
-                                  else:
-                                      # fallback: keep existing parsing for older formats
-                                      if line.startswith('Scenario:'):
-                                          pre = line.replace('Scenario:', '').strip() or pre
-                                      elif line.startswith('Coverage:'):
-                                          cov = line.replace('Coverage:', '').strip() or cov
+              if 'boundary' in n:
+                  return 'B'
+              if 'abnormal' in n:
+                  return 'A'
+              if 'normal' in n:
+                  return 'N'
+              return 'N'
 
-                      key=(cls,func)
-                      if key not in agg:
-                          agg[key]={("Class":cls,
-                                     "Function":func,
-                                     "Description":desc,
-                                     "PreCondition":pre,
-                                     "Requirement":cov,
-                                     "Expected":exp,
-                                     "TestType":test_type,
-                                     "InputConditions":input_conditions,
-                                     "ExpectedResult":expected_result,
-                                     "ExpectedReturnValue":expected_return_value,
-                                     "ExceptionExpected":exception_expected,
-                                     "FunctionLogMessage":log_msg_func}
-                      else:
-                          if not agg[key]["Description"] and desc: agg[key]["Description"]=desc
-                          if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"]=pre
-                          if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"]=cov
-                          if not agg[key]["Expected"] and exp: agg[key]["Expected"]=exp
-                          if not agg[key]["TestType"] and test_type: agg[key]["TestType"]=test_type
-                          if not agg[key]["InputConditions"] and input_conditions: agg[key]["InputConditions"]=input_conditions
-                          if not agg[key]["ExpectedResult"] and expected_result: agg[key]["ExpectedResult"]=expected_result
-                          if not agg[key]["ExpectedReturnValue"] and expected_return_value: agg[key]["ExpectedReturnValue"]=expected_return_value
-                          if not agg[key]["ExceptionExpected"] and exception_expected: agg[key]["ExceptionExpected"]=exception_expected
-                          if not agg[key]["FunctionLogMessage"] and log_msg_func: agg[key]["FunctionLogMessage"]=log_msg_func
+          def expected_from_name(name: str) -> str:
+              """Parse expected result from test name"""
+              n = (name or '').lower()
+              if 'shouldreturntrue' in n or 'should_be_true' in n:
+                  return 'TRUE'
+              if 'shouldreturnfalse' in n or 'should_be_false' in n:
+                  return 'FALSE'
+              if 'shouldthrow' in n or 'exception' in n or 'shouldthrownotfound' in n or 'shouldthrowconflict' in n or 'shouldthrowbadrequest' in n:
+                  return 'EXCEPTION'
+
+              # Specific patterns for different outcomes
+              if 'shouldcreateuser' in n or 'shouldupdateprofile' in n or 'shoulduploadavatar' in n or 'shouldupdatestatus' in n:
+                  return 'TRUE'
+              if 'shouldreactivateuser' in n:
+                  return 'TRUE'
+
+              return ''
+
+          def get_expected_return_value(name: str) -> str:
+              """Get specific return value expected from test name"""
+              n = (name or '').lower()
+
               # For successful operations
-              if 'shouldcreateuser' in n: return 'UserDto object'
-              if 'shouldupdateprofile' in n: return 'Updated UserDto'
-              if 'shoulduploadavatar' in n: return 'UserDto with avatar URL'
-              if 'shouldupdatestatus' in n: return 'Updated UserDto'
-              if 'shouldreactivateuser' in n: return 'Reactivated UserDto'
-          
+              if 'shouldcreateuser' in n:
+                  return 'UserDto object'
+              if 'shouldupdateprofile' in n:
+                  return 'Updated UserDto'
+              if 'shoulduploadavatar' in n:
+                  return 'UserDto with avatar URL'
+              if 'shouldupdatestatus' in n:
+                  return 'Updated UserDto'
+              if 'shouldreactivateuser' in n:
+                  return 'Reactivated UserDto'
+
               # For boolean returns
-              if 'shouldreturntrue' in n: return 'true'
-              if 'shouldreturnfalse' in n: return 'false'
-          
+              if 'shouldreturntrue' in n:
+                  return 'true'
+              if 'shouldreturnfalse' in n:
+                  return 'false'
+
               return ''
 
           def extract_log_message_from_name(name: str) -> str:
               """Extract expected log message or error from test name"""
               n = (name or '').lower()
-              if 'conflict' in n or 'emailexists' in n: return 'Email already exists'
-              if 'forbidden' in n: return 'Forbidden access'
-              if 'notfound' in n or 'usernotexists' in n: return 'User not found'
-              if 'badrequest' in n or 'fileisempty' in n: return 'Invalid input data'
-              if 'unauthorized' in n: return 'Unauthorized access'
-              if 'nameexists' in n: return 'Name already exists'
-              if 'empty' in n or 'null' in n: return 'Input validation error'
+              if 'conflict' in n or 'emailexists' in n:
+                  return 'Email already exists'
+              if 'forbidden' in n:
+                  return 'Forbidden access'
+              if 'notfound' in n or 'usernotexists' in n:
+                  return 'User not found'
+              if 'badrequest' in n or 'fileisempty' in n:
+                  return 'Invalid input data'
+              if 'unauthorized' in n:
+                  return 'Unauthorized access'
+              if 'nameexists' in n:
+                  return 'Name already exists'
+              if 'empty' in n or 'null' in n:
+                  return 'Input validation error'
               return ''
 
           def to_conditions_from_name(name: str):
               """Parse điều kiện từ tên test method."""
               base = strip_params(name or '').lower()
               conditions = []
-          
+
               # Patterns for different test scenarios
               if 'validdata' in base or ('should' in base and ('create' in base or 'update' in base) and 'when' not in base):
                   conditions.append('Valid input data provided')
-          
+
               if 'validfile' in base:
                   conditions.append('Valid file provided')
-          
+
               if 'empty' in base or 'null' in base:
                   if 'file' in base:
                       conditions.append('File is null or empty')
@@ -228,44 +204,44 @@ jobs:
                       conditions.append('Name is null or empty')
                   else:
                       conditions.append('Required field is null or empty')
-          
+
               if 'invalid' in base:
                   conditions.append('Invalid input data')
-          
+
               if 'notexists' in base or 'notfound' in base:
                   conditions.append('Entity does not exist')
-          
+
               if 'notadmin' in base or 'notauthorized' in base or 'forbidden' in base:
                   conditions.append('User lacks required permissions')
-          
+
               if 'emailexists' in base or 'conflict' in base:
                   conditions.append('Email already exists')
-          
+
               if 'userexists' in base:
                   conditions.append('User exists in system')
-          
+
               if 'statusisactive' in base:
                   conditions.append('Status is set to Active')
 
               # Default condition if none found
               if not conditions:
                   conditions.append('Standard test condition')
-          
+
               return conditions[:4]  # Max 4 conditions
 
           def safe_sheet_name(name, existing_sheets):
               """Create a safe Excel sheet name (max 31 chars, unique)"""
               if not name:
                   name = "Sheet"
-          
+
               # Clean invalid characters for Excel sheet names
               safe_name = re.sub(r'[\\/*\[\]:?]', '_', str(name))
-          
+
               # Truncate to fit within Excel's 31 character limit, leaving room for suffix
               max_base_length = 25  # Leave room for " (999)" suffix
               if len(safe_name) > max_base_length:
                   safe_name = safe_name[:max_base_length]
-          
+
               # Handle duplicates
               final_name = safe_name
               counter = 1
@@ -278,34 +254,34 @@ jobs:
                       final_name = f"{truncated}{suffix}"
                   else:
                       final_name = f"{safe_name}{suffix}"
-          
+
               return final_name
 
           # ---------- XML -> functions (group by class + function-under-test) ----------
           def extract_functions():
               xml_files = glob.glob('./BlindTreasure.UnitTest/bin/**/*.xml', recursive=True)
               agg = {}  # key=(Class, Func) -> data
-          
+
               print(f"Found {len(xml_files)} XML files")
-          
+
               for f in xml_files:
                   try:
                       root = ET.parse(f).getroot()
                   except Exception as e:
                       print(f"Error parsing {f}: {e}")
                       continue
-          
+
                   for m in root.findall('.//member'):
-                      name = m.get('name','')
+                      name = m.get('name', '')
                       print(f"Processing XML member name: {name}")
-                      if not name.startswith('M:'): 
+                      if not name.startswith('M:'):
                           print(f"Skipping {name}: Does not start with M:")
                           continue
-                      if not name.startswith(XML_PREFIX): 
+                      if not name.startswith(XML_PREFIX):
                           print(f"Skipping {name}: Does not start with XML_PREFIX ({XML_PREFIX})")
                           continue
                       parts = name.split('.')
-                      if len(parts) < 2: 
+                      if len(parts) < 2:
                           print(f"Skipping {name}: Not enough parts after splitting by '.'")
                           continue
                       cls = parts[-2]
@@ -314,62 +290,68 @@ jobs:
                       print(f"Extracted: Class={cls}, Test Method={test_method}, Function={func}")
 
                       desc = ''
-                      pre  = ''
-                      cov  = ''
+                      pre = ''
+                      cov = ''
                       s = m.find('summary')
-                      if s is not None and s.text: desc = ' '.join(s.text.split())
+                      if s is not None and s.text:
+                          desc = ' '.join(s.text.split())
                       r = m.find('remarks')
                       if r is not None and r.text:
                           for line in r.text.splitlines():
-                              line=line.strip()
-                              if line.startswith('Scenario:'): pre = line.replace('Scenario:','').strip() or pre
-                              elif line.startswith('Coverage:'): cov = line.replace('Coverage:','').strip() or cov
+                              line = line.strip()
+                              if line.startswith('Scenario:'):
+                                  pre = line.replace('Scenario:', '').strip() or pre
+                              elif line.startswith('Coverage:'):
+                                  cov = line.replace('Coverage:', '').strip() or cov
 
-                      key=(cls,func)
+                      key = (cls, func)
                       if key not in agg:
-                          agg[key]={"Class":cls,"Function":func,"Description":desc,"PreCondition":pre,"Requirement":cov}
+                          agg[key] = {"Class": cls, "Function": func, "Description": desc, "PreCondition": pre, "Requirement": cov}
                       else:
-                          if not agg[key]["Description"] and desc: agg[key]["Description"]=desc
-                          if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"]=pre
-                          if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"]=cov
-          
+                          if not agg[key]["Description"] and desc:
+                              agg[key]["Description"] = desc
+                          if not agg[key]["PreCondition"] and pre:
+                              agg[key]["PreCondition"] = pre
+                          if not agg[key]["Requirement"] and cov:
+                              agg[key]["Requirement"] = cov
+
               print(f"Extracted {len(agg)} functions from XML")
               return list(agg.values())
 
           # ---------- TRX robust parse ----------
           def parse_trx():
               trx_files = glob.glob('./TestResults/**/test-results.trx', recursive=True)
-              if not trx_files: 
+              if not trx_files:
                   print("No TRX files found")
                   return []
-          
-              print(f"Parsing TRX file: {trx_files[0]}")
-          
-              with open(trx_files[0],'r',encoding='utf-8') as f:
-                  soup = BeautifulSoup(f.read(),'xml')
 
-              id_map={}
+              print(f"Parsing TRX file: {trx_files[0]}")
+
+              with open(trx_files[0], 'r', encoding='utf-8') as f:
+                  soup = BeautifulSoup(f.read(), 'xml')
+
+              id_map = {}
               total_unit_tests = 0
               for ut in soup.find_all('UnitTest'):
                   total_unit_tests += 1
                   ut_id = ut.get('id') or ut.get('testId')
                   tm = ut.find('TestMethod');
-                  if not ut_id or tm is None: 
+                  if not ut_id or tm is None:
                       print(f"Skipping UnitTest: id={ut_id}, tm_found={tm is not None}")
                       continue
-                  class_full = tm.get('className','')
-                  method_name = strip_params(tm.get('name',''))
-                  id_map[ut_id]=(short_class(class_full), method_name)
+                  class_full = tm.get('className', '')
+                  method_name = strip_params(tm.get('name', ''))
+                  id_map[ut_id] = (short_class(class_full), method_name)
 
               print(f"Total UnitTest elements found: {total_unit_tests}")
               print(f"Found {len(id_map)} test definitions in TRX id_map")
 
-              out=[]
+              out = []
               total_unit_test_results = 0
               for res in soup.find_all('UnitTestResult'):
                   total_unit_test_results += 1
                   tid = res.get('testId')
-                  if not tid or tid not in id_map: 
+                  if not tid or tid not in id_map:
                       print(f"Skipping UnitTestResult: testId={tid}, id_map_contains={tid in id_map}")
                       continue
                   cls, mth = id_map[tid]
@@ -377,11 +359,11 @@ jobs:
                       "Class": cls,
                       "Method": mth,               # test method name
                       "Base": base_function_from_test(mth),  # function-under-test
-                      "Outcome": res.get('outcome','Unknown'),
-                      "Display": strip_params(res.get('testName','')),
+                      "Outcome": res.get('outcome', 'Unknown'),
+                      "Display": strip_params(res.get('testName', '')),
                       "ExecutedAt": res.get('endTime') or res.get('startTime') or ''
                   })
-          
+
               print(f"Total UnitTestResult elements found: {total_unit_test_results}")
               print(f"Parsed {len(out)} test results from TRX")
               return out
@@ -390,16 +372,16 @@ jobs:
           def build_core():
               funcs = extract_functions()
               trx = parse_trx()
-          
+
               # Debug: Print all test cases
               print("\n=== ALL TEST CASES FROM TRX ===")
               for i, t in enumerate(trx, 1):
                   print(f"{i}. Class: {t['Class']}, Method: {t['Method']}, Base: {t['Base']}")
-          
+
               # Index TRX by (Class, Base)
               idx = defaultdict(list)
               unmatched_tests = []
-          
+
               for t in trx:
                   matched = False
                   for f_existing in funcs: # Renamed loop variable to avoid shadowing
@@ -407,7 +389,7 @@ jobs:
                           idx[(f_existing["Class"], f_existing["Function"])].append(t)
                           matched = True
                           break
-          
+
                   if not matched:
                       unmatched_tests.append(t)
                       # Create a synthetic function for unmatched tests
@@ -418,20 +400,20 @@ jobs:
                           "PreCondition": "",
                           "Requirement": ""
                       }
-          
+
                       # Check if we already have this synthetic function
                       exists = False
                       for f_existing in funcs: # Renamed loop variable to avoid shadowing
                           if f_existing["Class"] == synthetic_func["Class"] and f_existing["Function"] == synthetic_func["Function"]:
                               exists = True
                               break
-          
+
                       if not exists:
                           funcs.append(synthetic_func)
-          
+
                       # Add test to index
                       idx[(t["Class"], t["Base"])].append(t)
-          
+
               print(f"\nTotal functions after processing: {len(funcs)}")
               print(f"Total test results from parse_trx: {len(trx)}")
               print(f"Total tests indexed (should match total test results): {sum(len(tests) for tests in idx.values())}")
@@ -442,11 +424,11 @@ jobs:
                   print("Unmatched test details (first 10):")
                   for t in unmatched_tests[:10]:  # Show first 10
                       print(f"  - {t['Class']}.{t['Method']}")
-          
+
               # Verify total test count
               total_indexed = sum(len(tests) for tests in idx.values())
               print(f"Total tests indexed: {total_indexed} (should be {len(trx)})")
-          
+
               # Sheet 1: Functions
               func_rows=[]
               for i, f in enumerate(funcs, 1):
@@ -467,7 +449,7 @@ jobs:
                       "Exception Expected (from remarks)": f.get("ExceptionExpected", ""),
                       "Function Log Message": f.get("FunctionLogMessage", "")
                   })
-          
+
               # Sheet 2: Statistics
               stat_rows=[]
               for i, f in enumerate(funcs, 1):
@@ -488,7 +470,7 @@ jobs:
                       "N": N, "A": A, "B": B,
                       "Total Test Cases": p+f_+u
                   })
-          
+
               return funcs, pd.DataFrame(func_rows), pd.DataFrame(stat_rows), idx
 
           # ---------- Matrix writer (per function) ----------
