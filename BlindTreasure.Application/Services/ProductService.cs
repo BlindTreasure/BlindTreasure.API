@@ -234,9 +234,10 @@ public class ProductService : IProductService
                     dto.ListedPrice.Value, product.RealSellingPrice));
                 throw ErrorHelper.BadRequest("Listed Price can not be lower than Real Selling Price.");
             }
-            product.ListedPrice = dto.ListedPrice.Value;
         }
-            if (dto.TotalStockQuantity.HasValue)
+        product.ListedPrice = dto.ListedPrice;
+
+        if (dto.TotalStockQuantity.HasValue)
         {
             product.TotalStockQuantity = dto.TotalStockQuantity.Value;
             // Tự động cập nhật status khi stock = 0
