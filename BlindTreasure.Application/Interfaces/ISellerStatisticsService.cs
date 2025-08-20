@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
+﻿using BlindTreasure.Application.Services;
+using BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,7 +18,7 @@ public interface ISellerStatisticsService
 
     Task<SellerOverviewStatisticsDto> GetOverviewStatisticsAsync(Guid sellerId, SellerStatisticsRequestDto req,
         CancellationToken ct = default);
-
+    Task<SellerRevenueSummaryDto> GetRevenueSummaryAsync(Guid sellerId, SellerStatisticsRequestDto req, CancellationToken ct = default);
     Task<SellerStatisticsResponseDto> GetTimeSeriesStatisticsAsync(Guid sellerId, SellerStatisticsRequestDto req,
         CancellationToken ct = default);
 

@@ -319,38 +319,50 @@ public class SellerStatisticsService : ISellerStatisticsService
     {
         var now = DateTime.UtcNow;
         DateTime start, end;
+
         switch (req.Range)
         {
             case StatisticsTimeRange.Day:
                 start = now.Date;
                 end = start.AddDays(1);
                 break;
+
             case StatisticsTimeRange.Week:
-                var diff = (7 + (now.DayOfWeek - DayOfWeek.Monday)) % 7;
-                start = now.AddDays(-1 * diff).Date;
+                // Always start from Monday (ISO standard)
+                int diff = (7 + (int)now.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+                start = now.Date.AddDays(-diff);
                 end = start.AddDays(7);
                 break;
+
             case StatisticsTimeRange.Month:
                 start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                 end = start.AddMonths(1);
                 break;
+
             case StatisticsTimeRange.Quarter:
-                var quarter = (now.Month - 1) / 3 + 1;
+                int quarter = ((now.Month - 1) / 3) + 1;
                 start = new DateTime(now.Year, (quarter - 1) * 3 + 1, 1, 0, 0, 0, DateTimeKind.Utc);
                 end = start.AddMonths(3);
                 break;
+
             case StatisticsTimeRange.Year:
                 start = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
                 end = start.AddYears(1);
                 break;
+
             case StatisticsTimeRange.Custom:
+                // Ensure both dates are UTC and start < end
                 start = req.StartDate.HasValue
-                    ? DateTime.SpecifyKind(req.StartDate.Value, DateTimeKind.Utc)
+                    ? DateTime.SpecifyKind(req.StartDate.Value.Date, DateTimeKind.Utc)
                     : now.Date;
                 end = req.EndDate.HasValue
-                    ? DateTime.SpecifyKind(req.EndDate.Value, DateTimeKind.Utc).AddDays(1)
-                    : now.Date.AddDays(1);
+                    ? DateTime.SpecifyKind(req.EndDate.Value.Date, DateTimeKind.Utc).AddDays(1)
+                    : start.AddDays(1);
+
+                if (end <= start)
+                    end = start.AddDays(1); // Ensure at least one day
                 break;
+
             default:
                 start = now.Date;
                 end = start.AddDays(1);
@@ -499,4 +511,60 @@ public class SellerStatisticsService : ISellerStatisticsService
 
         return BuildTimeSeriesData(orders, orderDetails, req.Range, start, end);
     }
+
+    public async Task<SellerRevenueSummaryDto> GetRevenueSummaryAsync(
+    Guid sellerId,
+    SellerStatisticsRequestDto req,
+    CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+
+        // Estimated: PAID orders
+        var paidOrders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == sellerId
+                        && o.Status == OrderStatus.PAID.ToString()
+                        && o.PlacedAt >= start && o.PlacedAt < end
+                        && !o.IsDeleted)
+            .Include(o => o.OrderDetails)
+            .ToListAsync(ct);
+
+        var estimatedRevenue = paidOrders
+            .SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+
+        // Actual: COMPLETED orders
+        var completedOrders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == sellerId
+                        && o.Status == OrderStatus.COMPLETED.ToString()
+                        && o.CompletedAt >= start && o.CompletedAt < end
+                        && !o.IsDeleted)
+            .Include(o => o.OrderDetails)
+            .ToListAsync(ct);
+
+        var actualRevenue = completedOrders
+            .SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+
+        return new SellerRevenueSummaryDto
+        {
+            EstimatedRevenue = decimal.Round(estimatedRevenue, 2),
+            ActualRevenue = decimal.Round(actualRevenue, 2),
+            EstimatedOrderCount = paidOrders.Count,
+            ActualOrderCount = completedOrders.Count,
+            PeriodStart = start,
+            PeriodEnd = end
+        };
+    }
+}
+
+public class SellerRevenueSummaryDto
+{
+    public decimal EstimatedRevenue { get; set; } // Doanh thu ước tính (PAID)
+    public decimal ActualRevenue { get; set; }    // Doanh thu thật (COMPLETED)
+    public int EstimatedOrderCount { get; set; }
+    public int ActualOrderCount { get; set; }
+    public DateTime PeriodStart { get; set; }
+    public DateTime PeriodEnd { get; set; }
 }
