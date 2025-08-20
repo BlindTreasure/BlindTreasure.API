@@ -223,7 +223,6 @@ jobs:
           path: |
             detailed-test-report.xlsx
             test-statistics.xlsx
-          find ./BlindTreasure.UnitTest/bin -name "*.xml" | sort || true
 
       - name: Run unit tests with coverage
         run: |
