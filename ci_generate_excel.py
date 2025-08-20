@@ -160,25 +160,35 @@ def extract_functions():
             desc = ''
             pre  = ''
             cov  = ''
+            exp  = ''
             s = m.find('summary')
-            if s is not None and s.text: desc = ' '.join(s.text.split())
+            if s is not None and s.text: 
+                desc = ' '.join(s.text.split())
             r = m.find('remarks')
             if r is not None and r.text:
                 for line in r.text.splitlines():
                     line = line.strip()
                     if line.startswith('Scenario:'):
                         pre = line.replace('Scenario:', '').strip() or pre
+                    elif line.startswith('Expected:'):
+                        exp = line.replace('Expected:', '').strip() or exp
                     elif line.startswith('Coverage:'):
                         cov = line.replace('Coverage:', '').strip() or cov
 
             key = (cls, func)
             if key not in agg:
-                agg[key] = {"Class": cls, "Function": func, "Description": desc, "PreCondition": pre, "Requirement": cov}
+                agg[key] = {
+                    "Class": cls, "Function": func,
+                    "Description": desc, "PreCondition": pre,
+                    "Requirement": cov, "ExpectedBehavior": exp
+                }
             else:
                 if not agg[key]["Description"] and desc: agg[key]["Description"] = desc
                 if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"] = pre
                 if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"] = cov
+                if not agg[key].get("ExpectedBehavior") and exp: agg[key]["ExpectedBehavior"] = exp
     return list(agg.values())
+
 
 # ---------- TRX robust parse ----------
 def parse_trx():
@@ -404,6 +414,12 @@ def write_matrix(workbook, writer, func, tests):
     ws.write(r, 0, "Log message", label_format)
     for j, c in enumerate(cols):
         ws.write(r, 1 + j, c["log_msg"], data_format)
+    r += 1
+
+    ws.write(r, 0, "Expected Behavior", label_format)
+    for j in range(len(cols)):
+    val = func.get("ExpectedBehavior","") or cols[j]["exp"]
+    ws.write(r, 1+j, val, data_format)
     r += 1
 
     # RESULT
