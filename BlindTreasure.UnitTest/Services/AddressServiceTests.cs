@@ -50,6 +50,12 @@ public class AddressServiceTests
     /// Scenario: A user adds their very first address to their account.
     /// Expected: The new address is created and automatically marked as their default address.
     /// Coverage: Logic for handling the first address addition.
+    /// TestType: Normal
+    /// InputConditions: CreateAddressDto with IsDefault=false, no existing addresses for user
+    /// ExpectedResult: Address created and automatically set as default
+    /// ExpectedReturnValue: Address entity
+    /// ExceptionExpected: false
+    /// LogMessage: First address created and set as default
     /// </remarks>
     [Fact]
     public async Task CreateAddressAsync_ShouldCreateAddressAndSetAsDefault_WhenItIsTheFirstAddress()
@@ -81,6 +87,12 @@ public class AddressServiceTests
     /// Scenario: A user with an existing default address adds a new address and marks it as the new default.
     /// Expected: The new address is created and set as default, while the old default address is updated to no longer be the default.
     /// Coverage: The logic for switching the default address when a new one is added.
+    /// TestType: Normal
+    /// InputConditions: CreateAddressDto with IsDefault=true, existing default address for user
+    /// ExpectedResult: New address created as default, previous default address updated to non-default
+    /// ExpectedReturnValue: Address entity
+    /// ExceptionExpected: false
+    /// LogMessage: Default address switched successfully
     /// </remarks>
     [Fact]
     public async Task CreateAddressAsync_ShouldCreateAddressAndUnsetPreviousDefault_WhenNewAddressIsDefault()
@@ -111,6 +123,12 @@ public class AddressServiceTests
     /// Scenario: A user adds a new address but does not mark it as the new default.
     /// Expected: The new address is created successfully as a non-default address, and the existing default address remains unchanged.
     /// Coverage: Logic for adding additional, non-default addresses.
+    /// TestType: Normal
+    /// InputConditions: CreateAddressDto with IsDefault=false, existing default address for user
+    /// ExpectedResult: New address created as non-default, existing default address unchanged
+    /// ExpectedReturnValue: Address entity
+    /// ExceptionExpected: false
+    /// LogMessage: N/A
     /// </remarks>
     [Fact]
     public async Task CreateAddressAsync_ShouldCreateNonDefaultAddress_WhenAnotherDefaultExists()
@@ -150,6 +168,12 @@ public class AddressServiceTests
     /// Scenario: A user provides new details for one of their existing addresses.
     /// Expected: The address is updated in the system with the new information.
     /// Coverage: The basic address update functionality.
+    /// TestType: Normal
+    /// InputConditions: Valid UpdateAddressDto, existing address owned by current user
+    /// ExpectedResult: Address updated with new information
+    /// ExpectedReturnValue: Updated Address entity
+    /// ExceptionExpected: false
+    /// LogMessage: N/A
     /// </remarks>
     [Fact]
     public async Task UpdateAddressAsync_ShouldUpdateAddress_WhenDataIsValidAndUserIsOwner()
@@ -177,6 +201,12 @@ public class AddressServiceTests
     /// Scenario: A user attempts to update an address using an ID that does not exist.
     /// Expected: The system responds with a 'Not Found' error.
     /// Coverage: Error handling for updating a non-existent address.
+    /// TestType: Abnormal
+    /// InputConditions: Valid UpdateAddressDto, non-existent address ID
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Address not found or access denied
     /// </remarks>
     [Fact]
     public async Task UpdateAddressAsync_ShouldThrowNotFound_WhenAddressDoesNotExist()
@@ -199,6 +229,12 @@ public class AddressServiceTests
     /// Scenario: A user attempts to update an address using an ID that belongs to another user.
     /// Expected: The system responds with a 'Not Found' error, preventing unauthorized updates.
     /// Coverage: Security check to ensure users can only update their own addresses.
+    /// TestType: Abnormal
+    /// InputConditions: Valid UpdateAddressDto, existing address owned by different user
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Unauthorized access attempt to address
     /// </remarks>
     [Fact]
     public async Task UpdateAddressAsync_ShouldThrowNotFound_WhenUserIsNotOwner()
@@ -226,6 +262,12 @@ public class AddressServiceTests
     /// Scenario: A user deletes one of their addresses.
     /// Expected: The address is marked as deleted (soft-deleted) in the system.
     /// Coverage: The address deletion functionality.
+    /// TestType: Normal
+    /// InputConditions: Existing address owned by current user
+    /// ExpectedResult: Address soft-deleted successfully
+    /// ExpectedReturnValue: Boolean (true)
+    /// ExceptionExpected: false
+    /// LogMessage: N/A
     /// </remarks>
     [Fact]
     public async Task DeleteAddressAsync_ShouldSoftDeleteAddress_WhenAddressExistsAndUserIsOwner()
@@ -251,6 +293,12 @@ public class AddressServiceTests
     /// Scenario: A user attempts to delete an address using an ID that belongs to another user.
     /// Expected: The system responds with a 'Not Found' error, preventing unauthorized deletions.
     /// Coverage: Security check to ensure users can only delete their own addresses.
+    /// TestType: Abnormal
+    /// InputConditions: Existing address owned by different user
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: N/A
     /// </remarks>
     [Fact]
     public async Task DeleteAddressAsync_ShouldThrowNotFound_WhenUserIsNotOwner()
@@ -272,6 +320,12 @@ public class AddressServiceTests
     /// Scenario: A user attempts to delete an address using an ID that does not exist.
     /// Expected: The system responds with a 'Not Found' error.
     /// Coverage: Error handling for deleting a non-existent address.
+    /// TestType: Abnormal
+    /// InputConditions: Non-existent address ID
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Address not found for deletion
     /// </remarks>
     [Fact]
     public async Task DeleteAddressAsync_ShouldThrowNotFound_WhenAddressDoesNotExist()
@@ -296,6 +350,12 @@ public class AddressServiceTests
     /// Scenario: A user chooses one of their non-default addresses and marks it as their new default.
     /// Expected: The chosen address becomes the new default, and the address that was previously the default is updated to no longer be the default.
     /// Coverage: The logic for changing a user's default address.
+    /// TestType: Normal
+    /// InputConditions: Existing non-default address owned by user, existing default address
+    /// ExpectedResult: Target address set as default, previous default address updated to non-default
+    /// ExpectedReturnValue: Updated Address entity
+    /// ExceptionExpected: false
+    /// LogMessage: N/A
     /// </remarks>
     [Fact]
     public async Task SetDefaultAddressAsync_ShouldSetAddressAsDefaultAndUnsetOthers_WhenSuccessful()
@@ -330,6 +390,12 @@ public class AddressServiceTests
     /// Scenario: A user attempts to set an address as default using an ID that belongs to another user.
     /// Expected: The system responds with a 'Not Found' error.
     /// Coverage: Security check to ensure users can only set their own addresses as default.
+    /// TestType: Abnormal
+    /// InputConditions: Existing address owned by different user
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: N/A
     /// </remarks>
     [Fact]
     public async Task SetDefaultAddressAsync_ShouldThrowNotFound_WhenUserIsNotOwner()
@@ -351,6 +417,12 @@ public class AddressServiceTests
     /// Scenario: A user tries to set their current default address as default again.
     /// Expected: The system recognizes it's already the default and completes the action without trying to update other addresses.
     /// Coverage: Graceful handling of redundant default-setting actions.
+    /// TestType: Boundary
+    /// InputConditions: Existing address already set as default for user
+    /// ExpectedResult: No unnecessary updates to other addresses, operation completes successfully
+    /// ExpectedReturnValue: Address entity
+    /// ExceptionExpected: false
+    /// LogMessage: N/A
     /// </remarks>
     [Fact]
     public async Task SetDefaultAddressAsync_ShouldDoNothing_WhenAddressIsAlreadyDefault()
@@ -385,6 +457,12 @@ public class AddressServiceTests
     /// Scenario: The system needs to retrieve the default address for a specific user.
     /// Expected: The address marked as default for that user is returned.
     /// Coverage: Retrieving a specific user's default address.
+    /// TestType: Normal
+    /// InputConditions: User ID with existing default address
+    /// ExpectedResult: Default address returned for the specified user
+    /// ExpectedReturnValue: Address entity
+    /// ExceptionExpected: false
+    /// LogMessage: N/A
     /// </remarks>
     [Fact]
     public async Task GetDefaultShippingAddressAsync_ShouldReturnDefaultAddress_WhenOneExists()
@@ -416,6 +494,12 @@ public class AddressServiceTests
     /// Scenario: The system needs to retrieve the default address for a user, but they haven't set one.
     /// Expected: The system returns null, indicating no default address was found.
     /// Coverage: Handling cases where no default address is set.
+    /// TestType: Boundary
+    /// InputConditions: User ID with no default address set
+    /// ExpectedResult: Null returned indicating no default address found
+    /// ExpectedReturnValue: null
+    /// ExceptionExpected: false
+    /// LogMessage: N/A
     /// </remarks>
     [Fact]
     public async Task GetDefaultShippingAddressAsync_ShouldReturnNull_WhenNoDefaultAddressExists()

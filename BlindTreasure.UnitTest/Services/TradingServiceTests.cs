@@ -97,6 +97,12 @@ public class TradingServiceTests
     /// Scenario: A valid listing ID is provided.
     /// Expected: A list of TradeRequestDto associated with the listing is returned.
     /// Coverage: Retrieving trade requests for an existing listing.
+    /// TestType: Normal
+    /// InputConditions: Valid listing ID, existing listing with trade requests
+    /// ExpectedResult: List of TradeRequestDto returned successfully
+    /// ExpectedReturnValue: List<TradeRequestDto>
+    /// ExceptionExpected: false
+    /// LogMessage: Trade requests retrieved successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeRequestsAsync_ShouldReturnTradeRequests_WhenListingExists()
@@ -163,6 +169,12 @@ public class TradingServiceTests
     /// Scenario: A non-existent listing ID is provided.
     /// Expected: An Exception with a 404 (Not Found) status code is thrown.
     /// Coverage: Error handling for retrieving trade requests with an invalid listing ID.
+    /// TestType: Abnormal
+    /// InputConditions: Non-existent listing ID
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Listing not found for trade requests retrieval
     /// </remarks>
     [Fact]
     public async Task GetTradeRequestsAsync_ShouldThrowNotFound_WhenListingDoesNotExist()
@@ -194,6 +206,12 @@ public class TradingServiceTests
     /// Scenario: Requesting all trade histories without restricting to the current user.
     /// Expected: A paginated list of all relevant trade histories is returned.
     /// Coverage: Comprehensive retrieval of trade histories, including filtering and sorting for public/admin views.
+    /// TestType: Normal
+    /// InputConditions: TradeHistoryQueryParameter with onlyMine=false, existing trade histories
+    /// ExpectedResult: Paginated list of all trade histories with filtering applied
+    /// ExpectedReturnValue: Pagination<TradeHistoryDto>
+    /// ExceptionExpected: false
+    /// LogMessage: All trade histories retrieved successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeHistoriesAsync_ShouldReturnAllTradeHistories_WhenOnlyMineIsFalse()
@@ -275,6 +293,12 @@ public class TradingServiceTests
     /// Scenario: Requesting trade histories with 'onlyMine' set to true.
     /// Expected: A paginated list containing only trade histories where the current user is the requester.
     /// Coverage: Filtering trade histories by the current user's ID.
+    /// TestType: Normal
+    /// InputConditions: TradeHistoryQueryParameter with onlyMine=true, current user's trade histories
+    /// ExpectedResult: Paginated list of current user's trade histories only
+    /// ExpectedReturnValue: Pagination<TradeHistoryDto>
+    /// ExceptionExpected: false
+    /// LogMessage: User trade histories retrieved successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeHistoriesAsync_ShouldReturnUserTradeHistories_WhenOnlyMineIsTrue()
@@ -328,6 +352,12 @@ public class TradingServiceTests
     /// Scenario: Requesting trade histories filtered by a specific FinalStatus.
     /// Expected: Only trade histories matching the specified status are returned.
     /// Coverage: Filtering capabilities by trade history final status.
+    /// TestType: Normal
+    /// InputConditions: TradeHistoryQueryParameter with specific FinalStatus filter
+    /// ExpectedResult: Trade histories filtered by specified status
+    /// ExpectedReturnValue: Pagination<TradeHistoryDto>
+    /// ExceptionExpected: false
+    /// LogMessage: Trade histories filtered by status successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeHistoriesAsync_ShouldFilterByFinalStatus()
@@ -381,6 +411,12 @@ public class TradingServiceTests
     /// Scenario: Requesting trade histories filtered by a specific ListingId.
     /// Expected: Only trade histories associated with the specified listing are returned.
     /// Coverage: Filtering capabilities by listing ID.
+    /// TestType: Normal
+    /// InputConditions: TradeHistoryQueryParameter with specific ListingId filter
+    /// ExpectedResult: Trade histories filtered by listing ID
+    /// ExpectedReturnValue: Pagination<TradeHistoryDto>
+    /// ExceptionExpected: false
+    /// LogMessage: Trade histories filtered by listing successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeHistoriesAsync_ShouldFilterByListingId()
@@ -434,6 +470,12 @@ public class TradingServiceTests
     /// Scenario: Requesting trade histories filtered by a combination of date ranges.
     /// Expected: Only trade histories falling within the specified date ranges are returned.
     /// Coverage: Date range filtering for trade history inquiries.
+    /// TestType: Normal
+    /// InputConditions: TradeHistoryQueryParameter with date range filters
+    /// ExpectedResult: Trade histories filtered by date ranges
+    /// ExpectedReturnValue: Pagination<TradeHistoryDto>
+    /// ExceptionExpected: false
+    /// LogMessage: Trade histories filtered by date range successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeHistoriesAsync_ShouldFilterByDateRanges()
@@ -493,6 +535,12 @@ public class TradingServiceTests
     /// Scenario: Requesting trade histories without specifying a sort order.
     /// Expected: Trade histories are sorted by CompletedAt in descending order by default.
     /// Coverage: Default sorting behavior of trade histories.
+    /// TestType: Normal
+    /// InputConditions: TradeHistoryQueryParameter without explicit sort specification
+    /// ExpectedResult: Trade histories sorted by CompletedAt descending by default
+    /// ExpectedReturnValue: Pagination<TradeHistoryDto>
+    /// ExceptionExpected: false
+    /// LogMessage: Trade histories sorted by default order successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeHistoriesAsync_ShouldSortByCompletedAtDescendingByDefault()
@@ -545,6 +593,12 @@ public class TradingServiceTests
     /// Scenario: Requesting trade histories sorted by CreatedAt in ascending order.
     /// Expected: Trade histories are sorted by their creation date from oldest to newest.
     /// Coverage: Explicit sorting by creation date.
+    /// TestType: Normal
+    /// InputConditions: TradeHistoryQueryParameter with CreatedAt ascending sort
+    /// ExpectedResult: Trade histories sorted by creation date ascending
+    /// ExpectedReturnValue: Pagination<TradeHistoryDto>
+    /// ExceptionExpected: false
+    /// LogMessage: Trade histories sorted by creation date successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeHistoriesAsync_ShouldSortByCreatedAtAscending()
@@ -602,6 +656,12 @@ public class TradingServiceTests
     /// Scenario: Attempting to create a trade request for a non-existent listing.
     /// Expected: An Exception with a 404 (Not Found) status code is thrown.
     /// Coverage: Error handling for trade request creation with an invalid listing ID.
+    /// TestType: Abnormal
+    /// InputConditions: Non-existent listing ID, valid CreateTradeRequestDto
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Listing not found for trade request creation
     /// </remarks>
     [Fact]
     public async Task CreateTradeRequestAsync_ShouldThrowNotFound_WhenListingNotExists()
@@ -628,6 +688,12 @@ public class TradingServiceTests
     /// Scenario: Attempting to create a trade request for a listing that is not in 'Active' status.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Validation of listing status during trade request creation.
+    /// TestType: Abnormal
+    /// InputConditions: Listing with non-active status (Sold), valid CreateTradeRequestDto
+    /// ExpectedResult: Exception with 400 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Cannot create trade request for inactive listing
     /// </remarks>
     [Fact]
     public async Task CreateTradeRequestAsync_ShouldThrowBadRequest_WhenListingNotActive()
@@ -667,6 +733,12 @@ public class TradingServiceTests
     /// Scenario: The current user attempts to create a trade request for a listing whose underlying inventory item is owned by them.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Preventing users from trading with their own items.
+    /// TestType: Abnormal
+    /// InputConditions: Active listing owned by current user, valid CreateTradeRequestDto
+    /// ExpectedResult: Exception with 400 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Cannot create trade request for own listing
     /// </remarks>
     [Fact]
     public async Task CreateTradeRequestAsync_ShouldThrowBadRequest_WhenUserIsListingOwner()
@@ -706,6 +778,12 @@ public class TradingServiceTests
     /// Scenario: A user attempts to create a trade request for a listing whose inventory item is currently on hold.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Validation of inventory item status for tradeability.
+    /// TestType: Abnormal
+    /// InputConditions: Active listing with inventory item on hold, valid CreateTradeRequestDto
+    /// ExpectedResult: Exception with 400 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Cannot create trade request for item on hold
     /// </remarks>
     [Fact]
     public async Task CreateTradeRequestAsync_ShouldThrowBadRequest_WhenListingItemIsOnHold()
@@ -747,6 +825,12 @@ public class TradingServiceTests
     /// Scenario: A user attempts to create a new trade request for a listing for which they already have a pending request.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Preventing duplicate pending trade requests.
+    /// TestType: Abnormal
+    /// InputConditions: Active listing, existing pending trade request from same user
+    /// ExpectedResult: Exception with 400 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Duplicate trade request not allowed
     /// </remarks>
     [Fact]
     public async Task CreateTradeRequestAsync_ShouldThrowBadRequest_WhenPendingTradeRequestExists()
@@ -791,6 +875,12 @@ public class TradingServiceTests
     /// Scenario: A user attempts to create a trade request by offering the same inventory item multiple times.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Validating offered items for duplicates.
+    /// TestType: Boundary
+    /// InputConditions: Active listing, CreateTradeRequestDto with duplicate offered items
+    /// ExpectedResult: Exception with 400 status code and duplicate validation message
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Duplicate items in trade offer rejected
     /// </remarks>
     [Fact]
     public async Task CreateTradeRequestAsync_ShouldThrowBadRequest_WhenOfferedItemsContainDuplicates()
@@ -838,6 +928,12 @@ public class TradingServiceTests
     /// Scenario: A user attempts to create a trade request offering an item that they do not own.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Validating ownership of offered items.
+    /// TestType: Abnormal
+    /// InputConditions: Active listing, offered items not owned by current user
+    /// ExpectedResult: Exception with 400 status code and ownership validation message
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Unauthorized attempt to offer items not owned
     /// </remarks>
     [Fact]
     public async Task CreateTradeRequestAsync_ShouldThrowBadRequest_WhenOfferedItemsNotOwnedByUser()
@@ -897,6 +993,12 @@ public class TradingServiceTests
     /// Scenario: A user attempts to create a trade request by offering an item that is not in 'Available' status.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Validating the availability status of offered items.
+    /// TestType: Abnormal
+    /// InputConditions: Active listing, offered items with non-available status (OnHold)
+    /// ExpectedResult: Exception with 400 status code and availability validation message
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Offered items not available for trading
     /// </remarks>
     [Fact]
     public async Task CreateTradeRequestAsync_ShouldThrowBadRequest_WhenOfferedItemsAreNotAvailable()
@@ -957,6 +1059,12 @@ public class TradingServiceTests
     /// Scenario: A user attempts to create a trade request for a non-free listing without offering any items.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Validation for requiring offered items on non-free listings.
+    /// TestType: Boundary
+    /// InputConditions: Active non-free listing, CreateTradeRequestDto with empty offered items
+    /// ExpectedResult: Exception with 400 status code and required items validation message
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: No offered items for non-free listing rejected
     /// </remarks>
     [Fact]
     public async Task CreateTradeRequestAsync_ShouldThrowBadRequest_WhenNoOfferedItemsForNonFreeListing()
@@ -1008,6 +1116,12 @@ public class TradingServiceTests
     /// Scenario: Attempting to respond to a trade request using an ID that does not exist.
     /// Expected: An Exception with a 404 (Not Found) status code is thrown.
     /// Coverage: Error handling for responding to non-existent trade requests.
+    /// TestType: Abnormal
+    /// InputConditions: Non-existent trade request ID, accept/reject response
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Trade request not found for response
     /// </remarks>
     [Fact]
     public async Task RespondTradeRequestAsync_ShouldThrowNotFound_WhenTradeRequestDoesNotExist()
@@ -1033,6 +1147,12 @@ public class TradingServiceTests
     /// Scenario: Attempting to respond to a trade request that is already ACCEPTED or REJECTED.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Preventing multiple responses to the same trade request.
+    /// TestType: Abnormal
+    /// InputConditions: Trade request with already processed status (ACCEPTED), response attempt
+    /// ExpectedResult: Exception with 400 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Trade request already processed
     /// </remarks>
     [Fact]
     public async Task RespondTradeRequestAsync_ShouldThrowBadRequest_WhenTradeRequestAlreadyProcessed()
@@ -1069,6 +1189,12 @@ public class TradingServiceTests
     /// Scenario: A user, who is not the owner of the listing item, attempts to accept or reject a trade request.
     /// Expected: An Exception with a 403 (Forbidden) status code is thrown.
     /// Coverage: Authorization check for responding to trade requests.
+    /// TestType: Abnormal
+    /// InputConditions: Pending trade request, user not the listing owner
+    /// ExpectedResult: Exception with 403 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Unauthorized trade request response attempt
     /// </remarks>
     [Fact]
     public async Task RespondTradeRequestAsync_ShouldThrowForbidden_WhenUserIsNotOwner()
@@ -1105,6 +1231,12 @@ public class TradingServiceTests
     /// Scenario: A trade request is rejected, and the listing item was previously on hold due to the trade request.
     /// Expected: The listing item's status is updated to InventoryItemStatus.Available.
     /// Coverage: Correct status management of listing items upon trade request rejection.
+    /// TestType: Normal
+    /// InputConditions: Pending trade request with item on hold, rejection response by owner
+    /// ExpectedResult: Trade request rejected and item status restored to Available
+    /// ExpectedReturnValue: TradeRequestDto
+    /// ExceptionExpected: false
+    /// LogMessage: Trade request rejected and item status restored
     /// </remarks>
     [Fact]
     public async Task RespondTradeRequestAsync_ShouldRestoreListingItemStatus_WhenRejected()
@@ -1178,6 +1310,12 @@ public class TradingServiceTests
     /// Scenario: A trade request is accepted. The listing item's status should remain on hold or be further processed, not reverted to Available prematurely.
     /// Expected: The listing item's status remains unchanged by this specific operation, or is set to a state appropriate for ongoing trade.
     /// Coverage: Ensuring correct status management of listing items upon trade request acceptance (i.e., not releasing hold).
+    /// TestType: Normal
+    /// InputConditions: Pending trade request with item on hold, acceptance response by owner
+    /// ExpectedResult: Trade request accepted and item remains on hold for further processing
+    /// ExpectedReturnValue: TradeRequestDto
+    /// ExceptionExpected: false
+    /// LogMessage: Trade request accepted, item remains on hold
     /// </remarks>
     [Fact]
     public async Task RespondTradeRequestAsync_ShouldNotRestoreListingItemStatus_WhenAccepted()
@@ -1256,6 +1394,12 @@ public class TradingServiceTests
     /// Scenario: Attempting to lock a trade request using an ID that does not exist.
     /// Expected: An Exception with a 404 (Not Found) status code is thrown.
     /// Coverage: Error handling for locking non-existent trade requests.
+    /// TestType: Abnormal
+    /// InputConditions: Non-existent trade request ID
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Trade request not found for locking
     /// </remarks>
     [Fact]
     public async Task LockDealAsync_ShouldThrowNotFound_WhenTradeRequestDoesNotExist()
@@ -1280,6 +1424,12 @@ public class TradingServiceTests
     /// Scenario: Attempting to lock a trade request that is still PENDING or already COMPLETED/REJECTED.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Validating trade request status before allowing a lock.
+    /// TestType: Abnormal
+    /// InputConditions: Trade request with non-accepted status (PENDING)
+    /// ExpectedResult: Exception with 400 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Cannot lock trade request not in accepted status
     /// </remarks>
     [Fact]
     public async Task LockDealAsync_ShouldThrowBadRequest_WhenTradeRequestNotAccepted()
@@ -1314,6 +1464,12 @@ public class TradingServiceTests
     /// Scenario: A third-party user attempts to lock an accepted trade request.
     /// Expected: An Exception with a 403 (Forbidden) status code is thrown.
     /// Coverage: Authorization check for locking trade deals.
+    /// TestType: Abnormal
+    /// InputConditions: Accepted trade request, user neither owner nor requester
+    /// ExpectedResult: Exception with 403 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Unauthorized trade deal lock attempt
     /// </remarks>
     [Fact]
     public async Task LockDealAsync_ShouldThrowForbidden_WhenUserIsNotOwnerOrRequester()
@@ -1355,6 +1511,12 @@ public class TradingServiceTests
     /// Scenario: The listing owner attempts to lock an accepted trade request again after already locking it.
     /// Expected: An Exception with a 400 (Bad Request) status code is thrown.
     /// Coverage: Preventing redundant lock actions by the owner.
+    /// TestType: Boundary
+    /// InputConditions: Accepted trade request already locked by owner
+    /// ExpectedResult: Exception with 400 status code and duplicate lock message
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Owner already locked this trade deal
     /// </remarks>
     [Fact]
     public async Task LockDealAsync_ShouldThrowBadRequest_WhenOwnerAlreadyLocked()
@@ -1398,6 +1560,12 @@ public class TradingServiceTests
     /// Scenario: A valid trade request ID is provided to retrieve its details.
     /// Expected: A TradeRequestDto populated with the request's details, including listing and offered items, is returned.
     /// Coverage: Successful retrieval and mapping of a trade request by ID.
+    /// TestType: Normal
+    /// InputConditions: Valid trade request ID, existing trade request with listing and offered items
+    /// ExpectedResult: TradeRequestDto with complete details returned
+    /// ExpectedReturnValue: TradeRequestDto
+    /// ExceptionExpected: false
+    /// LogMessage: Trade request retrieved successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeRequestByIdAsync_ShouldReturnTradeRequest_WhenFound()
@@ -1479,6 +1647,12 @@ public class TradingServiceTests
     /// Scenario: A non-existent trade request ID is provided.
     /// Expected: An Exception with a 404 (Not Found) status code is thrown.
     /// Coverage: Error handling for retrieving a trade request with an invalid ID.
+    /// TestType: Abnormal
+    /// InputConditions: Non-existent trade request ID
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Trade request not found for retrieval
     /// </remarks>
     [Fact]
     public async Task GetTradeRequestByIdAsync_ShouldThrowNotFound_WhenNotFound()
@@ -1504,6 +1678,12 @@ public class TradingServiceTests
     /// Scenario: A trade request has multiple offered items.
     /// Expected: The returned TradeRequestDto correctly lists all offered items with their details.
     /// Coverage: Comprehensive mapping of offered items within a trade request.
+    /// TestType: Normal
+    /// InputConditions: Valid trade request ID, trade request with multiple offered items
+    /// ExpectedResult: TradeRequestDto with all offered items correctly mapped
+    /// ExpectedReturnValue: TradeRequestDto
+    /// ExceptionExpected: false
+    /// LogMessage: Trade request with multiple offered items mapped successfully
     /// </remarks>
     [Fact]
     public async Task GetTradeRequestByIdAsync_ShouldMapOfferedItemsCorrectly()

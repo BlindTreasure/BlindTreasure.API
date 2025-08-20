@@ -66,6 +66,12 @@ public class CategoryServiceTests
     /// Scenario: An admin user provides valid information to create a new category.
     /// Expected: A `CategoryDto` representing the newly created category is returned, the category is added to the database, and relevant caches are invalidated.
     /// Coverage: Category creation, role-based access control, and cache management.
+    /// TestType: Normal
+    /// InputConditions: Valid CategoryCreateDto, admin user role, unique category name
+    /// ExpectedResult: Category created successfully with cache invalidation
+    /// ExpectedReturnValue: CategoryDto
+    /// ExceptionExpected: false
+    /// LogMessage: Category created successfully by admin
     /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldCreateCategory_WhenValidData()
@@ -119,6 +125,12 @@ public class CategoryServiceTests
     /// Scenario: An admin user attempts to create a category with a name that is already in use by another category.
     /// Expected: An `Exception` with a 409 (Conflict) status code is thrown.
     /// Coverage: Category name uniqueness validation.
+    /// TestType: Abnormal
+    /// InputConditions: Valid CategoryCreateDto with existing category name, admin user role
+    /// ExpectedResult: Exception with 409 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Category name already exists
     /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldThrowConflict_WhenCategoryNameExists()
@@ -161,6 +173,12 @@ public class CategoryServiceTests
     /// Scenario: A user without administrator privileges attempts to create a new category.
     /// Expected: An `Exception` with a 403 (Forbidden) status code is thrown.
     /// Coverage: Role-based access control for category creation.
+    /// TestType: Abnormal
+    /// InputConditions: Valid CategoryCreateDto, non-admin user role (Customer)
+    /// ExpectedResult: Exception with 403 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Unauthorized category creation attempt
     /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldThrowForbidden_WhenUserNotAdmin()
@@ -194,6 +212,12 @@ public class CategoryServiceTests
     /// Scenario: An administrator changes the details of an existing category with correct information.
     /// Expected: The category is updated in the system, and its new details are returned.
     /// Coverage: How categories are updated, ensuring only authorized users can do it, and making sure the system's saved information is fresh.
+    /// TestType: Normal
+    /// InputConditions: Valid CategoryUpdateDto, existing category, admin user role
+    /// ExpectedResult: Category updated successfully with cache invalidation
+    /// ExpectedReturnValue: CategoryDto
+    /// ExceptionExpected: false
+    /// LogMessage: Category updated successfully by admin
     /// </remarks>
     [Fact]
     public async Task UpdateAsync_ShouldUpdateCategory_WhenValidData()
@@ -258,6 +282,12 @@ public class CategoryServiceTests
     /// Scenario: A user who is not an administrator tries to change a category.
     /// Expected: The system stops the action with a 'Forbidden' error (status code 403), showing that the user doesn't have the right permissions.
     /// Coverage: Making sure only authorized users can update categories.
+    /// TestType: Abnormal
+    /// InputConditions: Valid CategoryUpdateDto, non-admin user role (Customer)
+    /// ExpectedResult: Exception with 403 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Unauthorized category update attempt
     /// </remarks>
     [Fact]
     public async Task UpdateAsync_ShouldThrowForbidden_WhenUserNotAuthorized()
@@ -293,6 +323,12 @@ public class CategoryServiceTests
     /// Scenario: An administrator deletes a category that doesn't have any products or smaller categories linked to it.
     /// Expected: The category is marked as deleted in the system, and its details are returned.
     /// Coverage: How categories are deleted, making sure only authorized users can do it, and ensuring categories are empty before deletion.
+    /// TestType: Normal
+    /// InputConditions: Existing category with no products or children, admin user role
+    /// ExpectedResult: Category soft-deleted successfully with cache invalidation
+    /// ExpectedReturnValue: CategoryDto
+    /// ExceptionExpected: false
+    /// LogMessage: Category deleted successfully by admin
     /// </remarks>
     [Fact]
     public async Task DeleteAsync_ShouldDeleteCategory_WhenValidAndNoChildren()
@@ -352,6 +388,12 @@ public class CategoryServiceTests
     /// Scenario: An administrator tries to delete a category that has products associated with it.
     /// Expected: The system stops the action with a 'Conflict' error (status code 409), indicating that the category cannot be deleted while products are linked.
     /// Coverage: Preventing deletion of categories that are still in use.
+    /// TestType: Abnormal
+    /// InputConditions: Existing category with associated products, admin user role
+    /// ExpectedResult: Exception with 409 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Cannot delete category with associated products
     /// </remarks>
     [Fact]
     public async Task DeleteAsync_ShouldThrowConflict_WhenCategoryHasProducts()
@@ -400,6 +442,12 @@ public class CategoryServiceTests
     /// Scenario: An administrator attempts to update a category using an ID that does not match any existing category.
     /// Expected: The system stops the action with a 'Not Found' error (status code 404), indicating the category doesn't exist.
     /// Coverage: Error handling when trying to update a non-existent category.
+    /// TestType: Abnormal
+    /// InputConditions: Valid CategoryUpdateDto, non-existent category ID, admin user role
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Category not found for update
     /// </remarks>
     [Fact]
     public async Task UpdateAsync_ShouldThrowNotFound_WhenCategoryNotExists()
@@ -439,6 +487,12 @@ public class CategoryServiceTests
     /// Scenario: A regular user (neither admin nor staff) attempts to delete a category.
     /// Expected: The system stops the action with a 'Forbidden' error (status code 403), showing that the user doesn't have the right permissions.
     /// Coverage: Ensuring only authorized personnel can delete categories.
+    /// TestType: Abnormal
+    /// InputConditions: Valid category ID, non-admin/non-staff user role (Customer)
+    /// ExpectedResult: Exception with 403 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Unauthorized category deletion attempt
     /// </remarks>
     [Fact]
     public async Task DeleteAsync_ShouldThrowForbidden_WhenUserNotAdminOrStaff()
@@ -469,6 +523,12 @@ public class CategoryServiceTests
     /// Scenario: An administrator tries to delete a category that has other categories listed under it.
     /// Expected: The system stops the action with a 'Conflict' error (status code 409), indicating that the category cannot be deleted while it has subcategories.
     /// Coverage: Preventing deletion of categories that are still organizing other categories.
+    /// TestType: Abnormal
+    /// InputConditions: Existing category with child categories, admin user role
+    /// ExpectedResult: Exception with 409 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Cannot delete category with subcategories
     /// </remarks>
     [Fact]
     public async Task DeleteAsync_ShouldThrowConflict_WhenCategoryHasChildren()
@@ -519,6 +579,12 @@ public class CategoryServiceTests
     /// Scenario: An administrator attempts to create a new category but leaves the name field blank.
     /// Expected: The system prevents the creation with an error, as a category name cannot be empty.
     /// Coverage: Input validation for category names.
+    /// TestType: Boundary
+    /// InputConditions: CategoryCreateDto with empty name, admin user role
+    /// ExpectedResult: Exception due to invalid input validation
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Category name cannot be empty
     /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldThrowBadRequest_WhenNameIsEmpty()
