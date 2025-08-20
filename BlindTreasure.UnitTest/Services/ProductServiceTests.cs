@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.Http;
 using MockQueryable.Moq;
 using Moq;
 
-namespace BlindTreaure.UnitTest.Services;
+namespace BlindTreasure.UnitTest.Services;
 
 public class ProductServiceTests
 {
@@ -70,6 +70,12 @@ public class ProductServiceTests
     /// Scenario: A seller provides all necessary and correct details to add a new product to the system.
     /// Expected: The product is successfully added, and its details are returned. The system also makes sure to update its internal records, like caches, to reflect this new product.
     /// Coverage: The process of adding a new product, including ensuring that the seller is authorized and that the product information is saved correctly.
+    /// TestType: Normal
+    /// InputConditions: Valid ProductCreateDto, verified seller, existing category
+    /// ExpectedResult: Product created successfully with cache invalidation
+    /// ExpectedReturnValue: ProducDetailDto
+    /// ExceptionExpected: false
+    /// LogMessage: Product created successfully by verified seller
     /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldCreateProduct_WhenValidData()
@@ -175,6 +181,12 @@ public class ProductServiceTests
     /// Scenario: A seller attempts to add a new product, but their account has not been approved or verified yet.
     /// Expected: The system prevents the product creation with a 'Forbidden' error (status code 403), indicating that only verified sellers can list products.
     /// Coverage: Ensuring that only legitimate and verified sellers can add products to the platform.
+    /// TestType: Abnormal
+    /// InputConditions: Valid ProductCreateDto, unverified seller (IsVerified=false, Status=WaitingReview)
+    /// ExpectedResult: Exception with 403 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Unverified seller attempted to create product
     /// </remarks>
     [Fact]
     public async Task CreateAsync_ShouldThrowForbidden_WhenSellerNotVerified()
@@ -219,6 +231,12 @@ public class ProductServiceTests
     /// Scenario: A seller updates the details of an existing product they own with correct information.
     /// Expected: The product's information is updated in the system, and its new details are returned.
     /// Coverage: How products are updated, ensuring data accuracy and reflecting changes in the system's records.
+    /// TestType: Normal
+    /// InputConditions: Valid ProductUpdateDto, existing product, verified seller
+    /// ExpectedResult: Product updated successfully with cache invalidation
+    /// ExpectedReturnValue: ProducDetailDto
+    /// ExceptionExpected: false
+    /// LogMessage: Product updated successfully
     /// </remarks>
     [Fact]
     public async Task UpdateAsync_ShouldUpdateProduct_WhenValidData()
@@ -295,6 +313,12 @@ public class ProductServiceTests
     /// Scenario: A request is made to update a product using an ID that does not belong to any existing product.
     /// Expected: The system responds with a 'Not Found' error (status code 404), indicating the product could not be found for an update.
     /// Coverage: Error handling when trying to modify a product that is not in the system.
+    /// TestType: Abnormal
+    /// InputConditions: Valid ProductUpdateDto, non-existent product ID
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Product not found for update
     /// </remarks>
     [Fact]
     public async Task UpdateAsync_ShouldThrowNotFound_WhenProductNotExists()
@@ -324,6 +348,12 @@ public class ProductServiceTests
     /// Scenario: A request is made to remove a product from active listings, and the product is found in the system.
     /// Expected: The product is marked as deleted and its status is changed to inactive, but it remains in the database for historical purposes.
     /// Coverage: The process of soft-deleting products and updating their status.
+    /// TestType: Normal
+    /// InputConditions: Existing product with active status
+    /// ExpectedResult: Product soft-deleted and status changed to inactive
+    /// ExpectedReturnValue: ProducDetailDto
+    /// ExceptionExpected: false
+    /// LogMessage: Product soft-deleted successfully
     /// </remarks>
     [Fact]
     public async Task DeleteAsync_ShouldSoftDeleteProduct_WhenProductExists()
@@ -380,6 +410,12 @@ public class ProductServiceTests
     /// Scenario: A user uploads an image file for a product.
     /// Expected: The image is successfully uploaded to storage, its URL is saved with the product's details, and the image preview URL is returned.
     /// Coverage: Image upload functionality, linking images to products, and ensuring the correct URL is returned.
+    /// TestType: Normal
+    /// InputConditions: Valid image file, existing product
+    /// ExpectedResult: Image uploaded successfully and URL returned
+    /// ExpectedReturnValue: String (image URL)
+    /// ExceptionExpected: false
+    /// LogMessage: Product image uploaded successfully
     /// </remarks>
     [Fact]
     public async Task UploadProductImageAsync_ShouldUploadImage_WhenValidFile()
@@ -432,6 +468,12 @@ public class ProductServiceTests
     /// Scenario: A user attempts to upload an image file that has no content (is empty).
     /// Expected: The system responds with a 'Bad Request' error (status code 400), indicating that an empty file cannot be uploaded.
     /// Coverage: Input validation for uploaded image files, specifically preventing empty files.
+    /// TestType: Boundary
+    /// InputConditions: Empty image file (0 bytes), existing product
+    /// ExpectedResult: Exception with 400 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Empty image file upload attempt rejected
     /// </remarks>
     [Fact]
     public async Task UploadProductImageAsync_ShouldThrowBadRequest_WhenFileIsEmpty()
@@ -459,6 +501,12 @@ public class ProductServiceTests
     /// Scenario: A user updates a product by replacing its existing images with new ones.
     /// Expected: Old images are removed from storage, new images are uploaded, and the product's image URLs are updated accordingly.
     /// Coverage: Updating product images, including handling existing images and uploading new ones.
+    /// TestType: Normal
+    /// InputConditions: Valid image files, existing product with current images
+    /// ExpectedResult: Old images deleted, new images uploaded, product updated
+    /// ExpectedReturnValue: ProducDetailDto
+    /// ExceptionExpected: false
+    /// LogMessage: Product images updated successfully
     /// </remarks>
     [Fact]
     public async Task UpdateProductImagesAsync_ShouldUpdateImages_WhenValidFiles()
@@ -539,6 +587,12 @@ public class ProductServiceTests
     /// Scenario: A request is made to update images for a product using an ID that does not belong to any existing product.
     /// Expected: The system responds with a 'Not Found' error (status code 404), indicating the product could not be found to update its images.
     /// Coverage: Error handling when attempting to modify images for a non-existent product.
+    /// TestType: Abnormal
+    /// InputConditions: Valid image files, non-existent product ID
+    /// ExpectedResult: Exception with 404 status code
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Product not found for image update
     /// </remarks>
     [Fact]
     public async Task UpdateProductImagesAsync_ShouldThrowNotFound_WhenProductNotExists()
@@ -569,6 +623,12 @@ public class ProductServiceTests
     /// Scenario: A user searches for products using a keyword and specifies a category, expecting the results to be filtered and sorted appropriately.
     /// Expected: Only products matching the search term within the specified category (including its subcategories) are returned, and they are ordered as requested.
     /// Coverage: The comprehensive filtering and sorting capabilities of the product search, ensuring accurate and relevant results.
+    /// TestType: Normal
+    /// InputConditions: ProductQueryParameter with search term and category ID, existing products
+    /// ExpectedResult: Filtered and sorted products returned with pagination
+    /// ExpectedReturnValue: Pagination<ProducDetailDto>
+    /// ExceptionExpected: false
+    /// LogMessage: Product search completed successfully
     /// </remarks>
     [Fact]
     public async Task ApplyProductFiltersAndSorts_ShouldFilterBySearchAndCategory()
@@ -656,6 +716,12 @@ public class ProductServiceTests
     /// Scenario: A seller attempts to create a product but provides empty or invalid data for required fields (e.g., empty name, negative price or stock).
     /// Expected: The system rejects the request with a 'Bad Request' error (status code 400), indicating that the input data is not acceptable.
     /// Coverage: Input validation for product creation, ensuring that only complete and valid product information is accepted.
+    /// TestType: Boundary
+    /// InputConditions: Invalid ProductCreateDto (empty name, negative price/stock), verified seller
+    /// ExpectedResult: Exception with 400 status code and validation message
+    /// ExpectedReturnValue: Exception
+    /// ExceptionExpected: true
+    /// LogMessage: Product validation failed - empty name, negative values
     /// </remarks>
     [Fact]
     public async Task ValidateProductDto_ShouldThrowBadRequest_WhenInvalidData()
