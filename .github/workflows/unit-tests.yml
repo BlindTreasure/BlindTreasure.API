@@ -5,17 +5,23 @@ on:
     branches: [unit-test]
 
 jobs:
-  analyze-tests:
+  test:
     runs-on: ubuntu-latest
-    outputs:
-      test-matrix: ${{ steps.generate-matrix.outputs.matrix }}
+    permissions:
+      contents: read
+      pull-requests: write
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
         with:
-          python-version: '3.11'
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -24,135 +30,6 @@ jobs:
           cache: true
           cache-dependency-path: '**/*.csproj'
 
-      - name: Install Python dependencies
-        run: |
-          pip install pandas openpyxl xlsxwriter lxml beautifulsoup4
-
-      - name: Build with XML docs
-        run: |
-          dotnet build BlindTreasure.API.sln \
-            --configuration Release \
-            /p:GenerateDocumentationFile=true
-
-      - name: Generate Test Matrix
-        id: generate-matrix
-        run: |
-          python - << EOF
-          import xml.etree.ElementTree as ET
-          import json
-          import glob
-          from bs4 import BeautifulSoup
-          
-          def extract_test_info(xml_content):
-              soup = BeautifulSoup(xml_content, 'xml')
-              test_cases = []
-              
-              for member in soup.find_all('member'):
-                  remarks = member.find('remarks')
-                  if not remarks:
-                      continue
-                  
-                  # Extract all test metadata from remarks
-                  lines = remarks.text.strip().split('\n')
-                  test_info = {}
-                  
-                  for line in lines:
-                      line = line.strip()
-                      if ':' in line:
-                          key, value = line.split(':', 1)
-                          test_info[key.strip()] = value.strip()
-                  
-                  if test_info:
-                      test_info['MemberName'] = member.get('name', '').split('.')[-1]
-                      test_cases.append(test_info)
-              
-              return test_cases
-          
-          # Find all XML documentation files
-          xml_files = glob.glob("**/bin/Release/**/*.xml", recursive=True)
-          all_tests = []
-          
-          for xml_file in xml_files:
-              try:
-                  with open(xml_file, 'r', encoding='utf-8') as f:
-                      xml_content = f.read()
-                      tests = extract_test_info(xml_content)
-                      all_tests.extend(tests)
-              except Exception as e:
-                  print(f"Error processing {xml_file}: {str(e)}")
-          
-          # Generate matrix
-          matrix = {
-              'include': [{
-                  'test_name': test['MemberName'],
-                  'scenario': test.get('Scenario', 'N/A'),
-                  'test_type': test.get('TestType', 'Normal'),
-                  'expected_result': test.get('ExpectedResult', 'N/A'),
-                  'exception_expected': test.get('ExceptionExpected', 'false'),
-                  'coverage': test.get('Coverage', 'N/A')
-              } for test in all_tests]
-          }
-          
-          # Output the matrix in GitHub Actions format
-          print(f"::set-output name=matrix::{json.dumps(matrix)}")
-          
-          # Generate detailed Excel report
-          import pandas as pd
-          
-          df = pd.DataFrame(all_tests)
-          df.to_excel('test-analysis.xlsx', index=False)
-          EOF
-
-      - name: Upload Test Analysis
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-analysis
-          path: test-analysis.xlsx
-
-  run-tests:
-    needs: analyze-tests
-    runs-on: ubuntu-latest
-    strategy:
-      matrix: ${{fromJson(needs.analyze-tests.outputs.test-matrix)}}
-      fail-fast: false
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Run Test
-        run: |
-          echo "Running test: ${{ matrix.test_name }}"
-          echo "Scenario: ${{ matrix.scenario }}"
-          echo "Type: ${{ matrix.test_type }}"
-          echo "Expected Result: ${{ matrix.expected_result }}"
-          echo "Exception Expected: ${{ matrix.exception_expected }}"
-          echo "Coverage: ${{ matrix.coverage }}"
-          
-          dotnet test BlindTreasure.API.sln \
-            --filter "FullyQualifiedName~${{ matrix.test_name }}" \
-            --logger "trx;LogFileName=${{ matrix.test_name }}.trx"
-
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-results-${{ matrix.test_name }}
-          path: "**/*.trx"
-
-  generate-report:
-    needs: [run-tests]
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-      - name: Download All Test Results
-        uses: actions/download-artifact@v3
-
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -160,69 +37,18 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install pandas openpyxl xlsxwriter
+          pip install pandas openpyxl xlsxwriter lxml beautifulsoup4
 
-      - name: Generate Final Report
+      - name: Restore dependencies
+        run: dotnet restore BlindTreasure.API.sln
+
+      - name: Build with XML docs
         run: |
-          python - << EOF
-          import pandas as pd
-          import glob
-          import xml.etree.ElementTree as ET
-          
-          def parse_trx(file_path):
-              tree = ET.parse(file_path)
-              root = tree.getroot()
-              ns = {'ns': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
-              
-              results = []
-              for test in root.findall('.//ns:UnitTestResult', ns):
-                  result = {
-                      'TestName': test.get('testName'),
-                      'Outcome': test.get('outcome'),
-                      'Duration': test.get('duration'),
-                      'ErrorMessage': test.find('ns:Output/ns:ErrorInfo/ns:Message', ns).text if test.find('ns:Output/ns:ErrorInfo/ns:Message', ns) is not None else None
-                  }
-                  results.append(result)
-              
-              return results
-          
-          # Process all TRX files
-          all_results = []
-          for trx_file in glob.glob('**/*.trx', recursive=True):
-              try:
-                  results = parse_trx(trx_file)
-                  all_results.extend(results)
-              except Exception as e:
-                  print(f"Error processing {trx_file}: {str(e)}")
-          
-          # Create detailed report
-          df = pd.DataFrame(all_results)
-          
-          # Add test analysis data
-          test_analysis = pd.read_excel('test-analysis/test-analysis.xlsx')
-          df = df.merge(test_analysis, left_on='TestName', right_on='MemberName', how='left')
-          
-          # Generate statistics
-          stats = {
-              'Total Tests': len(df),
-              'Passed': len(df[df['Outcome'] == 'Passed']),
-              'Failed': len(df[df['Outcome'] == 'Failed']),
-              'By Test Type': df['TestType'].value_counts().to_dict(),
-              'By Coverage Area': df['Coverage'].value_counts().to_dict()
-          }
-          
-          # Save reports
-          df.to_excel('detailed-test-report.xlsx', index=False)
-          pd.DataFrame([stats]).to_excel('test-statistics.xlsx')
-          EOF
-
-      - name: Upload Final Reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: final-test-reports
-          path: |
-            detailed-test-report.xlsx
-            test-statistics.xlsx
+          dotnet build BlindTreasure.API.sln \
+            --no-restore \
+            --configuration Release \
+            /p:GenerateDocumentationFile=true
+          find ./BlindTreasure.UnitTest/bin -name "*.xml" | sort || true
 
       - name: Run unit tests with coverage
         run: |
@@ -286,25 +112,78 @@ jobs:
               if 'boundary' in n: return 'B'
               if 'abnormal' in n: return 'A'
               if 'normal'   in n: return 'N'
-              return 'N'
+                      desc = ''
+                      pre  = ''
+                      cov  = ''
+                      exp  = ''
+                      test_type = ''
+                      input_conditions = ''
+                      expected_result = ''
+                      expected_return_value = ''
+                      exception_expected = ''
+                      log_msg_func = ''
+                      s = m.find('summary')
+                      if s is not None and s.text: desc = ' '.join(s.text.split())
+                      r = m.find('remarks')
+                      if r is not None and r.text:
+                          for line in r.text.splitlines():
+                              line = line.strip()
+                              if not line: continue
+                              # Support flexible key parsing: "Key: value" lines
+                              if ':' in line:
+                                  k, v = line.split(':', 1)
+                                  k = k.strip().lower()
+                                  v = v.strip()
+                                  if k == 'scenario':
+                                      pre = v or pre
+                                  elif k == 'coverage':
+                                      cov = v or cov
+                                  elif k == 'expected':
+                                      exp = v or exp
+                                  elif k == 'testtype':
+                                      test_type = v or test_type
+                                  elif k == 'inputconditions':
+                                      input_conditions = v or input_conditions
+                                  elif k == 'expectedresult':
+                                      expected_result = v or expected_result
+                                  elif k == 'expectedreturnvalue':
+                                      expected_return_value = v or expected_return_value
+                                  elif k == 'exceptionexpected':
+                                      exception_expected = v or exception_expected
+                                  elif k == 'logmessage':
+                                      log_msg_func = v or log_msg_func
+                                  else:
+                                      # fallback: keep existing parsing for older formats
+                                      if line.startswith('Scenario:'):
+                                          pre = line.replace('Scenario:', '').strip() or pre
+                                      elif line.startswith('Coverage:'):
+                                          cov = line.replace('Coverage:', '').strip() or cov
 
-          def expected_from_name(name: str) -> str:
-              """Parse expected result from test name"""
-              n = (name or '').lower()
-              if 'shouldreturntrue'  in n or 'should_be_true' in n:  return 'TRUE'
-              if 'shouldreturnfalse' in n or 'should_be_false' in n: return 'FALSE'
-              if 'shouldthrow' in n or 'exception' in n or 'shouldthrownotfound' in n or 'shouldthrowconflict' in n or 'shouldthrowbadrequest' in n: return 'EXCEPTION'
-          
-              # Specific patterns for different outcomes
-              if 'shouldcreateuser' in n or 'shouldupdateprofile' in n or 'shoulduploadavatar' in n or 'shouldupdatestatus' in n: return 'TRUE'
-              if 'shouldreactivateuser' in n: return 'TRUE'
-          
-              return ''
-
-          def get_expected_return_value(name: str) -> str:
-              """Get specific return value expected from test name"""
-              n = (name or '').lower()
-          
+                      key=(cls,func)
+                      if key not in agg:
+                          agg[key]={("Class":cls,
+                                     "Function":func,
+                                     "Description":desc,
+                                     "PreCondition":pre,
+                                     "Requirement":cov,
+                                     "Expected":exp,
+                                     "TestType":test_type,
+                                     "InputConditions":input_conditions,
+                                     "ExpectedResult":expected_result,
+                                     "ExpectedReturnValue":expected_return_value,
+                                     "ExceptionExpected":exception_expected,
+                                     "FunctionLogMessage":log_msg_func}
+                      else:
+                          if not agg[key]["Description"] and desc: agg[key]["Description"]=desc
+                          if not agg[key]["PreCondition"] and pre: agg[key]["PreCondition"]=pre
+                          if not agg[key]["Requirement"] and cov:  agg[key]["Requirement"]=cov
+                          if not agg[key]["Expected"] and exp: agg[key]["Expected"]=exp
+                          if not agg[key]["TestType"] and test_type: agg[key]["TestType"]=test_type
+                          if not agg[key]["InputConditions"] and input_conditions: agg[key]["InputConditions"]=input_conditions
+                          if not agg[key]["ExpectedResult"] and expected_result: agg[key]["ExpectedResult"]=expected_result
+                          if not agg[key]["ExpectedReturnValue"] and expected_return_value: agg[key]["ExpectedReturnValue"]=expected_return_value
+                          if not agg[key]["ExceptionExpected"] and exception_expected: agg[key]["ExceptionExpected"]=exception_expected
+                          if not agg[key]["FunctionLogMessage"] and log_msg_func: agg[key]["FunctionLogMessage"]=log_msg_func
               # For successful operations
               if 'shouldcreateuser' in n: return 'UserDto object'
               if 'shouldupdateprofile' in n: return 'Updated UserDto'
@@ -579,7 +458,14 @@ jobs:
                       "Function Code": f"Code_{i}",
                       "Sheet Name": f["Function"],
                       "Description": f["Description"],
-                      "Pre-Condition": f["PreCondition"]
+                      "Pre-Condition": f["PreCondition"],
+                      "Expected": f.get("Expected", ""),
+                      "Test Type": f.get("TestType", ""),
+                      "Input Conditions (from remarks)": f.get("InputConditions", ""),
+                      "Expected Result (from remarks)": f.get("ExpectedResult", ""),
+                      "Expected Return Value (from remarks)": f.get("ExpectedReturnValue", ""),
+                      "Exception Expected (from remarks)": f.get("ExceptionExpected", ""),
+                      "Function Log Message": f.get("FunctionLogMessage", "")
                   })
           
               # Sheet 2: Statistics
@@ -695,6 +581,43 @@ jobs:
               ws.write(r, 0, "Precondition", label_format)
               for j in range(len(cols)):
                   ws.write(r, 1+j, "", data_format)
+              r += 1
+
+              # Function-level Expected / TestType / InputConditions rows (from remarks)
+              ws.write(r, 0, "Function Expected (remarks)", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, func.get("Expected", ""), data_format)
+              r += 1
+
+              ws.write(r, 0, "Function Test Type (remarks)", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, func.get("TestType", ""), data_format)
+              r += 1
+
+              ws.write(r, 0, "Function Input Conditions (remarks)", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, func.get("InputConditions", ""), data_format)
+              r += 1
+
+              ws.write(r, 0, "Function Expected Result (remarks)", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, func.get("ExpectedResult", ""), data_format)
+              r += 1
+
+              ws.write(r, 0, "Function Expected Return Value (remarks)", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, func.get("ExpectedReturnValue", ""), data_format)
+              r += 1
+
+              ws.write(r, 0, "Function Exception Expected (remarks)", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, func.get("ExceptionExpected", ""), data_format)
+              r += 1
+
+              # Function-level log message
+              ws.write(r, 0, "Function Log Message", label_format)
+              for j in range(len(cols)):
+                  ws.write(r, 1+j, func.get("FunctionLogMessage", ""), data_format)
               r += 1
           
               # Input conditions
