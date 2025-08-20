@@ -65,8 +65,8 @@ jobs:
         run: mkdir -p coveragereport
 
       - name: Create generate_excel_report.py
-        shell: bash
         run: |
+          echo "Creating generate_excel_report.py"
           cat <<'EOF' > generate_excel_report.py
           import pandas as pd
           import xml.etree.ElementTree as ET
