@@ -115,19 +115,42 @@ jobs:
               return 'N'
 
           def expected_from_name(name: str) -> str:
+              """Parse expected result from test name"""
               n = (name or '').lower()
               if 'shouldreturntrue'  in n or 'should_be_true' in n:  return 'TRUE'
               if 'shouldreturnfalse' in n or 'should_be_false' in n: return 'FALSE'
-              if 'shouldthrow' in n or 'exception' in n: return 'EXCEPTION'
+              if 'shouldthrow' in n or 'exception' in n or 'shouldthrownotfound' in n or 'shouldthrowconflict' in n or 'shouldthrowbadrequest' in n: return 'EXCEPTION'
+          
+              # Specific patterns for different outcomes
+              if 'shouldcreateuser' in n or 'shouldupdateprofile' in n or 'shoulduploadavatar' in n or 'shouldupdatestatus' in n: return 'TRUE'
+              if 'shouldreactivateuser' in n: return 'TRUE'
+          
+              return ''
+
+          def get_expected_return_value(name: str) -> str:
+              """Get specific return value expected from test name"""
+              n = (name or '').lower()
+          
+              # For successful operations
+              if 'shouldcreateuser' in n: return 'UserDto object'
+              if 'shouldupdateprofile' in n: return 'Updated UserDto'
+              if 'shoulduploadavatar' in n: return 'UserDto with avatar URL'
+              if 'shouldupdatestatus' in n: return 'Updated UserDto'
+              if 'shouldreactivateuser' in n: return 'Reactivated UserDto'
+          
+              # For boolean returns
+              if 'shouldreturntrue' in n: return 'true'
+              if 'shouldreturnfalse' in n: return 'false'
+          
               return ''
 
           def extract_log_message_from_name(name: str) -> str:
               """Extract expected log message or error from test name"""
               n = (name or '').lower()
-              if 'conflict' in n: return 'Conflict error'
+              if 'conflict' in n or 'emailexists' in n: return 'Email already exists'
               if 'forbidden' in n: return 'Forbidden access'
-              if 'notfound' in n: return 'Not found error'
-              if 'badrequest' in n: return 'Bad request error'
+              if 'notfound' in n or 'usernotexists' in n: return 'User not found'
+              if 'badrequest' in n or 'fileisempty' in n: return 'Invalid input data'
               if 'unauthorized' in n: return 'Unauthorized access'
               if 'nameexists' in n: return 'Name already exists'
               if 'empty' in n or 'null' in n: return 'Input validation error'
@@ -142,8 +165,13 @@ jobs:
               if 'validdata' in base or ('should' in base and ('create' in base or 'update' in base) and 'when' not in base):
                   conditions.append('Valid input data provided')
           
+              if 'validfile' in base:
+                  conditions.append('Valid file provided')
+          
               if 'empty' in base or 'null' in base:
-                  if 'name' in base:
+                  if 'file' in base:
+                      conditions.append('File is null or empty')
+                  elif 'name' in base:
                       conditions.append('Name is null or empty')
                   else:
                       conditions.append('Required field is null or empty')
@@ -157,26 +185,14 @@ jobs:
               if 'notadmin' in base or 'notauthorized' in base or 'forbidden' in base:
                   conditions.append('User lacks required permissions')
           
-              if 'nameexists' in base or 'conflict' in base:
-                  conditions.append('Entity name already exists')
+              if 'emailexists' in base or 'conflict' in base:
+                  conditions.append('Email already exists')
           
-              if 'hasproducts' in base:
-                  conditions.append('Category has associated products')
+              if 'userexists' in base:
+                  conditions.append('User exists in system')
           
-              if 'haschildren' in base:
-                  conditions.append('Category has subcategories')
-          
-              if 'nochildren' in base and 'validandno' in base:
-                  conditions.append('Category has no dependencies')
-
-              if 'invaliditemcount' in base:
-                  conditions.append('Invalid item count provided')
-          
-              if 'nosecret' in base:
-                  conditions.append('No Secret rarity item included')
-
-              if 'notowns' in base:
-                  conditions.append('User does not own the entity')
+              if 'statusisactive' in base:
+                  conditions.append('Status is set to Active')
 
               # Default condition if none found
               if not conditions:
@@ -362,7 +378,7 @@ jobs:
           
                       # Add test to index
                       idx[(t["Class"], t["Base"])].append(t)
-              
+          
               print(f"\nTotal functions after processing: {len(funcs)}")
               print(f"Total test results from parse_trx: {len(trx)}")
               print(f"Total tests indexed (should match total test results): {sum(len(tests) for tests in idx.values())}")
@@ -464,6 +480,7 @@ jobs:
                       "id": f"UTCID{k:02d}",
                       "name": t["Display"] or t["Method"],
                       "exp": expected_from_name(t["Display"] or t["Method"]),
+                      "return_value": get_expected_return_value(t["Display"] or t["Method"]),
                       "type": classify_case(t["Display"] or t["Method"]),
                       "out": t["Outcome"],
                       "dt": t["ExecutedAt"],
@@ -520,10 +537,17 @@ jobs:
                   ws.write(r, 1+j, "", blue_section)
               r += 1
           
-              # Return subsection
+              # Return subsection header
               ws.write(r, 0, "Return", label_format)
               for j in range(len(cols)):
                   ws.write(r, 1+j, "", data_format)
+              r += 1
+          
+              # Expected return value row
+              ws.write(r, 0, "Expected Return Value", label_format)
+              for j, c in enumerate(cols):
+                  val = c["return_value"] if c["return_value"] else ""
+                  ws.write(r, 1+j, val, data_format)
               r += 1
           
               # FALSE row
@@ -540,10 +564,17 @@ jobs:
                   ws.write(r, 1+j, val, data_format)
               r += 1
           
-              # Exception subsection
+              # Exception subsection header
               ws.write(r, 0, "Exception", label_format)
               for j in range(len(cols)):
                   ws.write(r, 1+j, "", data_format)
+              r += 1
+          
+              # Exception expected row
+              ws.write(r, 0, "Exception Expected", label_format)
+              for j, c in enumerate(cols):
+                  val = "O" if c["exp"] == "EXCEPTION" else ""
+                  ws.write(r, 1+j, val, data_format)
               r += 1
           
               # Log message row
