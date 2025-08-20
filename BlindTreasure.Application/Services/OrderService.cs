@@ -824,6 +824,7 @@ public class OrderService : IOrderService
             .Include(o => o.Payment).ThenInclude(o => o.Transactions)
             .Include(o => o.User)
             .Include(o => o.Seller)
+            .Include(o => o.OrderSellerPromotions)
             .FirstOrDefaultAsync();
 
         if (order == null)
@@ -905,6 +906,7 @@ public class OrderService : IOrderService
             .Include(o => o.Payment).ThenInclude(o => o.Transactions)
             .Include(o => o.User)
             .Include(o => o.Seller)
+            .Include(o => o.OrderSellerPromotions)
             .ToListAsync();
 
         if (!orders.Any())
