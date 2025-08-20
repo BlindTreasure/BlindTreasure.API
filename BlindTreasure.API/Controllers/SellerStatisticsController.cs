@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -224,6 +225,31 @@ public class SellerStatisticsController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, ApiResult<SellerStatisticsResponseDto>.Failure("500", ex.Message));
+        }
+    }
+
+
+    [Authorize(Roles = "Seller,Admin,Staff")]
+    [HttpPost("revenue-summary")]
+    [ProducesResponseType(typeof(ApiResult<SellerRevenueSummaryDto>), 200)]
+    public async Task<IActionResult> GetRevenueSummary([FromBody] SellerStatisticsRequestDto req, CancellationToken ct)
+    {
+        try
+        {
+            var sellerId = _claimsService.CurrentUserId;
+            if (sellerId == Guid.Empty)
+                return Forbid("Không tìm thấy người bán đang đăng nhập.");
+
+            var seller = await _sellerService.GetSellerProfileByUserIdAsync(sellerId);
+            if (seller == null)
+                return NotFound("Người bán không tồn tại.");
+
+            var result = await _sellerStatisticsService.GetRevenueSummaryAsync(seller.SellerId, req, ct);
+            return Ok(ApiResult<SellerRevenueSummaryDto>.Success(result, "200", "Lấy doanh thu thành công."));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResult<SellerRevenueSummaryDto>.Failure("500", ex.Message));
         }
     }
 }

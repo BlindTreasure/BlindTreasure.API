@@ -173,6 +173,7 @@ public static class IocContainer
         //cron-jobs
         services.AddHostedService<TradeRequestLockJob>();
         services.AddHostedService<ItemHoldReleaseJob>();
+        services.AddHostedService<OrderCompletionJob>();
 
         //3rd party
         services.AddHttpClient();
