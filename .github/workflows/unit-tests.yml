@@ -26,14 +26,14 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: "8.0.x"
           cache: true
-          cache-dependency-path: '**/*.csproj'
+          cache-dependency-path: "**/*.csproj"
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install Python dependencies
         run: |
@@ -490,7 +490,7 @@ jobs:
                   "bg_color": "#1e1b4b",
                   "font_color": "white"
               })
-          
+
               # Blue section headers 
               blue_section = workbook.add_format({
                   "bold": True,
@@ -500,14 +500,14 @@ jobs:
                   "bg_color": "#1e1b4b",
                   "font_color": "white"
               })
-          
+
               # Regular label format
               label_format = workbook.add_format({
                   "align": "left",
                   "valign": "vcenter",
                   "border": 1
               })
-          
+
               # Data cell format (white background with border)
               data_format = workbook.add_format({
                   "align": "center",
@@ -536,7 +536,7 @@ jobs:
                   for cond in c["conds"]:
                       if cond and cond not in all_conditions:
                           all_conditions.append(cond)
-          
+
               if not all_conditions:
                   all_conditions = ["Standard test condition"]
 
@@ -546,7 +546,7 @@ jobs:
                   ws.set_column(1+j, 1+j, 15)  # Test case columns
 
               r = 0
-          
+
               # Header row with UTCID columns
               ws.write(r, 0, "", data_format)
               for j, c in enumerate(cols):
@@ -558,7 +558,7 @@ jobs:
               for j in range(len(cols)):
                   ws.write(r, 1+j, "", blue_section)
               r += 1
-          
+
               # Precondition row
               ws.write(r, 0, "Precondition", label_format)
               for j in range(len(cols)):
@@ -601,7 +601,7 @@ jobs:
               for j in range(len(cols)):
                   ws.write(r, 1+j, func.get("FunctionLogMessage", ""), data_format)
               r += 1
-          
+
               # Input conditions
               for condition in all_conditions:
                   ws.write(r, 0, f"Input: {condition}", label_format)
@@ -615,47 +615,47 @@ jobs:
               for j in range(len(cols)):
                   ws.write(r, 1+j, "", blue_section)
               r += 1
-          
+
               # Return subsection header
               ws.write(r, 0, "Return", label_format)
               for j in range(len(cols)):
                   ws.write(r, 1+j, "", data_format)
               r += 1
-          
+
               # Expected return value row
               ws.write(r, 0, "Expected Return Value", label_format)
               for j, c in enumerate(cols):
                   val = c["return_value"] if c["return_value"] else ""
                   ws.write(r, 1+j, val, data_format)
               r += 1
-          
+
               # FALSE row
               ws.write(r, 0, "FALSE", label_format)
               for j, c in enumerate(cols):
                   val = "O" if c["exp"] == "FALSE" else ""
                   ws.write(r, 1+j, val, data_format)
               r += 1
-          
+
               # TRUE row  
               ws.write(r, 0, "TRUE", label_format)
               for j, c in enumerate(cols):
                   val = "O" if c["exp"] == "TRUE" else ""
                   ws.write(r, 1+j, val, data_format)
               r += 1
-          
+
               # Exception subsection header
               ws.write(r, 0, "Exception", label_format)
               for j in range(len(cols)):
                   ws.write(r, 1+j, "", data_format)
               r += 1
-          
+
               # Exception expected row
               ws.write(r, 0, "Exception Expected", label_format)
               for j, c in enumerate(cols):
                   val = "O" if c["exp"] == "EXCEPTION" else ""
                   ws.write(r, 1+j, val, data_format)
               r += 1
-          
+
               # Log message row
               ws.write(r, 0, "Log message", label_format)
               for j, c in enumerate(cols):
@@ -668,20 +668,20 @@ jobs:
               for j in range(len(cols)):
                   ws.write(r, 1+j, "", blue_section)
               r += 1
-          
+
               # Type row
               ws.write(r, 0, "Type(N : Normal, A : Abnormal, B : Boundary)", label_format)
               for j, c in enumerate(cols):
                   ws.write(r, 1+j, c["type"], data_format)
               r += 1
-          
+
               # Passed/Failed row
               ws.write(r, 0, "Passed/Failed", label_format)
               for j, c in enumerate(cols):
                   result_val = "P" if c["out"] == "Passed" else ("F" if c["out"] == "Failed" else "")
                   ws.write(r, 1+j, result_val, data_format)
               r += 1
-          
+
               # Executed Date row
               ws.write(r, 0, "Executed Date", label_format)
               for j, c in enumerate(cols):
@@ -696,7 +696,7 @@ jobs:
                           pass
                   ws.write(r, 1+j, date_str, data_format)
               r += 1
-          
+
               # Defect ID row
               ws.write(r, 0, "Defect ID", label_format)
               for j in range(len(cols)):
@@ -708,10 +708,10 @@ jobs:
           def main():
               funcs, df_funcs, df_stats, idx = build_core()
               out = "./coveragereport/Functions_Statistics_Report.xlsx"
-          
+
               # Track actual sheet names created (for hyperlink updates)
               sheet_name_mapping = {}
-          
+
               with pd.ExcelWriter(out, engine="xlsxwriter") as w:
                   # Core sheets
                   df_funcs.to_excel(w, sheet_name="Functions", index=False)
@@ -719,7 +719,7 @@ jobs:
 
                   wb = w.book
                   hdr = wb.add_format({"bold": True,"bg_color":"#1F4E78","font_color":"white","border":1})
-          
+
                   for sheet,df in [("Functions",df_funcs),("Statistics",df_stats)]:
                       ws = w.sheets[sheet]
                       for c,col in enumerate(df.columns):
@@ -741,7 +741,7 @@ jobs:
                           stats_ws.write(i+1, 1, hyperlink_formula)
 
               print(f"Report generated: {out}")
-          
+
               # Final summary
               total_tests_in_report = sum([row["Total Test Cases"] for _, row in df_stats.iterrows()])
               print(f"\n=== FINAL SUMMARY ===")
