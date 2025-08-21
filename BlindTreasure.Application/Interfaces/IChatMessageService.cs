@@ -25,6 +25,7 @@ public interface IChatMessageService
     Task<ChatMessageDto?> GetMessageByIdAsync(Guid messageId);
     Task<Pagination<ChatMessageDto>> GetMessagesAsync(Guid user1Id, Guid user2Id, PaginationParameter pagination);
     Task<Pagination<ConversationDto>> GetConversationsAsync(Guid userId, PaginationParameter pagination);
+    Task<ConversationDto> GetNewConversationByReceiverIdAsync(Guid currentUserId, Guid receiverId);
 
     // Đọc tin nhắn và hội thoại
     Task MarkMessagesAsReadAsync(Guid fromUserId, Guid toUserId);

@@ -14,6 +14,7 @@ using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualBasic;
 
 namespace BlindTreasure.Application.Services;
 
@@ -277,6 +278,48 @@ public class ChatMessageService : IChatMessageService
     }
 
 
+    /// <summary>
+    /// Lấy danh sách cuộc trò chuyện của user hiện tại với một user khác
+    /// </summary>
+    /// <param name="currentUserId">ID người gửi</param>
+    /// <param name="receiverId">ID người nhận</param>
+    /// <returns>ConversationDto</returns>
+    public async Task<ConversationDto> GetNewConversationByReceiverIdAsync(Guid currentUserId, Guid receiverId)
+    {
+        _logger.Info(
+            $"[GetConversationsByReceiverIdAsync] User {currentUserId} requests conversations.");
+
+        // Tạo cache key dựa trên các tham số
+        var cacheKey = $"chat:conversations:by:{currentUserId}:{receiverId}";
+
+        // ✅ GIẢM THỜI GIAN CACHE CHO CONVERSATION VÌ CẦN CẬP NHẬT ONLINE STATUS
+        var cachedResult = await _cacheService.GetAsync<ConversationDto>(cacheKey);
+        if (cachedResult != null)
+        {
+            // ✅ CẬP NHẬT LẠI TRẠNG THÁI ONLINE NGAY CẢ KHI CÓ CACHE
+            cachedResult.IsOnline = await IsUserOnline(cachedResult.OtherUserId.ToString());
+
+            _logger.Info($"[GetConversationsByReceiverIdAsync] Cache hit for conversations with key: {cacheKey}");
+            return cachedResult;
+        }
+
+        var otherUser = await _unitOfWork.Users
+        .FirstOrDefaultAsync(u => u.Id == receiverId && !u.IsDeleted);
+
+        var conversation = new ConversationDto
+        {
+            OtherUserId = receiverId,
+            OtherUserName = otherUser?.FullName ?? "Unknown",
+            OtherUserAvatar = otherUser?.AvatarUrl ?? "",
+            IsOnline = await IsUserOnline(receiverId.ToString())
+        };
+
+        // ✅ CACHE NGẮN HƠN VÌ CẦN CẬP NHẬT ONLINE STATUS THƯỜNG XUYÊN
+        await _cacheService.SetAsync(cacheKey, conversation, TimeSpan.FromSeconds(15));
+        _logger.Info($"[GetConversationsByReceiverIdAsync] Conversation cached with key: {cacheKey}");
+
+        return conversation;
+    }
     public async Task<ChatMessageDto?> GetMessageByIdAsync(Guid messageId)
     {
         var currentUserId = _claimsService.CurrentUserId;
