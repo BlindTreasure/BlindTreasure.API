@@ -21,3 +21,9 @@ public class OrderQueryParameter : PaginationParameter
 
     public Guid? CheckoutGroupId { get; set; } = Guid.Empty;
 }
+
+public class OrderAdminQueryParameter : OrderQueryParameter
+{
+    public Guid? SellerId { get; set; }
+    public Guid? UserId { get; set; }
+}
