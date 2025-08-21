@@ -538,6 +538,29 @@ public class SellerService : ISellerService
         await _cacheService.RemoveAsync($"seller:user:{userId}");
     }
 
+    public async Task<OrderDto> GetSellerOrderByIdAsync(Guid orderId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Không tìm thấy seller tồn tại.");
+
+        var order = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.Id == orderId && o.SellerId == seller.Id && !o.IsDeleted)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
+            .Include(o => o.ShippingAddress)
+            .Include(o => o.User)
+            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+
+        if (order == null)
+            throw ErrorHelper.NotFound("Không tìm thấy đơn hàng hoặc bạn không có quyền truy cập.");
+
+        return OrderDtoMapper.ToOrderDto(order);
+    }
 
     // ----------------- PRIVATE HELPER METHODS -----------------
 
@@ -558,6 +581,8 @@ public class SellerService : ISellerService
 
         return seller;
     }
+
+ 
 
     private static void ValidateSellerInfoDto(UpdateSellerInfoDto dto)
     {
