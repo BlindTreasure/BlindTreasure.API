@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -71,6 +72,7 @@ namespace BlindTreasure.Application.Services
                     NetAmount = 0
                 };
                 payout = await _unitOfWork.Payouts.AddAsync(payout);
+                await _unitOfWork.SaveChangesAsync(); // <-- Add this line
                 _logger.Info($"[Payout] Created new pending payout for seller {sellerId} for period {periodStart:yyyy-MM-dd} - {periodEnd:yyyy-MM-dd}.");
             }
 
@@ -181,6 +183,182 @@ namespace BlindTreasure.Application.Services
             // TODO: Trigger Stripe payout here if needed
 
             return true;
+        }
+
+        public async Task<PayoutCalculationResultDto> CalculateUpcomingPayoutForCurrentSellerAsync(PayoutCalculationRequestDto req)
+        {
+            var userId = _claimsService.CurrentUserId;
+            var seller = await _unitOfWork.Sellers.GetQueryable()
+                .Include(s => s.User)
+                .FirstOrDefaultAsync(s => s.UserId == userId);
+
+            if (seller == null)
+                throw new InvalidOperationException("Seller profile not found.");
+
+            var periodStart = req.PeriodStart.Date;
+            var periodEnd = req.PeriodEnd.Date;
+
+            // Get all completed orders for seller in period, not yet included in a payout
+            var completedOrderDetails = await _unitOfWork.OrderDetails.GetQueryable()
+                .Include(od => od.Order)
+                .Include(od => od.Product)
+                .Where(od =>
+                    od.Order.SellerId == seller.Id &&
+                    od.Order.Status == OrderStatus.COMPLETED.ToString() &&
+                    od.Order.CompletedAt >= periodStart &&
+                    od.Order.CompletedAt < periodEnd &&
+                    !od.IsDeleted &&
+                    !_unitOfWork.PayoutDetails.GetQueryable().Any(pd => pd.OrderDetailId == od.Id)
+                )
+                .ToListAsync();
+
+            var grossAmount = completedOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+            var platformFeeRate = req.CustomPlatformFeeRate ?? 5.0m;
+            var platformFeeAmount = Math.Round(grossAmount * platformFeeRate / 100m, 2);
+            var netAmount = grossAmount - platformFeeAmount;
+
+            var orderDetailSummaries = completedOrderDetails.Select(od => new PayoutDetailSummaryDto
+            {
+                OrderDetailId = od.Id,
+                OrderId = od.OrderId,
+                ProductName = od.Product?.Name ?? "",
+                Quantity = od.Quantity,
+                OriginalAmount = od.TotalPrice,
+                DiscountAmount = od.DetailDiscountPromotion ?? 0,
+                FinalAmount = od.FinalDetailPrice ?? od.TotalPrice,
+                RefundAmount = 0, // Update if refunds exist
+                ContributedAmount = od.FinalDetailPrice ?? od.TotalPrice,
+                OrderCompletedAt = od.Order.CompletedAt ?? DateTime.MinValue
+            }).ToList();
+
+            var canPayout = seller.StripeAccountId != null && netAmount >= 100_000m;
+            var payoutBlockReason = canPayout ? null :
+                seller.StripeAccountId == null ? "Seller chưa liên kết Stripe account." :
+                netAmount < 100_000m ? "Số tiền chưa đủ tối thiểu để rút." : null;
+
+            return new PayoutCalculationResultDto
+            {
+                SellerId = seller.Id,
+                SellerName = seller.CompanyName ?? seller.User?.FullName ?? "",
+                SellerEmail = seller.User?.Email ?? "",
+                StripeAccountId = seller.StripeAccountId,
+                GrossAmount = grossAmount,
+                PlatformFeeRate = platformFeeRate,
+                PlatformFeeAmount = platformFeeAmount,
+                NetAmount = netAmount,
+                TotalOrderDetails = orderDetailSummaries.Count,
+                TotalOrders = orderDetailSummaries.Select(x => x.OrderId).Distinct().Count(),
+                CanPayout = canPayout,
+                PayoutBlockReason = payoutBlockReason,
+                OrderDetailSummaries = orderDetailSummaries
+            };
+        }
+
+        public async Task<List<PayoutListResponseDto>> GetSellerPayoutsForPeriodAsync(PayoutCalculationRequestDto req)
+        {
+            var userId = _claimsService.CurrentUserId;
+            var seller = await _unitOfWork.Sellers.GetQueryable()
+                .Include(s => s.User)
+                .FirstOrDefaultAsync(s => s.UserId == userId);
+
+            if (seller == null)
+                throw new InvalidOperationException("Seller profile not found.");
+
+            var periodStart = req.PeriodStart.Date;
+            var periodEnd = req.PeriodEnd.Date;
+
+            var payouts = await _unitOfWork.Payouts.GetQueryable()
+                .Where(p => p.SellerId == seller.Id &&
+                            p.PeriodStart >= periodStart &&
+                            p.PeriodEnd <= periodEnd)
+                .OrderByDescending(p => p.CreatedAt)
+                .ToListAsync();
+
+            return payouts.Select(p => new PayoutListResponseDto
+            {
+                Id = p.Id,
+                SellerId = p.SellerId,
+                SellerName = seller.CompanyName ?? seller.User?.FullName ?? "",
+                PeriodStart = p.PeriodStart,
+                PeriodEnd = p.PeriodEnd,
+                PeriodType = p.PeriodType.ToString(),
+                GrossAmount = p.GrossAmount,
+                NetAmount = p.NetAmount,
+                PlatformFeeAmount = p.PlatformFeeAmount,
+                Status = p.Status.ToString(),
+                CreatedAt = p.CreatedAt,
+                ProcessedAt = p.ProcessedAt,
+                CompletedAt = p.CompletedAt,
+                StripeTransferId = p.StripeTransferId,
+                FailureReason = p.FailureReason,
+                RetryCount = p.RetryCount
+            }).ToList();
+        }
+
+        public async Task<PayoutDetailResponseDto?> GetPayoutDetailByIdAsync(Guid payoutId)
+        {
+            var payout = await _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.PayoutDetails)
+                .Include(p => p.PayoutLogs)
+                .Include(p => p.Seller).ThenInclude(s => s.User)
+                .FirstOrDefaultAsync(p => p.Id == payoutId);
+
+            if (payout == null)
+                return null;
+
+            var seller = payout.Seller;
+            var payoutDetails = payout.PayoutDetails.Select(pd => new PayoutDetailSummaryDto
+            {
+                OrderDetailId = pd.OrderDetailId,
+                OrderId = pd.OrderDetail.OrderId,
+                ProductName = pd.OrderDetail.Product?.Name ?? "",
+                Quantity = pd.OrderDetail.Quantity,
+                OriginalAmount = pd.OriginalAmount,
+                DiscountAmount = pd.DiscountAmount,
+                FinalAmount = pd.FinalAmount,
+                RefundAmount = pd.RefundAmount,
+                ContributedAmount = pd.ContributedAmount,
+                OrderCompletedAt = pd.OrderDetail.Order.CompletedAt ?? DateTime.MinValue
+            }).ToList();
+
+            var payoutLogs = payout.PayoutLogs.Select(log => new PayoutLogDto
+            {
+                Id = log.Id,
+                FromStatus = log.FromStatus.ToString(),
+                ToStatus = log.ToStatus.ToString(),
+                Action = log.Action,
+                Details = log.Details,
+                ErrorMessage = log.ErrorMessage,
+                TriggeredByUserName = log.TriggeredByUser?.FullName ?? "",
+                LoggedAt = log.LoggedAt
+            }).ToList();
+
+            return new PayoutDetailResponseDto
+            {
+                Id = payout.Id,
+                SellerId = seller.Id,
+                SellerName = seller.CompanyName ?? seller.User?.FullName ?? "",
+                SellerEmail = seller.User?.Email ?? "",
+                PeriodStart = payout.PeriodStart,
+                PeriodEnd = payout.PeriodEnd,
+                PeriodType = payout.PeriodType.ToString(),
+                GrossAmount = payout.GrossAmount,
+                PlatformFeeRate = payout.PlatformFeeRate,
+                PlatformFeeAmount = payout.PlatformFeeAmount,
+                NetAmount = payout.NetAmount,
+                Status = payout.Status.ToString(),
+                CreatedAt = payout.CreatedAt,
+                ProcessedAt = payout.ProcessedAt,
+                CompletedAt = payout.CompletedAt,
+                StripeTransferId = payout.StripeTransferId,
+                StripeDestinationAccount = payout.StripeDestinationAccount,
+                Notes = payout.Notes,
+                FailureReason = payout.FailureReason,
+                RetryCount = payout.RetryCount,
+                NextRetryAt = payout.NextRetryAt,
+                PayoutDetails = payoutDetails,
+                PayoutLogs = payoutLogs
+            };
         }
     }
 }
