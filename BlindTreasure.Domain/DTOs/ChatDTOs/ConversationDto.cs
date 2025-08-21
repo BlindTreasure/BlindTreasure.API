@@ -9,4 +9,5 @@ public class ConversationDto
     public DateTime? LastMessageTime { get; set; }
     public int UnreadCount { get; set; }
     public bool IsOnline { get; set; }
+    public bool IsSeller { get; set; }
 }
