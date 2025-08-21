@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Domain;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Infrastructure.Interfaces;
 
@@ -39,6 +40,9 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<GroupPaymentSession> GroupPaymentSessions { get; }
     IGenericRepository<OrderDetailInventoryItemLog> OrderDetailInventoryItemLogs { get; }
     IGenericRepository<PromotionUserUsage> PromotionUserUsages { get; }
+    IGenericRepository<Payout> Payouts { get; }
+    IGenericRepository<PayoutLog> PayoutLogs { get; }
+    IGenericRepository<PayoutDetail> PayoutDetails { get; }
 
     Task<int> SaveChangesAsync();
 }
