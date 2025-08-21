@@ -113,6 +113,29 @@ public class ChatController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy danh sách cuộc trò chuyện của user hiện tại với một user khác
+    /// </summary>
+    [HttpGet("conversations/{receiverId}")]
+    [ProducesResponseType(typeof(ApiResult<ConversationDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> GetConversationsByUserId(Guid receiverId)
+    {
+        try
+        {
+            var currentUserId = _claimsService.CurrentUserId;
+            var result = await _chatMessageService.GetNewConversationByReceiverIdAsync(currentUserId, receiverId);
+
+            return Ok(ApiResult<object>.Success(result, "200", "Danh sách cuộc trò chuyện của bạn đã được tải thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    /// <summary>
     /// Lịch sử chat với AI
     /// </summary>
     [HttpGet("history/ai")]

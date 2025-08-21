@@ -334,7 +334,10 @@ public class ListingService : IListingService
         dto.AvatarUrl = listing.InventoryItem?.User?.AvatarUrl;
 
         if (listing.InventoryItem?.User != null)
+        {
             dto.OwnerName = listing.InventoryItem.User.FullName ?? listing.InventoryItem.User.Email;
+            dto.OwnerId = listing.InventoryItem.User.Id;
+        }        
 
         return dto;
     }
