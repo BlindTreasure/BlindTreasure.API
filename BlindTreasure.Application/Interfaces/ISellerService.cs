@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.DTOs.Pagination;
+﻿using BlindTreasure.Domain.DTOs.OrderDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.Enums;
@@ -21,4 +22,5 @@ public interface ISellerService
     Task<ProducDetailDto> DeleteProductAsync(Guid productId);
     Task<ProducDetailDto> UpdateSellerProductImagesAsync(Guid productId, List<IFormFile> images);
     Task<string> UpdateSellerAvatarAsync(Guid userId, IFormFile file);
+    Task<Pagination<OrderDto>> GetSellerOrdersAsync(OrderQueryParameter param);
 }

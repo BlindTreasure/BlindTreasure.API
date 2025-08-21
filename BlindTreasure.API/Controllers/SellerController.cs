@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
@@ -265,6 +266,34 @@ public class SellerController : ControllerBase
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<ProducDetailDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    /// <summary>
+    /// Lấy danh sách đơn hàng bán ra của Seller đang đăng nhập (có phân trang, filter).
+    /// </summary>
+    [Authorize(Roles = "Seller")]
+    [HttpGet("orders")]
+    [ProducesResponseType(typeof(ApiResult<Pagination<OrderDto>>), 200)]
+    public async Task<IActionResult> GetSellerOrders([FromQuery] OrderQueryParameter param)
+    {
+        try
+        {
+            var result = await _sellerService.GetSellerOrdersAsync(param);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách đơn hàng bán ra thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
