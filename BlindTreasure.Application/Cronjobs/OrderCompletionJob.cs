@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.Entities;
+﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +30,7 @@ public class OrderCompletionJob : BackgroundService
             {
                 using var scope = _serviceProvider.CreateScope();
                 var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                var payoutService = scope.ServiceProvider.GetRequiredService<IPayoutService>();
 
                 // Get all orders that are not completed/cancelled/expired
                 var orders = await unitOfWork.Orders.GetQueryable()
@@ -53,18 +55,22 @@ public class OrderCompletionJob : BackgroundService
                         order.CompletedAt = DateTime.UtcNow;
                         await unitOfWork.Orders.Update(order);
                         _logger.LogInformation("Order {OrderId} marked as COMPLETED.", order.Id);
+
+                        // Add to payout
+                        await payoutService.AddCompletedOrderToPayoutAsync(order, stoppingToken);
                     }
                 }
 
-                await unitOfWork.SaveChangesAsync();
+                var result = await unitOfWork.SaveChangesAsync();
+                _logger.LogInformation("OrderCompletionJob completed. {Count} changed orders updated.", result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in OrderCompletionJob: {Message}", ex.Message);
             }
 
-            // Run every hour
-            await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
+            // Run every 2 minutes
+            await Task.Delay(TimeSpan.FromMinutes(2), stoppingToken);
         }
     }
 }
