@@ -273,7 +273,7 @@ public class SellerController : ControllerBase
     /// <summary>
     /// Lấy danh sách đơn hàng bán ra của Seller đang đăng nhập (có phân trang, filter).
     /// </summary>
-    [Authorize(Roles = "Seller")]
+    [Authorize]
     [HttpGet("orders")]
     [ProducesResponseType(typeof(ApiResult<Pagination<OrderDto>>), 200)]
     public async Task<IActionResult> GetSellerOrders([FromQuery] OrderQueryParameter param)
@@ -289,6 +289,29 @@ public class SellerController : ControllerBase
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
             }, "200", "Lấy danh sách đơn hàng bán ra thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+
+    /// <summary>
+    /// Lấy chi tiết đơn hàng bán ra của Seller đang đăng nhập.
+    /// </summary>
+    [Authorize]
+    [HttpGet("orders/{orderId}")]
+    [ProducesResponseType(typeof(ApiResult<OrderDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 404)]
+    public async Task<IActionResult> GetSellerOrderById(Guid orderId)
+    {
+        try
+        {
+            var result = await _sellerService.GetSellerOrderByIdAsync(orderId);
+            return Ok(ApiResult<OrderDto>.Success(result, "200", "Lấy chi tiết đơn hàng bán ra thành công."));
         }
         catch (Exception ex)
         {
