@@ -8,9 +8,15 @@ namespace BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
 
 public class SellerOverviewStatisticsDto
 {
-    public decimal TotalRevenue { get; set; }
-    public decimal TotalRevenueLastPeriod { get; set; }
-    public decimal RevenueGrowthPercent { get; set; }
+    // Estimated Revenue (PAID orders)
+    public decimal EstimatedRevenue { get; set; }
+    public decimal EstimatedRevenueLastPeriod { get; set; }
+    public decimal EstimatedRevenueGrowthPercent { get; set; }
+
+
+    public decimal ActualRevenue { get; set; }
+    public decimal ActualRevenueLastPeriod { get; set; }
+    public decimal ActualRevenueGrowthPercent { get; set; }
 
     public int TotalOrders { get; set; }
     public int TotalOrdersLastPeriod { get; set; }

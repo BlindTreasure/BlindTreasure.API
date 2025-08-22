@@ -29,6 +29,8 @@ public class OrderDetailStatisticsItem
     public decimal BlindBoxPrice { get; set; }
     public string Status { get; set; } = string.Empty;
     public DateTime? CompletedAt { get; set; }
+    public DateTime? PlacedAt { get; set; } // NEW: Add PlacedAt for PAID orders
+
 }
 
 public class SellerStatisticsService : ISellerStatisticsService
@@ -52,24 +54,8 @@ public class SellerStatisticsService : ISellerStatisticsService
         var (start, end) = GetStatisticsDateRange(req);
         _loggerService.Info($"[SellerStatistics] Date range: {start:O} - {end:O}");
 
-
-
-        var orders = await _unitOfWork.Orders.GetQueryable()
-    .Where(o => o.SellerId == sellerId
-                && o.Status == OrderStatus.PAID.ToString()
-                && o.CompletedAt >= start
-                && o.CompletedAt < end
-                && !o.IsDeleted)
-    .Include(o => o.OrderDetails)
-    .ThenInclude(od => od.Product) // Đảm bảo include Product
-    .Include(o => o.OrderDetails)
-    .ThenInclude(od => od.BlindBox) // Đảm bảo include BlindBox
-    .Include(o => o.OrderDetails)
-    .ThenInclude(od => od.Order) // Đảm bảo include Order cho TimeSeries
-    .AsNoTracking()
-    .ToListAsync(ct);
-
-        // Flatten all order details, filter out cancelled
+        // FIX: Use COMPLETED orders for dashboard statistics, not PAID
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
         var orderDetails = orders
             .SelectMany(o => o.OrderDetails)
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
@@ -80,7 +66,7 @@ public class SellerStatisticsService : ISellerStatisticsService
         var topProducts = BuildTopProducts(orderDetails);
         var topBlindBoxes = BuildTopBlindBoxes(orderDetails);
         var orderStatusStats = BuildOrderStatusStatistics(orderDetails);
-        var timeSeries = BuildTimeSeriesData(orders, orderDetails, req.Range, start, end);
+        var timeSeries = await BuildTimeSeriesData(sellerId, req.Range, start, end);
 
         overview.TimeSeriesData = timeSeries;
 
@@ -96,6 +82,28 @@ public class SellerStatisticsService : ISellerStatisticsService
         };
     }
 
+    /// <summary>
+    /// Centralized method to get orders in date range - FIX: Use COMPLETED orders and CompletedAt
+    /// </summary>
+    private async Task<List<Order>> GetOrdersInRangeAsync(
+        Guid sellerId,
+        DateTime start,
+        DateTime end,
+        CancellationToken ct)
+    {
+        return await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == sellerId
+                        && o.Status == OrderStatus.COMPLETED.ToString() // FIX: Use COMPLETED
+                        && o.CompletedAt >= start && o.CompletedAt < end // FIX: Use CompletedAt consistently
+                        && !o.IsDeleted)
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails)
+                .ThenInclude(od => od.BlindBox)
+            .AsNoTracking()
+            .ToListAsync(ct);
+    }
+
     private async Task<SellerOverviewStatisticsDto> BuildOverviewStatisticsAsync(
         List<Order> orders,
         List<OrderDetail> orderDetails,
@@ -103,66 +111,72 @@ public class SellerStatisticsService : ISellerStatisticsService
         DateTime start,
         DateTime end,
         CancellationToken ct,
-        Guid sellerId) // Thêm sellerId
+        Guid sellerId)
     {
         var totalOrders = orders.Count;
         var totalProductsSold = orderDetails.Sum(od => od.Quantity);
 
-        var grossRevenue = orderDetails.Sum(od => od.TotalPrice);
-        var totalDiscount = orderDetails.Sum(od => od.DetailDiscountPromotion ?? 0m);
-        var netRevenue = orderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+        // Estimated Revenue: COMPLETED orders (same as actual for new business logic)
+        var estimatedRevenue = orderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
 
-        // Refunds: Only from payments of these orders
-        var orderIds = orders.Select(o => o.Id).ToList();
+        // Refunds for these orders
+        var orderIds = orders.Select(o => o.Id).ToHashSet();
         var totalRefunded = await _unitOfWork.Payments.GetQueryable()
-            .Where(p => orderIds.Contains(p.OrderId))
-            .SumAsync(p => (decimal?)p.RefundedAmount) ?? 0m;
+            .Where(p => orderIds.Contains(p.OrderId) && p.RefundedAmount > 0)
+            .SumAsync(p => (decimal?)p.RefundedAmount, ct) ?? 0m;
 
-        netRevenue -= totalRefunded;
-
-        var averageOrderValue = totalOrders > 0 ? Math.Round(netRevenue / totalOrders, 2) : 0m;
+        var finalRevenue = estimatedRevenue - totalRefunded;
+        var averageOrderValue = totalOrders > 0 ? Math.Round(finalRevenue / totalOrders, 2) : 0m;
 
         // Previous period for growth calculation
         var (lastStart, lastEnd) = GetPreviousDateRange(req.Range, start, end);
-        var lastOrders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == sellerId
-                        && o.Status == OrderStatus.PAID.ToString()
-                        && o.CompletedAt >= lastStart
-                        && o.CompletedAt < lastEnd
-                        && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .AsNoTracking()
-            .ToListAsync(ct);
-
+        var lastOrders = await GetOrdersInRangeAsync(sellerId, lastStart, lastEnd, ct);
         var lastOrderDetails = lastOrders
             .SelectMany(o => o.OrderDetails)
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
             .ToList();
 
-        var lastOrdersCount = lastOrders.Count;
-        var lastProductsSold = lastOrderDetails.Sum(od => od.Quantity);
-        var lastRevenue = lastOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
-        var lastAOV = lastOrdersCount > 0 ? Math.Round(lastRevenue / lastOrdersCount, 2) : 0m;
+        var lastEstimatedRevenue = lastOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+        var lastOrderIds = lastOrders.Select(o => o.Id).ToHashSet();
+        var lastRefunded = await _unitOfWork.Payments.GetQueryable()
+            .Where(p => lastOrderIds.Contains(p.OrderId) && p.RefundedAmount > 0)
+            .SumAsync(p => (decimal?)p.RefundedAmount, ct) ?? 0m;
 
-        var revenueGrowth = lastRevenue > 0 ? Math.Round((netRevenue - lastRevenue) * 100 / lastRevenue, 2) : 0m;
-        var ordersGrowth = lastOrdersCount > 0
-            ? Math.Round((decimal)(totalOrders - lastOrdersCount) * 100 / lastOrdersCount, 2)
-            : 0m;
-        var productsGrowth = lastProductsSold > 0
-            ? Math.Round((decimal)(totalProductsSold - lastProductsSold) * 100 / lastProductsSold, 2)
-            : 0m;
-        var aovGrowth = lastAOV > 0 ? Math.Round((averageOrderValue - lastAOV) * 100 / lastAOV, 2) : 0m;
+        var lastFinalRevenue = lastEstimatedRevenue - lastRefunded;
+        var lastAOV = lastOrders.Count > 0 ? Math.Round(lastFinalRevenue / lastOrders.Count, 2) : 0m;
+
+        // Growth calculations
+        var estimatedRevenueGrowth = lastFinalRevenue != 0 ?
+            Math.Round((finalRevenue - lastFinalRevenue) * 100 / Math.Abs(lastFinalRevenue), 2) :
+            (finalRevenue > 0 ? 100m : 0m);
+
+        var ordersGrowth = lastOrders.Count != 0 ?
+            Math.Round((decimal)(totalOrders - lastOrders.Count) * 100 / lastOrders.Count, 2) :
+            (totalOrders > 0 ? 100m : 0m);
+
+        var productsGrowth = lastOrderDetails.Sum(od => od.Quantity) != 0 ?
+            Math.Round((decimal)(totalProductsSold - lastOrderDetails.Sum(od => od.Quantity)) * 100 / lastOrderDetails.Sum(od => od.Quantity), 2) :
+            (totalProductsSold > 0 ? 100m : 0m);
+
+        var aovGrowth = lastAOV != 0 ?
+            Math.Round((averageOrderValue - lastAOV) * 100 / Math.Abs(lastAOV), 2) :
+            (averageOrderValue > 0 ? 100m : 0m);
 
         return new SellerOverviewStatisticsDto
         {
-            TotalRevenue = decimal.Round(netRevenue, 2),
-            TotalRevenueLastPeriod = decimal.Round(lastRevenue, 2),
-            RevenueGrowthPercent = revenueGrowth,
+            EstimatedRevenue = decimal.Round(finalRevenue, 2),
+            EstimatedRevenueLastPeriod = decimal.Round(lastFinalRevenue, 2),
+            EstimatedRevenueGrowthPercent = estimatedRevenueGrowth,
+
+            ActualRevenue = decimal.Round(finalRevenue, 2),
+            ActualRevenueLastPeriod = decimal.Round(lastFinalRevenue, 2),
+            ActualRevenueGrowthPercent = estimatedRevenueGrowth,
+
             TotalOrders = totalOrders,
-            TotalOrdersLastPeriod = lastOrdersCount,
+            TotalOrdersLastPeriod = lastOrders.Count,
             OrdersGrowthPercent = ordersGrowth,
             TotalProductsSold = totalProductsSold,
-            TotalProductsSoldLastPeriod = lastProductsSold,
+            TotalProductsSoldLastPeriod = lastOrderDetails.Sum(od => od.Quantity),
             ProductsSoldGrowthPercent = productsGrowth,
             AverageOrderValue = averageOrderValue,
             AverageOrderValueLastPeriod = lastAOV,
@@ -181,7 +195,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                 ProductName = g.First().Product!.Name,
                 ProductImageUrl = g.First().Product!.ImageUrls?.FirstOrDefault() ?? string.Empty,
                 QuantitySold = g.Sum(x => x.Quantity),
-                Revenue = g.Sum(x => x.FinalDetailPrice ?? x.TotalPrice - (x.DetailDiscountPromotion ?? 0m)),
+                Revenue = g.Sum(x => x.FinalDetailPrice ?? x.TotalPrice), // FIX: Simplified calculation
                 Price = g.First().Product!.RealSellingPrice
             })
             .OrderByDescending(x => x.QuantitySold)
@@ -200,7 +214,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                 BlindBoxName = g.First().BlindBox!.Name,
                 BlindBoxImageUrl = g.First().BlindBox!.ImageUrl ?? string.Empty,
                 QuantitySold = g.Sum(x => x.Quantity),
-                Revenue = g.Sum(x => x.FinalDetailPrice ?? x.TotalPrice - (x.DetailDiscountPromotion ?? 0m)),
+                Revenue = g.Sum(x => x.FinalDetailPrice ?? x.TotalPrice), // FIX: Simplified calculation
                 Price = g.First().BlindBox!.Price
             })
             .OrderByDescending(x => x.QuantitySold)
@@ -210,100 +224,82 @@ public class SellerStatisticsService : ISellerStatisticsService
 
     private List<OrderStatusStatisticsDto> BuildOrderStatusStatistics(List<OrderDetail> orderDetails)
     {
-        var totalOrders = orderDetails.Select(od => od.OrderId).Distinct().Count();
-        return orderDetails
+        var statusGroups = orderDetails
             .GroupBy(od => od.Status.ToString())
+            .ToList();
+
+        var totalCount = statusGroups.Sum(g => g.Count());
+
+        return statusGroups
             .Select(g => new OrderStatusStatisticsDto
             {
                 Status = g.Key,
                 Count = g.Count(),
-                Revenue = g.Sum(x => x.FinalDetailPrice ?? x.TotalPrice - (x.DetailDiscountPromotion ?? 0m)),
-                Percentage = totalOrders > 0 ? Math.Round((decimal)g.Count() * 100 / totalOrders, 2) : 0m
+                Revenue = g.Sum(x => x.FinalDetailPrice ?? x.TotalPrice), // FIX: Simplified calculation
+                Percentage = totalCount > 0 ? Math.Round((decimal)g.Count() * 100 / totalCount, 2) : 0m
             })
             .ToList();
     }
 
-    private SellerStatisticsResponseDto BuildTimeSeriesData(
-        List<Order> orders,
-        List<OrderDetail> orderDetails,
+    private async Task<SellerStatisticsResponseDto> BuildTimeSeriesData(
+        Guid sellerId,
         StatisticsTimeRange range,
         DateTime start,
-        DateTime end)
+        DateTime end
+    )
     {
+        // Get PAID orders for EstimatedRevenue
+        var paidOrders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == sellerId
+                        && o.Status == OrderStatus.PAID.ToString()
+                        && o.PlacedAt >= start && o.PlacedAt < end
+                        && !o.IsDeleted)
+            .Include(o => o.OrderDetails)
+            .AsNoTracking()
+            .ToListAsync();
+
+        // Get COMPLETED orders for ActualRevenue
+        var completedOrders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == sellerId
+                        && o.Status == OrderStatus.COMPLETED.ToString()
+                        && o.CompletedAt >= start && o.CompletedAt < end
+                        && !o.IsDeleted)
+            .Include(o => o.OrderDetails)
+            .AsNoTracking()
+            .ToListAsync();
+
         var categories = new List<string>();
         var sales = new List<int>();
-        var revenue = new List<decimal>();
+        var actualRevenue = new List<decimal>();
+        var estimatedRevenue = new List<decimal>();
 
-        Func<OrderDetail, decimal> netRevenueSelector = od =>
-            od.FinalDetailPrice ?? od.TotalPrice - (od.DetailDiscountPromotion ?? 0m);
+        Func<OrderDetail, decimal> revenueSelector = od => od.FinalDetailPrice ?? od.TotalPrice;
 
-        switch (range)
+        // Example: Daily breakdown
+        var totalDays = (end - start).Days;
+        for (var day = 0; day < totalDays; day++)
         {
-            case StatisticsTimeRange.Day:
-                for (var hour = 0; hour < 24; hour++)
-                {
-                    categories.Add($"{hour}:00");
-                    var details = orderDetails.Where(od => od.Order.CompletedAt.HasValue &&
-                                                           od.Order.CompletedAt.Value.Hour == hour);
-                    sales.Add(details.Count());
-                    revenue.Add(details.Sum(netRevenueSelector));
-                }
+            var date = start.AddDays(day);
+            categories.Add(date.ToString("dd/MM"));
 
-                break;
-            case StatisticsTimeRange.Week:
-                var culture = CultureInfo.CurrentCulture;
-                for (var i = 0; i < 7; i++)
-                {
-                    var dayName = culture.DateTimeFormat.GetDayName((DayOfWeek)i);
-                    categories.Add(dayName);
-                    var details = orderDetails.Where(od => od.Order.CompletedAt.HasValue &&
-                                                           (int)od.Order.CompletedAt.Value.DayOfWeek == i);
-                    sales.Add(details.Count());
-                    revenue.Add(details.Sum(netRevenueSelector));
-                }
+            // ActualRevenue: COMPLETED orders for this day
+            var completedDetails = completedOrders
+                .Where(o => o.CompletedAt.HasValue && o.CompletedAt.Value.Date == date.Date)
+                .SelectMany(o => o.OrderDetails)
+                .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+                .ToList();
 
-                break;
-            case StatisticsTimeRange.Month:
-                var daysInMonth = (end - start).Days;
-                for (var day = 0; day < daysInMonth; day++)
-                {
-                    var date = start.AddDays(day);
-                    categories.Add(date.ToString("dd/MM"));
-                    var details = orderDetails.Where(od => od.Order.CompletedAt.HasValue &&
-                                                           od.Order.CompletedAt.Value.Date == date.Date);
-                    sales.Add(details.Count());
-                    revenue.Add(details.Sum(netRevenueSelector));
-                }
+            actualRevenue.Add(completedDetails.Sum(revenueSelector));
+            sales.Add(completedDetails.Sum(od => od.Quantity));
 
-                break;
-            case StatisticsTimeRange.Quarter:
-            case StatisticsTimeRange.Year:
-                var months = range == StatisticsTimeRange.Quarter ? 3 : 12;
-                for (var m = 0; m < months; m++)
-                {
-                    var monthDate = start.AddMonths(m);
-                    categories.Add(monthDate.ToString("MM/yyyy"));
-                    var details = orderDetails.Where(od => od.Order.CompletedAt.HasValue &&
-                                                           od.Order.CompletedAt.Value.Month == monthDate.Month &&
-                                                           od.Order.CompletedAt.Value.Year == monthDate.Year);
-                    sales.Add(details.Count());
-                    revenue.Add(details.Sum(netRevenueSelector));
-                }
+            // EstimatedRevenue: PAID orders for this day
+            var paidDetails = paidOrders
+                .Where(o => o.PlacedAt.Date == date.Date)
+                .SelectMany(o => o.OrderDetails)
+                .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+                .ToList();
 
-                break;
-            case StatisticsTimeRange.Custom:
-                var totalDays = (end - start).Days;
-                for (var day = 0; day < totalDays; day++)
-                {
-                    var date = start.AddDays(day);
-                    categories.Add(date.ToString("dd/MM"));
-                    var details = orderDetails.Where(od => od.Order.CompletedAt.HasValue &&
-                                                           od.Order.CompletedAt.Value.Date == date.Date);
-                    sales.Add(details.Count());
-                    revenue.Add(details.Sum(netRevenueSelector));
-                }
-
-                break;
+            estimatedRevenue.Add(paidDetails.Sum(revenueSelector));
         }
 
         return new SellerStatisticsResponseDto
@@ -311,7 +307,8 @@ public class SellerStatisticsService : ISellerStatisticsService
             Range = range.ToString(),
             Categories = categories,
             Sales = sales,
-            Revenue = revenue
+            ActualRevenue = actualRevenue,
+            EstimatedRevenue = estimatedRevenue
         };
     }
 
@@ -323,48 +320,52 @@ public class SellerStatisticsService : ISellerStatisticsService
         switch (req.Range)
         {
             case StatisticsTimeRange.Day:
-                start = now.Date;
+                var dayBase = req.StartDate?.Date ?? now.Date;
+                start = DateTime.SpecifyKind(dayBase, DateTimeKind.Utc);
                 end = start.AddDays(1);
                 break;
 
             case StatisticsTimeRange.Week:
+                // Use StartDate if provided, otherwise use current date
+                var weekBase = req.StartDate?.Date ?? now.Date;
                 // Always start from Monday (ISO standard)
-                int diff = (7 + (int)now.DayOfWeek - (int)DayOfWeek.Monday) % 7;
-                start = now.Date.AddDays(-diff);
+                int diff = (7 + (int)weekBase.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+                start = DateTime.SpecifyKind(weekBase.AddDays(-diff), DateTimeKind.Utc);
                 end = start.AddDays(7);
                 break;
 
             case StatisticsTimeRange.Month:
-                start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                var monthBase = req.StartDate?.Date ?? now.Date;
+                start = new DateTime(monthBase.Year, monthBase.Month, 1, 0, 0, 0, DateTimeKind.Utc);
                 end = start.AddMonths(1);
                 break;
 
             case StatisticsTimeRange.Quarter:
-                int quarter = ((now.Month - 1) / 3) + 1;
-                start = new DateTime(now.Year, (quarter - 1) * 3 + 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                var quarterBase = req.StartDate?.Date ?? now.Date;
+                int quarter = ((quarterBase.Month - 1) / 3) + 1;
+                start = new DateTime(quarterBase.Year, (quarter - 1) * 3 + 1, 1, 0, 0, 0, DateTimeKind.Utc);
                 end = start.AddMonths(3);
                 break;
 
             case StatisticsTimeRange.Year:
-                start = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                var yearBase = req.StartDate?.Date ?? now.Date;
+                start = new DateTime(yearBase.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
                 end = start.AddYears(1);
                 break;
 
             case StatisticsTimeRange.Custom:
-                // Ensure both dates are UTC and start < end
                 start = req.StartDate.HasValue
                     ? DateTime.SpecifyKind(req.StartDate.Value.Date, DateTimeKind.Utc)
-                    : now.Date;
+                    : DateTime.SpecifyKind(now.Date, DateTimeKind.Utc);
                 end = req.EndDate.HasValue
                     ? DateTime.SpecifyKind(req.EndDate.Value.Date, DateTimeKind.Utc).AddDays(1)
                     : start.AddDays(1);
-
                 if (end <= start)
-                    end = start.AddDays(1); // Ensure at least one day
+                    end = start.AddDays(1);
                 break;
 
             default:
-                start = now.Date;
+                start = DateTime.SpecifyKind(now.Date, DateTimeKind.Utc);
                 end = start.AddDays(1);
                 break;
         }
@@ -374,43 +375,27 @@ public class SellerStatisticsService : ISellerStatisticsService
 
     private (DateTime Start, DateTime End) GetPreviousDateRange(StatisticsTimeRange range, DateTime start, DateTime end)
     {
-        switch (range)
+        var period = end - start;
+        return range switch
         {
-            case StatisticsTimeRange.Day:
-                return (start.AddDays(-1), start);
-            case StatisticsTimeRange.Week:
-                return (start.AddDays(-7), start);
-            case StatisticsTimeRange.Month:
-                return (start.AddMonths(-1), start);
-            case StatisticsTimeRange.Quarter:
-                return (start.AddMonths(-3), start);
-            case StatisticsTimeRange.Year:
-                return (start.AddYears(-1), start);
-            case StatisticsTimeRange.Custom:
-                var period = end - start;
-                return (start - period, start);
-            default:
-                return (start.AddDays(-1), start);
-        }
+            StatisticsTimeRange.Day => (start.AddDays(-1), start),
+            StatisticsTimeRange.Week => (start.AddDays(-7), start),
+            StatisticsTimeRange.Month => (start.AddMonths(-1), start),
+            StatisticsTimeRange.Quarter => (start.AddMonths(-3), start),
+            StatisticsTimeRange.Year => (start.AddYears(-1), start),
+            StatisticsTimeRange.Custom => (start - period, start),
+            _ => (start.AddDays(-1), start)
+        };
     }
 
-    // API methods
+    // API methods - FIX: All use centralized GetOrdersInRangeAsync
     public async Task<SellerOverviewStatisticsDto> GetOverviewStatisticsAsync(
         Guid sellerId,
         SellerStatisticsRequestDto req,
         CancellationToken ct = default)
     {
         var (start, end) = GetStatisticsDateRange(req);
-        var orders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == sellerId
-                        && o.Status == OrderStatus.PAID.ToString()
-                        && o.CompletedAt >= start
-                        && o.CompletedAt < end
-                        && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .AsNoTracking()
-            .ToListAsync(ct);
-
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
         var orderDetails = orders.SelectMany(o => o.OrderDetails)
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
             .ToList();
@@ -424,17 +409,7 @@ public class SellerStatisticsService : ISellerStatisticsService
         CancellationToken ct = default)
     {
         var (start, end) = GetStatisticsDateRange(req);
-        var orders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == sellerId
-                        && o.Status == OrderStatus.PAID.ToString()
-                        && o.CompletedAt >= start
-                        && o.CompletedAt < end
-                        && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.Product)
-            .AsNoTracking()
-            .ToListAsync(ct);
-
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
         var orderDetails = orders.SelectMany(o => o.OrderDetails)
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
             .ToList();
@@ -448,17 +423,7 @@ public class SellerStatisticsService : ISellerStatisticsService
         CancellationToken ct = default)
     {
         var (start, end) = GetStatisticsDateRange(req);
-        var orders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == sellerId
-                        && o.Status == OrderStatus.PAID.ToString()
-                        && o.CompletedAt >= start
-                        && o.CompletedAt < end
-                        && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .ThenInclude(od => od.BlindBox)
-            .AsNoTracking()
-            .ToListAsync(ct);
-
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
         var orderDetails = orders.SelectMany(o => o.OrderDetails)
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
             .ToList();
@@ -472,16 +437,7 @@ public class SellerStatisticsService : ISellerStatisticsService
         CancellationToken ct = default)
     {
         var (start, end) = GetStatisticsDateRange(req);
-        var orders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == sellerId
-                        && o.Status == OrderStatus.PAID.ToString()
-                        && o.CompletedAt >= start
-                        && o.CompletedAt < end
-                        && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .AsNoTracking()
-            .ToListAsync(ct);
-
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
         var orderDetails = orders.SelectMany(o => o.OrderDetails)
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
             .ToList();
@@ -495,37 +451,29 @@ public class SellerStatisticsService : ISellerStatisticsService
         CancellationToken ct = default)
     {
         var (start, end) = GetStatisticsDateRange(req);
-        var orders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == sellerId
-                        && o.Status == OrderStatus.PAID.ToString()
-                        && o.CompletedAt >= start
-                        && o.CompletedAt < end
-                        && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .AsNoTracking()
-            .ToListAsync(ct);
-
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
         var orderDetails = orders.SelectMany(o => o.OrderDetails)
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
             .ToList();
-
-        return BuildTimeSeriesData(orders, orderDetails, req.Range, start, end);
+        var result = await BuildTimeSeriesData(sellerId, req.Range, start, end);
+        return result;
     }
 
     public async Task<SellerRevenueSummaryDto> GetRevenueSummaryAsync(
-    Guid sellerId,
-    SellerStatisticsRequestDto req,
-    CancellationToken ct = default)
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
     {
         var (start, end) = GetStatisticsDateRange(req);
 
-        // Estimated: PAID orders
+        // Estimated: PAID orders (using PlacedAt)
         var paidOrders = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.SellerId == sellerId
                         && o.Status == OrderStatus.PAID.ToString()
                         && o.PlacedAt >= start && o.PlacedAt < end
                         && !o.IsDeleted)
             .Include(o => o.OrderDetails)
+            .AsNoTracking()
             .ToListAsync(ct);
 
         var estimatedRevenue = paidOrders
@@ -533,13 +481,14 @@ public class SellerStatisticsService : ISellerStatisticsService
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
             .Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
 
-        // Actual: COMPLETED orders
+        // Actual: COMPLETED orders (using CompletedAt)
         var completedOrders = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.SellerId == sellerId
                         && o.Status == OrderStatus.COMPLETED.ToString()
                         && o.CompletedAt >= start && o.CompletedAt < end
                         && !o.IsDeleted)
             .Include(o => o.OrderDetails)
+            .AsNoTracking()
             .ToListAsync(ct);
 
         var actualRevenue = completedOrders

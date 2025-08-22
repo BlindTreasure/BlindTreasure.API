@@ -667,7 +667,7 @@ public class StripeService : IStripeService
             var transfer = await transferService.CreateAsync(transferOptions);
             if (transfer == null)
                 throw ErrorHelper.Internal("Stripe payout failed.");
-            // TODO: Lưu transaction payout vào DB nếu cần
+            // TODO: Lưu transaction từ stripe khi payout vào DB nếu cần
 
             var transaction = new Transaction
             {
