@@ -1,9 +1,9 @@
-﻿using System.Web;
-using BlindTreasure.Application.Interfaces;
+﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
@@ -14,6 +14,7 @@ using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using System.Web;
 
 namespace BlindTreasure.Application.Services;
 
@@ -493,10 +494,72 @@ public class SellerService : ISellerService
         return avatarUrl;
     }
 
+    public async Task<Pagination<OrderDto>> GetSellerOrdersAsync(OrderQueryParameter param)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Không tìm thấy seller.");
+
+        var query = _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == seller.Id && !o.IsDeleted)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
+            .Include(o => o.ShippingAddress)
+            .Include(o => o.User)
+            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+            .AsNoTracking();
+
+        if (param.Status.HasValue)
+            query = query.Where(o => o.Status == param.Status.Value.ToString());
+        if (param.PlacedFrom.HasValue)
+            query = query.Where(o => o.PlacedAt >= param.PlacedFrom.Value);
+        if (param.PlacedTo.HasValue)
+            query = query.Where(o => o.PlacedAt <= param.PlacedTo.Value);
+
+        query = param.Desc
+            ? query.OrderByDescending(o => o.UpdatedAt ?? o.CreatedAt)
+            : query.OrderBy(o => o.UpdatedAt ?? o.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+        var orders = param.PageIndex == 0
+            ? await query.ToListAsync()
+            : await query.Skip((param.PageIndex - 1) * param.PageSize).Take(param.PageSize).ToListAsync();
+
+        var dtos = orders.Select(OrderDtoMapper.ToOrderDto).ToList();
+        _loggerService.Info("Loaded seller's order list.");
+        return new Pagination<OrderDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
+
     private async Task RemoveSellerCacheAsync(Guid sellerId, Guid userId)
     {
         await _cacheService.RemoveAsync($"seller:{sellerId}");
         await _cacheService.RemoveAsync($"seller:user:{userId}");
+    }
+
+    public async Task<OrderDto> GetSellerOrderByIdAsync(Guid orderId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId);
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Không tìm thấy seller tồn tại.");
+
+        var order = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.Id == orderId && o.SellerId == seller.Id && !o.IsDeleted)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
+            .Include(o => o.ShippingAddress)
+            .Include(o => o.User)
+            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+
+        if (order == null)
+            throw ErrorHelper.NotFound("Không tìm thấy đơn hàng hoặc bạn không có quyền truy cập.");
+
+        return OrderDtoMapper.ToOrderDto(order);
     }
 
     // ----------------- PRIVATE HELPER METHODS -----------------
@@ -518,6 +581,8 @@ public class SellerService : ISellerService
 
         return seller;
     }
+
+ 
 
     private static void ValidateSellerInfoDto(UpdateSellerInfoDto dto)
     {

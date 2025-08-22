@@ -15,6 +15,7 @@ public interface IOrderService
     Task<MultiOrderCheckoutResultDto> CheckoutAsync(CreateCheckoutRequestDto dto);
     Task<MultiOrderCheckoutResultDto> CheckoutFromClientCartAsync(DirectCartCheckoutDto cartDto);
     Task DeleteOrderAsync(Guid orderId);
+    Task<Pagination<OrderDto>> GetAllOrdersForAdminAsync(OrderAdminQueryParameter param);
     Task<Pagination<OrderDetailDto>> GetMyOrderDetailsAsync(OrderDetailQueryParameter param);
     Task<Pagination<OrderDto>> GetMyOrdersAsync(OrderQueryParameter param);
     Task<List<OrderDto>> GetOrderByCheckoutGroupId(Guid groupId);

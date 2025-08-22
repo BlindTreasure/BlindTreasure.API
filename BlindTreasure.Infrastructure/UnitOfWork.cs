@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Domain;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -47,6 +48,9 @@ public class UnitOfWork : IUnitOfWork
         IGenericRepository<GroupPaymentSession> groupPaymentSessions,
         IGenericRepository<OrderDetailInventoryItemLog> orderDetailInventoryItemLogs,
         IGenericRepository<PromotionUserUsage> promotionUserUsage,
+        IGenericRepository<Payout> payouts,
+        IGenericRepository<PayoutDetail> payoutDetails,
+        IGenericRepository<PayoutLog> payoutLogs,
         IDbContextTransaction? transaction = null
     )
     {
@@ -86,6 +90,9 @@ public class UnitOfWork : IUnitOfWork
         GroupPaymentSessions = groupPaymentSessions;
         OrderDetailInventoryItemLogs = orderDetailInventoryItemLogs;
         PromotionUserUsages = promotionUserUsage;
+        Payouts = payouts;
+        PayoutDetails = payoutDetails;
+        PayoutLogs = payoutLogs;
     }
 
     public void Dispose()
@@ -177,4 +184,7 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<GroupPaymentSession> GroupPaymentSessions { get; }
     public IGenericRepository<OrderDetailInventoryItemLog> OrderDetailInventoryItemLogs { get; }
     public IGenericRepository<PromotionUserUsage> PromotionUserUsages { get; }
+    public IGenericRepository<Payout> Payouts { get; }
+    public IGenericRepository<PayoutDetail> PayoutDetails { get; }
+    public IGenericRepository<PayoutLog> PayoutLogs { get; }
 }

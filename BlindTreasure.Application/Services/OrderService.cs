@@ -1049,4 +1049,43 @@ public class OrderService : IOrderService
 
        // await _unitOfWork.SaveChangesAsync();
     }
+
+    public async Task<Pagination<OrderDto>> GetAllOrdersForAdminAsync(OrderAdminQueryParameter param)
+    {
+        var query = _unitOfWork.Orders.GetQueryable()
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
+            .Include(o => o.ShippingAddress)
+            .Include(o => o.User)
+            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+            .AsNoTracking()
+            .Where(o => !o.IsDeleted);
+
+        if (param.Status.HasValue)
+            query = query.Where(o => o.Status == param.Status.Value.ToString());
+        if (param.PlacedFrom.HasValue)
+            query = query.Where(o => o.PlacedAt >= param.PlacedFrom.Value);
+        if (param.PlacedTo.HasValue)
+            query = query.Where(o => o.PlacedAt <= param.PlacedTo.Value);
+        if (param.CheckoutGroupId.HasValue && param.CheckoutGroupId.Value != Guid.Empty)
+            query = query.Where(o => o.CheckoutGroupId == param.CheckoutGroupId.Value);
+        if (param.SellerId.HasValue)
+            query = query.Where(o => o.SellerId == param.SellerId.Value);
+        if (param.UserId.HasValue)
+            query = query.Where(o => o.UserId == param.UserId.Value);
+
+        query = param.Desc
+            ? query.OrderByDescending(o => o.UpdatedAt ?? o.CreatedAt)
+            : query.OrderBy(o => o.UpdatedAt ?? o.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+        var orders = param.PageIndex == 0
+            ? await query.ToListAsync()
+            : await query.Skip((param.PageIndex - 1) * param.PageSize).Take(param.PageSize).ToListAsync();
+
+        var dtos = orders.Select(OrderDtoMapper.ToOrderDto).ToList();
+        return new Pagination<OrderDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
 }
