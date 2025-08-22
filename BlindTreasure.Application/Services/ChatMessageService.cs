@@ -303,7 +303,6 @@ public class ChatMessageService : IChatMessageService
             return cachedResult;
         }
 
-        // Kiểm tra trong bảng User trước
         var otherUser = await _unitOfWork.Users.GetQueryable()
             .Where(u => u.Id == receiverId && !u.IsDeleted)
             .FirstOrDefaultAsync();
@@ -319,7 +318,7 @@ public class ChatMessageService : IChatMessageService
                 // Nếu user có role là Seller, lấy thông tin từ bảng Seller
                 var seller = await _unitOfWork.Sellers.GetQueryable()
                     .Include(s => s.User)
-                    .Where(s => s.Id == receiverId)
+                    .Where(s => s.UserId == receiverId)
                     .FirstOrDefaultAsync();
 
                 if (seller != null)
@@ -334,20 +333,6 @@ public class ChatMessageService : IChatMessageService
                 // Nếu không phải Seller, sử dụng thông tin User
                 otherUserName = otherUser.FullName ?? "Unknown";
                 otherUserAvatar = otherUser.AvatarUrl ?? "";
-            }
-        }
-        else
-        {
-            // Nếu không tìm thấy user, kiểm tra trong bảng Seller
-            var seller = await _unitOfWork.Sellers.GetQueryable()
-                .Where(s => s.Id == receiverId)
-                .FirstOrDefaultAsync();
-
-            if (seller != null)
-            {
-                isSeller = true;
-                otherUserName = seller.CompanyName ?? "Unknown";
-                otherUserAvatar = seller.User.AvatarUrl ?? "";
             }
         }
 
