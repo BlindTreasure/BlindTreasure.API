@@ -14,6 +14,7 @@ using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualBasic;
 
 namespace BlindTreasure.Application.Services;
 
@@ -277,6 +278,133 @@ public class ChatMessageService : IChatMessageService
     }
 
 
+    /// <summary>
+    /// Lấy danh sách cuộc trò chuyện của user hiện tại với một user khác
+    /// </summary>
+    /// <param name="currentUserId">ID người gửi</param>
+    /// <param name="receiverId">ID người nhận</param>
+    /// <returns>ConversationDto</returns>
+    public async Task<ConversationDto> GetNewConversationByReceiverIdAsync(Guid currentUserId, Guid receiverId)
+    {
+        _logger.Info(
+            $"[GetNewConversationByReceiverIdAsync] User {currentUserId} requests conversation with receiver {receiverId}.");
+
+        // Tạo cache key dựa trên các tham số
+        var cacheKey = $"chat:conversations:by:{currentUserId}:{receiverId}";
+
+        // ✅ GIẢM THỜI GIAN CACHE CHO CONVERSATION VÌ CẦN CẬP NHẬT ONLINE STATUS
+        var cachedResult = await _cacheService.GetAsync<ConversationDto>(cacheKey);
+        if (cachedResult != null)
+        {
+            // ✅ CẬP NHẬT LẠI TRẠNG THÁI ONLINE NGAY CẢ KHI CÓ CACHE
+            cachedResult.IsOnline = await IsUserOnline(cachedResult.OtherUserId.ToString());
+
+            _logger.Info($"[GetNewConversationByReceiverIdAsync] Cache hit for conversation with key: {cacheKey}");
+            return cachedResult;
+        }
+
+        var otherUser = await _unitOfWork.Users.GetQueryable()
+            .Where(u => u.Id == receiverId && !u.IsDeleted)
+            .FirstOrDefaultAsync();
+
+        bool isSeller = false;
+        string otherUserName = "Unknown";
+        string otherUserAvatar = "";
+
+        if (otherUser != null)
+        {
+            if (otherUser.RoleName == RoleType.Seller)
+            {
+                // Nếu user có role là Seller, lấy thông tin từ bảng Seller
+                var seller = await _unitOfWork.Sellers.GetQueryable()
+                    .Include(s => s.User)
+                    .Where(s => s.UserId == receiverId)
+                    .FirstOrDefaultAsync();
+
+                if (seller != null)
+                {
+                    isSeller = true;
+                    otherUserName = seller.CompanyName ?? "Unknown";
+                    otherUserAvatar = seller.User.AvatarUrl ?? "";
+                }
+            }
+            else
+            {
+                // Nếu không phải Seller, sử dụng thông tin User
+                otherUserName = otherUser.FullName ?? "Unknown";
+                otherUserAvatar = otherUser.AvatarUrl ?? "";
+            }
+        }
+
+        // Lấy thông tin tin nhắn mới nhất (nếu có)
+        var lastMessage = await _unitOfWork.ChatMessages.GetQueryable()
+            .Where(m =>
+                (m.SenderId == currentUserId && m.ReceiverId == receiverId) ||
+                (m.SenderId == receiverId && m.ReceiverId == currentUserId) &&
+                m.SenderType == ChatParticipantType.User &&
+                m.ReceiverType == ChatParticipantType.User)
+            .OrderByDescending(m => m.SentAt)
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+
+        string lastMessageContent = null;
+        DateTime? lastMessageTime = null;
+        int unreadCount = 0;
+
+        if (lastMessage != null)
+        {
+            // Xử lý nội dung tin nhắn
+            lastMessageContent = lastMessage.Content;
+            switch (lastMessage.MessageType)
+            {
+                case ChatMessageType.ImageMessage:
+                    lastMessageContent = "[Hình ảnh]";
+                    break;
+                case ChatMessageType.VideoMessage:
+                    lastMessageContent = "[Video]";
+                    break;
+                case ChatMessageType.InventoryItemMessage:
+                    lastMessageContent = "[Chia sẻ vật phẩm]";
+                    break;
+                case ChatMessageType.AiToUser:
+                case ChatMessageType.UserToAi:
+                    lastMessageContent = lastMessage.Content;
+                    break;
+                default:
+                    lastMessageContent = lastMessage.Content;
+                    break;
+            }
+
+            lastMessageTime = lastMessage.SentAt;
+
+            // Đếm số tin nhắn chưa đọc
+            unreadCount = await _unitOfWork.ChatMessages.GetQueryable()
+                .CountAsync(m => m.SenderId == receiverId &&
+                                 m.ReceiverId == currentUserId &&
+                                 !m.IsRead &&
+                                 m.SenderType == ChatParticipantType.User &&
+                                 m.ReceiverType == ChatParticipantType.User);
+        }
+
+        var conversation = new ConversationDto
+        {
+            OtherUserId = receiverId,
+            OtherUserName = otherUserName,
+            OtherUserAvatar = otherUserAvatar,
+            LastMessage = lastMessageContent,
+            LastMessageTime = lastMessageTime,
+            UnreadCount = unreadCount,
+            IsOnline = await IsUserOnline(receiverId.ToString()),
+            IsSeller = isSeller
+        };
+
+        // ✅ CACHE NGẮN HƠN VÌ CẦN CẬP NHẬT ONLINE STATUS THƯỜNG XUYÊN
+        await _cacheService.SetAsync(cacheKey, conversation, TimeSpan.FromSeconds(15));
+        _logger.Info($"[GetNewConversationByReceiverIdAsync] Conversation cached with key: {cacheKey}");
+
+        return conversation;
+    }
+
     public async Task<ChatMessageDto?> GetMessageByIdAsync(Guid messageId)
     {
         var currentUserId = _claimsService.CurrentUserId;
@@ -458,9 +586,9 @@ public class ChatMessageService : IChatMessageService
         return result;
     }
 
-    public async Task<Pagination<ConversationDto>> GetConversationsAsync(
-        Guid userId,
-        PaginationParameter param)
+     public async Task<Pagination<ConversationDto>> GetConversationsAsync(
+     Guid userId,
+     PaginationParameter param)
     {
         _logger.Info(
             $"[GetConversationsAsync] User {userId} requests conversations. Page: {param.PageIndex}, Size: {param.PageSize}");
@@ -532,12 +660,54 @@ public class ChatMessageService : IChatMessageService
                                  m.ReceiverId == userId &&
                                  !m.IsRead);
 
-            // Xác định người dùng khác
+            // Xác định người dùng hoặc seller
+            bool isSeller = false;
+            string otherUserName = "Unknown";
+            string otherUserAvatar = "";
+
+            // Kiểm tra trong bảng User trước
             User? otherUser = null;
             if (lastMessage.SenderId == otherUserId)
                 otherUser = lastMessage.Sender;
             else
                 otherUser = lastMessage.Receiver;
+
+            if (otherUser != null)
+            {
+                if (otherUser.RoleName == RoleType.Seller)
+                {
+                    // Nếu user có role là Seller, lấy thông tin từ bảng Seller
+                    var seller = await _unitOfWork.Sellers.GetQueryable()
+                        .Include(s => s.User)
+                        .Where(s => s.UserId == otherUserId)
+                        .FirstOrDefaultAsync();
+                    if (seller != null)
+                    {
+                        isSeller = true;
+                        otherUserName = seller.CompanyName ?? "Unknown";
+                        otherUserAvatar = seller.User.AvatarUrl ?? "";
+                    }
+                }
+                else
+                {
+                    // Nếu không phải Seller, sử dụng thông tin User
+                    otherUserName = otherUser.FullName ?? "Unknown";
+                    otherUserAvatar = otherUser.AvatarUrl ?? "";
+                }
+            }
+            else
+            {
+                var seller = await _unitOfWork.Sellers.GetQueryable()
+                    .Include(s => s.User)
+                    .Where(s => s.UserId == otherUserId)
+                    .FirstOrDefaultAsync();
+                if (seller != null)
+                {
+                    isSeller = true;
+                    otherUserName = seller.CompanyName ?? "Unknown";
+                    otherUserAvatar = seller.User.AvatarUrl ?? "";
+                }
+            }
 
             // ✅ CẢI THIỆN XỬ LÝ NỘI DUNG TIN NHẮN
             var lastMessageContent = lastMessage.Content;
@@ -564,12 +734,13 @@ public class ChatMessageService : IChatMessageService
             var conversation = new ConversationDto
             {
                 OtherUserId = otherUserId.Value,
-                OtherUserName = otherUser?.FullName ?? "Unknown",
-                OtherUserAvatar = otherUser?.AvatarUrl ?? "",
+                OtherUserName = otherUserName,
+                OtherUserAvatar = otherUserAvatar,
                 LastMessage = lastMessageContent,
                 LastMessageTime = lastMessage.SentAt,
                 UnreadCount = unreadCount,
-                IsOnline = false // Sẽ cập nhật sau
+                IsOnline = false, // Sẽ cập nhật sau
+                IsSeller = isSeller
             };
 
             conversations.Add(conversation);
@@ -595,7 +766,7 @@ public class ChatMessageService : IChatMessageService
         _logger.Info($"[GetConversationsAsync] Conversations cached with key: {cacheKey}");
 
         return result;
-    }
+     }
 
     public async Task MarkMessagesAsReadAsync(Guid fromUserId, Guid toUserId)
     {
