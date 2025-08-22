@@ -18,17 +18,23 @@ namespace BlindTreasure.Application.Services
         private readonly ILoggerService _logger;
         private readonly IOrderService _orderService;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ICurrencyConversionService _currencyConversionService;
+        private readonly IStripeService _stripeService;
 
         public PayoutService(
             IClaimsService claimsService,
             ILoggerService logger,
             IOrderService orderService,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            ICurrencyConversionService currencyConversionService,
+            IStripeService stripeService)
         {
             _claimsService = claimsService;
             _logger = logger;
             _orderService = orderService;
             _unitOfWork = unitOfWork;
+            _currencyConversionService = currencyConversionService;
+            _stripeService = stripeService;
         }
 
         /// <summary>
@@ -161,28 +167,81 @@ namespace BlindTreasure.Application.Services
                 return false;
             }
 
-            payout.Status = PayoutStatus.PROCESSING;
-            payout.ProcessedAt = DateTime.UtcNow;
-            await _unitOfWork.Payouts.Update(payout);
-
-            var log = new PayoutLog
+            // 1. Lấy thông tin seller và kiểm tra Stripe account
+            var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId);
+            if (seller == null || string.IsNullOrEmpty(seller.StripeAccountId))
             {
-                PayoutId = payout.Id,
-                FromStatus = PayoutStatus.PENDING,
-                ToStatus = PayoutStatus.PROCESSING,
-                Action = "SELLER_REQUEST",
-                Details = "Seller requested payout.",
-                TriggeredByUserId = sellerId,
-                LoggedAt = DateTime.UtcNow
-            };
-            await _unitOfWork.PayoutLogs.AddAsync(log);
+                _logger.Warn($"[Payout] Seller {sellerId} does not have a Stripe account.");
+                return false;
+            }
 
-            await _unitOfWork.SaveChangesAsync();
-            _logger.Success($"[Payout] Seller {sellerId} payout {payout.Id} moved to PROCESSING.");
+            // 2. Chuyển đổi tiền VND sang USD nếu cần
+            var rate = await _currencyConversionService.GetVNDToUSDRate();
+            if (rate == null || rate <= 0)
+            {
+                _logger.Warn("[Payout] Currency conversion rate is invalid.");
+                return false;
+            }
+            // Stripe expects amount in smallest unit (cents)
+            decimal usdAmount = payout.NetAmount / rate.Value * 100;
 
-            // TODO: Trigger Stripe payout here if needed
+            // 3. Thực hiện chuyển tiền qua Stripe
+            try
+            {
+                var transfer = await _stripeService.PayoutToSellerAsync(
+                    seller.StripeAccountId,
+                    usdAmount,
+                    "usd",
+                    $"Payout for seller {sellerId} - period {payout.PeriodStart:yyyy-MM-dd} to {payout.PeriodEnd:yyyy-MM-dd}");
 
-            return true;
+                // 4. Cập nhật trạng thái payout và lưu thông tin giao dịch Stripe
+                payout.Status = PayoutStatus.PROCESSING;
+                payout.ProcessedAt = DateTime.UtcNow;
+                payout.StripeTransferId = transfer.Id;
+                payout.StripeDestinationAccount = seller.StripeAccountId;
+                await _unitOfWork.Payouts.Update(payout);
+
+                var log = new PayoutLog
+                {
+                    PayoutId = payout.Id,
+                    FromStatus = PayoutStatus.PENDING,
+                    ToStatus = PayoutStatus.PROCESSING,
+                    Action = "SELLER_REQUEST",
+                    Details = "Seller requested payout.",
+                    TriggeredByUserId = sellerId,
+                    LoggedAt = DateTime.UtcNow,
+                    ErrorMessage = null
+                };
+                await _unitOfWork.PayoutLogs.AddAsync(log);
+
+                await _unitOfWork.SaveChangesAsync();
+                _logger.Success($"[Payout] Seller {sellerId} payout {payout.Id} moved to PROCESSING. Stripe transfer: {transfer.Id}");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Ghi log lỗi vào payout log
+                var log = new PayoutLog
+                {
+                    PayoutId = payout.Id,
+                    FromStatus = PayoutStatus.PENDING,
+                    ToStatus = PayoutStatus.FAILED,
+                    Action = "SELLER_REQUEST",
+                    Details = "Stripe payout failed.",
+                    TriggeredByUserId = sellerId,
+                    LoggedAt = DateTime.UtcNow,
+                    ErrorMessage = ex.Message
+                };
+                await _unitOfWork.PayoutLogs.AddAsync(log);
+
+                payout.Status = PayoutStatus.FAILED;
+                await _unitOfWork.Payouts.Update(payout);
+                await _unitOfWork.SaveChangesAsync();
+
+                _logger.Warn($"[Payout] Stripe payout failed for seller {sellerId}: {ex.Message}");
+                return false;
+            }
         }
 
         public async Task<PayoutCalculationResultDto> CalculateUpcomingPayoutForCurrentSellerAsync(PayoutCalculationRequestDto req)
@@ -359,6 +418,55 @@ namespace BlindTreasure.Application.Services
                 PayoutDetails = payoutDetails,
                 PayoutLogs = payoutLogs
             };
+        }
+
+        /// <summary>
+        /// Seller gửi yêu cầu rút tiền cho payout đang PENDING.
+        /// Chuyển trạng thái từ PENDING sang REQUESTED, ghi log.
+        /// </summary>
+        public async Task<bool> RequestPayoutAsync(Guid sellerId)
+        {
+            // Tìm payout đang PENDING của seller
+            var payout = await _unitOfWork.Payouts.GetQueryable()
+                .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PENDING)
+                .OrderByDescending(p => p.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (payout == null)
+            {
+                _logger.Warn($"[Payout] Seller {sellerId} không có payout nào ở trạng thái PENDING.");
+                return false;
+            }
+
+            // Kiểm tra số tiền tối thiểu
+            if (payout.NetAmount < 100_000m)
+            {
+                _logger.Warn($"[Payout] Seller {sellerId} chưa đủ số tiền tối thiểu để rút.");
+                return false;
+            }
+
+            // Chuyển trạng thái sang REQUESTED
+            payout.Status = PayoutStatus.REQUESTED;
+            payout.ProcessedAt = DateTime.UtcNow;
+            await _unitOfWork.Payouts.Update(payout);
+
+            // Ghi log yêu cầu rút tiền
+            var log = new PayoutLog
+            {
+                PayoutId = payout.Id,
+                FromStatus = PayoutStatus.PENDING,
+                ToStatus = PayoutStatus.REQUESTED,
+                Action = "SELLER_REQUEST",
+                Details = "Seller gửi yêu cầu rút tiền.",
+                TriggeredByUserId = sellerId,
+                LoggedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.PayoutLogs.AddAsync(log);
+
+            await _unitOfWork.SaveChangesAsync();
+            _logger.Success($"[Payout] Seller {sellerId} đã gửi yêu cầu rút tiền cho payout {payout.Id}.");
+
+            return true;
         }
     }
 }

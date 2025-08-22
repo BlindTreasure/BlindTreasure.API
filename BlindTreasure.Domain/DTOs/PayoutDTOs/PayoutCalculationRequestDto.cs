@@ -18,7 +18,7 @@ public class PayoutCalculationRequestDto
 
     public decimal? CustomPlatformFeeRate { get; set; } // Override default fee rate
 
-    public List<Guid>? SpecificSellerIds { get; set; } // Nếu chỉ muốn tính cho một số seller cụ thể
+    //public List<Guid>? SpecificSellerIds { get; set; } // Nếu chỉ muốn tính cho một số seller cụ thể
 }
 
 // Response DTO cho kết quả tính payout

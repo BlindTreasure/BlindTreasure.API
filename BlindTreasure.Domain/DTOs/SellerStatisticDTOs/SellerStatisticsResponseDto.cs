@@ -11,5 +11,7 @@ public class SellerStatisticsResponseDto
     public string Range { get; set; } = string.Empty;
     public List<string> Categories { get; set; } = new();
     public List<int> Sales { get; set; } = new(); // Số lượng đơn hàng
-    public List<decimal> Revenue { get; set; } = new(); // Doanh thu
+    public List<decimal> ActualRevenue { get; set; } = new(); // Doanh thu
+
+    public List<decimal> EstimatedRevenue { get; set; } = new(); // Doanh thu ước tính
 }
