@@ -666,14 +666,14 @@ namespace BlindTreasure.Application.Services
                 .Include(s => s.User)
                 .FirstOrDefaultAsync(s => s.UserId == userId);
             if (seller == null)
-                throw new InvalidOperationException("Seller profile not found.");
+                throw ErrorHelper.BadRequest("Seller profile not existing.");
 
             var payout = await _unitOfWork.Payouts.GetQueryable()
                 .Include(p => p.PayoutDetails).ThenInclude(pd => pd.OrderDetail)
                 .OrderByDescending(p => p.CreatedAt)
                 .FirstOrDefaultAsync(p => p.SellerId == seller.Id && p.Status == PayoutStatus.PROCESSING);
             if (payout == null)
-                throw new InvalidOperationException("No payout found.");
+                throw ErrorHelper.BadRequest("Not found the newest handling payout to show");
 
             return GeneratePayoutExcel(new List<Payout> { payout }, seller);
         }
