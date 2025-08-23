@@ -451,7 +451,7 @@ namespace BlindTreasure.Application.Services
         public async Task<PayoutDetailResponseDto?> GetPayoutDetailByIdAsync(Guid payoutId)
         {
             var payout = await _unitOfWork.Payouts.GetQueryable()
-                .Include(p => p.PayoutDetails)
+                .Include(p => p.PayoutDetails).ThenInclude(o=>o.OrderDetail).ThenInclude(o=>o.Order)
                 .Include(p => p.PayoutLogs)
                 .Include(p => p.Seller).ThenInclude(s => s.User)
                 .FirstOrDefaultAsync(p => p.Id == payoutId);
