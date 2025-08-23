@@ -237,13 +237,13 @@ public class SellerService : ISellerService
 
     public async Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId)
     {
-        var cacheKey = $"seller:user:{userId}";
-        var cached = await _cacheService.GetAsync<Seller>(cacheKey);
-        if (cached != null)
-        {
-            _loggerService.Info($"[GetSellerProfileByUserIdAsync] Cache hit for seller user {userId}");
-            return SellerMapper.ToSellerProfileDto(cached);
-        }
+        //var cacheKey = $"seller:user:{userId}";
+        //var cached = await _cacheService.GetAsync<Seller>(cacheKey);
+        //if (cached != null)
+        //{
+        //    _loggerService.Info($"[GetSellerProfileByUserIdAsync] Cache hit for seller user {userId}");
+        //    return SellerMapper.ToSellerProfileDto(cached);
+        //}
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);
         if (seller == null)
@@ -252,7 +252,7 @@ public class SellerService : ISellerService
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
         }
 
-        await _cacheService.SetAsync(cacheKey, seller, TimeSpan.FromHours(1));
+      //  await _cacheService.SetAsync(cacheKey, seller, TimeSpan.FromHours(1));
         _loggerService.Info($"[GetSellerProfileByUserIdAsync] Seller user {userId} loaded from DB and cached.");
         return SellerMapper.ToSellerProfileDto(seller);
     }
