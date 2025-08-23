@@ -22,12 +22,18 @@ public class Order : BaseEntity
     public DateTime PlacedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
 
+    public decimal? TotalRefundAmount { get; set; }
+
     // Tách rõ SellerId ở đây
     public Guid SellerId { get; set; }
     public Seller Seller { get; set; }
 
     // MỚI: Group ID để nhóm các order cùng checkout
     public Guid? CheckoutGroupId { get; set; }
+
+    //Payout tracking
+    public Guid? PayoutId { get; set; } // FK to track which payout this order belongs to
+    public Payout? Payout { get; set; }
 
     //promotion
     public ICollection<OrderSellerPromotion> OrderSellerPromotions { get; set; }

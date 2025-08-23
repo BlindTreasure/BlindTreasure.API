@@ -28,6 +28,7 @@ services:
       - STRIPE__DeployWebhookSecret=whsec_uWjfI4fkQ7zbwE8VrWMcu2Ysyqm8heUh
       - STRIPE__SuccessRedirectUrl=http://localhost:4040/thankyou
       - STRIPE__FailRedirectUrl=http://localhost:4040/fail
+      - STRIPE__CreatedRedirectUrl=http://localhost:4040/seller/dashboard
 
     ports:
       - "5000:5000"

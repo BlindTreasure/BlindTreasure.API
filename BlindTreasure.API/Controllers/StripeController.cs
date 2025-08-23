@@ -293,7 +293,7 @@ public class StripeController : ControllerBase
     /// <returns>Onboarding link Stripe Express</returns>
     [HttpGet("onboarding-link")]
     [Authorize(Roles = "Seller,Admin,Staff")]
-    public async Task<IActionResult> GetOnboardingLink([FromQuery] string? redirectUrl = null)
+    public async Task<IActionResult> GetOnboardingLink()
     {
         _logger.Info("[Stripe][OnboardingLink] Lấy onboarding link cho seller.");
         try
@@ -306,8 +306,7 @@ public class StripeController : ControllerBase
                 return NotFound(ApiResult<object>.Failure("Seller not found."));
             }
 
-            var url = await _stripeService.GenerateSellerOnboardingLinkAsync(seller.SellerId,
-                redirectUrl ?? "http://localhost:4040");
+            var url = await _stripeService.GenerateSellerOnboardingLinkAsync(seller.SellerId);
             _logger.Success("[Stripe][OnboardingLink] Onboarding link generated.");
             return Ok(ApiResult<string>.Success(url, "200", "Onboarding link generated."));
         }

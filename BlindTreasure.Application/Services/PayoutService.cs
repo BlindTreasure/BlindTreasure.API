@@ -1,11 +1,16 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
+using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using OfficeOpenXml;
+using OfficeOpenXml.Style;
 using System;
+using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -97,6 +102,7 @@ namespace BlindTreasure.Application.Services
                 {
                     PayoutId = payout.Id,
                     OrderDetailId = od.Id,
+                    OrderId = od.OrderId,
                     OriginalAmount = od.TotalPrice,
                     DiscountAmount = od.DetailDiscountPromotion ?? 0,
                     FinalAmount = od.FinalDetailPrice ?? od.TotalPrice,
@@ -112,6 +118,7 @@ namespace BlindTreasure.Application.Services
             payout.PlatformFeeAmount = Math.Round(payout.GrossAmount * payout.PlatformFeeRate / 100m, 2);
             payout.NetAmount = payout.GrossAmount - payout.PlatformFeeAmount;
 
+            order.PayoutId = payout.Id;
             await _unitOfWork.Payouts.Update(payout);
             await _unitOfWork.SaveChangesAsync();
 
@@ -141,7 +148,7 @@ namespace BlindTreasure.Application.Services
             }
 
             var pendingPayout = await _unitOfWork.Payouts.GetQueryable()
-                .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PENDING)
+                .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.REQUESTED)
                 .OrderByDescending(p => p.CreatedAt)
                 .FirstOrDefaultAsync();
 
@@ -160,6 +167,8 @@ namespace BlindTreasure.Application.Services
         /// </summary>
         public async Task<bool> ProcessSellerPayoutAsync(Guid sellerId)
         {
+            var currentUserId = _claimsService.CurrentUserId ;
+
             var payout = await GetEligiblePayoutForSellerAsync(sellerId);
             if (payout == null)
             {
@@ -208,7 +217,7 @@ namespace BlindTreasure.Application.Services
                     ToStatus = PayoutStatus.PROCESSING,
                     Action = "SELLER_REQUEST",
                     Details = "Seller requested payout.",
-                    TriggeredByUserId = sellerId,
+                    TriggeredByUserId = currentUserId == Guid.Empty ? null : currentUserId,
                     LoggedAt = DateTime.UtcNow,
                     ErrorMessage = null
                 };
@@ -225,7 +234,7 @@ namespace BlindTreasure.Application.Services
                 var log = new PayoutLog
                 {
                     PayoutId = payout.Id,
-                    FromStatus = PayoutStatus.PENDING,
+                    FromStatus = PayoutStatus.REQUESTED,
                     ToStatus = PayoutStatus.FAILED,
                     Action = "SELLER_REQUEST",
                     Details = "Stripe payout failed.",
@@ -244,73 +253,87 @@ namespace BlindTreasure.Application.Services
             }
         }
 
-        public async Task<PayoutCalculationResultDto> CalculateUpcomingPayoutForCurrentSellerAsync(PayoutCalculationRequestDto req)
+        public async Task<PayoutCalculationResultDto> GetUpcomingPayoutForCurrentSellerAsync()
         {
-            var userId = _claimsService.CurrentUserId;
-            var seller = await _unitOfWork.Sellers.GetQueryable()
-                .Include(s => s.User)
-                .FirstOrDefaultAsync(s => s.UserId == userId);
-
-            if (seller == null)
-                throw new InvalidOperationException("Seller profile not found.");
-
-            var periodStart = req.PeriodStart.Date;
-            var periodEnd = req.PeriodEnd.Date;
-
-            // Get all completed orders for seller in period, not yet included in a payout
-            var completedOrderDetails = await _unitOfWork.OrderDetails.GetQueryable()
-                .Include(od => od.Order)
-                .Include(od => od.Product)
-                .Where(od =>
-                    od.Order.SellerId == seller.Id &&
-                    od.Order.Status == OrderStatus.COMPLETED.ToString() &&
-                    od.Order.CompletedAt >= periodStart &&
-                    od.Order.CompletedAt < periodEnd &&
-                    !od.IsDeleted &&
-                    !_unitOfWork.PayoutDetails.GetQueryable().Any(pd => pd.OrderDetailId == od.Id)
-                )
-                .ToListAsync();
-
-            var grossAmount = completedOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
-            var platformFeeRate = req.CustomPlatformFeeRate ?? 5.0m;
-            var platformFeeAmount = Math.Round(grossAmount * platformFeeRate / 100m, 2);
-            var netAmount = grossAmount - platformFeeAmount;
-
-            var orderDetailSummaries = completedOrderDetails.Select(od => new PayoutDetailSummaryDto
+            try
             {
-                OrderDetailId = od.Id,
-                OrderId = od.OrderId,
-                ProductName = od.Product?.Name ?? "",
-                Quantity = od.Quantity,
-                OriginalAmount = od.TotalPrice,
-                DiscountAmount = od.DetailDiscountPromotion ?? 0,
-                FinalAmount = od.FinalDetailPrice ?? od.TotalPrice,
-                RefundAmount = 0, // Update if refunds exist
-                ContributedAmount = od.FinalDetailPrice ?? od.TotalPrice,
-                OrderCompletedAt = od.Order.CompletedAt ?? DateTime.MinValue
-            }).ToList();
+                var userId = _claimsService.CurrentUserId;
+                var seller = await _unitOfWork.Sellers.GetQueryable()
+                    .Include(s => s.User)
+                    .FirstOrDefaultAsync(s => s.UserId == userId);
 
-            var canPayout = seller.StripeAccountId != null && netAmount >= 100_000m;
-            var payoutBlockReason = canPayout ? null :
-                seller.StripeAccountId == null ? "Seller chưa liên kết Stripe account." :
-                netAmount < 100_000m ? "Số tiền chưa đủ tối thiểu để rút." : null;
+                if (seller == null)
+                    throw new InvalidOperationException("Seller profile not found.");
 
-            return new PayoutCalculationResultDto
+                var payout = await _unitOfWork.Payouts.GetQueryable().AsNoTracking()
+                    .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o=>o.Order)
+                    .FirstOrDefaultAsync(p => p.SellerId == seller.Id && p.Status == PayoutStatus.PENDING);
+
+                if (payout == null)
+                    return null;
+
+                var orderDetailSummaries = payout.PayoutDetails.Select(pd => new PayoutDetailSummaryDto
+                {
+                    OrderDetailId = pd.OrderDetailId,
+                    OrderId = pd.OrderDetail.OrderId,
+                    Quantity = pd.OrderDetail.Quantity,
+                    OriginalAmount = pd.OriginalAmount,
+                    DiscountAmount = pd.DiscountAmount,
+                    FinalAmount = pd.FinalAmount,
+                    RefundAmount = pd.RefundAmount,
+                    ContributedAmount = pd.ContributedAmount,
+                    OrderCompletedAt = pd.OrderDetail.Order.CompletedAt ?? DateTime.MinValue
+                }).ToList();
+
+                 
+                // Map payout and details to PayoutCalculationResultDto (or a new DTO)
+                foreach( var payoutDetail in payout.PayoutDetails)
+                {
+                    var payoutDetailSummaryDto = new PayoutDetailSummaryDto
+                    {
+                        OrderDetailId = payoutDetail.OrderDetailId,
+                        OrderId = payoutDetail.OrderDetail.OrderId,
+                        Quantity = payoutDetail.OrderDetail.Quantity,
+                        OriginalAmount = payoutDetail.OriginalAmount,
+                        DiscountAmount = payoutDetail.DiscountAmount,
+                        FinalAmount = payoutDetail.FinalAmount,
+                        RefundAmount = payoutDetail.RefundAmount,
+                        ContributedAmount = payoutDetail.ContributedAmount,
+                        OrderCompletedAt = payoutDetail.OrderDetail.Order.CompletedAt ?? DateTime.MinValue
+
+                    };
+
+                }
+
+              
+
+                var canPayout = seller.StripeAccountId != null && payout.NetAmount >= 100_000m;
+                var payoutBlockReason = canPayout ? null :
+                    seller.StripeAccountId == null ? "Seller chưa liên kết Stripe account." :
+                    payout.NetAmount < 100_000m ? "Số tiền chưa đủ tối thiểu để rút." : null;
+
+                return new PayoutCalculationResultDto
+                {
+                    SellerId = seller.Id,
+                    SellerName = seller.CompanyName ?? seller.User?.FullName ?? "",
+                    SellerEmail = seller.User?.Email ?? "",
+                    StripeAccountId = seller.StripeAccountId,
+                    GrossAmount = payout.GrossAmount,
+                    PlatformFeeRate = payout.PlatformFeeRate,
+                    PlatformFeeAmount = payout.PlatformFeeAmount,
+                    NetAmount = payout.NetAmount,
+                    TotalOrderDetails = orderDetailSummaries.Count,
+                    TotalOrders = orderDetailSummaries.Select(x => x.OrderId).Distinct().Count(),
+                    CanPayout = canPayout,
+                    PayoutBlockReason = payoutBlockReason,
+                    OrderDetailSummaries = orderDetailSummaries
+                };
+            }
+            catch (Exception ex)
             {
-                SellerId = seller.Id,
-                SellerName = seller.CompanyName ?? seller.User?.FullName ?? "",
-                SellerEmail = seller.User?.Email ?? "",
-                StripeAccountId = seller.StripeAccountId,
-                GrossAmount = grossAmount,
-                PlatformFeeRate = platformFeeRate,
-                PlatformFeeAmount = platformFeeAmount,
-                NetAmount = netAmount,
-                TotalOrderDetails = orderDetailSummaries.Count,
-                TotalOrders = orderDetailSummaries.Select(x => x.OrderId).Distinct().Count(),
-                CanPayout = canPayout,
-                PayoutBlockReason = payoutBlockReason,
-                OrderDetailSummaries = orderDetailSummaries
-            };
+
+                throw ErrorHelper.BadRequest(ex.Message);
+            }
         }
 
         public async Task<List<PayoutListResponseDto>> GetSellerPayoutsForPeriodAsync(PayoutCalculationRequestDto req)
@@ -370,7 +393,6 @@ namespace BlindTreasure.Application.Services
             {
                 OrderDetailId = pd.OrderDetailId,
                 OrderId = pd.OrderDetail.OrderId,
-                ProductName = pd.OrderDetail.Product?.Name ?? "",
                 Quantity = pd.OrderDetail.Quantity,
                 OriginalAmount = pd.OriginalAmount,
                 DiscountAmount = pd.DiscountAmount,
@@ -468,5 +490,129 @@ namespace BlindTreasure.Application.Services
 
             return true;
         }
+
+
+        private MemoryStream GeneratePayoutExcel(List<Payout> payouts, Seller seller)
+        {
+            ExcelPackage.License.SetNonCommercialPersonal("your-name-or-organization");
+            var package = new ExcelPackage();
+
+            // Sheet 1: Payouts
+            var ws = package.Workbook.Worksheets.Add("Payouts");
+            string[] headers = {
+        "SellerName", "SellerEmail", "StripeAccountId", "PeriodStart", "PeriodEnd", "GrossAmount",
+        "PlatformFeeAmount", "NetAmount", "Status", "CreatedAt", "ProcessedAt", "CompletedAt",
+        "StripeTransferId", "FailureReason"
+    };
+            for (int i = 0; i < headers.Length; i++)
+            {
+                ws.Cells[1, i + 1].Value = headers[i];
+                ws.Cells[1, i + 1].Style.Font.Bold = true;
+                ws.Cells[1, i + 1].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                ws.Cells[1, i + 1].Style.Fill.BackgroundColor.SetColor(Color.LightGreen);
+                ws.Cells[1, i + 1].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+            }
+            for (int i = 0; i < payouts.Count; i++)
+            {
+                var p = payouts[i];
+                ws.Cells[i + 2, 1].Value = seller.CompanyName ?? seller.User?.FullName ?? "";
+                ws.Cells[i + 2, 2].Value = seller.User?.Email ?? "";
+                ws.Cells[i + 2, 3].Value = seller.StripeAccountId ?? "";
+                ws.Cells[i + 2, 4].Value = p.PeriodStart.ToString("yyyy-MM-dd");
+                ws.Cells[i + 2, 5].Value = p.PeriodEnd.ToString("yyyy-MM-dd");
+                ws.Cells[i + 2, 6].Value = p.GrossAmount;
+                ws.Cells[i + 2, 7].Value = p.PlatformFeeAmount;
+                ws.Cells[i + 2, 8].Value = p.NetAmount;
+                ws.Cells[i + 2, 9].Value = p.Status.ToString();
+                ws.Cells[i + 2, 10].Value = p.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss");
+                ws.Cells[i + 2, 11].Value = p.ProcessedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                ws.Cells[i + 2, 12].Value = p.CompletedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                ws.Cells[i + 2, 13].Value = p.StripeTransferId ?? "";
+                ws.Cells[i + 2, 14].Value = p.FailureReason ?? "";
+            }
+            ws.Cells[ws.Dimension.Address].AutoFitColumns();
+
+            // Sheet 2: Payout Details
+            var wsDetail = package.Workbook.Worksheets.Add("Payout Details");
+            string[] detailHeaders = {
+        "PayoutId", "OrderDetailId", "OrderId", "ProductName", "Quantity", "OriginalAmount",
+        "DiscountAmount", "FinalAmount", "RefundAmount", "ContributedAmount", "OrderCompletedAt"
+    };
+            for (int i = 0; i < detailHeaders.Length; i++)
+            {
+                wsDetail.Cells[1, i + 1].Value = detailHeaders[i];
+                wsDetail.Cells[1, i + 1].Style.Font.Bold = true;
+                wsDetail.Cells[1, i + 1].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                wsDetail.Cells[1, i + 1].Style.Fill.BackgroundColor.SetColor(Color.LightBlue);
+                wsDetail.Cells[1, i + 1].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+            }
+            int row = 2;
+            foreach (var p in payouts)
+            {
+                foreach (var pd in p.PayoutDetails)
+                {
+                    wsDetail.Cells[row, 1].Value = p.Id.ToString();
+                    wsDetail.Cells[row, 2].Value = pd.OrderDetailId.ToString();
+                    wsDetail.Cells[row, 3].Value = pd.OrderDetail.OrderId.ToString();
+                    wsDetail.Cells[row, 4].Value = pd.OrderDetail.Product?.Name ?? "";
+                    wsDetail.Cells[row, 5].Value = pd.OrderDetail.Quantity;
+                    wsDetail.Cells[row, 6].Value = pd.OriginalAmount;
+                    wsDetail.Cells[row, 7].Value = pd.DiscountAmount;
+                    wsDetail.Cells[row, 8].Value = pd.FinalAmount;
+                    wsDetail.Cells[row, 9].Value = pd.RefundAmount;
+                    wsDetail.Cells[row, 10].Value = pd.ContributedAmount;
+                    wsDetail.Cells[row, 11].Value = pd.OrderDetail.Order?.CompletedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "";
+                    row++;
+                }
+            }
+            wsDetail.Cells[wsDetail.Dimension.Address].AutoFitColumns();
+
+            var stream = new MemoryStream();
+            package.SaveAs(stream);
+            if (stream.CanSeek) stream.Position = 0;
+            return stream;
+        }
+
+        public async Task<MemoryStream> ExportLatestPayoutProofAsync()
+        {
+            var userId = _claimsService.CurrentUserId;
+            var seller = await _unitOfWork.Sellers.GetQueryable()
+                .Include(s => s.User)
+                .FirstOrDefaultAsync(s => s.UserId == userId);
+            if (seller == null)
+                throw new InvalidOperationException("Seller profile not found.");
+
+            var payout = await _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.PayoutDetails).ThenInclude(pd => pd.OrderDetail)
+                .OrderByDescending(p => p.CreatedAt)
+                .FirstOrDefaultAsync(p => p.SellerId == seller.Id && p.Status == PayoutStatus.PROCESSING);
+            if (payout == null)
+                throw new InvalidOperationException("No payout found.");
+
+            return GeneratePayoutExcel(new List<Payout> { payout }, seller);
+        }
+
+        public async Task<MemoryStream> ExportPayoutsByPeriodAsync(DateTime? fromDate, DateTime? toDate)
+        {
+            var userId = _claimsService.CurrentUserId;
+            var seller = await _unitOfWork.Sellers.GetQueryable()
+                .Include(s => s.User)
+                .FirstOrDefaultAsync(s => s.UserId == userId);
+            if (seller == null)
+                throw new InvalidOperationException("Seller profile not found.");
+
+            var query = _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.PayoutDetails).ThenInclude(pd => pd.OrderDetail)
+                .Where(p => p.SellerId == seller.Id);
+            if (fromDate.HasValue)
+                query = query.Where(p => p.PeriodStart >= fromDate.Value);
+            if (toDate.HasValue)
+                query = query.Where(p => p.PeriodEnd <= toDate.Value);
+
+            var payouts = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
+            return GeneratePayoutExcel(payouts, seller);
+        }
+
+
     }
 }

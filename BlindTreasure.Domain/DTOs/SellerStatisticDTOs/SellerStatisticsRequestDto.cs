@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
@@ -9,6 +10,7 @@ namespace BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
 
 public class SellerStatisticsRequestDto
 {
+    [DefaultValue(StatisticsTimeRange.Custom)]
     [Required] public StatisticsTimeRange Range { get; set; } = StatisticsTimeRange.Week;
 
     public DateTime? StartDate { get; set; }
