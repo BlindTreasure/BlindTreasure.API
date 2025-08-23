@@ -517,7 +517,7 @@ namespace BlindTreasure.Application.Services
         /// Seller gửi yêu cầu rút tiền cho payout đang PENDING.
         /// Chuyển trạng thái từ PENDING sang REQUESTED, ghi log.
         /// </summary>
-        public async Task<bool> RequestPayoutAsync(Guid sellerId)
+        public async Task<PayoutDetailResponseDto?> RequestPayoutAsync(Guid sellerId)
         {
             var userId = _claimsService.CurrentUserId;
 
@@ -525,13 +525,24 @@ namespace BlindTreasure.Application.Services
             var hasRequestedPayout = await _unitOfWork.Payouts.GetQueryable()
                 .FirstOrDefaultAsync(p => p.SellerId == sellerId && p.Status == PayoutStatus.REQUESTED);
 
-            if (hasRequestedPayout != null )
+            if (hasRequestedPayout != null)
             {
                 throw ErrorHelper.BadRequest($"[Payout] Seller {sellerId} đã có một yêu cầu rút tiền chưa được duyệt. PayoutId {hasRequestedPayout.Id}");
             }
 
+            // Lấy thông tin seller để kiểm tra StripeAccountId
+            var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId);
+            if (seller == null)
+            {
+                _logger.Warn($"[Payout] Seller {sellerId} không tồn tại.");
+                return null;
+            }
+
             // Tìm payout đang PENDING của seller
             var payout = await _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.PayoutDetails).ThenInclude(pd => pd.OrderDetail).ThenInclude(od => od.Order)
+                .Include(p => p.PayoutLogs)
+                .Include(p => p.Seller).ThenInclude(s => s.User)
                 .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PENDING)
                 .OrderByDescending(p => p.CreatedAt)
                 .FirstOrDefaultAsync();
@@ -539,14 +550,22 @@ namespace BlindTreasure.Application.Services
             if (payout == null)
             {
                 _logger.Warn($"[Payout] Seller {sellerId} không có payout nào ở trạng thái PENDING.");
-                return false;
+                return null;
             }
 
-            // Kiểm tra số tiền tối thiểu
-            if (payout.NetAmount < 100_000m)
+            // Kiểm tra điều kiện canPayout
+            bool canPayout = seller.StripeAccountId != null
+                     && payout.NetAmount >= 100_000m;
+
+            if (!canPayout)
             {
-                _logger.Warn($"[Payout] Seller {sellerId} chưa đủ số tiền tối thiểu để rút.");
-                return false;
+                var reason = seller.StripeAccountId == null
+                    ? "Seller chưa liên kết Stripe account."
+                    : payout.NetAmount < 100_000m
+                        ? "Số tiền chưa đủ tối thiểu để rút."
+                        : "Không đủ điều kiện rút tiền.";
+                _logger.Warn($"[Payout] Seller {sellerId} không đủ điều kiện rút tiền: {reason}");
+                throw ErrorHelper.BadRequest($"[Payout] {reason}");
             }
 
             // Update PeriodEnd to Sunday of current week
@@ -574,7 +593,8 @@ namespace BlindTreasure.Application.Services
             await _unitOfWork.SaveChangesAsync();
             _logger.Success($"[Payout] Seller {sellerId} đã gửi yêu cầu rút tiền cho payout {payout.Id}.");
 
-            return true;
+            // Trả về chi tiết payout sau khi cập nhật
+            return await GetPayoutDetailByIdAsync(payout.Id);
         }
 
 
@@ -767,7 +787,7 @@ namespace BlindTreasure.Application.Services
                 .FirstOrDefaultAsync(s => s.UserId == userId);
 
             if (seller == null)
-                throw new InvalidOperationException("Seller profile not found.");
+                throw ErrorHelper.BadRequest("Seller profile not found.");
 
             var query = BuildPayoutQuery(param, seller.Id);
 
