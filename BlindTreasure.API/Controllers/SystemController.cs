@@ -1160,8 +1160,13 @@ public class SystemController : ControllerBase
 
                 var tablesToDelete = new List<Func<Task>>
                 {
+                    () => context.PayoutLogs.ExecuteDeleteAsync(),
+                    () => context.PayoutDetails.ExecuteDeleteAsync(),
+                           () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),
+                    () => context.InventoryItems.ExecuteDeleteAsync(),
+
                     () => context.ChatMessages.ExecuteDeleteAsync(),
-                    () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),
+             
                     () => context.CustomerFavourites.ExecuteDeleteAsync(),
                     () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
@@ -1172,7 +1177,8 @@ public class SystemController : ControllerBase
                     () => context.OrderDetails.ExecuteDeleteAsync(),
                     () => context.Shipments.ExecuteDeleteAsync(),
                     () => context.Listings.ExecuteDeleteAsync(),
-                    () => context.InventoryItems.ExecuteDeleteAsync(),
+        
+                    () => context.Payouts.ExecuteDeleteAsync(),
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
                     () => context.GroupPaymentSessions.ExecuteDeleteAsync(),
 

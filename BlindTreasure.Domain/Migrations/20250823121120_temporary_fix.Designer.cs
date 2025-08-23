@@ -3,6 +3,7 @@ using System;
 using BlindTreasure.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    partial class BlindTreasureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250823121120_temporary_fix")]
+    partial class temporary_fix
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1034,9 +1037,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid?>("PaymentId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("PayoutId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime>("PlacedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1056,9 +1056,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<decimal>("TotalAmount")
                         .HasColumnType("numeric");
 
-                    b.Property<decimal?>("TotalRefundAmount")
-                        .HasColumnType("numeric");
-
                     b.Property<decimal?>("TotalShippingFee")
                         .HasColumnType("numeric");
 
@@ -1075,8 +1072,6 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.HasIndex("PaymentId")
                         .IsUnique();
-
-                    b.HasIndex("PayoutId");
 
                     b.HasIndex("PromotionId");
 
@@ -1130,9 +1125,6 @@ namespace BlindTreasure.Domain.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
-
-                    b.Property<decimal?>("RefundedAmount")
-                        .HasColumnType("numeric");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1404,9 +1396,6 @@ namespace BlindTreasure.Domain.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<decimal?>("AdjustedGrossAmount")
-                        .HasColumnType("numeric");
-
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1482,9 +1471,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<string>("StripeTransferId")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
-
-                    b.Property<decimal?>("TotalRefundAmount")
-                        .HasColumnType("numeric");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2639,9 +2625,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Property<Guid>("OrderDetailId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("OriginalAmount")
                         .HasColumnType("decimal(18,2)");
 
@@ -2983,10 +2966,6 @@ namespace BlindTreasure.Domain.Migrations
                         .HasForeignKey("BlindTreasure.Domain.Entities.Order", "PaymentId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("BlindTreasure.Domain.Entities.Payout", "Payout")
-                        .WithMany("Orders")
-                        .HasForeignKey("PayoutId");
-
                     b.HasOne("BlindTreasure.Domain.Entities.Promotion", null)
                         .WithMany("Orders")
                         .HasForeignKey("PromotionId");
@@ -3009,8 +2988,6 @@ namespace BlindTreasure.Domain.Migrations
                         .IsRequired();
 
                     b.Navigation("Payment");
-
-                    b.Navigation("Payout");
 
                     b.Navigation("Seller");
 
@@ -3468,8 +3445,6 @@ namespace BlindTreasure.Domain.Migrations
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.Payout", b =>
                 {
-                    b.Navigation("Orders");
-
                     b.Navigation("PayoutDetails");
 
                     b.Navigation("PayoutLogs");
