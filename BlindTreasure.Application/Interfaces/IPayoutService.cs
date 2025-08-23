@@ -19,8 +19,9 @@ namespace BlindTreasure.Application.Interfaces
         Task<List<PayoutListResponseDto>> GetSellerPayoutsForPeriodAsync(PayoutCalculationRequestDto req);
         Task<bool> ProcessSellerPayoutAsync(Guid sellerId);
         Task<bool> RequestPayoutAsync(Guid sellerId);
-        Task<MemoryStream> ExportPayoutsByPeriodAsync(DateTime? fromDate, DateTime? toDate);
+        Task<MemoryStream> ExportPayoutByIdAsync(Guid payoutId);
         Task<MemoryStream> ExportLatestPayoutProofAsync();
         Task<Pagination<PayoutListResponseDto>> GetPayoutsForAdminAsync(PayoutAdminQueryParameter param);
+        Task<Pagination<PayoutListResponseDto>> GetPayoutsForCurrentSellerAsync(PayoutAdminQueryParameter param);
     }
 }
