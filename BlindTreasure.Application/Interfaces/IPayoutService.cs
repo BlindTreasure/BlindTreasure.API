@@ -1,5 +1,7 @@
-﻿using BlindTreasure.Domain.DTOs.PayoutDTOs;
+﻿using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.Entities;
+using BlindTreasure.Infrastructure.Commons;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,5 +21,6 @@ namespace BlindTreasure.Application.Interfaces
         Task<bool> RequestPayoutAsync(Guid sellerId);
         Task<MemoryStream> ExportPayoutsByPeriodAsync(DateTime? fromDate, DateTime? toDate);
         Task<MemoryStream> ExportLatestPayoutProofAsync();
+        Task<Pagination<PayoutListResponseDto>> GetPayoutsForAdminAsync(PayoutAdminQueryParameter param);
     }
 }

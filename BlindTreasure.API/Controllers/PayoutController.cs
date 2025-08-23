@@ -87,16 +87,16 @@ namespace BlindTreasure.API.Controllers
         /// <summary>
         /// Seller tiến hành rút tiền (Stripe payout). Chỉ gọi khi đã được staff duyệt.
         /// </summary>
-        [HttpPost("process")]
+        [HttpPost("{sellerId}/process")]
         [ProducesResponseType(typeof(ApiResult<bool>), 200)]
         [ProducesResponseType(typeof(ApiResult<bool>), 400)]
         [Authorize]
-        public async Task<IActionResult> ProcessSellerPayout()
+        public async Task<IActionResult> ProcessSellerPayout(Guid sellerId)
         {
             try
             {
-                var userId = _claimsService.CurrentUserId;
-                var seller = await _sellerService.GetSellerProfileByUserIdAsync(userId);
+                //var userId = _claimsService.CurrentUserId;
+                var seller = await _sellerService.GetSellerProfileByIdAsync(sellerId);
                 if (seller == null)
                     return BadRequest(ApiResult<bool>.Failure("400", "Không tìm thấy hồ sơ seller."));
 
@@ -196,13 +196,13 @@ namespace BlindTreasure.API.Controllers
             }
         }
 
-        [HttpGet("export-history")]
+        [HttpPost("export-history")]
         [Authorize]
-        public async Task<IActionResult> ExportPayoutsByPeriod([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+        public async Task<IActionResult> ExportPayoutsByPeriod([FromBody] PayoutPeriodTimeRequestDto dto)
         {
             try
             {
-                var stream = await _payoutService.ExportPayoutsByPeriodAsync(fromDate, toDate);
+                var stream = await _payoutService.ExportPayoutsByPeriodAsync(dto.PeriodStart, dto.PeriodEnd);
                 if (stream.CanSeek) stream.Position = 0;
 
                 string fileName = $"PayoutHistory_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
