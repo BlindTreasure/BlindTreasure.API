@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.Entities;
@@ -27,6 +28,7 @@ namespace BlindTreasure.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly ICurrencyConversionService _currencyConversionService;
         private readonly IStripeService _stripeService;
+        private readonly INotificationService _notificationService;
 
         public PayoutService(
             IClaimsService claimsService,
@@ -34,7 +36,8 @@ namespace BlindTreasure.Application.Services
             IOrderService orderService,
             IUnitOfWork unitOfWork,
             ICurrencyConversionService currencyConversionService,
-            IStripeService stripeService)
+            IStripeService stripeService,
+            INotificationService notificationService)
         {
             _claimsService = claimsService;
             _logger = logger;
@@ -42,6 +45,7 @@ namespace BlindTreasure.Application.Services
             _unitOfWork = unitOfWork;
             _currencyConversionService = currencyConversionService;
             _stripeService = stripeService;
+            _notificationService = notificationService;
         }
 
         /// <summary>
@@ -58,11 +62,33 @@ namespace BlindTreasure.Application.Services
             var sellerId = order.SellerId;
             var now = DateTime.UtcNow;
 
-            // Determine current payout period (weekly, starting Monday)
-            var periodStart = now.Date.AddDays(-(int)now.DayOfWeek);
-            var periodEnd = periodStart.AddDays(7);
+            // Calculate current week period
+            var currentMonday = now.Date.AddDays(-(int)now.DayOfWeek);
+            var currentSunday = currentMonday.AddDays(6);
 
-            // Find existing pending payout
+            // Find the latest payout for this seller
+            var lastPayout = await _unitOfWork.Payouts.GetQueryable()
+                .Where(p => p.SellerId == sellerId)
+                .OrderByDescending(p => p.PeriodEnd)
+                .FirstOrDefaultAsync();
+
+            DateTime periodStart;
+            DateTime periodEnd;
+
+            if (lastPayout != null && lastPayout.Status != PayoutStatus.PENDING && lastPayout.PeriodEnd >= currentMonday)
+            {
+                // Last payout for this week is already requested/completed, start new period from next Monday
+                periodStart = lastPayout.PeriodEnd.AddDays(1); // Next Monday
+                periodEnd = periodStart.AddDays(7);            // Next Monday
+            }
+            else
+            {
+                // No previous payout or still pending, use current week
+                periodStart = currentMonday;
+                periodEnd = periodStart.AddDays(7);
+            }
+
+            // Find existing pending payout for this period
             var payout = await _unitOfWork.Payouts.GetQueryable()
                 .FirstOrDefaultAsync(p =>
                     p.SellerId == sellerId &&
@@ -171,7 +197,7 @@ namespace BlindTreasure.Application.Services
         /// </summary>
         public async Task<bool> ProcessSellerPayoutAsync(Guid sellerId)
         {
-            var currentUserId = _claimsService.CurrentUserId ;
+            var currentUserId = _claimsService.CurrentUserId;
 
             var payout = await GetEligiblePayoutForSellerAsync(sellerId);
             if (payout == null)
@@ -229,6 +255,16 @@ namespace BlindTreasure.Application.Services
 
                 await _unitOfWork.SaveChangesAsync();
                 _logger.Success($"[Payout] Seller {sellerId} payout {payout.Id} moved to PROCESSING. Stripe transfer: {transfer.Id}");
+
+                // Push notification to seller about payout
+                var notificationDto = new NotificationDto
+                {
+                    Title = "Payout is being processed",
+                    Message = $"Your payout for period {payout.PeriodStart:yyyy-MM-dd} to {payout.PeriodEnd:yyyy-MM-dd} is being processed. Amount: {payout.NetAmount:N0} VND.",
+                    Type = NotificationType.System,
+                    SourceUrl = null
+                };
+                await _notificationService.PushNotificationToUser(seller.UserId, notificationDto);
 
                 return true;
             }
@@ -513,9 +549,13 @@ namespace BlindTreasure.Application.Services
                 return false;
             }
 
+            // Update PeriodEnd to Sunday of current week
+            var now = DateTime.UtcNow;
+            payout.PeriodEnd = now.Date.AddDays(7 - (int)now.DayOfWeek - 1);
+
             // Chuyển trạng thái sang REQUESTED
             payout.Status = PayoutStatus.REQUESTED;
-            payout.ProcessedAt = DateTime.UtcNow;
+            payout.ProcessedAt = now;
             await _unitOfWork.Payouts.Update(payout);
 
             // Ghi log yêu cầu rút tiền
