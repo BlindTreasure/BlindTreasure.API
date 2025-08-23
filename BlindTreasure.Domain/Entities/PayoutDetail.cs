@@ -12,6 +12,7 @@ public class PayoutDetail : BaseEntity
     public Guid PayoutId { get; set; }
     public Payout Payout { get; set; }
 
+    public Guid OrderId { get; set; }
     public Guid OrderDetailId { get; set; }
     public OrderDetail OrderDetail { get; set; }
 

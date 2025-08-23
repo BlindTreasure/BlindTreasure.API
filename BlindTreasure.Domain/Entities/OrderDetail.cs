@@ -21,6 +21,7 @@ public class OrderDetail : BaseEntity
     public decimal TotalPrice { get; set; }
     public decimal? DetailDiscountPromotion { get; set; } = 0;
     public decimal? FinalDetailPrice { get; set; } = 0; // TotalPrice - DetailDiscountPromotion ?? 0;
+    public decimal? RefundedAmount { get; set; } = 0;
     public OrderDetailItemStatus Status { get; set; }
     public string? Logs { get; set; } = string.Empty; // Lưu trữ nhật ký trạng thái
 

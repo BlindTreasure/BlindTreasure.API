@@ -21,6 +21,7 @@ public class StripeService : IStripeService
     private readonly string _failRedirectUrl;
     private readonly IStripeClient _stripeClient;
     private readonly string _successRedirectUrl;
+    private readonly string _createdAccountRedirectUrl;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILoggerService _loggerService;
 
@@ -35,6 +36,8 @@ public class StripeService : IStripeService
 
         _successRedirectUrl = _configuration["STRIPE:SuccessRedirectUrl"] ?? "http://localhost:4040/thankyou";
         _failRedirectUrl = _configuration["STRIPE:FailRedirectUrl"] ?? "http://localhost:4040/fail";
+        _createdAccountRedirectUrl = _configuration["STRIPE:CreatedRedirectUrl"] ??
+                                     "STRIPE__CreatedRedirectUrl";
     }
 
     public async Task<string> GetOrCreateGroupPaymentLink(Guid checkoutGroupId)
@@ -669,18 +672,30 @@ public class StripeService : IStripeService
                 throw ErrorHelper.Internal("Stripe payout failed.");
             // TODO: Lưu transaction từ stripe khi payout vào DB nếu cần
 
-            var transaction = new Transaction
-            {
-                Type = TransactionType.Payout.ToString(),
-                Amount = amount,
-                Currency = currency,
-                ExternalRef = transfer.Id,
-                OccurredAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = userId
-            };
-            await _unitOfWork.Transactions.AddAsync(transaction);
-            await _unitOfWork.SaveChangesAsync();
+            //var payment = new Payment
+            //{
+            //    Amount = amount,
+            //    NetAmount = amount,
+            //    Method = "Stripe Payout",
+            //    Status = PaymentStatus.Paid,
+            //    PaidAt = DateTime.UtcNow,
+            //    CreatedAt = DateTime.UtcNow,
+            //    CreatedBy = userId
+            //};
+
+            //var transaction = new Transaction
+            //{
+            //    Type = TransactionType.Payout.ToString(),
+            //    Amount = amount,
+            //    Currency = currency,
+            //    ExternalRef = transfer.Id,
+            //    OccurredAt = DateTime.UtcNow,
+            //    CreatedAt = DateTime.UtcNow,
+            //    CreatedBy = userId,
+            //    Status = TransactionStatus.Pending
+            //};
+            //await _unitOfWork.Transactions.AddAsync(transaction);
+            //await _unitOfWork.SaveChangesAsync();
 
             return transfer;
         }
@@ -776,7 +791,7 @@ public class StripeService : IStripeService
     }
 
     // 3. Tạo onboarding link cho seller (Stripe Express)
-    public async Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId, string redirectUrl)
+    public async Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId)
     {
         var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId);
         if (seller == null)
@@ -827,8 +842,8 @@ public class StripeService : IStripeService
         var linkOptions = new AccountLinkCreateOptions
         {
             Account = seller.StripeAccountId,
-            RefreshUrl = $"{redirectUrl}/profile",
-            ReturnUrl = $"{redirectUrl}/profile",
+            RefreshUrl = $"{_createdAccountRedirectUrl}",
+            ReturnUrl = $"{_createdAccountRedirectUrl}",
             Type = "account_onboarding"
         };
 

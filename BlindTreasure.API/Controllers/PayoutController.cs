@@ -119,11 +119,11 @@ namespace BlindTreasure.API.Controllers
         [HttpPost("calculate-upcoming")]
         [ProducesResponseType(typeof(ApiResult<PayoutCalculationResultDto>), 200)]
         [Authorize]
-        public async Task<IActionResult> CalculateUpcomingPayout([FromBody] PayoutCalculationRequestDto req)
+        public async Task<IActionResult> CalculateUpcomingPayout()
         {
             try
             {
-                var result = await _payoutService.CalculateUpcomingPayoutForCurrentSellerAsync(req);
+                var result = await _payoutService.GetUpcomingPayoutForCurrentSellerAsync();
                 return Ok(ApiResult<PayoutCalculationResultDto>.Success(result, "200", "Tính toán payout sắp tới thành công."));
             }
             catch (Exception ex)
@@ -173,6 +173,46 @@ namespace BlindTreasure.API.Controllers
             {
                 _loggerService.Error($"[GetPayoutDetailById] {ex.Message}");
                 return StatusCode(500, ApiResult<PayoutDetailResponseDto>.Failure("500", "Có lỗi xảy ra khi lấy chi tiết payout."));
+            }
+        }
+
+        [HttpGet("export-latest")]
+        [Authorize]
+        public async Task<IActionResult> ExportLatestPayoutProof()
+        {
+            try
+            {
+                var stream = await _payoutService.ExportLatestPayoutProofAsync();
+                if (stream.CanSeek) stream.Position = 0;
+
+                string fileName = $"PayoutProof_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+                string fileType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                return File(stream, fileType, fileName);
+            }
+            catch (Exception ex)
+            {
+                _loggerService.Error($"[ExportLatestPayoutProof] {ex.Message}");
+                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi export file payout."));
+            }
+        }
+
+        [HttpGet("export-history")]
+        [Authorize]
+        public async Task<IActionResult> ExportPayoutsByPeriod([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+        {
+            try
+            {
+                var stream = await _payoutService.ExportPayoutsByPeriodAsync(fromDate, toDate);
+                if (stream.CanSeek) stream.Position = 0;
+
+                string fileName = $"PayoutHistory_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+                string fileType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                return File(stream, fileType, fileName);
+            }
+            catch (Exception ex)
+            {
+                _loggerService.Error($"[ExportPayoutsByPeriod] {ex.Message}");
+                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi export file payout history."));
             }
         }
     }

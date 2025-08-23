@@ -14,7 +14,7 @@ public interface IStripeService
     Task<GroupPaymentSession> DisableStripeGroupPaymentSessionAsync(Guid checkoutGroupId, List<Order> orders);
     Task DisableStripeOrderPaymentSessionAsync(Guid orderId);
     Task<string> GenerateExpressLoginLink();
-    Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId, string redirectUrl);
+    Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId);
     Task<string> GetOrCreateGroupPaymentLink(Guid checkoutGroupId);
     Task<bool> IsSellerStripeAccountVerifiedAsync(string sellerStripeAccountId);
 

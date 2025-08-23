@@ -48,7 +48,6 @@ public class PayoutDetailSummaryDto
 {
     public Guid OrderDetailId { get; set; }
     public Guid OrderId { get; set; }
-    public string ProductName { get; set; } = string.Empty;
     public int Quantity { get; set; }
     public decimal OriginalAmount { get; set; }
     public decimal DiscountAmount { get; set; }

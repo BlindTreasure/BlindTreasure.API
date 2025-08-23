@@ -24,6 +24,10 @@ public class Payout : BaseEntity
     public decimal PlatformFeeAmount { get; set; } // Số tiền phí nền tảng
     public decimal NetAmount { get; set; } // Số tiền thực trả = Gross - Fee
 
+    //Refund
+    public decimal? TotalRefundAmount { get; set; } // Tổng refund trong period
+    public decimal? AdjustedGrossAmount { get; set; } // Gross - Refunds
+
     // Stripe integration
     public string? StripeTransferId { get; set; }
     public string? StripeDestinationAccount { get; set; } // Seller's Stripe account
@@ -42,4 +46,6 @@ public class Payout : BaseEntity
     // Navigation properties
     public ICollection<PayoutDetail> PayoutDetails { get; set; } = new List<PayoutDetail>();
     public ICollection<PayoutLog> PayoutLogs { get; set; } = new List<PayoutLog>();
+    public ICollection<Order> Orders { get; set; } = new List<Order>();
+
 }
