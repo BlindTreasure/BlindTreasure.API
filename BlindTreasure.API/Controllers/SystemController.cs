@@ -1178,7 +1178,6 @@ public class SystemController : ControllerBase
                     () => context.Shipments.ExecuteDeleteAsync(),
                     () => context.Listings.ExecuteDeleteAsync(),
         
-                    () => context.Payouts.ExecuteDeleteAsync(),
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
                     () => context.GroupPaymentSessions.ExecuteDeleteAsync(),
 
@@ -1192,6 +1191,8 @@ public class SystemController : ControllerBase
                     () => context.ListingReports.ExecuteDeleteAsync(),
 
                     () => context.Orders.ExecuteDeleteAsync(),
+                                        () => context.Payouts.ExecuteDeleteAsync(),
+
                     () => context.Payments.ExecuteDeleteAsync(),
                     () => context.PromotionUserUsages.ExecuteDeleteAsync(),
                     () => context.Promotions.ExecuteDeleteAsync(),

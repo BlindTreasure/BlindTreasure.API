@@ -8,17 +8,22 @@ using System.Threading.Tasks;
 
 namespace BlindTreasure.Domain.DTOs.PayoutDTOs;
 
-public class PayoutCalculationRequestDto
+public class PayoutCalculationRequestDto : PayoutPeriodTimeRequestDto
 {
-    [Required] public DateTime PeriodStart { get; set; }
-
-    [Required] public DateTime PeriodEnd { get; set; }
+   
 
     public PayoutPeriodType PeriodType { get; set; } = PayoutPeriodType.WEEKLY;
 
     public decimal? CustomPlatformFeeRate { get; set; } // Override default fee rate
 
     //public List<Guid>? SpecificSellerIds { get; set; } // Nếu chỉ muốn tính cho một số seller cụ thể
+}
+
+public class PayoutPeriodTimeRequestDto
+{
+    [Required] public DateTime PeriodStart { get; set; }
+
+    [Required] public DateTime PeriodEnd { get; set; }
 }
 
 // Response DTO cho kết quả tính payout

@@ -1,9 +1,11 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -448,6 +450,7 @@ namespace BlindTreasure.Application.Services
         /// </summary>
         public async Task<bool> RequestPayoutAsync(Guid sellerId)
         {
+            var userId = _claimsService.CurrentUserId;
             // Tìm payout đang PENDING của seller
             var payout = await _unitOfWork.Payouts.GetQueryable()
                 .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PENDING)
@@ -480,7 +483,7 @@ namespace BlindTreasure.Application.Services
                 ToStatus = PayoutStatus.REQUESTED,
                 Action = "SELLER_REQUEST",
                 Details = "Seller gửi yêu cầu rút tiền.",
-                TriggeredByUserId = sellerId,
+                TriggeredByUserId = userId != Guid.Empty ? userId : null,
                 LoggedAt = DateTime.UtcNow
             };
             await _unitOfWork.PayoutLogs.AddAsync(log);
@@ -611,6 +614,61 @@ namespace BlindTreasure.Application.Services
 
             var payouts = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
             return GeneratePayoutExcel(payouts, seller);
+        }
+
+        public async Task<Pagination<PayoutListResponseDto>> GetPayoutsForAdminAsync(PayoutAdminQueryParameter param)
+        {
+            var query = _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.Seller).ThenInclude(s => s.User)
+                .Include(p => p.PayoutDetails).ThenInclude(p=> p.OrderDetail)
+                .Where(p => !p.Seller.IsDeleted);
+
+            if (param.Status.HasValue)
+                query = query.Where(p => p.Status == param.Status.Value);
+
+            if (param.SellerId.HasValue)
+                query = query.Where(p => p.SellerId == param.SellerId.Value);
+
+            if (param.PeriodStart.HasValue)
+                query = query.Where(p => p.PeriodStart >= param.PeriodStart.Value);
+
+            if (param.PeriodEnd.HasValue)
+                query = query.Where(p => p.PeriodEnd <= param.PeriodEnd.Value);
+
+            query = query.OrderByDescending(p => p.CreatedAt);
+
+            var totalCount = await query.CountAsync();
+
+            List<Payout> payouts;
+            if (param.PageIndex == 0)
+                payouts = await query.ToListAsync();
+            else
+                payouts = await query
+                    .Skip((param.PageIndex - 1) * param.PageSize)
+                    .Take(param.PageSize)
+                    .ToListAsync();
+
+            var items = payouts.Select(p => new PayoutListResponseDto
+            {
+                Id = p.Id,
+                SellerId = p.SellerId,
+                SellerName = p.Seller.CompanyName ?? p.Seller.User?.FullName ?? "",
+                PeriodStart = p.PeriodStart,
+                PeriodEnd = p.PeriodEnd,
+                PeriodType = p.PeriodType.ToString(),
+                GrossAmount = p.GrossAmount,
+                NetAmount = p.NetAmount,
+                PlatformFeeAmount = p.PlatformFeeAmount,
+                Status = p.Status.ToString(),
+                CreatedAt = p.CreatedAt,
+                ProcessedAt = p.ProcessedAt,
+                CompletedAt = p.CompletedAt,
+                StripeTransferId = p.StripeTransferId,
+                FailureReason = p.FailureReason,
+                RetryCount = p.RetryCount
+            }).ToList();
+
+            return new Pagination<PayoutListResponseDto>(items, totalCount, param.PageIndex, param.PageSize);
         }
 
 
