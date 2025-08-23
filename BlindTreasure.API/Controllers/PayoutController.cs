@@ -32,8 +32,8 @@ namespace BlindTreasure.API.Controllers
         /// Chuyển trạng thái payout sang REQUESTED, staff sẽ duyệt.
         /// </summary>
         [HttpPost("request")]
-        [ProducesResponseType(typeof(ApiResult<bool>), 200)]
-        [ProducesResponseType(typeof(ApiResult<bool>), 400)]
+        [ProducesResponseType(typeof(ApiResult<object>), 200)]
+        [ProducesResponseType(typeof(ApiResult<object>), 400)]
         [Authorize]
         public async Task<IActionResult> RequestPayout()
         {
@@ -42,13 +42,13 @@ namespace BlindTreasure.API.Controllers
                 var userId = _claimsService.CurrentUserId;
                 var seller = await _sellerService.GetSellerProfileByUserIdAsync(userId);
                 if (seller == null)
-                    return BadRequest(ApiResult<bool>.Failure("400", "Không tìm thấy hồ sơ seller."));
+                    return BadRequest(ApiResult<object>.Failure("400", "Không tìm thấy hồ sơ seller."));
 
                 var success = await _payoutService.RequestPayoutAsync(seller.SellerId);
-                if (!success)
-                    return BadRequest(ApiResult<bool>.Failure("400", "Không có payout hợp lệ hoặc số dư chưa đủ để rút."));
+                if (success == null )
+                    return BadRequest(ApiResult<object>.Failure("400", "Không có payout hợp lệ hoặc số dư chưa đủ để rút."));
 
-                return Ok(ApiResult<bool>.Success(true, "200", "Yêu cầu rút tiền đã được gửi thành công. Chờ staff duyệt."));
+                return Ok(ApiResult<object>.Success(success, "200", "Yêu cầu rút tiền đã được gửi thành công. Chờ staff duyệt."));
             }
             catch (Exception ex)
             {
@@ -110,7 +110,7 @@ namespace BlindTreasure.API.Controllers
             catch (Exception ex)
             {
                 _loggerService.Error($"[ProcessSellerPayout] {ex.Message}");
-                return StatusCode(500, ApiResult<bool>.Failure("500", "Có lỗi xảy ra khi xử lý rút tiền."));
+                return StatusCode(500, ApiResult<bool>.Failure("500", "Có lỗi xảy ra khi xử lý rút tiền:." + ex.Message));
             }
         }
 
