@@ -82,19 +82,19 @@ public class PayoutConfiguration : IEntityTypeConfiguration<Payout>
             .HasForeignKey(pl => pl.PayoutId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Indexes
-        builder.HasIndex(p => p.SellerId)
-            .HasDatabaseName("IX_Payouts_SellerId");
+        //// Indexes
+        //builder.HasIndex(p => p.SellerId)
+        //    .HasDatabaseName("IX_Payouts_SellerId");
 
-        builder.HasIndex(p => new { p.SellerId, p.PeriodStart, p.PeriodEnd })
-            .HasDatabaseName("IX_Payouts_Seller_Period")
-            .IsUnique();
+        //builder.HasIndex(p => new { p.SellerId, p.PeriodStart, p.PeriodEnd })
+        //    .HasDatabaseName("IX_Payouts_Seller_Period")
+        //    .IsUnique();
 
-        builder.HasIndex(p => p.Status)
-            .HasDatabaseName("IX_Payouts_Status");
+        //builder.HasIndex(p => p.Status)
+        //    .HasDatabaseName("IX_Payouts_Status");
 
-        builder.HasIndex(p => p.StripeTransferId)
-            .HasDatabaseName("IX_Payouts_StripeTransferId");
+        //builder.HasIndex(p => p.StripeTransferId)
+        //    .HasDatabaseName("IX_Payouts_StripeTransferId");
     }
 }
 
@@ -194,16 +194,16 @@ public class PayoutDetailConfiguration : IEntityTypeConfiguration<PayoutDetail>
             .HasForeignKey(pd => pd.OrderDetailId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Indexes
-        builder.HasIndex(pd => pd.PayoutId)
-            .HasDatabaseName("IX_PayoutDetails_PayoutId");
+        //// Indexes
+        //builder.HasIndex(pd => pd.PayoutId)
+        //    .HasDatabaseName("IX_PayoutDetails_PayoutId");
 
-        builder.HasIndex(pd => pd.OrderDetailId)
-            .HasDatabaseName("IX_PayoutDetails_OrderDetailId");
+        //builder.HasIndex(pd => pd.OrderDetailId)
+        //    .HasDatabaseName("IX_PayoutDetails_OrderDetailId");
 
-        // Unique constraint: Mỗi OrderDetail chỉ thuộc 1 payout
-        builder.HasIndex(pd => pd.OrderDetailId)
-            .IsUnique()
-            .HasDatabaseName("UK_PayoutDetails_OrderDetailId");
+        //// Unique constraint: Mỗi OrderDetail chỉ thuộc 1 payout
+        //builder.HasIndex(pd => pd.OrderDetailId)
+        //    .IsUnique()
+        //    .HasDatabaseName("UK_PayoutDetails_OrderDetailId");
     }
 }
