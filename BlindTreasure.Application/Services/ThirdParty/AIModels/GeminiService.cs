@@ -25,8 +25,7 @@ public class GeminiService : IGeminiService
     public GeminiService(IHttpClientFactory httpClientFactory, IConfiguration config, ICacheService cache)
     {
         _httpClient = httpClientFactory.CreateClient();
-        _apiKey = config["Gemini:ApiKey"]
-                  ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY")
+        _apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY")
                   ?? throw new Exception("Gemini API key not configured.");
         _cache = cache;
     }
