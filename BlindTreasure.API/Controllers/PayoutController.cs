@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -31,8 +32,8 @@ namespace BlindTreasure.API.Controllers
         /// Chuyển trạng thái payout sang REQUESTED, staff sẽ duyệt.
         /// </summary>
         [HttpPost("request")]
-        [ProducesResponseType(typeof(ApiResult<bool>), 200)]
-        [ProducesResponseType(typeof(ApiResult<bool>), 400)]
+        [ProducesResponseType(typeof(ApiResult<object>), 200)]
+        [ProducesResponseType(typeof(ApiResult<object>), 400)]
         [Authorize]
         public async Task<IActionResult> RequestPayout()
         {
@@ -41,13 +42,13 @@ namespace BlindTreasure.API.Controllers
                 var userId = _claimsService.CurrentUserId;
                 var seller = await _sellerService.GetSellerProfileByUserIdAsync(userId);
                 if (seller == null)
-                    return BadRequest(ApiResult<bool>.Failure("400", "Không tìm thấy hồ sơ seller."));
+                    return BadRequest(ApiResult<object>.Failure("400", "Không tìm thấy hồ sơ seller."));
 
                 var success = await _payoutService.RequestPayoutAsync(seller.SellerId);
-                if (!success)
-                    return BadRequest(ApiResult<bool>.Failure("400", "Không có payout hợp lệ hoặc số dư chưa đủ để rút."));
+                if (success == null )
+                    return BadRequest(ApiResult<object>.Failure("400", "Không có payout hợp lệ hoặc số dư chưa đủ để rút."));
 
-                return Ok(ApiResult<bool>.Success(true, "200", "Yêu cầu rút tiền đã được gửi thành công. Chờ staff duyệt."));
+                return Ok(ApiResult<object>.Success(success, "200", "Yêu cầu rút tiền đã được gửi thành công. Chờ staff duyệt."));
             }
             catch (Exception ex)
             {
@@ -57,7 +58,7 @@ namespace BlindTreasure.API.Controllers
         }
 
         /// <summary>
-        /// Seller kiểm tra payout hiện tại có đủ điều kiện rút tiền không.
+        /// Seller kiểm tra payout hiện tại đang trong quá trình duyệt và xử lý
         /// </summary>
         [HttpGet("eligible")]
         [ProducesResponseType(typeof(ApiResult<object>), 200)]
@@ -87,16 +88,16 @@ namespace BlindTreasure.API.Controllers
         /// <summary>
         /// Seller tiến hành rút tiền (Stripe payout). Chỉ gọi khi đã được staff duyệt.
         /// </summary>
-        [HttpPost("process")]
+        [HttpPost("{sellerId}/process")]
         [ProducesResponseType(typeof(ApiResult<bool>), 200)]
         [ProducesResponseType(typeof(ApiResult<bool>), 400)]
         [Authorize]
-        public async Task<IActionResult> ProcessSellerPayout()
+        public async Task<IActionResult> ProcessSellerPayout(Guid sellerId)
         {
             try
             {
-                var userId = _claimsService.CurrentUserId;
-                var seller = await _sellerService.GetSellerProfileByUserIdAsync(userId);
+                //var userId = _claimsService.CurrentUserId;
+                var seller = await _sellerService.GetSellerProfileByIdAsync(sellerId);
                 if (seller == null)
                     return BadRequest(ApiResult<bool>.Failure("400", "Không tìm thấy hồ sơ seller."));
 
@@ -109,7 +110,7 @@ namespace BlindTreasure.API.Controllers
             catch (Exception ex)
             {
                 _loggerService.Error($"[ProcessSellerPayout] {ex.Message}");
-                return StatusCode(500, ApiResult<bool>.Failure("500", "Có lỗi xảy ra khi xử lý rút tiền."));
+                return StatusCode(500, ApiResult<bool>.Failure("500", "Có lỗi xảy ra khi xử lý rút tiền:." + ex.Message));
             }
         }
 
@@ -196,13 +197,13 @@ namespace BlindTreasure.API.Controllers
             }
         }
 
-        [HttpGet("export-history")]
+        [HttpPost("{payoutId}/export-history")]
         [Authorize]
-        public async Task<IActionResult> ExportPayoutsByPeriod([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+        public async Task<IActionResult> ExportPayoutsByPeriod(Guid payoutId)
         {
             try
             {
-                var stream = await _payoutService.ExportPayoutsByPeriodAsync(fromDate, toDate);
+                var stream = await _payoutService.ExportPayoutByIdAsync(payoutId);
                 if (stream.CanSeek) stream.Position = 0;
 
                 string fileName = $"PayoutHistory_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
@@ -213,6 +214,32 @@ namespace BlindTreasure.API.Controllers
             {
                 _loggerService.Error($"[ExportPayoutsByPeriod] {ex.Message}");
                 return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi export file payout history."));
+            }
+        }
+
+        /// <summary>
+        /// LIST PAYOUTS CỦA SELLER, KHÔNG CẦN TRUYỀN SELLERID
+        /// </summary>
+        [HttpGet("my-payouts")]
+        [Authorize]
+        public async Task<IActionResult> GetMyPayouts([FromQuery] PayoutAdminQueryParameter param)
+        {
+            try
+            {
+                var result = await _payoutService.GetPayoutsForCurrentSellerAsync(param);
+                return Ok(ApiResult<object>.Success(new
+                {
+                    result,
+                    count = result.Count,
+                    pageSize = param.PageSize,
+                    currentPage = param.PageIndex,
+                    totalPages = (int)Math.Ceiling((double)result.Count / param.PageSize)
+                }, "200", "Lấy danh sách payouts của seller thành công."));
+            }
+            catch (Exception ex)
+            {
+                _loggerService.Error($"[GetMyPayouts] {ex.Message}");
+                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi lấy danh sách payouts của seller."));
             }
         }
     }

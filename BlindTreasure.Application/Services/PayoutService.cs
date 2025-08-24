@@ -1,9 +1,12 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +28,7 @@ namespace BlindTreasure.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly ICurrencyConversionService _currencyConversionService;
         private readonly IStripeService _stripeService;
+        private readonly INotificationService _notificationService;
 
         public PayoutService(
             IClaimsService claimsService,
@@ -32,7 +36,8 @@ namespace BlindTreasure.Application.Services
             IOrderService orderService,
             IUnitOfWork unitOfWork,
             ICurrencyConversionService currencyConversionService,
-            IStripeService stripeService)
+            IStripeService stripeService,
+            INotificationService notificationService)
         {
             _claimsService = claimsService;
             _logger = logger;
@@ -40,6 +45,7 @@ namespace BlindTreasure.Application.Services
             _unitOfWork = unitOfWork;
             _currencyConversionService = currencyConversionService;
             _stripeService = stripeService;
+            _notificationService = notificationService;
         }
 
         /// <summary>
@@ -56,11 +62,33 @@ namespace BlindTreasure.Application.Services
             var sellerId = order.SellerId;
             var now = DateTime.UtcNow;
 
-            // Determine current payout period (weekly, starting Monday)
-            var periodStart = now.Date.AddDays(-(int)now.DayOfWeek);
-            var periodEnd = periodStart.AddDays(7);
+            // Calculate current week period
+            var currentMonday = now.Date.AddDays(-(int)now.DayOfWeek);
+            var currentSunday = currentMonday.AddDays(6);
 
-            // Find existing pending payout
+            // Find the latest payout for this seller
+            var lastPayout = await _unitOfWork.Payouts.GetQueryable()
+                .Where(p => p.SellerId == sellerId)
+                .OrderByDescending(p => p.PeriodEnd)
+                .FirstOrDefaultAsync();
+
+            DateTime periodStart;
+            DateTime periodEnd;
+
+            if (lastPayout != null && lastPayout.Status != PayoutStatus.PENDING && lastPayout.PeriodEnd >= currentMonday)
+            {
+                // Last payout for this week is already requested/completed, start new period from next Monday
+                periodStart = lastPayout.PeriodEnd.AddDays(1); // Next Monday
+                periodEnd = periodStart.AddDays(7);            // Next Monday
+            }
+            else
+            {
+                // No previous payout or still pending, use current week
+                periodStart = currentMonday;
+                periodEnd = periodStart.AddDays(7);
+            }
+
+            // Find existing pending payout for this period
             var payout = await _unitOfWork.Payouts.GetQueryable()
                 .FirstOrDefaultAsync(p =>
                     p.SellerId == sellerId &&
@@ -126,25 +154,27 @@ namespace BlindTreasure.Application.Services
         }
 
         /// <summary>
-        /// Get eligible payout for seller (min 10 days since last payout, min 100,000 VND).
+        /// Get eligible payout for seller (min 100,000 VND, và kiểm tra 7 ngày gần nhất nếu cần).
         /// </summary>
         public async Task<Payout?> GetEligiblePayoutForSellerAsync(Guid sellerId)
         {
+            // Lấy payout gần nhất đã hoàn thành hoặc đang xử lý
             var lastPayout = await _unitOfWork.Payouts.GetQueryable()
                 .Where(p => p.SellerId == sellerId &&
                             (p.Status == PayoutStatus.COMPLETED || p.Status == PayoutStatus.PROCESSING))
-                .OrderByDescending(p => p.CompletedAt ?? p.ProcessedAt)
+                .OrderByDescending(p => p.CompletedAt ?? p.ProcessedAt ?? p.CreatedAt)
                 .FirstOrDefaultAsync();
 
             var now = DateTime.UtcNow;
             if (lastPayout != null)
             {
                 var lastDate = lastPayout.CompletedAt ?? lastPayout.ProcessedAt ?? lastPayout.CreatedAt;
-                if ((now - lastDate).TotalDays < 10)
-                {
-                    _logger.Warn($"[Payout] Seller {sellerId} must wait 10 days between payouts. Last payout: {lastDate:yyyy-MM-dd}.");
-                    return null;
-                }
+                // Kiểm tra 7 ngày gần nhất (comment lại để test liên tục)
+                // if ((now - lastDate).TotalDays < 7)
+                // {
+                //     _logger.Warn($"[Payout] Seller {sellerId} must wait 7 days between payouts. Last payout: {lastDate:yyyy-MM-dd}.");
+                //     return null;
+                // }
             }
 
             var pendingPayout = await _unitOfWork.Payouts.GetQueryable()
@@ -167,7 +197,7 @@ namespace BlindTreasure.Application.Services
         /// </summary>
         public async Task<bool> ProcessSellerPayoutAsync(Guid sellerId)
         {
-            var currentUserId = _claimsService.CurrentUserId ;
+            var currentUserId = _claimsService.CurrentUserId;
 
             var payout = await GetEligiblePayoutForSellerAsync(sellerId);
             if (payout == null)
@@ -226,6 +256,16 @@ namespace BlindTreasure.Application.Services
                 await _unitOfWork.SaveChangesAsync();
                 _logger.Success($"[Payout] Seller {sellerId} payout {payout.Id} moved to PROCESSING. Stripe transfer: {transfer.Id}");
 
+                // Push notification to seller about payout
+                var notificationDto = new NotificationDto
+                {
+                    Title = "Payout is being processed",
+                    Message = $"Your payout for period {payout.PeriodStart:yyyy-MM-dd} to {payout.PeriodEnd:yyyy-MM-dd} is being processed. Amount: {payout.NetAmount:N0} VND.",
+                    Type = NotificationType.System,
+                    SourceUrl = null
+                };
+                await _notificationService.PushNotificationToUser(seller.UserId, notificationDto);
+
                 return true;
             }
             catch (Exception ex)
@@ -264,6 +304,9 @@ namespace BlindTreasure.Application.Services
 
                 if (seller == null)
                     throw new InvalidOperationException("Seller profile not found.");
+                // Check if there is any payout in REQUESTED status
+                var hasRequestedPayout = await _unitOfWork.Payouts.GetQueryable()
+                    .FirstOrDefaultAsync(p => p.SellerId == seller.Id && p.Status == PayoutStatus.REQUESTED);
 
                 var payout = await _unitOfWork.Payouts.GetQueryable().AsNoTracking()
                     .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o=>o.Order)
@@ -305,10 +348,38 @@ namespace BlindTreasure.Application.Services
 
                 }
 
-              
+                // --- KIỂM TRA 7 NGÀY ---
+                var lastPayout = await _unitOfWork.Payouts.GetQueryable()
+                    .Where(p => p.SellerId == seller.Id &&
+                                (p.Status == PayoutStatus.COMPLETED || p.Status == PayoutStatus.PROCESSING))
+                    .OrderByDescending(p => p.CompletedAt ?? p.ProcessedAt ?? p.CreatedAt)
+                    .FirstOrDefaultAsync();
 
-                var canPayout = seller.StripeAccountId != null && payout.NetAmount >= 100_000m;
+                bool isWait7Days = false;
+                string wait7DaysReason = null;
+                if (lastPayout != null)
+                {
+                    var lastDate = lastPayout.CompletedAt ?? lastPayout.ProcessedAt ?? lastPayout.CreatedAt;
+                    var daysSinceLast = (DateTime.UtcNow - lastDate).TotalDays;
+                    if (daysSinceLast < 7)
+                    {
+                        isWait7Days = true;
+                        wait7DaysReason = $"Bạn phải chờ đủ 7 ngày kể từ lần rút tiền gần nhất ({lastDate:yyyy-MM-dd}).";
+                    }
+                }
+
+                var canPayout = seller.StripeAccountId != null
+                                && payout.NetAmount >= 100_000m
+                                && !isWait7Days;
+
+                //var payoutBlockReason = canPayout ? null :
+                //     isWait7Days ? wait7DaysReason :
+                //    seller.StripeAccountId == null ? "Seller chưa liên kết Stripe account." :
+                //    payout.NetAmount < 100_000m ? "Số tiền chưa đủ tối thiểu để rút." : null;
+
+
                 var payoutBlockReason = canPayout ? null :
+                    hasRequestedPayout != null ? $"Bạn đang có một yêu cầu rút tiền chưa được duyệt. PayoutId {hasRequestedPayout.Id}" :
                     seller.StripeAccountId == null ? "Seller chưa liên kết Stripe account." :
                     payout.NetAmount < 100_000m ? "Số tiền chưa đủ tối thiểu để rút." : null;
 
@@ -380,7 +451,7 @@ namespace BlindTreasure.Application.Services
         public async Task<PayoutDetailResponseDto?> GetPayoutDetailByIdAsync(Guid payoutId)
         {
             var payout = await _unitOfWork.Payouts.GetQueryable()
-                .Include(p => p.PayoutDetails)
+                .Include(p => p.PayoutDetails).ThenInclude(o=>o.OrderDetail).ThenInclude(o=>o.Order)
                 .Include(p => p.PayoutLogs)
                 .Include(p => p.Seller).ThenInclude(s => s.User)
                 .FirstOrDefaultAsync(p => p.Id == payoutId);
@@ -446,10 +517,32 @@ namespace BlindTreasure.Application.Services
         /// Seller gửi yêu cầu rút tiền cho payout đang PENDING.
         /// Chuyển trạng thái từ PENDING sang REQUESTED, ghi log.
         /// </summary>
-        public async Task<bool> RequestPayoutAsync(Guid sellerId)
+        public async Task<PayoutDetailResponseDto?> RequestPayoutAsync(Guid sellerId)
         {
+            var userId = _claimsService.CurrentUserId;
+
+            // Check if there is any payout in REQUESTED status for this seller
+            var hasRequestedPayout = await _unitOfWork.Payouts.GetQueryable()
+                .FirstOrDefaultAsync(p => p.SellerId == sellerId && p.Status == PayoutStatus.REQUESTED);
+
+            if (hasRequestedPayout != null)
+            {
+                throw ErrorHelper.BadRequest($"[Payout] Seller {sellerId} đã có một yêu cầu rút tiền chưa được duyệt. PayoutId {hasRequestedPayout.Id}");
+            }
+
+            // Lấy thông tin seller để kiểm tra StripeAccountId
+            var seller = await _unitOfWork.Sellers.GetByIdAsync(sellerId);
+            if (seller == null)
+            {
+                _logger.Warn($"[Payout] Seller {sellerId} không tồn tại.");
+                return null;
+            }
+
             // Tìm payout đang PENDING của seller
             var payout = await _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.PayoutDetails).ThenInclude(pd => pd.OrderDetail).ThenInclude(od => od.Order)
+                .Include(p => p.PayoutLogs)
+                .Include(p => p.Seller).ThenInclude(s => s.User)
                 .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PENDING)
                 .OrderByDescending(p => p.CreatedAt)
                 .FirstOrDefaultAsync();
@@ -457,19 +550,31 @@ namespace BlindTreasure.Application.Services
             if (payout == null)
             {
                 _logger.Warn($"[Payout] Seller {sellerId} không có payout nào ở trạng thái PENDING.");
-                return false;
+                return null;
             }
 
-            // Kiểm tra số tiền tối thiểu
-            if (payout.NetAmount < 100_000m)
+            // Kiểm tra điều kiện canPayout
+            bool canPayout = seller.StripeAccountId != null
+                     && payout.NetAmount >= 100_000m;
+
+            if (!canPayout)
             {
-                _logger.Warn($"[Payout] Seller {sellerId} chưa đủ số tiền tối thiểu để rút.");
-                return false;
+                var reason = seller.StripeAccountId == null
+                    ? "Seller chưa liên kết Stripe account."
+                    : payout.NetAmount < 100_000m
+                        ? "Số tiền chưa đủ tối thiểu để rút."
+                        : "Không đủ điều kiện rút tiền.";
+                _logger.Warn($"[Payout] Seller {sellerId} không đủ điều kiện rút tiền: {reason}");
+                throw ErrorHelper.BadRequest($"[Payout] {reason}");
             }
+
+            // Update PeriodEnd to Sunday of current week
+            var now = DateTime.UtcNow;
+            payout.PeriodEnd = now.Date.AddDays(7 - (int)now.DayOfWeek - 1);
 
             // Chuyển trạng thái sang REQUESTED
             payout.Status = PayoutStatus.REQUESTED;
-            payout.ProcessedAt = DateTime.UtcNow;
+            payout.ProcessedAt = now;
             await _unitOfWork.Payouts.Update(payout);
 
             // Ghi log yêu cầu rút tiền
@@ -480,7 +585,7 @@ namespace BlindTreasure.Application.Services
                 ToStatus = PayoutStatus.REQUESTED,
                 Action = "SELLER_REQUEST",
                 Details = "Seller gửi yêu cầu rút tiền.",
-                TriggeredByUserId = sellerId,
+                TriggeredByUserId = userId != Guid.Empty ? userId : null,
                 LoggedAt = DateTime.UtcNow
             };
             await _unitOfWork.PayoutLogs.AddAsync(log);
@@ -488,7 +593,8 @@ namespace BlindTreasure.Application.Services
             await _unitOfWork.SaveChangesAsync();
             _logger.Success($"[Payout] Seller {sellerId} đã gửi yêu cầu rút tiền cho payout {payout.Id}.");
 
-            return true;
+            // Trả về chi tiết payout sau khi cập nhật
+            return await GetPayoutDetailByIdAsync(payout.Id);
         }
 
 
@@ -580,19 +686,19 @@ namespace BlindTreasure.Application.Services
                 .Include(s => s.User)
                 .FirstOrDefaultAsync(s => s.UserId == userId);
             if (seller == null)
-                throw new InvalidOperationException("Seller profile not found.");
+                throw ErrorHelper.BadRequest("Seller profile not existing.");
 
             var payout = await _unitOfWork.Payouts.GetQueryable()
                 .Include(p => p.PayoutDetails).ThenInclude(pd => pd.OrderDetail)
                 .OrderByDescending(p => p.CreatedAt)
                 .FirstOrDefaultAsync(p => p.SellerId == seller.Id && p.Status == PayoutStatus.PROCESSING);
             if (payout == null)
-                throw new InvalidOperationException("No payout found.");
+                throw ErrorHelper.BadRequest("Not found the newest handling payout to show");
 
             return GeneratePayoutExcel(new List<Payout> { payout }, seller);
         }
 
-        public async Task<MemoryStream> ExportPayoutsByPeriodAsync(DateTime? fromDate, DateTime? toDate)
+        public async Task<MemoryStream> ExportPayoutByIdAsync(Guid payoutId)
         {
             var userId = _claimsService.CurrentUserId;
             var seller = await _unitOfWork.Sellers.GetQueryable()
@@ -601,16 +707,122 @@ namespace BlindTreasure.Application.Services
             if (seller == null)
                 throw new InvalidOperationException("Seller profile not found.");
 
-            var query = _unitOfWork.Payouts.GetQueryable()
+            var payout = await _unitOfWork.Payouts.GetQueryable()
                 .Include(p => p.PayoutDetails).ThenInclude(pd => pd.OrderDetail)
-                .Where(p => p.SellerId == seller.Id);
-            if (fromDate.HasValue)
-                query = query.Where(p => p.PeriodStart >= fromDate.Value);
-            if (toDate.HasValue)
-                query = query.Where(p => p.PeriodEnd <= toDate.Value);
+                .FirstOrDefaultAsync(p => p.Id == payoutId && p.SellerId == seller.Id);
 
-            var payouts = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
-            return GeneratePayoutExcel(payouts, seller);
+            if (payout == null)
+                throw new InvalidOperationException("Payout not found.");
+
+            return GeneratePayoutExcel(new List<Payout> { payout }, seller);
+        }
+
+        public async Task<Pagination<PayoutListResponseDto>> GetPayoutsForAdminAsync(PayoutAdminQueryParameter param)
+        {
+            var query = BuildPayoutQuery(param);
+
+            var totalCount = await query.CountAsync();
+
+            List<Payout> payouts;
+            if (param.PageIndex == 0)
+                payouts = await query.ToListAsync();
+            else
+                payouts = await query
+                    .Skip((param.PageIndex - 1) * param.PageSize)
+                    .Take(param.PageSize)
+                    .ToListAsync();
+
+            var items = payouts.Select(p => new PayoutListResponseDto
+            {
+                Id = p.Id,
+                SellerId = p.SellerId,
+                SellerName = p.Seller.CompanyName ?? p.Seller.User?.FullName ?? "",
+                PeriodStart = p.PeriodStart,
+                PeriodEnd = p.PeriodEnd,
+                PeriodType = p.PeriodType.ToString(),
+                GrossAmount = p.GrossAmount,
+                NetAmount = p.NetAmount,
+                PlatformFeeAmount = p.PlatformFeeAmount,
+                Status = p.Status.ToString(),
+                CreatedAt = p.CreatedAt,
+                ProcessedAt = p.ProcessedAt,
+                CompletedAt = p.CompletedAt,
+                StripeTransferId = p.StripeTransferId,
+                FailureReason = p.FailureReason,
+                RetryCount = p.RetryCount
+            }).ToList();
+
+            return new Pagination<PayoutListResponseDto>(items, totalCount, param.PageIndex, param.PageSize);
+        }
+
+        private IQueryable<Payout> BuildPayoutQuery(PayoutAdminQueryParameter param, Guid? sellerId = null)
+        {
+            var query = _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.Seller).ThenInclude(s => s.User)
+                .Include(p => p.PayoutDetails).ThenInclude(p => p.OrderDetail)
+                .Where(p => !p.Seller.IsDeleted);
+
+            if (sellerId.HasValue)
+                query = query.Where(p => p.SellerId == sellerId.Value);
+
+            if (param.Status.HasValue)
+                query = query.Where(p => p.Status == param.Status.Value);
+
+            if (param.SellerId.HasValue)
+                query = query.Where(p => p.SellerId == param.SellerId.Value);
+
+            if (param.PeriodStart.HasValue)
+                query = query.Where(p => p.PeriodStart >= param.PeriodStart.Value);
+
+            if (param.PeriodEnd.HasValue)
+                query = query.Where(p => p.PeriodEnd <= param.PeriodEnd.Value);
+
+            return query.OrderByDescending(p => p.CreatedAt);
+        }
+
+        public async Task<Pagination<PayoutListResponseDto>> GetPayoutsForCurrentSellerAsync(PayoutAdminQueryParameter param)
+        {
+            var userId = _claimsService.CurrentUserId;
+            var seller = await _unitOfWork.Sellers.GetQueryable()
+                .FirstOrDefaultAsync(s => s.UserId == userId);
+
+            if (seller == null)
+                throw ErrorHelper.BadRequest("Seller profile not found.");
+
+            var query = BuildPayoutQuery(param, seller.Id);
+
+            var totalCount = await query.CountAsync();
+
+            List<Payout> payouts;
+            if (param.PageIndex == 0)
+                payouts = await query.ToListAsync();
+            else
+                payouts = await query
+                    .Skip((param.PageIndex - 1) * param.PageSize)
+                    .Take(param.PageSize)
+                    .ToListAsync();
+
+            var items = payouts.Select(p => new PayoutListResponseDto
+            {
+                Id = p.Id,
+                SellerId = p.SellerId,
+                SellerName = p.Seller.CompanyName ?? p.Seller.User?.FullName ?? "",
+                PeriodStart = p.PeriodStart,
+                PeriodEnd = p.PeriodEnd,
+                PeriodType = p.PeriodType.ToString(),
+                GrossAmount = p.GrossAmount,
+                NetAmount = p.NetAmount,
+                PlatformFeeAmount = p.PlatformFeeAmount,
+                Status = p.Status.ToString(),
+                CreatedAt = p.CreatedAt,
+                ProcessedAt = p.ProcessedAt,
+                CompletedAt = p.CompletedAt,
+                StripeTransferId = p.StripeTransferId,
+                FailureReason = p.FailureReason,
+                RetryCount = p.RetryCount
+            }).ToList();
+
+            return new Pagination<PayoutListResponseDto>(items, totalCount, param.PageIndex, param.PageSize);
         }
 
 

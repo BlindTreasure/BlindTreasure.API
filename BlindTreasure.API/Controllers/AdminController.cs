@@ -19,13 +19,15 @@ public class AdminController : ControllerBase
     private readonly IClaimsService _claimsService;
     private readonly IUserService _userService;
     private readonly IOrderService _orderService;
+    private readonly IPayoutService _payoutService;
 
-    public AdminController(ISellerVerificationService sellerVerificationService, IClaimsService claimsService, IUserService userService, IOrderService orderService)
+    public AdminController(ISellerVerificationService sellerVerificationService, IClaimsService claimsService, IUserService userService, IOrderService orderService, IPayoutService payoutService)
     {
         _sellerVerificationService = sellerVerificationService;
         _claimsService = claimsService;
         _userService = userService;
         _orderService = orderService;
+        _payoutService = payoutService;
     }
 
     [HttpGet("users")]
@@ -147,6 +149,29 @@ public class AdminController : ControllerBase
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    [HttpGet("payouts")]
+    [Authorize]
+    public async Task<IActionResult> GetPayoutsForAdmin([FromQuery] PayoutAdminQueryParameter param)
+    {
+        try
+        {
+            var result = await _payoutService.GetPayoutsForAdminAsync(param);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.Count,
+                pageSize = param.PageSize,
+                currentPage = param.PageIndex,
+                totalPages = (int)Math.Ceiling((double)result.Count / param.PageSize)
+            }, "200", "Lấy danh sách payouts thành công."));
+        }
+        catch (Exception ex)
+        {
+            //_.Error($"[GetPayoutsForAdmin] {ex.Message}");
+            return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi lấy danh sách payouts."));
         }
     }
 
