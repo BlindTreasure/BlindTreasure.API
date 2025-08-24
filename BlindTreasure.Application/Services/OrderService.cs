@@ -594,7 +594,7 @@ public class OrderService : IOrderService
 
         var groupSession = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
         result.GeneralPaymentUrl = groupSession.PaymentUrl;
-        result.CheckOutSessionId= groupSession.StripeSessionId;
+        result.CheckOutSessionId = groupSession.StripeSessionId;
         //// Tạo link thanh toán tổng cho tất cả order
         //if (createdOrderIds.Count == 1)
         //    // If only one order, use its payment URL
@@ -610,65 +610,32 @@ public class OrderService : IOrderService
         return result;
     }
 
-    //private async Task SendPaymentNotificationToUser(User user, MultiOrderCheckoutResultDto result)
-    //{
-    //    try
-    //    {
-    //        if (user != null)
-    //        {
-    //            var totalAmount = result.Orders.Sum(o => o.FinalAmount);
-    //            // Thông báo ngắn gọn: chỉ số lượng đơn và tổng tiền, không liệt kê từng đơn
-    //            var notificationMsg = $"Đã tạo {result.Orders.Count} đơn hàng mới. Tổng tiền cần thanh toán: {totalAmount:N0}đ.";
-
-    //            // Nếu có link thanh toán tổng, thêm vào cuối (rút gọn)
-    //            if (!string.IsNullOrEmpty(result.GeneralPaymentUrl))
-    //                notificationMsg += $" Xem link thanh toán tổng trong chi tiết đơn.";
-
-    //            // Đảm bảo không vượt quá 500 ký tự
-    //            if (notificationMsg.Length > 500)
-    //                notificationMsg = notificationMsg.Substring(0, 497) + "...";
-
-    //            await _notificationService.PushNotificationToUser(user.Id, new NotificationDto
-    //            {
-    //                Title = $"Đã tạo nhóm đơn hàng mới ({result.Orders.Count} đơn)",
-    //                Message = notificationMsg,
-    //                Type = NotificationType.Order,
-    //                SourceUrl = result.GeneralPaymentUrl
-    //            });
-    //        }
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        throw ErrorHelper.BadRequest("[SendPaymentNotificationToUser] error:" + ex.Message);
-    //    }
-    //}
-
     private async Task SendPaymentNotificationToUser(User user, MultiOrderCheckoutResultDto result)
     {
         try
         {
-            // Thông báo cho user về nhóm đơn hàng vừa tạo
             if (user != null)
             {
                 var totalAmount = result.Orders.Sum(o => o.FinalAmount);
-                var orderList = string.Join("<br/>", result.Orders.Select(o =>
-                    $"- Đơn #{o.OrderId} của seller {o.SellerName}: {o.FinalAmount:N0}đ <a href='{o.PaymentUrl}'>Thanh toán</a>"));
+
+                var orderList = string.Join(Environment.NewLine, result.Orders.Select(o =>
+                    $"- Đơn #{o.OrderId} của seller {o.SellerName}: {o.FinalAmount:N0}đ (Thanh toán: {o.PaymentUrl})"));
 
                 var notificationMsg = $@"
-            <b>Đã tạo {result.Orders.Count} đơn hàng mới từ giỏ hàng.</b><br/>
-            Tổng số tiền cần thanh toán: <b>{totalAmount:N0}đ</b><br/>
-            {orderList}<br/>
-            {(result.GeneralPaymentUrl != null && result.GeneralPaymentUrl != "" ? $"<a href='{result.GeneralPaymentUrl}'>Thanh toán tất cả</a>" : "")}
-        ";
+Đã tạo {result.Orders.Count} đơn hàng mới từ giỏ hàng.
+Tổng số tiền cần thanh toán: {totalAmount:N0}đ
+{orderList}
+{(string.IsNullOrWhiteSpace(result.GeneralPaymentUrl) ? "" : $"Thanh toán tất cả: {result.GeneralPaymentUrl}")}
+";
 
-                // Truncate message to 500 characters to avoid SQL error
+                // Giới hạn 500 ký tự để tránh lỗi SQL
                 if (notificationMsg.Length > 500)
                     notificationMsg = notificationMsg.Substring(0, 497) + "...";
 
                 await _notificationService.PushNotificationToUser(user.Id, new NotificationDto
                 {
                     Title = $"Đã tạo nhóm đơn hàng mới ({result.Orders.Count} đơn)",
-                    Message = notificationMsg,
+                    Message = notificationMsg.Trim(),
                     Type = NotificationType.Order,
                     SourceUrl = result.GeneralPaymentUrl
                 });
@@ -1047,7 +1014,7 @@ public class OrderService : IOrderService
             }
         }
 
-       // await _unitOfWork.SaveChangesAsync();
+        // await _unitOfWork.SaveChangesAsync();
     }
 
     public async Task<Pagination<OrderDto>> GetAllOrdersForAdminAsync(OrderAdminQueryParameter param)
