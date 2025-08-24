@@ -369,8 +369,8 @@ namespace BlindTreasure.Application.Services
                 }
 
                 var canPayout = seller.StripeAccountId != null
-                                && payout.NetAmount >= 100_000m
-                                && !isWait7Days;
+                                && payout.NetAmount >= 100_000m;
+                              //  && !isWait7Days;
 
                 //var payoutBlockReason = canPayout ? null :
                 //     isWait7Days ? wait7DaysReason :
