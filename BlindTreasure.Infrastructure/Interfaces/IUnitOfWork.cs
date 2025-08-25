@@ -43,6 +43,7 @@ public interface IUnitOfWork : IDisposable
     IGenericRepository<Payout> Payouts { get; }
     IGenericRepository<PayoutLog> PayoutLogs { get; }
     IGenericRepository<PayoutDetail> PayoutDetails { get; }
+    IGenericRepository<PayoutTransaction> PayoutTransactions { get; }
 
     Task<int> SaveChangesAsync();
 }

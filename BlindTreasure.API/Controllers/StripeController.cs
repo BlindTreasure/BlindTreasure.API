@@ -338,30 +338,30 @@ public class StripeController : ControllerBase
         }
     }
 
-    /// <summary>
-    ///     Thực hiện payout chuyển tiền cho seller (Stripe Connect). Chỉ cho phép Admin/Staff.
-    /// </summary>
-    /// <param name="dto">Thông tin payout (StripeAccountId, số tiền, currency, mô tả)</param>
-    /// <returns>Thông tin Stripe Transfer</returns>
-    [HttpPost("payout")]
-    [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> PayoutToSeller([FromBody] PayoutRequestDto dto)
-    {
-        _logger.Info(
-            $"[Stripe][Payout] Thực hiện payout cho seller: {dto.SellerStripeAccountId}, amount: {dto.Amount} {dto.Currency}");
-        try
-        {
-            var transfer = await _stripeService.PayoutToSellerAsync(dto.SellerStripeAccountId, dto.Amount, dto.Currency,
-                dto.Description);
-            _logger.Success("[Stripe][Payout] Payout thành công.");
-            return Ok(ApiResult<object>.Success(transfer, "200", "Payout successful."));
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"[Stripe][Payout] Lỗi: {ex.Message}");
-            return StatusCode(500, ApiResult<object>.Failure(ex.Message));
-        }
-    }
+    ///// <summary>
+    /////     Thực hiện payout chuyển tiền cho seller (Stripe Connect). Chỉ cho phép Admin/Staff.
+    ///// </summary>
+    ///// <param name="dto">Thông tin payout (StripeAccountId, số tiền, currency, mô tả)</param>
+    ///// <returns>Thông tin Stripe Transfer</returns>
+    //[HttpPost("payout")]
+    //[Authorize(Roles = "Admin,Staff")]
+    //public async Task<IActionResult> PayoutToSeller([FromBody] PayoutRequestDto dto)
+    //{
+    //    _logger.Info(
+    //        $"[Stripe][Payout] Thực hiện payout cho seller: {dto.SellerStripeAccountId}, amount: {dto.Amount} {dto.Currency}");
+    //    try
+    //    {
+    //        var transfer = await _stripeService.PayoutToSellerAsync(dto.SellerStripeAccountId, dto.Amount, dto.Currency,
+    //            dto.Description);
+    //        _logger.Success("[Stripe][Payout] Payout thành công.");
+    //        return Ok(ApiResult<object>.Success(transfer, "200", "Payout successful."));
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        _logger.Error($"[Stripe][Payout] Lỗi: {ex.Message}");
+    //        return StatusCode(500, ApiResult<object>.Failure(ex.Message));
+    //    }
+    //}
 
     /// <summary>
     ///     Hoàn tiền cho khách hàng (Stripe Refund). Chỉ cho phép Admin/Staff.

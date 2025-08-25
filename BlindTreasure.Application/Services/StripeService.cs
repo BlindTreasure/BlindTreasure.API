@@ -649,20 +649,27 @@ public class StripeService : IStripeService
 
 
     // 1. Chuyển tiền payout cho seller (Stripe Connect)
-    public async Task<Transfer> PayoutToSellerAsync(string sellerStripeAccountId, decimal amount,
-        string currency = "usd", string description = "Payout to seller")
+    public async Task<Transfer> PayoutToSellerAsync(Guid payoutId,
+        string sellerStripeAccountId,
+        decimal amount,
+        string currency = "usd",
+        string description = "Payout to seller")
     {
-        var userId = _claimsService.CurrentUserId; // chỗ này là lấy user id của seller là người đang login
-        var user = await _unitOfWork.Users.FirstOrDefaultAsync(user => user.Id == userId) ??
-                   throw ErrorHelper.Forbidden("User is not existing");
+        var userId = _claimsService.CurrentUserId;
+        var user = await _unitOfWork.Users.FirstOrDefaultAsync(user => user.Id == userId)
+                   ?? throw ErrorHelper.Forbidden("User is not existing");
+
+        // Get seller info for description
+        var payout = await _unitOfWork.Payouts.FirstOrDefaultAsync(p => p.Id == payoutId, p => p.Seller);
+        var sellerName = payout?.Seller?.CompanyName ?? payout?.Seller?.User?.FullName ?? "Unknown Seller";
 
         var transferService = new TransferService(_stripeClient);
         var transferOptions = new TransferCreateOptions
         {
-            Amount = (long)amount, // Stripe expects smallest unit (vnd: xu)
+            Amount = (long)amount,
             Currency = currency,
             Destination = sellerStripeAccountId,
-            Description = description + $" - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}" + "made by user:" + user.FullName
+            Description = $"{description} for Seller: {sellerName} (ID: {payout?.SellerId}) - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} by {user.FullName}"
         };
 
         try
@@ -670,37 +677,32 @@ public class StripeService : IStripeService
             var transfer = await transferService.CreateAsync(transferOptions);
             if (transfer == null)
                 throw ErrorHelper.Internal("Stripe payout failed.");
-            // TODO: Lưu transaction từ stripe khi payout vào DB nếu cần
 
-            //var payment = new Payment
-            //{
-            //    Amount = amount,
-            //    NetAmount = amount,
-            //    Method = "Stripe Payout",
-            //    Status = PaymentStatus.Paid,
-            //    PaidAt = DateTime.UtcNow,
-            //    CreatedAt = DateTime.UtcNow,
-            //    CreatedBy = userId
-            //};
+            // Save payout transaction history
+            var payoutTransaction = new PayoutTransaction
+            {
+                PayoutId = payoutId,
+                StripeTransferId = transfer.Id,
+                StripeDestinationAccount = sellerStripeAccountId,
+                Amount = transfer.Amount,
+                Currency = transfer.Currency,
+                Status = "succeed",// "pending", etc.
+                TransferredAt = transfer.Created,
+                Description = transfer.Description,
+                ExternalRef = transfer.BalanceTransactionId,
+                FailureReason = null,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId
+            };
 
-            //var transaction = new Transaction
-            //{
-            //    Type = TransactionType.Payout.ToString(),
-            //    Amount = amount,
-            //    Currency = currency,
-            //    ExternalRef = transfer.Id,
-            //    OccurredAt = DateTime.UtcNow,
-            //    CreatedAt = DateTime.UtcNow,
-            //    CreatedBy = userId,
-            //    Status = TransactionStatus.Pending
-            //};
-            //await _unitOfWork.Transactions.AddAsync(transaction);
-            //await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.PayoutTransactions.AddAsync(payoutTransaction);
+            await _unitOfWork.SaveChangesAsync();
 
             return transfer;
         }
         catch (StripeException ex)
         {
+            // Optionally log failed transaction here if needed
             throw ErrorHelper.BadRequest($"Stripe error: {ex.StripeError?.Message ?? ex.Message}");
         }
     }
