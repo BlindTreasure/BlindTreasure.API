@@ -42,6 +42,9 @@ public class Payout : BaseEntity
     public string? FailureReason { get; set; }
     public int RetryCount { get; set; } = 0;
     public DateTime? NextRetryAt { get; set; }
+    //
+
+    public List<string>? ProofImageUrls { get; set; } = new(); // new: khởi tạo mặc định tránh null
 
     // Navigation properties
     public ICollection<PayoutDetail> PayoutDetails { get; set; } = new List<PayoutDetail>();

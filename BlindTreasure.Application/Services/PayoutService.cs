@@ -8,6 +8,7 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
@@ -17,6 +18,7 @@ using System.Drawing;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 
 namespace BlindTreasure.Application.Services
 {
@@ -29,6 +31,8 @@ namespace BlindTreasure.Application.Services
         private readonly ICurrencyConversionService _currencyConversionService;
         private readonly IStripeService _stripeService;
         private readonly INotificationService _notificationService;
+        private readonly IBlobService _blobService;
+
 
         public PayoutService(
             IClaimsService claimsService,
@@ -37,7 +41,8 @@ namespace BlindTreasure.Application.Services
             IUnitOfWork unitOfWork,
             ICurrencyConversionService currencyConversionService,
             IStripeService stripeService,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IBlobService blobService)
         {
             _claimsService = claimsService;
             _logger = logger;
@@ -46,6 +51,7 @@ namespace BlindTreasure.Application.Services
             _currencyConversionService = currencyConversionService;
             _stripeService = stripeService;
             _notificationService = notificationService;
+            _blobService = blobService;
         }
 
         /// <summary>
@@ -234,6 +240,7 @@ namespace BlindTreasure.Application.Services
                     $"Payout for seller {sellerId} - period {payout.PeriodStart:yyyy-MM-dd} to {payout.PeriodEnd:yyyy-MM-dd}");
 
                 // 4. Cập nhật trạng thái payout và lưu thông tin giao dịch Stripe
+                var oldStatus = payout.Status;
                 payout.Status = PayoutStatus.PROCESSING;
                 payout.ProcessedAt = DateTime.UtcNow;
                 payout.StripeTransferId = transfer.Id;
@@ -243,7 +250,7 @@ namespace BlindTreasure.Application.Services
                 var log = new PayoutLog
                 {
                     PayoutId = payout.Id,
-                    FromStatus = PayoutStatus.PENDING,
+                    FromStatus = oldStatus,
                     ToStatus = PayoutStatus.PROCESSING,
                     Action = "SELLER_REQUEST",
                     Details = "Seller requested payout.",
@@ -309,7 +316,7 @@ namespace BlindTreasure.Application.Services
                     .FirstOrDefaultAsync(p => p.SellerId == seller.Id && p.Status == PayoutStatus.REQUESTED);
 
                 var payout = await _unitOfWork.Payouts.GetQueryable().AsNoTracking()
-                    .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o=>o.Order)
+                    .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o => o.Order)
                     .FirstOrDefaultAsync(p => p.SellerId == seller.Id && p.Status == PayoutStatus.PENDING);
 
                 if (payout == null)
@@ -328,9 +335,9 @@ namespace BlindTreasure.Application.Services
                     OrderCompletedAt = pd.OrderDetail.Order.CompletedAt ?? DateTime.MinValue
                 }).ToList();
 
-                 
+
                 // Map payout and details to PayoutCalculationResultDto (or a new DTO)
-                foreach( var payoutDetail in payout.PayoutDetails)
+                foreach (var payoutDetail in payout.PayoutDetails)
                 {
                     var payoutDetailSummaryDto = new PayoutDetailSummaryDto
                     {
@@ -370,7 +377,7 @@ namespace BlindTreasure.Application.Services
 
                 var canPayout = seller.StripeAccountId != null
                                 && payout.NetAmount >= 100_000m;
-                              //  && !isWait7Days;
+                //  && !isWait7Days;
 
                 //var payoutBlockReason = canPayout ? null :
                 //     isWait7Days ? wait7DaysReason :
@@ -444,14 +451,15 @@ namespace BlindTreasure.Application.Services
                 CompletedAt = p.CompletedAt,
                 StripeTransferId = p.StripeTransferId,
                 FailureReason = p.FailureReason,
-                RetryCount = p.RetryCount
+                RetryCount = p.RetryCount,
+                ProofImageUrls = p.ProofImageUrls
             }).ToList();
         }
 
         public async Task<PayoutDetailResponseDto?> GetPayoutDetailByIdAsync(Guid payoutId)
         {
             var payout = await _unitOfWork.Payouts.GetQueryable()
-                .Include(p => p.PayoutDetails).ThenInclude(o=>o.OrderDetail).ThenInclude(o=>o.Order)
+                .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o => o.Order)
                 .Include(p => p.PayoutLogs)
                 .Include(p => p.Seller).ThenInclude(s => s.User)
                 .FirstOrDefaultAsync(p => p.Id == payoutId);
@@ -509,7 +517,8 @@ namespace BlindTreasure.Application.Services
                 RetryCount = payout.RetryCount,
                 NextRetryAt = payout.NextRetryAt,
                 PayoutDetails = payoutDetails,
-                PayoutLogs = payoutLogs
+                PayoutLogs = payoutLogs,
+                ProofImageUrls = payout.ProofImageUrls
             };
         }
 
@@ -749,7 +758,8 @@ namespace BlindTreasure.Application.Services
                 CompletedAt = p.CompletedAt,
                 StripeTransferId = p.StripeTransferId,
                 FailureReason = p.FailureReason,
-                RetryCount = p.RetryCount
+                RetryCount = p.RetryCount,
+                ProofImageUrls = p.ProofImageUrls
             }).ToList();
 
             return new Pagination<PayoutListResponseDto>(items, totalCount, param.PageIndex, param.PageSize);
@@ -819,12 +829,87 @@ namespace BlindTreasure.Application.Services
                 CompletedAt = p.CompletedAt,
                 StripeTransferId = p.StripeTransferId,
                 FailureReason = p.FailureReason,
-                RetryCount = p.RetryCount
+                RetryCount = p.RetryCount,
+                ProofImageUrls = p.ProofImageUrls
             }).ToList();
 
             return new Pagination<PayoutListResponseDto>(items, totalCount, param.PageIndex, param.PageSize);
         }
 
+        private async Task<List<string>> UploadProofImagesAsync(Guid payoutId, List<IFormFile> files)
+        {
+            var uploadedUrls = new List<string>();
+            foreach (var file in files.Where(f => f.Length > 0).Take(6))
+            {
+                var fileExtension = Path.GetExtension(file.FileName);
+                var fileName = $"payouts/proof_{payoutId}_{Guid.NewGuid():N}{fileExtension}";
+                await using var stream = file.OpenReadStream();
+                await _blobService.UploadFileAsync(fileName, stream);
+                var fileUrl = await _blobService.GetPreviewUrlAsync(fileName);
+                if (string.IsNullOrEmpty(fileUrl))
+                    throw ErrorHelper.Internal("Cannot get proof image url.");
+                uploadedUrls.Add(fileUrl);
+            }
+            return uploadedUrls;
+        }
 
+        public async Task<PayoutDetailResponseDto?> AdminConfirmPayoutWithProofAsync(Guid payoutId, List<IFormFile> files, Guid adminUserId)
+        {
+            if (files == null || files.Count == 0 || files.All(f => f.Length == 0))
+                throw ErrorHelper.BadRequest("No valid proof images provided.");
+
+            var payout = await _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.Seller).ThenInclude(s => s.User)
+                .Include(p => p.PayoutLogs)
+                .FirstOrDefaultAsync(p => p.Id == payoutId);
+
+            if (payout == null)
+                throw ErrorHelper.NotFound("Payout not found.");
+
+            if (payout.Status != PayoutStatus.PROCESSING)
+                throw ErrorHelper.BadRequest("Only payouts in PROCESSING status can be confirmed.");
+
+            // Use helper to upload images
+            var uploadedUrls = await UploadProofImagesAsync(payoutId, files);
+
+            // Update payout
+            payout.ProofImageUrls = uploadedUrls;
+            payout.Status = PayoutStatus.COMPLETED;
+            payout.CompletedAt = DateTime.UtcNow;
+            await _unitOfWork.Payouts.Update(payout);
+
+            // Log the status change
+            var log = new PayoutLog
+            {
+                PayoutId = payout.Id,
+                FromStatus = PayoutStatus.PROCESSING,
+                ToStatus = PayoutStatus.COMPLETED,
+                Action = "ADMIN_CONFIRM",
+                Details = $"Admin confirmed payout and uploaded {uploadedUrls.Count} proof images.",
+                TriggeredByUserId = adminUserId,
+                LoggedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.PayoutLogs.AddAsync(log);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.Success($"[Payout] Admin confirmed payout {payout.Id} for seller {payout.SellerId}.");
+
+            // Notify seller
+            if (payout.Seller?.User != null)
+            {
+                var notificationDto = new NotificationDto
+                {
+                    Title = "Payout Completed",
+                    Message = $"Your payout for period {payout.PeriodStart:yyyy-MM-dd} to {payout.PeriodEnd:yyyy-MM-dd} has been completed. Please check your account.",
+                    Type = NotificationType.System,
+                    SourceUrl = null
+                };
+                await _notificationService.PushNotificationToUser(payout.Seller.User.Id, notificationDto);
+            }
+
+            // Return updated payout details
+            return await GetPayoutDetailByIdAsync(payout.Id);
+        }
     }
 }

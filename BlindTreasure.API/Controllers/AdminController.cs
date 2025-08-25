@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -172,6 +173,28 @@ public class AdminController : ControllerBase
         {
             //_.Error($"[GetPayoutsForAdmin] {ex.Message}");
             return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi lấy danh sách payouts."));
+        }
+    }
+
+    [HttpPost("payouts/{payoutId}/confirm")]
+    [Authorize(Roles = "Admin,Staff")]
+    [ProducesResponseType(typeof(ApiResult<PayoutDetailResponseDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    public async Task<IActionResult> AdminConfirmPayoutWithProof(Guid payoutId, [FromForm] List<IFormFile> files)
+    {
+        try
+        {
+            var adminUserId = _claimsService.CurrentUserId;
+            var result = await _payoutService.AdminConfirmPayoutWithProofAsync(payoutId, files, adminUserId);
+            if (result == null)
+                return BadRequest(ApiResult<object>.Failure("400", "Payout confirmation failed."));
+
+            return Ok(ApiResult<PayoutDetailResponseDto>.Success(result, "200", "Payout confirmed and completed successfully."));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AdminConfirmPayoutWithProof] {ex.Message}");
+            return StatusCode(500, ApiResult<object>.Failure("500", "Error occurred during payout confirmation."));
         }
     }
 
