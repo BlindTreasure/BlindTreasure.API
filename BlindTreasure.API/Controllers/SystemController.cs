@@ -1007,6 +1007,87 @@ public class SystemController : ControllerBase
         public bool Complete { get; set; } = true;
     }
 
+    [HttpPost("dev/simulate-order-completion-flow")]
+    public async Task<IActionResult> SimulateOrderCompletionFlow([FromBody] Guid orderId)
+    {
+        var order = await _context.Orders
+            .Include(o => o.OrderDetails)
+            .ThenInclude(od => od.InventoryItems)
+            .Include(o => o.OrderDetails)
+            .ThenInclude(od => od.Shipments)
+            .FirstOrDefaultAsync(o => o.Id == orderId);
+
+        if (order == null)
+            return NotFound("Order not found.");
+
+        var now = DateTime.UtcNow;
+
+        // Kiểm tra có shipment hay không
+        var hasShipment = order.OrderDetails.Any(od => od.Shipments != null && od.Shipments.Any());
+
+        if (hasShipment)
+        {
+            // Nếu có shipment, giả lập shipment flow cho từng shipment liên quan
+            var shipmentIds = order.OrderDetails
+                .SelectMany(od => od.Shipments ?? new List<Shipment>())
+                .Select(s => s.Id)
+                .Distinct()
+                .ToList();
+
+            var logs = new List<object>();
+            foreach (var shipmentId in shipmentIds)
+            {
+                var req = new SimulateShipmentFullFlowRequest
+                {
+                    ShipmentId = shipmentId,
+                    StartFrom = ShipmentStatus.PROCESSING,
+                    Complete = true
+                };
+                // Gọi lại method SimulateShipmentFullFlow
+                var result = await SimulateShipmentFullFlow(req);
+                logs.Add(result);
+            }
+
+            return Ok(new
+            {
+                order.Id,
+                Message = "Simulated shipment flow for all related shipments.",
+                ShipmentLogs = logs
+            });
+        }
+        else
+        {
+            // Nếu không có shipment, giả lập trạng thái IN_INVENTORY >= 3 ngày cho tất cả OrderDetail
+            foreach (var od in order.OrderDetails)
+            {
+                od.Status = OrderDetailItemStatus.IN_INVENTORY;
+                od.UpdatedAt = now.AddDays(-4); // Lùi lại 4 ngày để chắc chắn > 3 ngày
+                od.Logs += $"\n[{od.UpdatedAt:yyyy-MM-dd HH:mm:ss}] Status updated to IN_INVENTORY for simulation.";
+                // Nếu có InventoryItem, cũng lùi UpdatedAt
+                foreach (var item in od.InventoryItems ?? new List<InventoryItem>())
+                {
+                    item.UpdatedAt = now.AddDays(-4);
+                }
+            }
+            order.PlacedAt = now.AddDays(-5); // Lùi lại cho chắc chắn
+             _context.OrderDetails.UpdateRange(order.OrderDetails);
+             _context.Orders.Update(order);
+            var changes = await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                order.Id,
+                Message = "Order and OrderDetails updated to IN_INVENTORY >= 3 days for payout cronjob.",
+                OrderDetails = order.OrderDetails.Select(od => new
+                {
+                    od.Id,
+                    od.Status,
+                    od.UpdatedAt
+                }).ToList()
+            });
+        }
+    }
+
     private List<User> GetPredefinedUsers()
     {
         var passwordHasher = new PasswordHasher();
@@ -1160,6 +1241,7 @@ public class SystemController : ControllerBase
 
                 var tablesToDelete = new List<Func<Task>>
                 {
+                    () => context.PayoutTransactions.ExecuteDeleteAsync(),
                     () => context.PayoutLogs.ExecuteDeleteAsync(),
                     () => context.PayoutDetails.ExecuteDeleteAsync(),
                            () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),

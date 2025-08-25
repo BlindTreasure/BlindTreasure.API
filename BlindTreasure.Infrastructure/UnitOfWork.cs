@@ -51,6 +51,7 @@ public class UnitOfWork : IUnitOfWork
         IGenericRepository<Payout> payouts,
         IGenericRepository<PayoutDetail> payoutDetails,
         IGenericRepository<PayoutLog> payoutLogs,
+        IGenericRepository<PayoutTransaction> payoutTransactions,
         IDbContextTransaction? transaction = null
     )
     {
@@ -93,6 +94,7 @@ public class UnitOfWork : IUnitOfWork
         Payouts = payouts;
         PayoutDetails = payoutDetails;
         PayoutLogs = payoutLogs;
+        PayoutTransactions = payoutTransactions;
     }
 
     public void Dispose()
@@ -187,4 +189,5 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<Payout> Payouts { get; }
     public IGenericRepository<PayoutDetail> PayoutDetails { get; }
     public IGenericRepository<PayoutLog> PayoutLogs { get; }
+    public IGenericRepository<PayoutTransaction> PayoutTransactions { get; }
 }
