@@ -746,8 +746,8 @@ namespace BlindTreasure.Application.Services
             if (payout == null)
                 throw ErrorHelper.NotFound("Payout not found.");
 
-            if (payout.Status != PayoutStatus.PROCESSING)
-                throw ErrorHelper.BadRequest("Only payouts in PROCESSING status can be confirmed.");
+            //if (payout.Status != PayoutStatus.PROCESSING  ||  payout.Status != )
+            //    throw ErrorHelper.BadRequest("Only payouts in PENDING OR COMPLETED status can be confirmed.");
 
             return payout;
         }
