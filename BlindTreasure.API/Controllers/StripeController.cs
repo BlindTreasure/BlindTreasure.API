@@ -567,7 +567,7 @@ public class StripeController : ControllerBase
         }
 
 
-            _logger.Warn($"[Stripe][Webhook] Checkout session expired: {session.Id}");
+            _logger.Warn($"[Stripe][Webhook] Checkout session expired: {session.Id} with stauts {session.PaymentStatus}");
         await _transactionService.HandleFailedPaymentAsync(session.Id);
     }
 

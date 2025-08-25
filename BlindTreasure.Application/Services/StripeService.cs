@@ -692,7 +692,10 @@ public class StripeService : IStripeService
                 ExternalRef = transfer.BalanceTransactionId,
                 FailureReason = null,
                 CreatedAt = DateTime.UtcNow,
-                CreatedBy = userId
+                CreatedBy = userId,
+                SellerName = sellerName,
+                InitiatedBy= userId,
+                InitiatedByName= user.FullName,
             };
 
             await _unitOfWork.PayoutTransactions.AddAsync(payoutTransaction);

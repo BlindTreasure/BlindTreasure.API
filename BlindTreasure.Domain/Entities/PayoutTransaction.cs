@@ -30,11 +30,15 @@ namespace BlindTreasure.Domain.Entities
         // Context & tracking
         public string? Description { get; set; }
         public string? FailureReason { get; set; }
-        public Guid InitiatedBy { get; set; }
-        public string InitiatedByName { get; set; }
+        public Guid InitiatedBy { get; set; } = Guid.Empty;
+        public string InitiatedByName { get; set; } = "System";
 
         // Optional
         public string? ExternalRef { get; set; }
         public string? BatchId { get; set; }
+
+        //platform
+        public decimal? PlatformRevenueOfPayoutAmount { get; set; } // Số tiền doanh thu từ payout nền tảng
+
     }
 }

@@ -245,6 +245,7 @@ public class TransactionService : ITransactionService
                 }
 
                 OrderDtoMapper.UpdateOrderDetailStatusAndLogs(od);
+                await _unitOfWork.OrderDetails.Update(od);
             }
 
             await _unitOfWork.OrderDetails.UpdateRange(order.OrderDetails.ToList());
@@ -594,7 +595,8 @@ public class TransactionService : ITransactionService
                 {
                     if (order.Status == OrderStatus.CANCELLED.ToString() ||
                         order.Status == OrderStatus.EXPIRED.ToString() ||
-                        order.Status == OrderStatus.PAID.ToString())
+                        order.Status == OrderStatus.PAID.ToString()||
+                        order.Status == OrderStatus.COMPLETED.ToString())
                     {
                         _logger.Warn($"[HandleFailedPaymentAsync] Order {order.Id} đã ở trạng thái không cần xử lý.");
                         continue;
@@ -704,7 +706,7 @@ public class TransactionService : ITransactionService
                 var order = transaction.Payment.Order;
                 var status = order.Status;
                 if (status == OrderStatus.CANCELLED.ToString() || status == OrderStatus.EXPIRED.ToString() ||
-                    status == OrderStatus.PAID.ToString())
+                    status == OrderStatus.PAID.ToString() || status == OrderStatus.COMPLETED.ToString())
                 {
                     _logger.Warn(
                         $"[HandleFailedPaymentAsync] Order {transaction.Payment.OrderId} đã ở trạng thái không cần xử lý.");

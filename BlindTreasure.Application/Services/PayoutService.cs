@@ -81,7 +81,7 @@ namespace BlindTreasure.Application.Services
             //if (!await IsSellerEligibleForPayoutAsync(sellerId))
             //    return null;
 
-            var pendingPayout = await GetPendingRequestedPayoutAsync(sellerId);
+            var pendingPayout = await GetActivePayoutWithDetailsAsync(sellerId);
             if (pendingPayout == null || pendingPayout.NetAmount < MINIMUM_PAYOUT_AMOUNT)
             {
                 _logger.Warn($"[Payout] Seller {sellerId} does not have enough funds for payout. NetAmount: {pendingPayout?.NetAmount:N0}.");
@@ -94,6 +94,16 @@ namespace BlindTreasure.Application.Services
 
         public async Task<bool> ProcessSellerPayoutAsync(Guid sellerId)
         {
+            // Check if there is any PROCESSING payout not completed yet
+            var processingPayout = await _unitOfWork.Payouts.GetQueryable()
+                .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PROCESSING)
+                .FirstOrDefaultAsync();
+
+            if (processingPayout != null)
+            {
+                _logger.Warn($"[Payout] Seller {sellerId} has a payout in PROCESSING (Id: {processingPayout.Id}). Must wait until it is completed before processing another payout.");
+                return false;
+            }
             var payout = await GetEligiblePayoutForSellerAsync(sellerId);
             if (payout == null)
             {
@@ -371,12 +381,14 @@ namespace BlindTreasure.Application.Services
             return true;
         }
 
-        private async Task<Payout?> GetPendingRequestedPayoutAsync(Guid sellerId)
+        private async Task<Payout?> GetActivePayoutWithDetailsAsync(Guid sellerId)
         {
             return await _unitOfWork.Payouts.GetQueryable()
-                .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.REQUESTED)
-                .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync();
+        .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o => o.Order)
+        .Where(p => p.SellerId == sellerId &&
+                    (p.Status == PayoutStatus.REQUESTED || p.Status == PayoutStatus.PROCESSING))
+        .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+        .FirstOrDefaultAsync();
         }
 
         private async Task<Seller?> GetSellerWithStripeAccountAsync(Guid sellerId)
@@ -464,6 +476,21 @@ namespace BlindTreasure.Application.Services
                 .FirstOrDefaultAsync(p => p.SellerId == sellerId && p.Status == PayoutStatus.REQUESTED);
         }
 
+        private async Task<Payout?> GetProcessingPayoutAsync(Guid sellerId)
+        {
+            // Check if there is any PROCESSING payout not completed yet
+            var processingPayout = await _unitOfWork.Payouts.GetQueryable()
+                .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PROCESSING)
+                .FirstOrDefaultAsync();
+
+            if (processingPayout != null)
+            {
+                _logger.Warn($"[Payout] Seller {sellerId} has a payout in PROCESSING (Id: {processingPayout.Id}). Must wait until it is completed before processing another payout.");
+            }
+
+            return processingPayout;
+        }
+
         private async Task<Payout?> GetPendingPayoutWithDetailsAsync(Guid sellerId)
         {
             return await _unitOfWork.Payouts.GetQueryable().AsNoTracking()
@@ -497,6 +524,17 @@ namespace BlindTreasure.Application.Services
 
             if (payout.NetAmount < MINIMUM_PAYOUT_AMOUNT)
                 return (false, "Số tiền chưa đủ tối thiểu để rút.");
+
+            // Check if there is any PROCESSING payout not completed yet
+            var processingPayout = await _unitOfWork.Payouts.GetQueryable()
+                .Where(p => p.SellerId == seller.Id && p.Status == PayoutStatus.PROCESSING)
+                .FirstOrDefaultAsync();
+
+            if (processingPayout != null)
+            {
+                _logger.Warn($"[Payout] Seller {seller.Id} has a payout in PROCESSING (Id: {processingPayout.Id}). Must wait until it is completed before processing another payout.");
+                return (false, $"[Payout] Seller {seller.Id} has a payout in PROCESSING (Id: {processingPayout.Id}). Must wait until it is completed before processing another payout.");
+            }
 
             // TODO: Uncomment this block when ready for production
             /*
@@ -621,6 +659,8 @@ namespace BlindTreasure.Application.Services
             {
                 throw ErrorHelper.BadRequest($"[Payout] Seller {sellerId} đã có một yêu cầu rút tiền chưa được duyệt. PayoutId {hasRequestedPayout.Id}");
             }
+
+
         }
 
         private async Task ValidatePayoutEligibilityAsync(Seller seller, Payout payout)
@@ -656,9 +696,9 @@ namespace BlindTreasure.Application.Services
         private async Task<Payout?> GetLatestProcessingPayoutAsync(Guid sellerId)
         {
             return await _unitOfWork.Payouts.GetQueryable()
-                .Include(p => p.PayoutDetails).ThenInclude(pd => pd.OrderDetail)
+                .Include(p => p.PayoutDetails).ThenInclude(pd => pd.OrderDetail).ThenInclude(o=> o.Product)
                 .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync(p => p.SellerId == sellerId && p.Status == PayoutStatus.PROCESSING);
+                .FirstOrDefaultAsync(p => p.SellerId == sellerId && (p.Status == PayoutStatus.PROCESSING || p.Status == PayoutStatus.COMPLETED));
         }
 
         private async Task<Payout?> GetPayoutForSellerAsync(Guid payoutId, Guid sellerId)
@@ -837,7 +877,7 @@ namespace BlindTreasure.Application.Services
 
         private MemoryStream GeneratePayoutExcel(List<Payout> payouts, Seller seller)
         {
-            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            ExcelPackage.License.SetNonCommercialPersonal("your-name-or-organization");
             var package = new ExcelPackage();
 
             CreatePayoutSummarySheet(package, payouts, seller);
