@@ -562,6 +562,55 @@ public class SellerService : ISellerService
         return OrderDtoMapper.ToOrderDto(order);
     }
 
+    public async Task<SellerOverviewDto?> GetSellerOverviewAsync(Guid sellerId)
+    {
+        var seller = await _unitOfWork.Sellers.GetQueryable()
+            .Include(s => s.Products)
+            .Include(s => s.Reviews)
+            .FirstOrDefaultAsync(s => s.Id == sellerId && !s.IsDeleted);
+
+        if (seller == null)
+            return null;
+
+        // Tính trung bình rating, chỉ lấy review có OverallRating > 0
+        var avgRating = seller.Reviews != null && seller.Reviews.Count > 0
+            ? seller.Reviews.Where(r => r.OverallRating > 0).Average(r => r.OverallRating)
+            : 0;
+
+        var now = DateTime.UtcNow;
+        var joinedAt = seller.CreatedAt;
+        var totalMinutes = (now - joinedAt).TotalMinutes;
+        var totalDays = (now - joinedAt).TotalDays;
+
+        string joinedAtToText = $"Tham gia từ ngày {joinedAt:MM-dd-yyyy}";
+
+        //if (totalDays >= 30)
+        //{
+        //    joinedAtToText = $"Tham gia từ ngày {joinedAt:MM-dd-yyyy}";
+        //}
+        //else if (totalDays >= 1)
+        //{
+        //    joinedAtToText = $"Đã tham gia được khoảng {Math.Floor(totalDays)} ngày";
+        //}
+        //else
+        //{
+        //    joinedAtToText = $"Đã tồn tại trên cõi đời này được {Math.Floor(totalMinutes)} phút";
+        //}
+
+        var dto = new SellerOverviewDto
+        {
+            SellerId = seller.Id,
+            AverageRating = Math.Round(avgRating, 2),
+            JoinedAt = seller.CreatedAt,
+            ProductCount = seller.Products?.Count ?? 0,
+            CompanyName = seller.CompanyName,
+            CompanyArea = seller.CompanyProvinceName,
+            JoinedAtToText = joinedAtToText
+        };
+
+        return dto;
+    }
+
     // ----------------- PRIVATE HELPER METHODS -----------------
 
     private async Task<Seller> GetSellerWithUserAsync(Guid sellerId)

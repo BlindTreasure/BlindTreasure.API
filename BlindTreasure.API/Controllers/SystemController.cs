@@ -1007,8 +1007,8 @@ public class SystemController : ControllerBase
         public bool Complete { get; set; } = true;
     }
 
-    [HttpPost("dev/simulate-order-completion-flow")]
-    public async Task<IActionResult> SimulateOrderCompletionFlow([FromBody] Guid orderId)
+    [HttpPost("dev/simulate-order-completion-flow/{orderId}")]
+    public async Task<IActionResult> SimulateOrderCompletionFlow( Guid orderId)
     {
         var order = await _context.Orders
             .Include(o => o.OrderDetails)

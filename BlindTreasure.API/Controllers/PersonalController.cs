@@ -32,6 +32,32 @@ public class PersonalController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy thông tin tổng quan của Seller đang đăng nhập.
+    /// </summary>
+    [Authorize(Roles = "Seller")]
+    [HttpGet("seller-overview")]
+    [ProducesResponseType(typeof(ApiResult<SellerOverviewDto>), 200)]
+    public async Task<IActionResult> GetMySellerOverview()
+    {
+        try
+        {
+            var userId = _claimsService.CurrentUserId;
+            var seller = await _sellerService.GetSellerProfileByUserIdAsync(userId);
+            if (seller == null)
+                return NotFound(ApiResult<SellerOverviewDto>.Failure("404", "Không tìm thấy seller."));
+
+            var overview = await _sellerService.GetSellerOverviewAsync(seller.SellerId);
+            return Ok(ApiResult<SellerOverviewDto>.Success(overview, "200", "Lấy thông tin tổng quan seller thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<SellerOverviewDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
     ///     Lấy thông tin Seller theo userId login hiện tại.
     /// </summary>
     [Authorize]

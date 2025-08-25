@@ -29,6 +29,29 @@ public class SellerController : ControllerBase
     }
 
     /// <summary>
+    /// Lấy thông tin tổng quan của Seller theo sellerId.
+    /// </summary>
+    [HttpGet("{sellerId}/overview")]
+    [ProducesResponseType(typeof(ApiResult<SellerOverviewDto>), 200)]
+    public async Task<IActionResult> GetSellerOverview(Guid sellerId)
+    {
+        try
+        {
+            var overview = await _sellerService.GetSellerOverviewAsync(sellerId);
+            if (overview == null)
+                return NotFound(ApiResult<SellerOverviewDto>.Failure("404", "Không tìm thấy seller."));
+
+            return Ok(ApiResult<SellerOverviewDto>.Success(overview, "200", "Lấy thông tin tổng quan seller thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<SellerOverviewDto>(ex);
+            return StatusCode(statusCode, error);
+        }
+    }
+
+    /// <summary>
     ///     Staff xem list của Seller cung voi status
     /// </summary>
     [HttpGet]

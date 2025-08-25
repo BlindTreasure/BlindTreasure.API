@@ -72,7 +72,7 @@ namespace BlindTreasure.API.Controllers
                 if (seller == null)
                     return BadRequest(ApiResult<object>.Failure("400", "Không tìm thấy hồ sơ seller."));
 
-                var payout = await _payoutService.GetEligiblePayoutForSellerAsync(seller.SellerId);
+                var payout = await _payoutService.GetEligiblePayoutDtoForSellerAsync(seller.SellerId);
                 if (payout == null)
                     return Ok(ApiResult<object>.Success(null, "200", "Không có payout hợp lệ hoặc chưa đủ điều kiện rút."));
 

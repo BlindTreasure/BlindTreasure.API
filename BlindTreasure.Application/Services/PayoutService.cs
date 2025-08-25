@@ -92,6 +92,23 @@ namespace BlindTreasure.Application.Services
             return pendingPayout;
         }
 
+        public async Task<PayoutListResponseDto?> GetEligiblePayoutDtoForSellerAsync(Guid sellerId)
+        {
+            // Check 7-day waiting period (commented for testing)
+            //if (!await IsSellerEligibleForPayoutAsync(sellerId))
+            //    return null;
+
+            var payout = await GetMainActivePayoutWithDetailsAsync(sellerId);
+            if (payout == null || payout.NetAmount < MINIMUM_PAYOUT_AMOUNT)
+            {
+                _logger.Warn($"[Payout] Seller {sellerId} does not have enough funds for payout. NetAmount: {payout?.NetAmount:N0}.");
+                return null;
+            }
+
+            _logger.Info($"[Payout] Seller {sellerId} is eligible for payout. NetAmount: {payout.NetAmount:N0}.");
+            return CreatePayoutListResponseFromPayout(payout);
+        }
+
         public async Task<bool> ProcessSellerPayoutAsync(Guid sellerId)
         {
             // Check if there is any PROCESSING payout not completed yet

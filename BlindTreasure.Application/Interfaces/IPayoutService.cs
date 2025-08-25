@@ -25,5 +25,6 @@ namespace BlindTreasure.Application.Interfaces
         Task<Pagination<PayoutListResponseDto>> GetPayoutsForAdminAsync(PayoutAdminQueryParameter param);
         Task<Pagination<PayoutListResponseDto>> GetPayoutsForCurrentSellerAsync(PayoutAdminQueryParameter param);
         Task<PayoutDetailResponseDto?> AdminConfirmPayoutWithProofAsync(Guid payoutId, List<IFormFile> files, Guid adminUserId);
+        Task<PayoutListResponseDto?> GetEligiblePayoutDtoForSellerAsync(Guid sellerId);
     }
 }
