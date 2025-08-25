@@ -81,7 +81,7 @@ namespace BlindTreasure.Application.Services
             //if (!await IsSellerEligibleForPayoutAsync(sellerId))
             //    return null;
 
-            var pendingPayout = await GetActivePayoutWithDetailsAsync(sellerId);
+            var pendingPayout = await GetMainActivePayoutWithDetailsAsync(sellerId);
             if (pendingPayout == null || pendingPayout.NetAmount < MINIMUM_PAYOUT_AMOUNT)
             {
                 _logger.Warn($"[Payout] Seller {sellerId} does not have enough funds for payout. NetAmount: {pendingPayout?.NetAmount:N0}.");
@@ -381,14 +381,26 @@ namespace BlindTreasure.Application.Services
             return true;
         }
 
-        private async Task<Payout?> GetActivePayoutWithDetailsAsync(Guid sellerId)
+        private async Task<Payout?> GetMainActivePayoutWithDetailsAsync(Guid sellerId)
         {
-            return await _unitOfWork.Payouts.GetQueryable()
-        .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o => o.Order)
-        .Where(p => p.SellerId == sellerId &&
-                    (p.Status == PayoutStatus.REQUESTED || p.Status == PayoutStatus.PROCESSING))
-        .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
-        .FirstOrDefaultAsync();
+            // Ưu tiên payout PROCESSING
+            var processingPayout = await _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o => o.Order)
+                .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PROCESSING)
+                .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (processingPayout != null)
+                return processingPayout;
+
+            // Nếu không có PROCESSING, lấy payout REQUESTED gần nhất
+            var requestedPayout = await _unitOfWork.Payouts.GetQueryable()
+                .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o => o.Order)
+                .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.REQUESTED)
+                .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            return requestedPayout;
         }
 
         private async Task<Seller?> GetSellerWithStripeAccountAsync(Guid sellerId)
