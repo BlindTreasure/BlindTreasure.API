@@ -194,7 +194,7 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             Console.WriteLine($"[AdminConfirmPayoutWithProof] {ex.Message}");
-            return StatusCode(500, ApiResult<object>.Failure("500", "Error occurred during payout confirmation."));
+            return StatusCode(500, ApiResult<object>.Failure("500", "Error occurred during payout confirmation: ." + ex.Message));
         }
     }
 
