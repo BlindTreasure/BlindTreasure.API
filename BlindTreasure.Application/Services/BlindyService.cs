@@ -181,16 +181,13 @@ public class BlindyService : IBlindyService
         public List<string>? ReasonArray { get; set; }
     }
 
-    /// <summary>
-    ///     HÀM NÀY ĐỂ STAFF GỌI CHO AI PHÂN TÍCH HỆ THỐNG
-    /// </summary>
+
     public async Task<string> AnalyzeUsersWithAi()
     {
         var users = await _analyzerService.GetUsersForAiAnalysisAsync();
 
         var formatted = string.Join("\n", users.Select(u =>
             $"""
-             - ID: {u.UserId}
                Họ tên: {u.FullName}
                Email: {u.Email}
                Số điện thoại: {u.PhoneNumber}
@@ -226,7 +223,6 @@ public class BlindyService : IBlindyService
 
         var formatted = string.Join("\n", products.Select(p =>
             $"""
-             - ID: {p.Id}
                Tên: {p.Name}
                Mô tả: {p.Description}
                Giá: {p.RealSellingPrice} VNĐ

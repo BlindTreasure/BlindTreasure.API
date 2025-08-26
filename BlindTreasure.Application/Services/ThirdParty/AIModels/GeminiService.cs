@@ -9,7 +9,6 @@ namespace BlindTreasure.Application.Services.ThirdParty.AIModels;
 public class GeminiService : IGeminiService
 {
     private readonly string _apiKey;
-    private readonly ICacheService _cache;
     private readonly HttpClient _httpClient;
 
     // Danh sách model khả dụng
@@ -27,7 +26,6 @@ public class GeminiService : IGeminiService
         _httpClient = httpClientFactory.CreateClient();
         _apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY")
                   ?? throw new Exception("Gemini API key not configured.");
-        _cache = cache;
     }
 
     /// <summary>
@@ -40,14 +38,6 @@ public class GeminiService : IGeminiService
         modelName ??= GeminiModels.FlashV2; // Default fallback model
 
         var fullPrompt = $"{GeminiContext.SystemPrompt}\n\n{userPrompt}";
-        var cacheKey = $"gemini:{modelName}:{fullPrompt.GetHashCode()}";
-
-        // Check cache
-        if (await _cache.ExistsAsync(cacheKey))
-        {
-            var cached = await _cache.GetAsync<string>(cacheKey);
-            if (!string.IsNullOrWhiteSpace(cached)) return cached;
-        }
 
         // Build API URL với model động
         var url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={_apiKey}";
@@ -88,9 +78,6 @@ public class GeminiService : IGeminiService
             .GetString();
 
         var finalResult = result ?? string.Empty;
-
-        // Cache 6 giờ
-        await _cache.SetAsync(cacheKey, finalResult, TimeSpan.FromHours(6));
         return finalResult;
     }
 
