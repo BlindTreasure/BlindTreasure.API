@@ -565,6 +565,7 @@ public class SellerService : ISellerService
     public async Task<SellerOverviewDto?> GetSellerOverviewAsync(Guid sellerId)
     {
         var seller = await _unitOfWork.Sellers.GetQueryable()
+            .Include(s => s.BlindBoxes)
             .Include(s => s.Products)
             .Include(s => s.Reviews)
             .FirstOrDefaultAsync(s => s.Id == sellerId && !s.IsDeleted);
@@ -579,23 +580,18 @@ public class SellerService : ISellerService
 
         var now = DateTime.UtcNow;
         var joinedAt = seller.CreatedAt;
-        var totalMinutes = (now - joinedAt).TotalMinutes;
-        var totalDays = (now - joinedAt).TotalDays;
-
         var joinedAtToText = $"Tham gia từ ngày {joinedAt:MM-dd-yyyy}";
 
-        //if (totalDays >= 30)
-        //{
-        //    joinedAtToText = $"Tham gia từ ngày {joinedAt:MM-dd-yyyy}";
-        //}
-        //else if (totalDays >= 1)
-        //{
-        //    joinedAtToText = $"Đã tham gia được khoảng {Math.Floor(totalDays)} ngày";
-        //}
-        //else
-        //{
-        //    joinedAtToText = $"Đã tồn tại trên cõi đời này được {Math.Floor(totalMinutes)} phút";
-        //}
+        // Đếm sản phẩm bán trực tiếp hoặc cả hai
+        var productInSellingCount = seller.Products?
+            .Count(p => p.ProductType == ProductSaleType.DirectSale || p.ProductType == ProductSaleType.Both) ?? 0;
+
+        // Đếm sản phẩm chỉ trong BlindBox hoặc cả hai
+        var productInBlindBoxCount = seller.Products?
+            .Count(p => p.ProductType == ProductSaleType.BlindBoxOnly || p.ProductType == ProductSaleType.Both) ?? 0;
+
+        // Đếm số lượng BlindBox của seller
+        var blindBoxCount = seller.BlindBoxes?.Where(x=> x.IsDeleted == false && x.Status == BlindBoxStatus.Approved ).Count() ?? 0;
 
         var dto = new SellerOverviewDto
         {
@@ -605,7 +601,10 @@ public class SellerService : ISellerService
             ProductCount = seller.Products?.Count ?? 0,
             CompanyName = seller.CompanyName,
             CompanyArea = seller.CompanyProvinceName,
-            JoinedAtToText = joinedAtToText
+            JoinedAtToText = joinedAtToText,
+            ProductInSellingCount = productInSellingCount,
+            ProductInBlindBoxCount = productInBlindBoxCount,
+            BlindBoxCount = blindBoxCount
         };
 
         return dto;

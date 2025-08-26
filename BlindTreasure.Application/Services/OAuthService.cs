@@ -16,12 +16,12 @@ public class OAuthService : IOAuthService
 {
     private readonly IConfiguration _configuration;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
     private readonly string clientId;
     private readonly string passwordCharacters;
     public readonly IAuthService _authService;
 
-    public OAuthService(IUserService userService, IUnitOfWork unitOfWork, IConfiguration configuration,
+    public OAuthService(IAdminService userService, IUnitOfWork unitOfWork, IConfiguration configuration,
         IAuthService authService)
     {
         _userService = userService;

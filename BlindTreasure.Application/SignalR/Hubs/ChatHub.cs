@@ -10,12 +10,12 @@ public class ChatHub : Hub
 {
     private readonly IChatMessageService _chatMessageService;
     private readonly IBlindyService _blindyService;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
     private readonly ICacheService _cacheService;
     private readonly IBlobService _blobService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public ChatHub(IChatMessageService chatMessageService, IBlindyService blindyService, IUserService userService,
+    public ChatHub(IChatMessageService chatMessageService, IBlindyService blindyService, IAdminService userService,
         ICacheService cacheService, IBlobService blobService, IUnitOfWork unitOfWork)
     {
         _chatMessageService = chatMessageService;

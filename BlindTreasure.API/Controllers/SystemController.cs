@@ -28,11 +28,12 @@ public class SystemController : ControllerBase
     private readonly ILoggerService _logger;
     private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
     private readonly INotificationService _notificationService;
+    private readonly IAdminService _adminService;
 
 
     public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService,
         IUnboxingService unboxService, IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService,
-        INotificationService notificationService)
+        INotificationService notificationService, IAdminService adminService)
     {
         _context = context;
         _logger = logger;
@@ -40,6 +41,7 @@ public class SystemController : ControllerBase
         _unboxService = unboxService;
         _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService;
         _notificationService = notificationService;
+        _adminService = adminService;
     }
 
     [HttpPost("seed-all-data")]
@@ -252,7 +254,7 @@ public class SystemController : ControllerBase
             var currentTime = HttpContext.RequestServices.GetRequiredService<ICurrentTime>();
             var notificationService = HttpContext.RequestServices.GetRequiredService<INotificationService>();
             var notificationHub = HttpContext.RequestServices.GetRequiredService<IHubContext<UnboxingHub>>();
-            var userService = HttpContext.RequestServices.GetRequiredService<IUserService>();
+            var userService = HttpContext.RequestServices.GetRequiredService<IAdminService>();
             var blinboxService = HttpContext.RequestServices.GetRequiredService<IBlindBoxService>();
             var emailService = HttpContext.RequestServices.GetRequiredService<IEmailService>();
 
@@ -973,7 +975,13 @@ public class SystemController : ControllerBase
             });
         }
 
+
         await _context.SaveChangesAsync();
+
+
+        var order = shipment.OrderDetails?.FirstOrDefault()?.Order;
+        if (order != null)
+            await _adminService.TryCompleteOrderAsync(order);
 
         return Ok(new
         {
@@ -1063,6 +1071,9 @@ public class SystemController : ControllerBase
             _context.OrderDetails.UpdateRange(order.OrderDetails);
             _context.Orders.Update(order);
             var changes = await _context.SaveChangesAsync();
+
+            // Gọi TryCompleteOrderAsync để cập nhật trạng thái ngay
+            await _adminService.TryCompleteOrderAsync(order);
 
             return Ok(new
             {

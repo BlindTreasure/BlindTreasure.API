@@ -33,13 +33,13 @@ public class StripeController : ControllerBase
     private readonly IStripeClient _stripeClient;
     private readonly IStripeService _stripeService;
     private readonly ITransactionService _transactionService;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
 
 
     public StripeController(
         ISellerService sellerService,
         IClaimsService claimService,
-        IUserService userService,
+        IAdminService userService,
         IStripeService stripeService,
         ILoggerService logger,
         IStripeClient stripeClient,

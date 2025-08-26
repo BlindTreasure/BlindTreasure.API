@@ -37,7 +37,6 @@ public static class IocContainer
         //Add generic repositories
         services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
         //Add business services
-        services.AddScoped<IOAuthService, OAuthService>();
         services.SetupBusinessServicesLayer();
 
         services.SetupJwt();
@@ -136,7 +135,6 @@ public static class IocContainer
         services.AddScoped<IGhnShippingService, GhnShippingService>();
 
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<IUserService, UserService>();
         services.AddScoped<ILoggerService, LoggerService>();
         services.AddScoped<IMapperService, MapperService>();
         services.AddScoped<ICurrentTime, CurrentTime>();
@@ -170,6 +168,8 @@ public static class IocContainer
         services.AddScoped<IOrderDetailInventoryItemLogService, OrderDetailInventoryItemLogService>();
         services.AddScoped<IPayoutService, PayoutService>();
 
+        services.AddScoped<IAdminService, AdminService>();
+        services.AddScoped<IOAuthService, OAuthService>();
 
         //cron-jobs
         services.AddHostedService<TradeRequestLockJob>();

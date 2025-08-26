@@ -18,10 +18,10 @@ public class PersonalController : ControllerBase
     private readonly IAddressService _addressService;
     private readonly IClaimsService _claimsService;
     private readonly ISellerService _sellerService;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
     private readonly IPromotionService _promotionService;
 
-    public PersonalController(IClaimsService claimsService, IUserService userService, ISellerService sellerService,
+    public PersonalController(IClaimsService claimsService, IAdminService userService, ISellerService sellerService,
         IAddressService addressService, IPromotionService promotionService)
     {
         _claimsService = claimsService;

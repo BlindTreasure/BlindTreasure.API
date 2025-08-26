@@ -10,27 +10,31 @@ using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
 
-public class UserService : IUserService
+public class AdminService : IAdminService
 {
     private readonly IBlobService _blobService;
     private readonly ICacheService _cacheService;
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPayoutService _payoutService;
 
-    public UserService(
+    public AdminService(
         IUnitOfWork unitOfWork,
         ILoggerService logger,
         ICacheService cacheService,
-        IBlobService blobService)
+        IBlobService blobService,
+        IPayoutService payoutService)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
         _cacheService = cacheService;
         _blobService = blobService;
+        _payoutService = payoutService;
     }
 
 
@@ -278,6 +282,41 @@ public class UserService : IUserService
 
         return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id);
     }
+
+    public async Task<bool> TryCompleteOrderAsync(Order order, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (order.OrderDetails == null || !order.OrderDetails.Any())
+                return false;
+
+            var allDelivered = order.OrderDetails.All(od => od.Status == OrderDetailItemStatus.DELIVERED);
+            var allInInventory3Days = order.OrderDetails.All(od =>
+                od.Status == OrderDetailItemStatus.IN_INVENTORY &&
+                od.UpdatedAt.HasValue &&
+                (DateTime.UtcNow - od.UpdatedAt.Value).TotalDays >= 3);
+
+            if (allDelivered || allInInventory3Days)
+            {
+                order.Status = OrderStatus.COMPLETED.ToString();
+                order.CompletedAt = DateTime.UtcNow;
+                await _unitOfWork.Orders.Update(order);
+                _logger.Info($"Order {order.Id} marked as COMPLETED.");
+
+                await _payoutService.AddCompletedOrderToPayoutAsync(order, cancellationToken);
+                await _unitOfWork.SaveChangesAsync();
+                return true;
+            }
+            return false;
+        }
+        catch (Exception ex)
+        {
+
+            throw ErrorHelper.BadRequest(ex.Message);
+        }
+    }
+
+
 
 
     // ----------------- PRIVATE HELPER METHODS -----------------
