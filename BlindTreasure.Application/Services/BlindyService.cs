@@ -20,6 +20,38 @@ public class BlindyService : IBlindyService
         _analyzerService = analyzerService;
     }
 
+    public async Task<string> AnalyzeTrendingProductsWithAi()
+    {
+        var stats = await _analyzerService.GetTrendingProductsForAiAsync();
+
+        var formatted = string.Join("\n", stats.Select(p =>
+            $"""
+             Tên: {p.ProductName}
+             Số đơn: {p.TotalOrders}
+             Tổng SL bán: {p.TotalQuantity}
+             Doanh thu: {p.TotalRevenue:N0}đ
+             Lượt review: {p.ReviewCount}
+             Lượt yêu thích: {p.FavouriteCount}
+             Tăng trưởng 30 ngày: {p.GrowthRate:F2}%
+             """
+        ));
+
+        var prompt = $"""
+                          Dưới đây là thống kê các sản phẩm trong hệ thống BlindTreasure:
+                          {formatted}
+
+                          Phân tích:
+                          - Top 5 sản phẩm trending nhất (có thể dựa trên tăng trưởng, số lượng bán, doanh thu).
+                          - Giải thích ngắn gọn tại sao các sản phẩm đó trending.
+                          - Gợi ý hành động cho staff (ví dụ: đẩy quảng cáo, kiểm tra hàng tồn, highlight trên trang chủ).
+
+                          Trả lời ngắn gọn, rõ ràng, dạng bullet point.
+                      """;
+
+        return await AskStaffAsync(prompt);
+    }
+
+    
     public async Task<bool> ValidateReviewAsync(string comment)
     {
         if (string.IsNullOrWhiteSpace(comment)) return false;
@@ -181,16 +213,13 @@ public class BlindyService : IBlindyService
         public List<string>? ReasonArray { get; set; }
     }
 
-    /// <summary>
-    ///     HÀM NÀY ĐỂ STAFF GỌI CHO AI PHÂN TÍCH HỆ THỐNG
-    /// </summary>
+
     public async Task<string> AnalyzeUsersWithAi()
     {
         var users = await _analyzerService.GetUsersForAiAnalysisAsync();
 
         var formatted = string.Join("\n", users.Select(u =>
             $"""
-             - ID: {u.UserId}
                Họ tên: {u.FullName}
                Email: {u.Email}
                Số điện thoại: {u.PhoneNumber}
@@ -226,7 +255,6 @@ public class BlindyService : IBlindyService
 
         var formatted = string.Join("\n", products.Select(p =>
             $"""
-             - ID: {p.Id}
                Tên: {p.Name}
                Mô tả: {p.Description}
                Giá: {p.RealSellingPrice} VNĐ
