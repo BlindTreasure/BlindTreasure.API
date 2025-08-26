@@ -16,4 +16,5 @@ public interface IInventoryItemService
     Task<InventoryItemDto?> GetByIdAsync(Guid id);
     Task<List<ShipmentCheckoutResponseDTO>> PreviewShipmentForListItemsAsync(RequestItemShipmentDTO request);
     Task<ShipmentItemResponseDTO> RequestShipmentAsync(RequestItemShipmentDTO request);
+    Task<InventoryItemDto> ForceReleaseHeldItemAsync(Guid inventoryItemId);
 }

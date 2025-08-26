@@ -1,8 +1,10 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
+using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -13,7 +15,7 @@ namespace BlindTreasure.API.Controllers;
 
 //[Authorize(Roles = "Admin,Staff")]
 [ApiController]
-[Route("api/administrator")] // hoặc "api/seller-verification"
+[Route("api/administrator")]
 public class AdminController : ControllerBase
 {
     private readonly ISellerVerificationService _sellerVerificationService;
@@ -21,8 +23,12 @@ public class AdminController : ControllerBase
     private readonly IAdminService _userService;
     private readonly IOrderService _orderService;
     private readonly IPayoutService _payoutService;
+    private readonly ITradingService _tradingService;
+    private readonly IInventoryItemService _inventoryItemService;
 
     public AdminController(ISellerVerificationService sellerVerificationService, IClaimsService claimsService,
+        IUserService userService, IOrderService orderService, IPayoutService payoutService,
+        ITradingService tradingService, IInventoryItemService inventoryItemService)
         IAdminService userService, IOrderService orderService, IPayoutService payoutService)
     {
         _sellerVerificationService = sellerVerificationService;
@@ -30,6 +36,53 @@ public class AdminController : ControllerBase
         _userService = userService;
         _orderService = orderService;
         _payoutService = payoutService;
+        _tradingService = tradingService;
+        _inventoryItemService = inventoryItemService;
+    }
+
+    
+    /// <summary>
+    /// API Admin: ép buộc giải phóng trạng thái giữ 3 ngày của một InventoryItem
+    /// để test/demo khả năng tạo listing lại ngay sau khi trade.
+    /// </summary>
+    /// <param name="inventoryItemId">ID của InventoryItem</param>
+    /// <returns>Thông tin InventoryItem sau khi đã được force release</returns>
+    [HttpPost("inventory/{inventoryItemId}/force-release-hold")]
+    public async Task<IActionResult> ForceReleaseHold(Guid inventoryItemId)
+    {
+        try
+        {
+            var result = await _inventoryItemService.ForceReleaseHeldItemAsync(inventoryItemId);
+            return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Item đã được force release khỏi trạng thái OnHold."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<InventoryItemDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+    
+    /// <summary>
+    /// Admin ép buộc một yêu cầu trao đổi (TradeRequest) hết hạn ngay lập tức,
+    /// bỏ qua khoảng chờ 10 phút để test exception trong quá trình demo.
+    /// </summary>
+    /// <param name="tradeRequestId">ID của yêu cầu trao đổi cần ép timeout</param>
+    /// <returns>Thông tin TradeRequest sau khi đã bị ép timeout</returns>
+    [HttpPost("trades/{tradeRequestId}/force-timeout")]
+    public async Task<IActionResult> ForceTimeout(Guid tradeRequestId)
+    {
+        try
+        {
+            var result = await _tradingService.ForceTimeoutTradeRequestAsync(tradeRequestId);
+            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", "Trade request has been forced to timeout."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<TradeRequestDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
     }
 
     [HttpGet("users")]

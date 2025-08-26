@@ -112,9 +112,9 @@ public class SystemController : ControllerBase
                 _logger.Info($"[SeedUserBoxes] Bắt đầu seed blind box cho user: {email}");
             }
 
-            // Gọi hàm seed hộp (nếu chưa có)
-            _logger.Info("[SeedUserBoxes] Gọi SeedHighSecretBlindBoxes()");
-            await SeedHighSecretBlindBoxes();
+            // // Gọi hàm seed hộp (nếu chưa có)
+            // _logger.Info("[SeedUserBoxes] Gọi SeedHighSecretBlindBoxes()");
+            // await SeedHighSecretBlindBoxes();
 
             // Lấy blind box thường
             _logger.Info("[SeedUserBoxes] Truy vấn hộp thường (SecretProbability <= 5)");
@@ -1094,9 +1094,10 @@ public class SystemController : ControllerBase
         var passwordHasher = new PasswordHasher();
         var now = DateTime.UtcNow;
         var defaultAvatar = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg";
+        var sellerAvatar = "https://thumbs.dreamstime.com/b/faceless-businessman-avatar-man-suit-blue-tie-human-profile-userpic-face-features-web-picture-gentlemen-85824471.jpg";
         var staffAvatar =
             "https://cdn4.iconfinder.com/data/icons/taxi-service-flat/90/support__services__employee__avatar_-512.png";
-
+        
         List<Address> defaultAddress =
         [
             new()
@@ -1153,7 +1154,7 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar
+                AvatarUrl = sellerAvatar
             },
             new()
             {
@@ -1198,9 +1199,8 @@ public class SystemController : ControllerBase
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
                 CreatedAt = now,
-                AvatarUrl = defaultAvatar
+                AvatarUrl = sellerAvatar
             },
-
             new()
             {
                 Email = "smiskiofficial@gmail.com",
@@ -2247,268 +2247,268 @@ public class SystemController : ControllerBase
         _logger.Success("[SmiskiBlindBoxes] Đã seed blind box cho SMISKI Series1 thành công.");
     }
 
-    private async Task SeedHighSecretBlindBoxes()
-    {
-        // Check if high secret blind boxes already exist
-        var existingHighSecretBoxes = await _context.BlindBoxes
-            .Where(b => b.SecretProbability == 25 && b.Status == BlindBoxStatus.Approved && !b.IsDeleted)
-            .ToListAsync();
-
-        if (existingHighSecretBoxes.Count >= 2)
-        {
-            _logger.Info("High secret blind boxes already exist, skipping creation.");
-            return;
-        }
-
-        var now = DateTime.UtcNow;
-        var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
-        if (sellerUser == null)
-        {
-            _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo blind box.");
-            return;
-        }
-
-        var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == sellerUser.Id);
-        if (seller == null)
-        {
-            _logger.Error("User này chưa có Seller tương ứng.");
-            return;
-        }
-
-        // Lấy tất cả category con (ParentId != null)
-        var categories = await _context.Categories
-            .Where(c => !c.IsDeleted && c.ParentId != null)
-            .ToListAsync();
-
-        if (!categories.Any())
-        {
-            _logger.Warn("[SeedHighSecretBlindBoxes] Không tìm thấy category con để tạo blind box.");
-            return;
-        }
-
-        foreach (var category in categories.Take(2)) // Tạo 2 high secret box từ 2 category đầu tiên
-        {
-            // Tạo mới 6 sản phẩm cho mỗi category, ProductSaleType là BlindBoxOnly
-            var blindBoxProducts = new List<Product>
-            {
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = $"HACIPUPU Super Rare Series Figure 1 ({category.Name})",
-                    Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    RealSellingPrice = 450000,
-                    TotalStockQuantity = 20,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fca-sau-sao-chep.webp&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "PVC",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = $"HACIPUPU Super Rare Series Figure 2 ({category.Name})",
-                    Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    RealSellingPrice = 450000,
-                    TotalStockQuantity = 20,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fcanh-cut-sao-chep.webp&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "PVC",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = $"HACIPUPU Super Rare Series Figure 3 ({category.Name})",
-                    Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    RealSellingPrice = 450000,
-                    TotalStockQuantity = 20,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-hong-sao-chep.jpg&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "PVC",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = $"HACIPUPU Super Rare Series Figure 4 ({category.Name})",
-                    Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    RealSellingPrice = 450000,
-                    TotalStockQuantity = 20,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fkhung-moi-khong-website-sao-chep.webp&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "PVC",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = $"HACIPUPU Super Rare Series Figure 5 ({category.Name})",
-                    Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    RealSellingPrice = 450000,
-                    TotalStockQuantity = 20,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Ftim-sao-chep%20(1).webp&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "PVC",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                },
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    Name = $"HACIPUPU Super Rare Series SECRET ({category.Name})",
-                    Description = "Mô hình SECRET đặc biệt dành cho blindbox với tỉ lệ cao.",
-                    CategoryId = category.Id,
-                    SellerId = seller.Id,
-                    RealSellingPrice = 900000,
-                    TotalStockQuantity = 10,
-                    Status = ProductStatus.Active,
-                    CreatedAt = now,
-                    ImageUrls = new List<string>
-                    {
-                        "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-sao-chep.webp&version_id=null"
-                    },
-                    Brand = seller.CompanyName,
-                    Material = "PVC",
-                    ProductType = ProductSaleType.BlindBoxOnly,
-                    Height = 12
-                }
-            };
-
-            await _context.Products.AddRangeAsync(blindBoxProducts);
-            await _context.SaveChangesAsync();
-
-            // Rarity cấu hình với tỉ lệ SECRET cao (25%)
-            var rarityArr = new[]
-            {
-                new { Rarity = RarityName.Common, Weight = 30, Quantity = 6 },
-                new { Rarity = RarityName.Rare, Weight = 20, Quantity = 5 },
-                new { Rarity = RarityName.Rare, Weight = 10, Quantity = 5 },
-                new { Rarity = RarityName.Epic, Weight = 10, Quantity = 4 },
-                new { Rarity = RarityName.Epic, Weight = 5, Quantity = 3 },
-                new { Rarity = RarityName.Secret, Weight = 25, Quantity = 5 } // Tăng weight và quantity cho SECRET
-            };
-
-            // Tổng quantity * weight để tính drop rate
-            var totalWeightQty = rarityArr.Sum(x => x.Quantity * x.Weight);
-
-            var blindBox = new BlindBox
-            {
-                Id = Guid.NewGuid(),
-                SellerId = seller.Id,
-                CategoryId = category.Id,
-                Name = $"Super Secret Blind Box - {category.Name}",
-                Description = $"Blindbox đặc biệt với tỉ lệ SECRET cao 25% thuộc {category.Name}",
-                Price = 800000, // Giá cao hơn do tỉ lệ SECRET cao
-                TotalQuantity = 20,
-                HasSecretItem = true,
-                SecretProbability = 25, // Tỉ lệ SECRET cao 25%
-                Status = BlindBoxStatus.Approved,
-                ImageUrl = blindBoxProducts[0].ImageUrls.FirstOrDefault() ?? "",
-                ReleaseDate = now,
-                CreatedAt = now
-            };
-
-            var blindBoxItems = new List<BlindBoxItem>();
-            var rarityConfigs = new List<RarityConfig>();
-
-            for (var i = 0; i < 6; i++)
-            {
-                var r = rarityArr[i];
-                var product = blindBoxProducts[i];
-
-                var dropRate = Math.Round((decimal)(r.Quantity * r.Weight) / totalWeightQty * 100m, 2);
-                var itemId = Guid.NewGuid();
-
-                blindBoxItems.Add(new BlindBoxItem
-                {
-                    Id = itemId,
-                    BlindBoxId = blindBox.Id,
-                    ProductId = product.Id,
-                    Quantity = r.Quantity,
-                    DropRate = dropRate,
-                    IsSecret = r.Rarity == RarityName.Secret,
-                    IsActive = true,
-                    CreatedAt = now
-                });
-
-                rarityConfigs.Add(new RarityConfig
-                {
-                    Id = Guid.NewGuid(),
-                    BlindBoxItemId = itemId,
-                    Name = r.Rarity,
-                    Weight = r.Weight,
-                    IsSecret = r.Rarity == RarityName.Secret,
-                    CreatedAt = now
-                });
-            }
-
-            await _context.BlindBoxes.AddAsync(blindBox);
-            await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
-            await _context.RarityConfigs.AddRangeAsync(rarityConfigs);
-            await _context.SaveChangesAsync();
-
-            // Sau khi SaveChanges xong BlindBox và BlindBoxItems:
-            foreach (var item in blindBoxItems)
-            {
-                var probCfg = new ProbabilityConfig
-                {
-                    Id = Guid.NewGuid(),
-                    BlindBoxItemId = item.Id,
-                    Probability = item.DropRate,
-                    EffectiveFrom = now,
-                    EffectiveTo = now.AddYears(1), // đảm bảo NOW nằm trong range này
-                    ApprovedBy = sellerUser.Id,
-                    ApprovedAt = now,
-                    CreatedAt = now
-                };
-                await _context.ProbabilityConfigs.AddAsync(probCfg);
-            }
-
-            await _context.SaveChangesAsync();
-
-            _logger.Success(
-                $"[SeedHighSecretBlindBoxes] Đã seed high secret blind box cho category {category.Name} thành công.");
-        }
-    }
+    // private async Task SeedHighSecretBlindBoxes()
+    // {
+    //     // Check if high secret blind boxes already exist
+    //     var existingHighSecretBoxes = await _context.BlindBoxes
+    //         .Where(b => b.SecretProbability == 25 && b.Status == BlindBoxStatus.Approved && !b.IsDeleted)
+    //         .ToListAsync();
+    //
+    //     if (existingHighSecretBoxes.Count >= 2)
+    //     {
+    //         _logger.Info("High secret blind boxes already exist, skipping creation.");
+    //         return;
+    //     }
+    //
+    //     var now = DateTime.UtcNow;
+    //     var sellerUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == "blindtreasurefpt@gmail.com");
+    //     if (sellerUser == null)
+    //     {
+    //         _logger.Error("Không tìm thấy user Seller với email blindtreasurefpt@gmail.com để tạo blind box.");
+    //         return;
+    //     }
+    //
+    //     var seller = await _context.Sellers.FirstOrDefaultAsync(s => s.UserId == sellerUser.Id);
+    //     if (seller == null)
+    //     {
+    //         _logger.Error("User này chưa có Seller tương ứng.");
+    //         return;
+    //     }
+    //
+    //     // Lấy tất cả category con (ParentId != null)
+    //     var categories = await _context.Categories
+    //         .Where(c => !c.IsDeleted && c.ParentId != null)
+    //         .ToListAsync();
+    //
+    //     if (!categories.Any())
+    //     {
+    //         _logger.Warn("[SeedHighSecretBlindBoxes] Không tìm thấy category con để tạo blind box.");
+    //         return;
+    //     }
+    //
+    //     foreach (var category in categories.Take(2)) // Tạo 2 high secret box từ 2 category đầu tiên
+    //     {
+    //         // Tạo mới 6 sản phẩm cho mỗi category, ProductSaleType là BlindBoxOnly
+    //         var blindBoxProducts = new List<Product>
+    //         {
+    //             new()
+    //             {
+    //                 Id = Guid.NewGuid(),
+    //                 Name = $"HACIPUPU Super Rare Series Figure 1 ({category.Name})",
+    //                 Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
+    //                 CategoryId = category.Id,
+    //                 SellerId = seller.Id,
+    //                 RealSellingPrice = 450000,
+    //                 TotalStockQuantity = 20,
+    //                 Status = ProductStatus.Active,
+    //                 CreatedAt = now,
+    //                 ImageUrls = new List<string>
+    //                 {
+    //                     "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fca-sau-sao-chep.webp&version_id=null"
+    //                 },
+    //                 Brand = seller.CompanyName,
+    //                 Material = "PVC",
+    //                 ProductType = ProductSaleType.BlindBoxOnly,
+    //                 Height = 12
+    //             },
+    //             new()
+    //             {
+    //                 Id = Guid.NewGuid(),
+    //                 Name = $"HACIPUPU Super Rare Series Figure 2 ({category.Name})",
+    //                 Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
+    //                 CategoryId = category.Id,
+    //                 SellerId = seller.Id,
+    //                 RealSellingPrice = 450000,
+    //                 TotalStockQuantity = 20,
+    //                 Status = ProductStatus.Active,
+    //                 CreatedAt = now,
+    //                 ImageUrls = new List<string>
+    //                 {
+    //                     "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fcanh-cut-sao-chep.webp&version_id=null"
+    //                 },
+    //                 Brand = seller.CompanyName,
+    //                 Material = "PVC",
+    //                 ProductType = ProductSaleType.BlindBoxOnly,
+    //                 Height = 12
+    //             },
+    //             new()
+    //             {
+    //                 Id = Guid.NewGuid(),
+    //                 Name = $"HACIPUPU Super Rare Series Figure 3 ({category.Name})",
+    //                 Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
+    //                 CategoryId = category.Id,
+    //                 SellerId = seller.Id,
+    //                 RealSellingPrice = 450000,
+    //                 TotalStockQuantity = 20,
+    //                 Status = ProductStatus.Active,
+    //                 CreatedAt = now,
+    //                 ImageUrls = new List<string>
+    //                 {
+    //                     "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-hong-sao-chep.jpg&version_id=null"
+    //                 },
+    //                 Brand = seller.CompanyName,
+    //                 Material = "PVC",
+    //                 ProductType = ProductSaleType.BlindBoxOnly,
+    //                 Height = 12
+    //             },
+    //             new()
+    //             {
+    //                 Id = Guid.NewGuid(),
+    //                 Name = $"HACIPUPU Super Rare Series Figure 4 ({category.Name})",
+    //                 Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
+    //                 CategoryId = category.Id,
+    //                 SellerId = seller.Id,
+    //                 RealSellingPrice = 450000,
+    //                 TotalStockQuantity = 20,
+    //                 Status = ProductStatus.Active,
+    //                 CreatedAt = now,
+    //                 ImageUrls = new List<string>
+    //                 {
+    //                     "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fkhung-moi-khong-website-sao-chep.webp&version_id=null"
+    //                 },
+    //                 Brand = seller.CompanyName,
+    //                 Material = "PVC",
+    //                 ProductType = ProductSaleType.BlindBoxOnly,
+    //                 Height = 12
+    //             },
+    //             new()
+    //             {
+    //                 Id = Guid.NewGuid(),
+    //                 Name = $"HACIPUPU Super Rare Series Figure 5 ({category.Name})",
+    //                 Description = "Mô hình đặc biệt dành cho blindbox với tỉ lệ secret cao.",
+    //                 CategoryId = category.Id,
+    //                 SellerId = seller.Id,
+    //                 RealSellingPrice = 450000,
+    //                 TotalStockQuantity = 20,
+    //                 Status = ProductStatus.Active,
+    //                 CreatedAt = now,
+    //                 ImageUrls = new List<string>
+    //                 {
+    //                     "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Ftim-sao-chep%20(1).webp&version_id=null"
+    //                 },
+    //                 Brand = seller.CompanyName,
+    //                 Material = "PVC",
+    //                 ProductType = ProductSaleType.BlindBoxOnly,
+    //                 Height = 12
+    //             },
+    //             new()
+    //             {
+    //                 Id = Guid.NewGuid(),
+    //                 Name = $"HACIPUPU Super Rare Series SECRET ({category.Name})",
+    //                 Description = "Mô hình SECRET đặc biệt dành cho blindbox với tỉ lệ cao.",
+    //                 CategoryId = category.Id,
+    //                 SellerId = seller.Id,
+    //                 RealSellingPrice = 900000,
+    //                 TotalStockQuantity = 10,
+    //                 Status = ProductStatus.Active,
+    //                 CreatedAt = now,
+    //                 ImageUrls = new List<string>
+    //                 {
+    //                     "https://minio.fpt-devteam.fun/api/v1/buckets/blindtreasure-bucket/objects/download?preview=true&prefix=blindbox-thumbnails%2FHACIPUPU%20Snuggle%20With%20You%20Series%20Figure%20Blind%20Box%2Fheo-sao-chep.webp&version_id=null"
+    //                 },
+    //                 Brand = seller.CompanyName,
+    //                 Material = "PVC",
+    //                 ProductType = ProductSaleType.BlindBoxOnly,
+    //                 Height = 12
+    //             }
+    //         };
+    //
+    //         await _context.Products.AddRangeAsync(blindBoxProducts);
+    //         await _context.SaveChangesAsync();
+    //
+    //         // Rarity cấu hình với tỉ lệ SECRET cao (25%)
+    //         var rarityArr = new[]
+    //         {
+    //             new { Rarity = RarityName.Common, Weight = 30, Quantity = 6 },
+    //             new { Rarity = RarityName.Rare, Weight = 20, Quantity = 5 },
+    //             new { Rarity = RarityName.Rare, Weight = 10, Quantity = 5 },
+    //             new { Rarity = RarityName.Epic, Weight = 10, Quantity = 4 },
+    //             new { Rarity = RarityName.Epic, Weight = 5, Quantity = 3 },
+    //             new { Rarity = RarityName.Secret, Weight = 25, Quantity = 5 } // Tăng weight và quantity cho SECRET
+    //         };
+    //
+    //         // Tổng quantity * weight để tính drop rate
+    //         var totalWeightQty = rarityArr.Sum(x => x.Quantity * x.Weight);
+    //
+    //         var blindBox = new BlindBox
+    //         {
+    //             Id = Guid.NewGuid(),
+    //             SellerId = seller.Id,
+    //             CategoryId = category.Id,
+    //             Name = $"Super Secret Blind Box - {category.Name}",
+    //             Description = $"Blindbox đặc biệt với tỉ lệ SECRET cao 25% thuộc {category.Name}",
+    //             Price = 800000, // Giá cao hơn do tỉ lệ SECRET cao
+    //             TotalQuantity = 20,
+    //             HasSecretItem = true,
+    //             SecretProbability = 25, // Tỉ lệ SECRET cao 25%
+    //             Status = BlindBoxStatus.Approved,
+    //             ImageUrl = blindBoxProducts[0].ImageUrls.FirstOrDefault() ?? "",
+    //             ReleaseDate = now,
+    //             CreatedAt = now
+    //         };
+    //
+    //         var blindBoxItems = new List<BlindBoxItem>();
+    //         var rarityConfigs = new List<RarityConfig>();
+    //
+    //         for (var i = 0; i < 6; i++)
+    //         {
+    //             var r = rarityArr[i];
+    //             var product = blindBoxProducts[i];
+    //
+    //             var dropRate = Math.Round((decimal)(r.Quantity * r.Weight) / totalWeightQty * 100m, 2);
+    //             var itemId = Guid.NewGuid();
+    //
+    //             blindBoxItems.Add(new BlindBoxItem
+    //             {
+    //                 Id = itemId,
+    //                 BlindBoxId = blindBox.Id,
+    //                 ProductId = product.Id,
+    //                 Quantity = r.Quantity,
+    //                 DropRate = dropRate,
+    //                 IsSecret = r.Rarity == RarityName.Secret,
+    //                 IsActive = true,
+    //                 CreatedAt = now
+    //             });
+    //
+    //             rarityConfigs.Add(new RarityConfig
+    //             {
+    //                 Id = Guid.NewGuid(),
+    //                 BlindBoxItemId = itemId,
+    //                 Name = r.Rarity,
+    //                 Weight = r.Weight,
+    //                 IsSecret = r.Rarity == RarityName.Secret,
+    //                 CreatedAt = now
+    //             });
+    //         }
+    //
+    //         await _context.BlindBoxes.AddAsync(blindBox);
+    //         await _context.BlindBoxItems.AddRangeAsync(blindBoxItems);
+    //         await _context.RarityConfigs.AddRangeAsync(rarityConfigs);
+    //         await _context.SaveChangesAsync();
+    //
+    //         // Sau khi SaveChanges xong BlindBox và BlindBoxItems:
+    //         foreach (var item in blindBoxItems)
+    //         {
+    //             var probCfg = new ProbabilityConfig
+    //             {
+    //                 Id = Guid.NewGuid(),
+    //                 BlindBoxItemId = item.Id,
+    //                 Probability = item.DropRate,
+    //                 EffectiveFrom = now,
+    //                 EffectiveTo = now.AddYears(1), // đảm bảo NOW nằm trong range này
+    //                 ApprovedBy = sellerUser.Id,
+    //                 ApprovedAt = now,
+    //                 CreatedAt = now
+    //             };
+    //             await _context.ProbabilityConfigs.AddAsync(probCfg);
+    //         }
+    //
+    //         await _context.SaveChangesAsync();
+    //
+    //         _logger.Success(
+    //             $"[SeedHighSecretBlindBoxes] Đã seed high secret blind box cho category {category.Name} thành công.");
+    //     }
+    // }
 
     private async Task SeedPromotions()
     {
