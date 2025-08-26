@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
+using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -42,4 +43,57 @@ public class DataAnalyzerService : IDataAnalyzerService
 
         return products;
     }
+    
+    public async Task<List<ProductTrendingStatDto>> GetTrendingProductsForAiAsync()
+    {
+        var now = DateTime.UtcNow;
+        var last30Days = now.AddDays(-30);
+        var prev30Days = now.AddDays(-60);
+
+        var query = await _unitOfWork.OrderDetails.GetQueryable()
+            .Where(od => !od.IsDeleted
+                         && od.ProductId != null
+                         && od.Order != null
+                         && od.Order.CompletedAt != null)
+            .Include(od => od.Product)
+            .ThenInclude(p => p.Reviews)
+            .Include(od => od.Product)
+            .ThenInclude(p => p.CustomerFavourites)
+            .ToListAsync();
+
+        var grouped = query
+            .GroupBy(od => od.Product!)
+            .Select(g =>
+            {
+                var product = g.Key;
+
+                var recent = g.Where(x => x.Order.CompletedAt >= last30Days).ToList();
+                var previous = g.Where(x => x.Order.CompletedAt < last30Days && x.Order.CompletedAt >= prev30Days).ToList();
+
+                var recentQty = recent.Sum(x => x.Quantity);
+                var previousQty = previous.Sum(x => x.Quantity);
+
+                double growthRate = 0;
+                if (previousQty > 0)
+                    growthRate = ((double)(recentQty - previousQty) / previousQty) * 100;
+
+                return new ProductTrendingStatDto
+                {
+                    ProductId = product.Id,
+                    ProductName = product.Name,
+                    TotalOrders = g.Count(),
+                    TotalQuantity = g.Sum(x => x.Quantity),
+                    TotalRevenue = g.Sum(x => x.TotalPrice),
+                    ReviewCount = product.Reviews?.Count ?? 0,
+                    FavouriteCount = product.CustomerFavourites?.Count ?? 0,
+                    GrowthRate = growthRate
+                };
+            })
+            .OrderByDescending(x => x.TotalQuantity)
+            .Take(50) // lấy top 50 để đưa cho AI phân tích
+            .ToList();
+
+        return grouped;
+    }
+
 }
