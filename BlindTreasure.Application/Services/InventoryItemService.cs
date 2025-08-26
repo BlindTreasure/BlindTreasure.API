@@ -42,6 +42,43 @@ public class InventoryItemService : IInventoryItemService
         _stripeService = stripeService; // initialize stripeService
     }
 
+    public async Task<InventoryItemDto> ForceReleaseHeldItemAsync(Guid inventoryItemId)
+    {
+        _loggerService.Warn($"[ForceReleaseHeldItemAsync] Admin forcing release hold for InventoryItem {inventoryItemId}");
+
+        var item = await _unitOfWork.InventoryItems.GetByIdAsync(inventoryItemId,
+            i => i.Product,
+            i => i.Listings);
+
+        if (item == null)
+            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm trong kho.");
+
+        if (item.Status != InventoryItemStatus.OnHold)
+            throw ErrorHelper.BadRequest("Vật phẩm không ở trạng thái OnHold, không cần force release.");
+
+        // Reset trạng thái
+        item.Status = InventoryItemStatus.Available;
+        item.HoldUntil = null;
+        item.LockedByRequestId = null;
+
+        await _unitOfWork.InventoryItems.Update(item);
+        await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate cache
+        await _cacheService.RemoveAsync(GetCacheKey(inventoryItemId));
+
+        // Map sang DTO trả về
+        var dto = InventoryItemMapper.ToInventoryItemDto(item);
+        dto.ProductName = item.Product?.Name ?? "hehe";
+        dto.Image = item.Product?.ImageUrls?.FirstOrDefault() ?? "";
+        dto.HasActiveListing = item.Listings?.Any(l => l.Status == ListingStatus.Active) ?? false;
+        dto.IsOnHold = false;
+
+        _loggerService.Success($"[ForceReleaseHeldItemAsync] Đã force release item {inventoryItemId}");
+
+        return dto;
+    }
+    
     public async Task<List<InventoryItemDto>> GetMyUnboxedItemsFromBlindBoxAsync(Guid blindBoxId)
     {
         var userId = _claimsService.CurrentUserId;

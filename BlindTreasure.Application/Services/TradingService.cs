@@ -35,6 +35,73 @@ public class TradingService : ITradingService
         _notificationHub = notificationHub;
     }
 
+    
+    public async Task<TradeRequestDto> ForceTimeoutTradeRequestAsync(Guid tradeRequestId)
+    {
+        _logger.Warn($"[ForceTimeoutTradeRequestAsync] Admin forcing timeout for TradeRequest {tradeRequestId}");
+
+        var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
+            t => t.Listing,
+            t => t.Listing!.InventoryItem,
+            t => t.Listing!.InventoryItem.Product!);
+
+        if (tradeRequest == null)
+            throw ErrorHelper.NotFound("Trade request not found.");
+
+        if (tradeRequest.Status != TradeRequestStatus.ACCEPTED)
+            throw ErrorHelper.BadRequest("Only accepted trade requests can be forced to timeout.");
+
+        // Reset giống cronjob khi timeout
+        tradeRequest.Status = TradeRequestStatus.PENDING;
+        tradeRequest.RespondedAt = null;
+        tradeRequest.OwnerLocked = false;
+        tradeRequest.RequesterLocked = false;
+        tradeRequest.TimeRemaining = 0;
+
+        // Restore listing item nếu bị giữ
+        var listingItem = tradeRequest.Listing?.InventoryItem;
+        if (listingItem != null && listingItem.Status != InventoryItemStatus.Available)
+        {
+            listingItem.Status = InventoryItemStatus.Available;
+            listingItem.LockedByRequestId = null;
+            await _unitOfWork.InventoryItems.Update(listingItem);
+        }
+
+        await _unitOfWork.TradeRequests.Update(tradeRequest);
+        await _unitOfWork.SaveChangesAsync();
+
+        // Gửi thông báo cho cả owner và requester
+        try
+        {
+            await _notificationService.PushNotificationToUser(
+                tradeRequest.RequesterId,
+                new NotificationDto
+                {
+                    Title = "Trade expired (forced)",
+                    Message = "Admin has forced this trade to expire for testing.",
+                    Type = NotificationType.Trading
+                });
+            if (listingItem != null)
+            {
+                await _notificationService.PushNotificationToUser(
+                    listingItem.UserId,
+                    new NotificationDto
+                    {
+                        Title = "Trade expired (forced)",
+                        Message = "Admin has forced this trade to expire for testing.",
+                        Type = NotificationType.Trading
+                    });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"[ForceTimeoutTradeRequestAsync] Error sending notification: {ex.Message}");
+        }
+
+        return await GetTradeRequestByIdAsync(tradeRequestId);
+    }
+
+
     public async Task<List<TradeRequestDto>> GetTradeRequestsAsync(Guid listingId)
     {
         // Lấy thông tin listing
@@ -228,8 +295,8 @@ public class TradingService : ITradingService
 
             // Reset TimeRemaining dựa trên trạng thái mới
             if (isAccepted)
-                // Nếu accept, tính toán TimeRemaining = 2 phút = 120 giây
-                tradeRequest.TimeRemaining = 120;
+                // Nếu accept, tính toán TimeRemaining = 10 phút = 600 giây
+                tradeRequest.TimeRemaining = 600;
             else
                 // Nếu reject, TimeRemaining = 0
                 tradeRequest.TimeRemaining = 0;
@@ -1089,7 +1156,7 @@ public class TradingService : ITradingService
         var timeRemaining = 0;
         if (tradeRequest.Status == TradeRequestStatus.ACCEPTED && tradeRequest.RespondedAt.HasValue)
         {
-            var timeoutMinutes = 2; // 2 phút timeout
+            var timeoutMinutes = 10; // 10 phút timeout
             var elapsedTime = DateTime.UtcNow - tradeRequest.RespondedAt.Value;
             var remainingTime = TimeSpan.FromMinutes(timeoutMinutes) - elapsedTime;
 

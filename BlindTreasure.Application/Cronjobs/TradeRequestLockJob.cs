@@ -66,7 +66,7 @@ public class TradeRequestLockJob : IHostedService, IDisposable
                     return;
                 }
 
-                var timeoutMinutes = 2; // Thời gian timeout là 2 phút
+                var timeoutMinutes = 10; // Thời gian timeout là 2 phút
                 var updatedRequests = new List<TradeRequest>();
 
                 foreach (var tradeRequest in tradeRequests)

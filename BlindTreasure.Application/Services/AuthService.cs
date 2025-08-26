@@ -90,7 +90,7 @@ public class AuthService : IAuthService
             FullName = dto.FullName,
             Phone = dto.PhoneNumber,
             DateOfBirth = dto.DateOfBirth,
-            AvatarUrl = "https://img.freepik.com/free-psd/3d-illustration-human-avatar-profile_23-2150671142.jpg",
+            AvatarUrl = "https://thumbs.dreamstime.com/b/faceless-businessman-avatar-man-suit-blue-tie-human-profile-userpic-face-features-web-picture-gentlemen-85824471.jpg",
             RoleName = RoleType.Seller,
             Status = UserStatus.Pending,
             IsEmailVerified = false
