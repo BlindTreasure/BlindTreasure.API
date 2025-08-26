@@ -20,14 +20,14 @@ public class CategoryService : ICategoryService
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
 
     public CategoryService(
         IUnitOfWork unitOfWork,
         ILoggerService logger,
         ICacheService cacheService,
         IClaimsService claimsService,
-        IUserService userService, IBlobService blobService, IMapperService mapper)
+        IAdminService userService, IBlobService blobService, IMapperService mapper)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;

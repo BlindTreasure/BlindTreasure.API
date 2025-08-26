@@ -41,7 +41,7 @@ public class BlindBoxServiceTests
     private readonly Mock<ICurrentTime> _timeMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IGenericRepository<User>> _userRepoMock;
-    private readonly Mock<IUserService> _userServiceMock; // Added UserService Mock
+    private readonly Mock<IAdminService> _userServiceMock; // Added UserService Mock
 
     public BlindBoxServiceTests()
     {
@@ -56,7 +56,7 @@ public class BlindBoxServiceTests
         _emailServiceMock = new Mock<IEmailService>();
         _categoryServiceMock = new Mock<ICategoryService>();
         _notificationServiceMock = new Mock<INotificationService>();
-        _userServiceMock = new Mock<IUserService>(); // Initialize UserService Mock
+        _userServiceMock = new Mock<IAdminService>(); // Initialize UserService Mock
 
         // Repository mocks
         _blindBoxRepoMock = new Mock<IGenericRepository<BlindBox>>();

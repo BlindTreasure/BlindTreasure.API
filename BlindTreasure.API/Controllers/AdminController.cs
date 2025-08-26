@@ -18,12 +18,12 @@ public class AdminController : ControllerBase
 {
     private readonly ISellerVerificationService _sellerVerificationService;
     private readonly IClaimsService _claimsService;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
     private readonly IOrderService _orderService;
     private readonly IPayoutService _payoutService;
 
     public AdminController(ISellerVerificationService sellerVerificationService, IClaimsService claimsService,
-        IUserService userService, IOrderService orderService, IPayoutService payoutService)
+        IAdminService userService, IOrderService orderService, IPayoutService payoutService)
     {
         _sellerVerificationService = sellerVerificationService;
         _claimsService = claimsService;

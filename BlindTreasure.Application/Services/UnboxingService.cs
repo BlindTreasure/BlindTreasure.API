@@ -29,13 +29,13 @@ public class UnboxingService : IUnboxingService
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<UnboxingHub> _notificationHub;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
     private readonly IBlindBoxService _blindBoxService;
     private readonly IEmailService _emailService;
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
         ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub,
-        IUserService userService, IBlindBoxService blindBoxService, IEmailService emailService)
+        IAdminService userService, IBlindBoxService blindBoxService, IEmailService emailService)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;

@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace BlindTreasure.Application.Interfaces;
 
-public interface IUserService
+public interface IAdminService
 {
     Task<UserDto?> GetUserDetailsByIdAsync(Guid userId);
     Task<UserDto?> UpdateProfileAsync(Guid userId, UpdateProfileDto dto);
@@ -20,6 +20,7 @@ public interface IUserService
     Task<Pagination<UserDto>> GetAllUsersAsync(UserQueryParameter param);
     Task<User?> GetUserByEmail(string email, bool useCache = false);
     Task<User?> GetUserById(Guid id, bool useCache = false);
+    Task<bool> TryCompleteOrderAsync(Order order, CancellationToken cancellationToken = default);
 
     //AI analysis
 }

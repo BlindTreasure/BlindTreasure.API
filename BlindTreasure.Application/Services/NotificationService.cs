@@ -15,16 +15,14 @@ public class NotificationService : INotificationService
     private readonly ICurrentTime _currentTime;
     private readonly IHubContext<NotificationHub> _hubContext;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IUserService _userService;
 
     public NotificationService(ICacheService cacheService, IUnitOfWork unitOfWork, ICurrentTime currentTime,
-        IHubContext<NotificationHub> hubContext, IUserService userService)
+        IHubContext<NotificationHub> hubContext)
     {
         _cacheService = cacheService;
         _unitOfWork = unitOfWork;
         _currentTime = currentTime;
         _hubContext = hubContext;
-        _userService = userService;
     }
 
     public async Task<List<NotificationDto>> GetNotificationsAsync(Guid userId, int pageIndex, int pageSize,

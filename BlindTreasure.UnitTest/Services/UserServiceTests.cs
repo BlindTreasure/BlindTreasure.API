@@ -28,7 +28,7 @@ public class UserServiceTests
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IGenericRepository<User>> _userRepoMock;
     private readonly Mock<IGenericRepository<Seller>> _sellerRepoMock;
-    private readonly UserService _userService;
+    private readonly AdminService _userService;
 
     public UserServiceTests()
     {
