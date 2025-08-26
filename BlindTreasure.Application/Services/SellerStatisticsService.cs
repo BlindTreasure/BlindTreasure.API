@@ -30,7 +30,6 @@ public class OrderDetailStatisticsItem
     public string Status { get; set; } = string.Empty;
     public DateTime? CompletedAt { get; set; }
     public DateTime? PlacedAt { get; set; } // NEW: Add PlacedAt for PAID orders
-
 }
 
 public class SellerStatisticsService : ISellerStatisticsService
@@ -97,9 +96,9 @@ public class SellerStatisticsService : ISellerStatisticsService
                         && o.CompletedAt >= start && o.CompletedAt < end // FIX: Use CompletedAt consistently
                         && !o.IsDeleted)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.Product)
+            .ThenInclude(od => od.Product)
             .Include(o => o.OrderDetails)
-                .ThenInclude(od => od.BlindBox)
+            .ThenInclude(od => od.BlindBox)
             .AsNoTracking()
             .ToListAsync(ct);
     }
@@ -146,21 +145,34 @@ public class SellerStatisticsService : ISellerStatisticsService
         var lastAOV = lastOrders.Count > 0 ? Math.Round(lastFinalRevenue / lastOrders.Count, 2) : 0m;
 
         // Growth calculations
-        var estimatedRevenueGrowth = lastFinalRevenue != 0 ?
-            Math.Round((finalRevenue - lastFinalRevenue) * 100 / Math.Abs(lastFinalRevenue), 2) :
-            (finalRevenue > 0 ? 100m : 0m);
+        var estimatedRevenueGrowth = lastFinalRevenue != 0
+            ?
+            Math.Round((finalRevenue - lastFinalRevenue) * 100 / Math.Abs(lastFinalRevenue), 2)
+            :
+            finalRevenue > 0
+                ? 100m
+                : 0m;
 
-        var ordersGrowth = lastOrders.Count != 0 ?
-            Math.Round((decimal)(totalOrders - lastOrders.Count) * 100 / lastOrders.Count, 2) :
-            (totalOrders > 0 ? 100m : 0m);
+        var ordersGrowth = lastOrders.Count != 0
+            ?
+            Math.Round((decimal)(totalOrders - lastOrders.Count) * 100 / lastOrders.Count, 2)
+            :
+            totalOrders > 0
+                ? 100m
+                : 0m;
 
-        var productsGrowth = lastOrderDetails.Sum(od => od.Quantity) != 0 ?
-            Math.Round((decimal)(totalProductsSold - lastOrderDetails.Sum(od => od.Quantity)) * 100 / lastOrderDetails.Sum(od => od.Quantity), 2) :
-            (totalProductsSold > 0 ? 100m : 0m);
+        var productsGrowth = lastOrderDetails.Sum(od => od.Quantity) != 0
+            ?
+            Math.Round(
+                (decimal)(totalProductsSold - lastOrderDetails.Sum(od => od.Quantity)) * 100 /
+                lastOrderDetails.Sum(od => od.Quantity), 2)
+            :
+            totalProductsSold > 0
+                ? 100m
+                : 0m;
 
-        var aovGrowth = lastAOV != 0 ?
-            Math.Round((averageOrderValue - lastAOV) * 100 / Math.Abs(lastAOV), 2) :
-            (averageOrderValue > 0 ? 100m : 0m);
+        var aovGrowth = lastAOV != 0 ? Math.Round((averageOrderValue - lastAOV) * 100 / Math.Abs(lastAOV), 2) :
+            averageOrderValue > 0 ? 100m : 0m;
 
         return new SellerOverviewStatisticsDto
         {
@@ -329,7 +341,7 @@ public class SellerStatisticsService : ISellerStatisticsService
                 // Use StartDate if provided, otherwise use current date
                 var weekBase = req.StartDate?.Date ?? now.Date;
                 // Always start from Monday (ISO standard)
-                int diff = (7 + (int)weekBase.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+                var diff = (7 + (int)weekBase.DayOfWeek - (int)DayOfWeek.Monday) % 7;
                 start = DateTime.SpecifyKind(weekBase.AddDays(-diff), DateTimeKind.Utc);
                 end = start.AddDays(7);
                 break;
@@ -342,7 +354,7 @@ public class SellerStatisticsService : ISellerStatisticsService
 
             case StatisticsTimeRange.Quarter:
                 var quarterBase = req.StartDate?.Date ?? now.Date;
-                int quarter = ((quarterBase.Month - 1) / 3) + 1;
+                var quarter = (quarterBase.Month - 1) / 3 + 1;
                 start = new DateTime(quarterBase.Year, (quarter - 1) * 3 + 1, 1, 0, 0, 0, DateTimeKind.Utc);
                 end = start.AddMonths(3);
                 break;
@@ -511,7 +523,7 @@ public class SellerStatisticsService : ISellerStatisticsService
 public class SellerRevenueSummaryDto
 {
     public decimal EstimatedRevenue { get; set; } // Doanh thu ước tính (PAID)
-    public decimal ActualRevenue { get; set; }    // Doanh thu thật (COMPLETED)
+    public decimal ActualRevenue { get; set; } // Doanh thu thật (COMPLETED)
     public int EstimatedOrderCount { get; set; }
     public int ActualOrderCount { get; set; }
     public DateTime PeriodStart { get; set; }

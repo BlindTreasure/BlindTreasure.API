@@ -231,10 +231,8 @@ public class SystemController : ControllerBase
                 .ToListAsync();
 
             if (unopenedBoxes.Count < 2)
-            {
                 return BadRequest(
                     $"User không có đủ hộp chưa mở. Cần ít nhất 2 hộp, hiện có {unopenedBoxes.Count} hộp.");
-            }
 
             // Random chọn 2 hộp
             var random = new Random();
@@ -244,7 +242,7 @@ public class SystemController : ControllerBase
                 .ToList();
 
             _logger.Info($"[SeedUserInventory] Đã chọn {selectedBoxes.Count} hộp để unbox");
-    
+
             // Tạo UnboxingService với mock ClaimsService
             var mockClaimsService = new MockClaimsService(user.Id);
 
@@ -254,10 +252,10 @@ public class SystemController : ControllerBase
             var currentTime = HttpContext.RequestServices.GetRequiredService<ICurrentTime>();
             var notificationService = HttpContext.RequestServices.GetRequiredService<INotificationService>();
             var notificationHub = HttpContext.RequestServices.GetRequiredService<IHubContext<UnboxingHub>>();
-            var userService =  HttpContext.RequestServices.GetRequiredService<IUserService>();
-            var blinboxService =  HttpContext.RequestServices.GetRequiredService<IBlindBoxService>();
-            var emailService =  HttpContext.RequestServices.GetRequiredService<IEmailService>();
-            
+            var userService = HttpContext.RequestServices.GetRequiredService<IUserService>();
+            var blinboxService = HttpContext.RequestServices.GetRequiredService<IBlindBoxService>();
+            var emailService = HttpContext.RequestServices.GetRequiredService<IEmailService>();
+
             // Tạo instance UnboxingService mới với đầy đủ tham số
             var unboxingService = new UnboxingService(
                 loggerService,
@@ -270,8 +268,8 @@ public class SystemController : ControllerBase
                 blinboxService,
                 emailService
             );
-            
-            
+
+
             var unboxResults = new List<UnboxResultDto>();
 
             // Unbox từng hộp đã chọn
@@ -776,9 +774,7 @@ public class SystemController : ControllerBase
 
         // Log cho từng OrderDetail
         foreach (var od in shipment.OrderDetails ?? new List<OrderDetail>())
-        {
             await _orderDetailInventoryItemLogService.LogShipmentAddedAsync(od, shipment, trackingMessage);
-        }
 
         // Log cho từng InventoryItem
         foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
@@ -852,7 +848,7 @@ public class SystemController : ControllerBase
         var timeStep = TimeSpan.FromHours(1);
 
         var logs = new List<object>();
-        for (int i = startIndex; i < statusFlow.Count; i++)
+        for (var i = startIndex; i < statusFlow.Count; i++)
         {
             var oldStatus = shipment.Status;
             var newStatus = statusFlow[i];
@@ -919,14 +915,11 @@ public class SystemController : ControllerBase
 
             // Log for each InventoryItem (except DELIVERED, which is handled above)
             if (newStatus != ShipmentStatus.DELIVERED && newStatus != ShipmentStatus.COMPLETED)
-            {
                 foreach (var item in shipment.InventoryItems ?? new List<InventoryItem>())
                 {
                     var oldItemStatus = item.Status;
                     if (newStatus == ShipmentStatus.PICKED_UP || newStatus == ShipmentStatus.IN_TRANSIT)
-                    {
                         item.Status = InventoryItemStatus.Delivering;
-                    }
 
                     await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
                         item.OrderDetail,
@@ -935,7 +928,6 @@ public class SystemController : ControllerBase
                         trackingMessage
                     );
                 }
-            }
 
             // Push notification to buyer
             if (buyer != null)
@@ -1008,7 +1000,7 @@ public class SystemController : ControllerBase
     }
 
     [HttpPost("dev/simulate-order-completion-flow/{orderId}")]
-    public async Task<IActionResult> SimulateOrderCompletionFlow( Guid orderId)
+    public async Task<IActionResult> SimulateOrderCompletionFlow(Guid orderId)
     {
         var order = await _context.Orders
             .Include(o => o.OrderDetails)
@@ -1064,14 +1056,12 @@ public class SystemController : ControllerBase
                 od.UpdatedAt = now.AddDays(-4); // Lùi lại 4 ngày để chắc chắn > 3 ngày
                 od.Logs += $"\n[{od.UpdatedAt:yyyy-MM-dd HH:mm:ss}] Status updated to IN_INVENTORY for simulation.";
                 // Nếu có InventoryItem, cũng lùi UpdatedAt
-                foreach (var item in od.InventoryItems ?? new List<InventoryItem>())
-                {
-                    item.UpdatedAt = now.AddDays(-4);
-                }
+                foreach (var item in od.InventoryItems ?? new List<InventoryItem>()) item.UpdatedAt = now.AddDays(-4);
             }
+
             order.PlacedAt = now.AddDays(-5); // Lùi lại cho chắc chắn
-             _context.OrderDetails.UpdateRange(order.OrderDetails);
-             _context.Orders.Update(order);
+            _context.OrderDetails.UpdateRange(order.OrderDetails);
+            _context.Orders.Update(order);
             var changes = await _context.SaveChangesAsync();
 
             return Ok(new
@@ -1244,11 +1234,11 @@ public class SystemController : ControllerBase
                     () => context.PayoutTransactions.ExecuteDeleteAsync(),
                     () => context.PayoutLogs.ExecuteDeleteAsync(),
                     () => context.PayoutDetails.ExecuteDeleteAsync(),
-                           () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),
+                    () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),
                     () => context.InventoryItems.ExecuteDeleteAsync(),
 
                     () => context.ChatMessages.ExecuteDeleteAsync(),
-             
+
                     () => context.CustomerFavourites.ExecuteDeleteAsync(),
                     () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
                     () => context.ProbabilityConfigs.ExecuteDeleteAsync(),
@@ -1259,7 +1249,7 @@ public class SystemController : ControllerBase
                     () => context.OrderDetails.ExecuteDeleteAsync(),
                     () => context.Shipments.ExecuteDeleteAsync(),
                     () => context.Listings.ExecuteDeleteAsync(),
-        
+
                     () => context.CustomerBlindBoxes.ExecuteDeleteAsync(),
                     () => context.GroupPaymentSessions.ExecuteDeleteAsync(),
 
@@ -1273,7 +1263,7 @@ public class SystemController : ControllerBase
                     () => context.ListingReports.ExecuteDeleteAsync(),
 
                     () => context.Orders.ExecuteDeleteAsync(),
-                                        () => context.Payouts.ExecuteDeleteAsync(),
+                    () => context.Payouts.ExecuteDeleteAsync(),
 
                     () => context.Payments.ExecuteDeleteAsync(),
                     () => context.PromotionUserUsages.ExecuteDeleteAsync(),
@@ -1606,7 +1596,7 @@ public class SystemController : ControllerBase
                             Description = "Blind box PopMart kích thước nhỏ gọn, thích hợp sưu tầm.",
                             CategoryId = category.Id,
                             SellerId = seller.Id,
-                            RealSellingPrice = 750000,  
+                            RealSellingPrice = 750000,
                             TotalStockQuantity = 70,
                             Status = ProductStatus.Active,
                             CreatedAt = now,

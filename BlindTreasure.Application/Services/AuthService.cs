@@ -135,12 +135,10 @@ public class AuthService : IAuthService
             throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
 
         if (!loginDto.IsLoginGoole.Value)
-        {
             if (!new PasswordHasher().VerifyPassword(loginDto.Password!, user.Password))
                 throw ErrorHelper.Unauthorized(ErrorMessages.AccountWrongPassword);
-        }
 
-       
+
         if (user.Status != UserStatus.Active)
             throw ErrorHelper.Forbidden(ErrorMessages.AccountNotVerified);
 

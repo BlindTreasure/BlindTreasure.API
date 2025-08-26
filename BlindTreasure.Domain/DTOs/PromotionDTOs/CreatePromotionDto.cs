@@ -25,5 +25,4 @@ public class CreatePromotionDto
 
     [DefaultValue(100)] public int UsageLimit { get; set; }
     [DefaultValue(2)] public int? MaxUsagePerUser { get; set; } = 2; // e.g. 2
-
 }

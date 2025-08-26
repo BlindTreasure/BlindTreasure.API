@@ -5,5 +5,5 @@ public enum TransactionStatus
     Pending,
     Successful,
     Failed,
-    Canceled,
+    Canceled
 }

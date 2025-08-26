@@ -232,8 +232,6 @@ public class StripeController : ControllerBase
                         foreach (var orderId in orderIds)
                             await HandleSuccessfulPaymentForOrder(orderId, completedSession.Id,
                                 completedSession.Metadata);
-
-
                     }
                     else
                     {
@@ -567,7 +565,7 @@ public class StripeController : ControllerBase
         }
 
 
-            _logger.Warn($"[Stripe][Webhook] Checkout session expired: {session.Id} with stauts {session.PaymentStatus}");
+        _logger.Warn($"[Stripe][Webhook] Checkout session expired: {session.Id} with stauts {session.PaymentStatus}");
         await _transactionService.HandleFailedPaymentAsync(session.Id);
     }
 
@@ -695,7 +693,9 @@ public class StripeController : ControllerBase
             }
             else
             {
-                return BadRequest(ApiResult<object>.Failure("Thông tin request không hợp lệ hoặc thiếu thông tin orderId/checkoutGroupId."));
+                return BadRequest(
+                    ApiResult<object>.Failure(
+                        "Thông tin request không hợp lệ hoặc thiếu thông tin orderId/checkoutGroupId."));
             }
         }
         catch (Exception ex)

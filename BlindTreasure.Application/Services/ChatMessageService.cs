@@ -307,9 +307,9 @@ public class ChatMessageService : IChatMessageService
             .Where(u => u.Id == receiverId && !u.IsDeleted)
             .FirstOrDefaultAsync();
 
-        bool isSeller = false;
-        string otherUserName = "Unknown";
-        string otherUserAvatar = "";
+        var isSeller = false;
+        var otherUserName = "Unknown";
+        var otherUserAvatar = "";
 
         if (otherUser != null)
         {
@@ -340,16 +340,16 @@ public class ChatMessageService : IChatMessageService
         var lastMessage = await _unitOfWork.ChatMessages.GetQueryable()
             .Where(m =>
                 (m.SenderId == currentUserId && m.ReceiverId == receiverId) ||
-                (m.SenderId == receiverId && m.ReceiverId == currentUserId) &&
-                m.SenderType == ChatParticipantType.User &&
-                m.ReceiverType == ChatParticipantType.User)
+                (m.SenderId == receiverId && m.ReceiverId == currentUserId &&
+                 m.SenderType == ChatParticipantType.User &&
+                 m.ReceiverType == ChatParticipantType.User))
             .OrderByDescending(m => m.SentAt)
             .AsNoTracking()
             .FirstOrDefaultAsync();
 
         string lastMessageContent = null;
         DateTime? lastMessageTime = null;
-        int unreadCount = 0;
+        var unreadCount = 0;
 
         if (lastMessage != null)
         {
@@ -586,9 +586,9 @@ public class ChatMessageService : IChatMessageService
         return result;
     }
 
-     public async Task<Pagination<ConversationDto>> GetConversationsAsync(
-     Guid userId,
-     PaginationParameter param)
+    public async Task<Pagination<ConversationDto>> GetConversationsAsync(
+        Guid userId,
+        PaginationParameter param)
     {
         _logger.Info(
             $"[GetConversationsAsync] User {userId} requests conversations. Page: {param.PageIndex}, Size: {param.PageSize}");
@@ -661,9 +661,9 @@ public class ChatMessageService : IChatMessageService
                                  !m.IsRead);
 
             // Xác định người dùng hoặc seller
-            bool isSeller = false;
-            string otherUserName = "Unknown";
-            string otherUserAvatar = "";
+            var isSeller = false;
+            var otherUserName = "Unknown";
+            var otherUserAvatar = "";
 
             // Kiểm tra trong bảng User trước
             User? otherUser = null;
@@ -766,7 +766,7 @@ public class ChatMessageService : IChatMessageService
         _logger.Info($"[GetConversationsAsync] Conversations cached with key: {cacheKey}");
 
         return result;
-     }
+    }
 
     public async Task MarkMessagesAsReadAsync(Guid fromUserId, Guid toUserId)
     {

@@ -3,7 +3,7 @@
 public enum RarityName
 {
     Common,
-    Rare ,
-    Epic ,
-    Secret 
+    Rare,
+    Epic,
+    Secret
 }

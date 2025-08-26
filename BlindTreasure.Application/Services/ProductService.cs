@@ -164,10 +164,12 @@ public class ProductService : IProductService
         {
             if (dto.ListedPrice.Value < product.RealSellingPrice)
             {
-                _logger.Warn(string.Format("Listed Price can not be lower than Real Selling Price. Listed Price: {0}, Real Selling Price: {1}",
+                _logger.Warn(string.Format(
+                    "Listed Price can not be lower than Real Selling Price. Listed Price: {0}, Real Selling Price: {1}",
                     dto.ListedPrice.Value, product.RealSellingPrice));
                 throw ErrorHelper.BadRequest("Listed Price can not be lower than Real Selling Price.");
             }
+
             product.ListedPrice = dto.ListedPrice.Value;
         }
 
@@ -227,14 +229,14 @@ public class ProductService : IProductService
         if (dto.RealSellingPrice.HasValue)
             product.RealSellingPrice = dto.RealSellingPrice.Value;
         if (dto.ListedPrice.HasValue)
-        {
             if (dto.ListedPrice.Value < product.RealSellingPrice)
             {
-                _logger.Warn(string.Format("Listed Price can not be lower than Real Selling Price. Listed Price: {0}, Real Selling Price: {1}",
+                _logger.Warn(string.Format(
+                    "Listed Price can not be lower than Real Selling Price. Listed Price: {0}, Real Selling Price: {1}",
                     dto.ListedPrice.Value, product.RealSellingPrice));
                 throw ErrorHelper.BadRequest("Listed Price can not be lower than Real Selling Price.");
             }
-        }
+
         product.ListedPrice = dto.ListedPrice;
 
         if (dto.TotalStockQuantity.HasValue)
@@ -477,7 +479,8 @@ public class ProductService : IProductService
 
         if (dto.RealSellingPrice <= 0)
         {
-            _logger.Warn($"[ValidateProductDto] Validation failed: 'Price' must be > 0. Input value: {dto.RealSellingPrice}");
+            _logger.Warn(
+                $"[ValidateProductDto] Validation failed: 'Price' must be > 0. Input value: {dto.RealSellingPrice}");
             throw ErrorHelper.BadRequest("Giá sản phẩm phải lớn hơn 0.");
         }
 

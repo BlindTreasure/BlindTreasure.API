@@ -28,7 +28,8 @@ public class CustomerFavouriteController : ControllerBase
         try
         {
             var result = await _customerFavouriteService.AddToFavouriteAsync(request);
-            return Ok(ApiResult<CustomerFavouriteDto>.Success(result, message: "Sản phẩm đã được thêm vào danh sách yêu thích của bạn."));
+            return Ok(ApiResult<CustomerFavouriteDto>.Success(result,
+                message: "Sản phẩm đã được thêm vào danh sách yêu thích của bạn."));
         }
         catch (Exception ex)
         {
@@ -90,7 +91,9 @@ public class CustomerFavouriteController : ControllerBase
         {
             var result = await _customerFavouriteService.IsInFavouriteAsync(productId, blindBoxId);
             return Ok(ApiResult<bool>.Success(result, "200",
-                result ? "Sản phẩm này đã có trong danh sách yêu thích của bạn." : "Sản phẩm này chưa có trong danh sách yêu thích của bạn."));
+                result
+                    ? "Sản phẩm này đã có trong danh sách yêu thích của bạn."
+                    : "Sản phẩm này chưa có trong danh sách yêu thích của bạn."));
         }
         catch (Exception ex)
         {

@@ -234,7 +234,8 @@ public class PromotionController : ControllerBase
         try
         {
             var result = await _promotionService.GetSpecificPromotionUsagesync(promotionId, userId);
-            return Ok(ApiResult<PromotionUserUsageDto>.Success(result, "200", "Lấy thông tin sử dụng voucher thành công."));
+            return Ok(ApiResult<PromotionUserUsageDto>.Success(result, "200",
+                "Lấy thông tin sử dụng voucher thành công."));
         }
         catch (Exception ex)
         {
@@ -254,7 +255,8 @@ public class PromotionController : ControllerBase
         try
         {
             var result = await _promotionService.GetPromotionUsageOfUserAsync(userId);
-            return Ok(ApiResult<List<PromotionUserUsageDto>>.Success(result, "200", "Lấy danh sách sử dụng voucher thành công."));
+            return Ok(ApiResult<List<PromotionUserUsageDto>>.Success(result, "200",
+                "Lấy danh sách sử dụng voucher thành công."));
         }
         catch (Exception ex)
         {
@@ -263,6 +265,4 @@ public class PromotionController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-
-
 }

@@ -10,7 +10,9 @@ namespace BlindTreasure.Domain.Enums;
 public enum PayoutStatus
 {
     [Description("Đã thêm vào hàng chờ")] PENDING, // Thêm trạng thái PENDING để phân biệt với PROCESSING
-    [Description("SELLER GỬI YÊU CẦU RÚT ")] REQUESTED, //  
+
+    [Description("SELLER GỬI YÊU CẦU RÚT ")]
+    REQUESTED, //  
     [Description("Đang xử lý")] PROCESSING,
 
     [Description("Hoàn thành")] COMPLETED,

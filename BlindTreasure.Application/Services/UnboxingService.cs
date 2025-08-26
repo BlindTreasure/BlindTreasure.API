@@ -603,14 +603,12 @@ public class UnboxingService : IUnboxingService
                 .FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
 
             if (sellerUser != null)
-            {
                 await _emailService.SendCommonItemOutOfStockAsync(
                     sellerUser.Email,
                     sellerUser.FullName ?? sellerUser.Email,
                     blindBox.Name,
                     commonItem.Product?.Name ?? "Unknown Product"
                 );
-            }
 
             _loggerService.Warn(
                 $"[DropRate] BlindBox {blindBox.Id} bị disable vì Common '{commonItem.Product?.Name}' hết hàng."
@@ -622,12 +620,10 @@ public class UnboxingService : IUnboxingService
         var sbBefore = new StringBuilder();
         sbBefore.AppendLine($"[DropRate-BEFORE] BlindBox {blindBox.Id}:");
         foreach (var item in items.OrderByDescending(x => x.DropRate))
-        {
             sbBefore.AppendLine($"- {item.Product?.Name ?? "Unknown"} | " +
                                 $"Rarity: {item.RarityConfig?.Name} | " +
                                 $"Qty: {item.Quantity} | " +
                                 $"DropRate: {item.DropRate:N2}%");
-        }
 
         _loggerService.Info(sbBefore.ToString());
 
@@ -662,12 +658,10 @@ public class UnboxingService : IUnboxingService
         var sbAfter = new StringBuilder();
         sbAfter.AppendLine($"[DropRate-AFTER] BlindBox {blindBox.Id}:");
         foreach (var item in items.OrderByDescending(x => x.DropRate))
-        {
             sbAfter.AppendLine($"- {item.Product?.Name ?? "Unknown"} | " +
                                $"Rarity: {item.RarityConfig?.Name} | " +
                                $"Qty: {item.Quantity} | " +
                                $"DropRate: {item.DropRate:N2}%");
-        }
 
         _loggerService.Info(sbAfter.ToString());
     }

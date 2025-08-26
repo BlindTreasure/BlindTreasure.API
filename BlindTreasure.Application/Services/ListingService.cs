@@ -107,9 +107,11 @@ public class ListingService : IListingService
 
         _logger.Info($"[GetAvailableItems] Cache miss cho user: {userId}");
 
-        // Lấy tất cả inventory items của user
+        // Lấy tất cả inventory items có status = Available
         var items = await _unitOfWork.InventoryItems.GetAllAsync(
-            x => x.UserId == userId && !x.IsDeleted,
+            x => x.UserId == userId
+                 && !x.IsDeleted
+                 && x.Status == InventoryItemStatus.Available,
             i => i.Product,
             i => i.Listings,
             i => i.LastTradeHistory
@@ -136,8 +138,6 @@ public class ListingService : IListingService
 
                 return dto;
             })
-            .OrderBy(item => item.Status != InventoryItemStatus.Available) // Sắp xếp Available lên đầu
-            .ThenBy(item => item.Status) // Sắp xếp các trạng thái còn lại theo thứ tự enum
             .ToList();
 
         // Cache kết quả
@@ -245,7 +245,7 @@ public class ListingService : IListingService
 
     private static class CacheKeys
     {
-        private const string PREFIX = "bai_dang:";
+        private const string PREFIX = "listing:";
 
         public static string GetListingDetail(Guid listingId)
         {
@@ -337,7 +337,7 @@ public class ListingService : IListingService
         {
             dto.OwnerName = listing.InventoryItem.User.FullName ?? listing.InventoryItem.User.Email;
             dto.OwnerId = listing.InventoryItem.User.Id;
-        }        
+        }
 
         return dto;
     }
@@ -358,7 +358,7 @@ public class ListingService : IListingService
         if (inventoryItem == null)
         {
             _logger.Warn($"[EnsureItemCanBeListed] Không tìm thấy item {inventoryId} hợp lệ");
-            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm hợp lệ để tạo bài đăng.");
+            throw ErrorHelper.Conflict("Không tìm thấy vật phẩm hợp lệ để tạo bài đăng.");
         }
 
         // Kiểm tra bài đăng active
@@ -381,8 +381,6 @@ public class ListingService : IListingService
             throw ErrorHelper.Conflict(
                 "Vật phẩm này hiện đang có giao dịch chờ xử lý. Vui lòng thử lại sau khi giao dịch kết thúc.");
         }
-
-        _logger.Success($"[EnsureItemCanBeListed] Item {inventoryId} đủ điều kiện tạo bài đăng");
     }
 
     #endregion

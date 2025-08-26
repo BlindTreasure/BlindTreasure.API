@@ -20,9 +20,8 @@ public class Product : BaseEntity
     public decimal? ListedPrice { get; set; } // Đây là giá niêm yết, có thể khác với giá bán thực tế
 
     public int TotalStockQuantity { get; set; }
-    public int ReservedInBlindBox { get; set; }      
-    [NotMapped]
-    public int AvailableToSell => TotalStockQuantity - ReservedInBlindBox;
+    public int ReservedInBlindBox { get; set; }
+    [NotMapped] public int AvailableToSell => TotalStockQuantity - ReservedInBlindBox;
     public List<string> ImageUrls { get; set; } = new(); // new: khởi tạo mặc định tránh null
     public ProductStatus Status { get; set; }
 

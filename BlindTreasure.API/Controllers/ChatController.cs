@@ -125,7 +125,8 @@ public class ChatController : ControllerBase
             var currentUserId = _claimsService.CurrentUserId;
             var result = await _chatMessageService.GetNewConversationByReceiverIdAsync(currentUserId, receiverId);
 
-            return Ok(ApiResult<object>.Success(result, "200", "Danh sách cuộc trò chuyện của bạn đã được tải thành công."));
+            return Ok(ApiResult<object>.Success(result, "200",
+                "Danh sách cuộc trò chuyện của bạn đã được tải thành công."));
         }
         catch (Exception ex)
         {

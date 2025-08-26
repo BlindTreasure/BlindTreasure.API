@@ -201,7 +201,7 @@ public class StripeService : IStripeService
                 CouponId = couponId,
                 PaymentIntentId = session.PaymentIntentId
             };
-            groupSession= await _unitOfWork.GroupPaymentSessions.AddAsync(groupSession);
+            groupSession = await _unitOfWork.GroupPaymentSessions.AddAsync(groupSession);
         }
         else
         {
@@ -669,7 +669,8 @@ public class StripeService : IStripeService
             Amount = (long)amount,
             Currency = currency,
             Destination = sellerStripeAccountId,
-            Description = $"{description} for Seller: {sellerName} (ID: {payout?.SellerId}) - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} by {user.FullName}"
+            Description =
+                $"{description} for Seller: {sellerName} (ID: {payout?.SellerId}) - {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} by {user.FullName}"
         };
 
         try
@@ -686,7 +687,7 @@ public class StripeService : IStripeService
                 StripeDestinationAccount = sellerStripeAccountId,
                 Amount = transfer.Amount,
                 Currency = transfer.Currency,
-                Status = "succeed",// "pending", etc.
+                Status = "succeed", // "pending", etc.
                 TransferredAt = transfer.Created,
                 Description = transfer.Description,
                 ExternalRef = transfer.BalanceTransactionId,
@@ -694,8 +695,8 @@ public class StripeService : IStripeService
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = userId,
                 SellerName = sellerName,
-                InitiatedBy= userId,
-                InitiatedByName= user.FullName,
+                InitiatedBy = userId,
+                InitiatedByName = user.FullName
             };
 
             await _unitOfWork.PayoutTransactions.AddAsync(payoutTransaction);

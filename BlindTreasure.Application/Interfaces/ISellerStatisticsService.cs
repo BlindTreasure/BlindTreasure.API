@@ -18,7 +18,10 @@ public interface ISellerStatisticsService
 
     Task<SellerOverviewStatisticsDto> GetOverviewStatisticsAsync(Guid sellerId, SellerStatisticsRequestDto req,
         CancellationToken ct = default);
-    Task<SellerRevenueSummaryDto> GetRevenueSummaryAsync(Guid sellerId, SellerStatisticsRequestDto req, CancellationToken ct = default);
+
+    Task<SellerRevenueSummaryDto> GetRevenueSummaryAsync(Guid sellerId, SellerStatisticsRequestDto req,
+        CancellationToken ct = default);
+
     Task<SellerStatisticsResponseDto> GetTimeSeriesStatisticsAsync(Guid sellerId, SellerStatisticsRequestDto req,
         CancellationToken ct = default);
 

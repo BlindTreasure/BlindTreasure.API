@@ -299,7 +299,8 @@ public static class IocContainer
                         context.HandleResponse();
                         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                         context.Response.ContentType = "application/json";
-                        var result = BlindTreasure.Application.Utils.ApiResult.Failure("401", "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.");
+                        var result = Application.Utils.ApiResult.Failure("401",
+                            "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.");
                         var json = System.Text.Json.JsonSerializer.Serialize(result);
                         return context.Response.WriteAsync(json);
                     },
@@ -307,7 +308,8 @@ public static class IocContainer
                     {
                         context.Response.StatusCode = StatusCodes.Status403Forbidden;
                         context.Response.ContentType = "application/json";
-                        var result = BlindTreasure.Application.Utils.ApiResult.Failure("403", "Bạn không có quyền truy cập vào tài nguyên này.");
+                        var result = Application.Utils.ApiResult.Failure("403",
+                            "Bạn không có quyền truy cập vào tài nguyên này.");
                         var json = System.Text.Json.JsonSerializer.Serialize(result);
                         return context.Response.WriteAsync(json);
                     }

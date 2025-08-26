@@ -595,57 +595,12 @@ public class OrderService : IOrderService
         var groupSession = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
         result.GeneralPaymentUrl = groupSession.PaymentUrl;
         result.CheckOutSessionId = groupSession.StripeSessionId;
-        //// Tạo link thanh toán tổng cho tất cả order
-        //if (createdOrderIds.Count == 1)
-        //    // If only one order, use its payment URL
-        //    result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
-        //else
-        //    // Multiple orders, create a general checkout session
-        //    result.GeneralPaymentUrl = await _stripeService.CreateGeneralCheckoutSessionForOrders(createdOrderIds);
-
         result.Message = $"Đã tạo {result.Orders.Count} đơn hàng, mỗi đơn một link thanh toán riêng.";
 
-        await SendPaymentNotificationToUser(user, result);
 
         return result;
     }
 
-    private async Task SendPaymentNotificationToUser(User user, MultiOrderCheckoutResultDto result)
-    {
-        try
-        {
-            if (user != null)
-            {
-                var totalAmount = result.Orders.Sum(o => o.FinalAmount);
-
-                var orderList = string.Join(Environment.NewLine, result.Orders.Select(o =>
-                    $"- Đơn #{o.OrderId} của seller {o.SellerName}: {o.FinalAmount:N0}đ (Thanh toán: {o.PaymentUrl})"));
-
-                var notificationMsg = $@"
-Đã tạo {result.Orders.Count} đơn hàng mới từ giỏ hàng.
-Tổng số tiền cần thanh toán: {totalAmount:N0}đ
-{orderList}
-{(string.IsNullOrWhiteSpace(result.GeneralPaymentUrl) ? "" : $"Thanh toán tất cả: {result.GeneralPaymentUrl}")}
-";
-
-                // Giới hạn 500 ký tự để tránh lỗi SQL
-                if (notificationMsg.Length > 500)
-                    notificationMsg = notificationMsg.Substring(0, 497) + "...";
-
-                await _notificationService.PushNotificationToUser(user.Id, new NotificationDto
-                {
-                    Title = $"Đã tạo nhóm đơn hàng mới ({result.Orders.Count} đơn)",
-                    Message = notificationMsg.Trim(),
-                    Type = NotificationType.Order,
-                    SourceUrl = result.GeneralPaymentUrl
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            throw ErrorHelper.BadRequest("[SendPaymentNotificationToUser] error:" + ex.Message);
-        }
-    }
 
     /// <summary>
     /// Apply promotion discount to individual OrderDetails
@@ -969,7 +924,6 @@ Tổng số tiền cần thanh toán: {totalAmount:N0}đ
     {
         // 1. Rollback product quantity
         foreach (var detail in order.OrderDetails)
-        {
             if (detail.ProductId.HasValue)
             {
                 var product = await _unitOfWork.Products.GetByIdAsync(detail.ProductId.Value);
@@ -988,7 +942,6 @@ Tổng số tiền cần thanh toán: {totalAmount:N0}đ
                     await _unitOfWork.BlindBoxes.Update(blindBox);
                 }
             }
-        }
 
         // 2. Rollback promotion usage limit and user usage count
         foreach (var osp in order.OrderSellerPromotions)

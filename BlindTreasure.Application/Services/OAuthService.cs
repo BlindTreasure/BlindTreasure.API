@@ -21,7 +21,8 @@ public class OAuthService : IOAuthService
     private readonly string passwordCharacters;
     public readonly IAuthService _authService;
 
-    public OAuthService(IUserService userService, IUnitOfWork unitOfWork, IConfiguration configuration, IAuthService authService)
+    public OAuthService(IUserService userService, IUnitOfWork unitOfWork, IConfiguration configuration,
+        IAuthService authService)
     {
         _userService = userService;
         _unitOfWork = unitOfWork;
