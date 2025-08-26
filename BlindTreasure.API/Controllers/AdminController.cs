@@ -26,10 +26,9 @@ public class AdminController : ControllerBase
     private readonly ITradingService _tradingService;
     private readonly IInventoryItemService _inventoryItemService;
 
-    public AdminController(ISellerVerificationService sellerVerificationService, IClaimsService claimsService,
-        IUserService userService, IOrderService orderService, IPayoutService payoutService,
-        ITradingService tradingService, IInventoryItemService inventoryItemService)
-        IAdminService userService, IOrderService orderService, IPayoutService payoutService)
+    public AdminController(ISellerVerificationService sellerVerificationService
+        , IClaimsService claimsService, IAdminService userService, IOrderService orderService
+        , IPayoutService payoutService, ITradingService tradingService, IInventoryItemService inventoryItemService)
     {
         _sellerVerificationService = sellerVerificationService;
         _claimsService = claimsService;
@@ -40,7 +39,9 @@ public class AdminController : ControllerBase
         _inventoryItemService = inventoryItemService;
     }
 
-    
+
+
+
     /// <summary>
     /// API Admin: ép buộc giải phóng trạng thái giữ 3 ngày của một InventoryItem
     /// để test/demo khả năng tạo listing lại ngay sau khi trade.
