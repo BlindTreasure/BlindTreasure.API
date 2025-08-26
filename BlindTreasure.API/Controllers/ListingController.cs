@@ -91,7 +91,8 @@ public class ListingController : ControllerBase
         try
         {
             await _listingService.ReportListingAsync(listingId, request.Reason);
-            return Ok(ApiResult<object>.Success(null, "200", "Báo cáo tin rao vặt thành công. Chúng tôi sẽ xem xét sớm."));
+            return Ok(ApiResult<object>.Success(null, "200",
+                "Báo cáo tin rao vặt thành công. Chúng tôi sẽ xem xét sớm."));
         }
         catch (Exception ex)
         {
@@ -110,7 +111,8 @@ public class ListingController : ControllerBase
         try
         {
             var result = await _listingService.GetAvailableItemsForListingAsync();
-            return Ok(ApiResult<List<InventoryItemDto>>.Success(result, "200", "Danh sách vật phẩm có thể tạo tin rao vặt đã được tải thành công."));
+            return Ok(ApiResult<List<InventoryItemDto>>.Success(result, "200",
+                "Danh sách vật phẩm có thể tạo tin rao vặt đã được tải thành công."));
         }
         catch (Exception ex)
         {

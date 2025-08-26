@@ -47,7 +47,8 @@ public class PersonalController : ControllerBase
                 return NotFound(ApiResult<SellerOverviewDto>.Failure("404", "Không tìm thấy seller."));
 
             var overview = await _sellerService.GetSellerOverviewAsync(seller.SellerId);
-            return Ok(ApiResult<SellerOverviewDto>.Success(overview, "200", "Lấy thông tin tổng quan seller thành công."));
+            return Ok(ApiResult<SellerOverviewDto>.Success(overview, "200",
+                "Lấy thông tin tổng quan seller thành công."));
         }
         catch (Exception ex)
         {
@@ -344,7 +345,8 @@ public class PersonalController : ControllerBase
         {
             var userId = _claimsService.CurrentUserId;
             var result = await _promotionService.GetSpecificPromotionUsagesync(promotionId, userId);
-            return Ok(ApiResult<PromotionUserUsageDto>.Success(result, "200", "Lấy thông tin sử dụng voucher thành công."));
+            return Ok(ApiResult<PromotionUserUsageDto>.Success(result, "200",
+                "Lấy thông tin sử dụng voucher thành công."));
         }
         catch (Exception ex)
         {
@@ -366,7 +368,8 @@ public class PersonalController : ControllerBase
         {
             var userId = _claimsService.CurrentUserId;
             var result = await _promotionService.GetPromotionUsageOfUserAsync(userId);
-            return Ok(ApiResult<List<PromotionUserUsageDto>>.Success(result, "200", "Lấy danh sách sử dụng voucher thành công."));
+            return Ok(ApiResult<List<PromotionUserUsageDto>>.Success(result, "200",
+                "Lấy danh sách sử dụng voucher thành công."));
         }
         catch (Exception ex)
         {
@@ -375,6 +378,4 @@ public class PersonalController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
-
-
 }

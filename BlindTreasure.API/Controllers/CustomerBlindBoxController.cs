@@ -77,7 +77,8 @@ public class CustomerBlindBoxController : ControllerBase
             }
 
             _logger.Info($"[CustomerInventoryController][GetById] Lấy chi tiết BlindBox {id} thành công.");
-            return Ok(ApiResult<CustomerInventoryDto>.Success(item, "200", "Thông tin chi tiết Blind Box đã được tải thành công."));
+            return Ok(ApiResult<CustomerInventoryDto>.Success(item, "200",
+                "Thông tin chi tiết Blind Box đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -102,7 +103,8 @@ public class CustomerBlindBoxController : ControllerBase
         {
             var result = await _customerBlindBoxService.MarkAsOpenedAsync(id);
             _logger.Success($"[CustomerInventoryController][MarkAsOpened] Đánh dấu BlindBox {id} đã mở.");
-            return Ok(ApiResult<CustomerInventoryDto>.Success(result, "200", "Blind Box đã được đánh dấu là đã mở thành công."));
+            return Ok(ApiResult<CustomerInventoryDto>.Success(result, "200",
+                "Blind Box đã được đánh dấu là đã mở thành công."));
         }
         catch (Exception ex)
         {

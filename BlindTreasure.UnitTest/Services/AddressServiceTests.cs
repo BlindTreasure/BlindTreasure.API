@@ -218,7 +218,8 @@ public class AddressServiceTests
             .ReturnsAsync((Address)null!);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.UpdateAddressAsync(addressId, updateDto));
+        var exception =
+            await Assert.ThrowsAsync<Exception>(() => _addressService.UpdateAddressAsync(addressId, updateDto));
         ExceptionUtils.ExtractStatusCode(exception).Should().Be(404);
     }
 
@@ -247,7 +248,8 @@ public class AddressServiceTests
             .ReturnsAsync(existingAddress);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<Exception>(() => _addressService.UpdateAddressAsync(addressId, updateDto));
+        var exception =
+            await Assert.ThrowsAsync<Exception>(() => _addressService.UpdateAddressAsync(addressId, updateDto));
         ExceptionUtils.ExtractStatusCode(exception).Should().Be(404);
     }
 

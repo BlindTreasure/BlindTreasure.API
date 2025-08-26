@@ -27,7 +27,7 @@ public class AuthController : ControllerBase
         _configuration = configuration;
         _oAuthService = oAuthService;
         passwordCharacters = _configuration["OAuthSettings:PasswordCharacters"] ??
-                            throw new Exception("Missing google oauth setting in config");
+                             throw new Exception("Missing google oauth setting in config");
     }
 
     [HttpPost("register")]
@@ -75,7 +75,8 @@ public class AuthController : ControllerBase
         {
             dto.IsLoginGoole = false; // Đặt mặc định là không đăng nhập bằng Google
             var result = await _authService.LoginAsync(dto, _configuration);
-            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập thành công. Chào mừng bạn trở lại!"));
+            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200",
+                "Đăng nhập thành công. Chào mừng bạn trở lại!"));
         }
         catch (Exception ex)
         {
@@ -146,7 +147,8 @@ public class AuthController : ControllerBase
         try
         {
             var sent = await _authService.ResendOtpAsync(dto.Email, dto.Type);
-            return Ok(ApiResult<object>.Success(sent!, "200", "Mã OTP đã được gửi lại thành công. Vui lòng kiểm tra email của bạn."));
+            return Ok(ApiResult<object>.Success(sent!, "200",
+                "Mã OTP đã được gửi lại thành công. Vui lòng kiểm tra email của bạn."));
         }
         catch (Exception ex)
         {
@@ -163,7 +165,8 @@ public class AuthController : ControllerBase
     {
         var reset = await _authService.ResetPasswordAsync(dto.Email, dto.Otp, dto.NewPassword);
         if (!reset)
-            return BadRequest(ApiResult.Failure("400", "Mã OTP không hợp lệ, đã hết hạn hoặc thông tin đặt lại mật khẩu không chính xác."));
+            return BadRequest(ApiResult.Failure("400",
+                "Mã OTP không hợp lệ, đã hết hạn hoặc thông tin đặt lại mật khẩu không chính xác."));
         return Ok(ApiResult.Success("200", "Mật khẩu của bạn đã được đặt lại thành công."));
     }
 
@@ -183,7 +186,8 @@ public class AuthController : ControllerBase
             var result = await _oAuthService.AuthenticateWithGoogle(dto.Token);
 
 
-            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200", "Đăng nhập bằng Google thành công. Chào mừng bạn trở lại!"));
+            return Ok(ApiResult<LoginResponseDto>.Success(result!, "200",
+                "Đăng nhập bằng Google thành công. Chào mừng bạn trở lại!"));
         }
         catch (Exception ex)
         {

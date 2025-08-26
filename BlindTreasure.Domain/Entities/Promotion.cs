@@ -23,7 +23,7 @@ public class Promotion : BaseEntity
     public Seller? Seller { get; set; }
     public RoleType? CreatedByRole { get; set; }
 
-    public int? MaxUsagePerUser { get; set; } = 2;// e.g. 2
+    public int? MaxUsagePerUser { get; set; } = 2; // e.g. 2
     public ICollection<PromotionParticipant> PromotionParticipants { get; set; }
 
 

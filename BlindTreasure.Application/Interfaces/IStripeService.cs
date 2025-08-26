@@ -18,7 +18,8 @@ public interface IStripeService
     Task<string> GetOrCreateGroupPaymentLink(Guid checkoutGroupId);
     Task<bool> IsSellerStripeAccountVerifiedAsync(string sellerStripeAccountId);
 
-    Task<Transfer> PayoutToSellerAsync(Guid payoutId, string sellerStripeAccountId, decimal amount, string currency = "usd",
+    Task<Transfer> PayoutToSellerAsync(Guid payoutId, string sellerStripeAccountId, decimal amount,
+        string currency = "usd",
         string description = "Payout to seller");
 
     Task<Refund> RefundPaymentAsync(string paymentIntentId, decimal amount);

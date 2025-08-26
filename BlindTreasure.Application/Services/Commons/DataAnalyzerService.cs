@@ -43,7 +43,7 @@ public class DataAnalyzerService : IDataAnalyzerService
 
         return products;
     }
-    
+
     public async Task<List<ProductTrendingStatDto>> GetTrendingProductsForAiAsync()
     {
         var now = DateTime.UtcNow;
@@ -68,14 +68,15 @@ public class DataAnalyzerService : IDataAnalyzerService
                 var product = g.Key;
 
                 var recent = g.Where(x => x.Order.CompletedAt >= last30Days).ToList();
-                var previous = g.Where(x => x.Order.CompletedAt < last30Days && x.Order.CompletedAt >= prev30Days).ToList();
+                var previous = g.Where(x => x.Order.CompletedAt < last30Days && x.Order.CompletedAt >= prev30Days)
+                    .ToList();
 
                 var recentQty = recent.Sum(x => x.Quantity);
                 var previousQty = previous.Sum(x => x.Quantity);
 
                 double growthRate = 0;
                 if (previousQty > 0)
-                    growthRate = ((double)(recentQty - previousQty) / previousQty) * 100;
+                    growthRate = (double)(recentQty - previousQty) / previousQty * 100;
 
                 return new ProductTrendingStatDto
                 {
@@ -95,5 +96,4 @@ public class DataAnalyzerService : IDataAnalyzerService
 
         return grouped;
     }
-
 }

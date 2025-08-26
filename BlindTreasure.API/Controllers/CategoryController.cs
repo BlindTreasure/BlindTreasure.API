@@ -77,7 +77,8 @@ public class CategoryController : ControllerBase
         try
         {
             var result = await _categoryService.GetByIdAsync(id);
-            return Ok(ApiResult<CategoryDto>.Success(result, "200", "Thông tin chi tiết danh mục đã được tải thành công."));
+            return Ok(ApiResult<CategoryDto>.Success(result, "200",
+                "Thông tin chi tiết danh mục đã được tải thành công."));
         }
         catch (Exception ex)
         {

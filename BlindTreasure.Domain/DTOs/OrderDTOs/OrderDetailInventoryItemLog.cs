@@ -6,21 +6,19 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlindTreasure.Domain.DTOs.OrderDTOs
+namespace BlindTreasure.Domain.DTOs.OrderDTOs;
+
+public class OrderDetailInventoryItemLogDto
 {
-    public class OrderDetailInventoryItemLogDto
-    {
-        public Guid Id { get; set; }
-        public Guid? OrderDetailId { get; set; }
+    public Guid Id { get; set; }
+    public Guid? OrderDetailId { get; set; }
 
-        public Guid? InventoryItemId { get; set; }
-        [MaxLength(1000)]
-        public string? LogContent { get; set; } = string.Empty; // Lưu trữ nhật ký trạng thái
-        public DateTime? LogTime { get; set; } = DateTime.UtcNow; // Lưu trữ thời gian nhật ký, định dạng ISO 8601
+    public Guid? InventoryItemId { get; set; }
+    [MaxLength(1000)] public string? LogContent { get; set; } = string.Empty; // Lưu trữ nhật ký trạng thái
+    public DateTime? LogTime { get; set; } = DateTime.UtcNow; // Lưu trữ thời gian nhật ký, định dạng ISO 8601
 
-        public ActionType? ActionType { get; set; }
-        public string? OldValue { get; set; } // Trạng thái trước thay đổi
-        public string? NewValue { get; set; } // Trạng thái mới
-        public Guid? ActorId { get; set; }
-    }
+    public ActionType? ActionType { get; set; }
+    public string? OldValue { get; set; } // Trạng thái trước thay đổi
+    public string? NewValue { get; set; } // Trạng thái mới
+    public Guid? ActorId { get; set; }
 }

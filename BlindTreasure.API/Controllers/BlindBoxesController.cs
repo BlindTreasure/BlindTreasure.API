@@ -65,7 +65,8 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.GetBlindBoxByIdAsync(id);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Thông tin chi tiết Blind Box đã được tải thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200",
+                "Thông tin chi tiết Blind Box đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -136,7 +137,8 @@ public class BlindBoxesController : ControllerBase
         try
         {
             var result = await _blindBoxService.AddItemsToBlindBoxAsync(id, items);
-            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200", "Vật phẩm đã được thêm vào Blind Box thành công."));
+            return Ok(ApiResult<BlindBoxDetailDto>.Success(result, "200",
+                "Vật phẩm đã được thêm vào Blind Box thành công."));
         }
         catch (Exception ex)
         {

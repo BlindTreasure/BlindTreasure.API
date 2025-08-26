@@ -50,5 +50,4 @@ public class Payout : BaseEntity
     public ICollection<PayoutDetail> PayoutDetails { get; set; } = new List<PayoutDetail>();
     public ICollection<PayoutLog> PayoutLogs { get; set; } = new List<PayoutLog>();
     public ICollection<Order> Orders { get; set; } = new List<Order>();
-
 }

@@ -78,8 +78,8 @@ public class UnboxController : ControllerBase
             if (stream.CanSeek)
                 stream.Position = 0;
 
-            string fileName = $"UnboxingLogs_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-            string fileType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            var fileName = $"UnboxingLogs_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            var fileType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
             return File(stream, fileType, fileName);
         }
         catch (Exception ex)

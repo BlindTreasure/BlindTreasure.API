@@ -252,7 +252,7 @@ public class SellerService : ISellerService
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
         }
 
-      //  await _cacheService.SetAsync(cacheKey, seller, TimeSpan.FromHours(1));
+        //  await _cacheService.SetAsync(cacheKey, seller, TimeSpan.FromHours(1));
         _loggerService.Info($"[GetSellerProfileByUserIdAsync] Seller user {userId} loaded from DB and cached.");
         return SellerMapper.ToSellerProfileDto(seller);
     }
@@ -376,7 +376,7 @@ public class SellerService : ISellerService
         if (seller == null)
             throw ErrorHelper.Forbidden("Seller chưa được đăng ký tồn tại.");
         var newProduct = _mapper.Map<ProductSellerCreateDto, ProductCreateDto>(dto);
-        
+
         newProduct.SellerId = seller.Id; // GÁN SELLER ID VÀO DTO ĐỂ NÉM QUA PRODUCT SERVICE ĐỂ TẠO
 
         var result = await _productService.CreateAsync(newProduct);
@@ -582,7 +582,7 @@ public class SellerService : ISellerService
         var totalMinutes = (now - joinedAt).TotalMinutes;
         var totalDays = (now - joinedAt).TotalDays;
 
-        string joinedAtToText = $"Tham gia từ ngày {joinedAt:MM-dd-yyyy}";
+        var joinedAtToText = $"Tham gia từ ngày {joinedAt:MM-dd-yyyy}";
 
         //if (totalDays >= 30)
         //{
@@ -631,7 +631,6 @@ public class SellerService : ISellerService
         return seller;
     }
 
- 
 
     private static void ValidateSellerInfoDto(UpdateSellerInfoDto dto)
     {

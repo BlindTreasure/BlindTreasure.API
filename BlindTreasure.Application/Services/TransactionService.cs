@@ -595,7 +595,7 @@ public class TransactionService : ITransactionService
                 {
                     if (order.Status == OrderStatus.CANCELLED.ToString() ||
                         order.Status == OrderStatus.EXPIRED.ToString() ||
-                        order.Status == OrderStatus.PAID.ToString()||
+                        order.Status == OrderStatus.PAID.ToString() ||
                         order.Status == OrderStatus.COMPLETED.ToString())
                     {
                         _logger.Warn($"[HandleFailedPaymentAsync] Order {order.Id} đã ở trạng thái không cần xử lý.");

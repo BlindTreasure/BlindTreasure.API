@@ -23,5 +23,6 @@ public interface IOrderService
 
     Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(List<CartSellerItemDto> items,
         bool? IsPreview = false);
+
     Task RollbackOrderInventoryAndPromotionAsync(Order order);
 }

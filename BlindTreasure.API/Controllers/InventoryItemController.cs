@@ -124,7 +124,8 @@ public class InventoryItemController : ControllerBase
             }
 
             _logger.Info($"[InventoryItemController][GetById] Lấy chi tiết inventory item {id} thành công.");
-            return Ok(ApiResult<InventoryItemDto>.Success(item, "200", "Thông tin chi tiết vật phẩm trong kho đã được tải thành công."));
+            return Ok(ApiResult<InventoryItemDto>.Success(item, "200",
+                "Thông tin chi tiết vật phẩm trong kho đã được tải thành công."));
         }
         catch (Exception ex)
         {
@@ -150,7 +151,8 @@ public class InventoryItemController : ControllerBase
         {
             var result = await _inventoryItemService.UpdateAsync(id, dto);
             _logger.Success($"[InventoryItemController][Update] Cập nhật inventory item {id} thành công.");
-            return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Vật phẩm trong kho đã được cập nhật thành công."));
+            return Ok(ApiResult<InventoryItemDto>.Success(result, "200",
+                "Vật phẩm trong kho đã được cập nhật thành công."));
         }
         catch (Exception ex)
         {
@@ -206,7 +208,8 @@ public class InventoryItemController : ControllerBase
             var result = await _inventoryItemService.RequestShipmentAsync(request);
             _logger.Success(
                 $"[InventoryItemController][RequestShipment] Đã tạo yêu cầu giao hàng cho list item {request.InventoryItemIds}.");
-            return Ok(ApiResult<ShipmentItemResponseDTO>.Success(result, "200", "Yêu cầu giao hàng đã được tạo thành công."));
+            return Ok(ApiResult<ShipmentItemResponseDTO>.Success(result, "200",
+                "Yêu cầu giao hàng đã được tạo thành công."));
         }
         catch (Exception ex)
         {

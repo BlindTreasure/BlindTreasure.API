@@ -41,7 +41,8 @@ public class SellerController : ControllerBase
             if (overview == null)
                 return NotFound(ApiResult<SellerOverviewDto>.Failure("404", "Không tìm thấy seller."));
 
-            return Ok(ApiResult<SellerOverviewDto>.Success(overview, "200", "Lấy thông tin tổng quan seller thành công."));
+            return Ok(ApiResult<SellerOverviewDto>.Success(overview, "200",
+                "Lấy thông tin tổng quan seller thành công."));
         }
         catch (Exception ex)
         {
@@ -132,7 +133,8 @@ public class SellerController : ControllerBase
             await _sellerVerificationService.VerifySellerAsync(sellerId, dto);
 
             var msg = dto.IsApproved
-                ? "Người bán đã được xác minh." : "Người bán đã bị từ chối. Lý do: " + (dto.RejectReason ?? "Không có");
+                ? "Người bán đã được xác minh."
+                : "Người bán đã bị từ chối. Lý do: " + (dto.RejectReason ?? "Không có");
 
             return Ok(ApiResult.Success("200", msg));
         }

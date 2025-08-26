@@ -22,7 +22,8 @@ public class AdminController : ControllerBase
     private readonly IOrderService _orderService;
     private readonly IPayoutService _payoutService;
 
-    public AdminController(ISellerVerificationService sellerVerificationService, IClaimsService claimsService, IUserService userService, IOrderService orderService, IPayoutService payoutService)
+    public AdminController(ISellerVerificationService sellerVerificationService, IClaimsService claimsService,
+        IUserService userService, IOrderService orderService, IPayoutService payoutService)
     {
         _sellerVerificationService = sellerVerificationService;
         _claimsService = claimsService;
@@ -177,7 +178,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpPost("payouts/{payoutId}/confirm")]
-   // [Authorize(Roles = "Admin,Staff")]
+    // [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResult<PayoutDetailResponseDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
     public async Task<IActionResult> AdminConfirmPayoutWithProof(Guid payoutId, [FromForm] List<IFormFile> files)
@@ -189,14 +190,14 @@ public class AdminController : ControllerBase
             if (result == null)
                 return BadRequest(ApiResult<object>.Failure("400", "Payout confirmation failed."));
 
-            return Ok(ApiResult<PayoutDetailResponseDto>.Success(result, "200", "Payout confirmed and completed successfully."));
+            return Ok(ApiResult<PayoutDetailResponseDto>.Success(result, "200",
+                "Payout confirmed and completed successfully."));
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[AdminConfirmPayoutWithProof] {ex.Message}");
-            return StatusCode(500, ApiResult<object>.Failure("500", "Error occurred during payout confirmation: ." + ex.Message));
+            return StatusCode(500,
+                ApiResult<object>.Failure("500", "Error occurred during payout confirmation: ." + ex.Message));
         }
     }
-
-
 }

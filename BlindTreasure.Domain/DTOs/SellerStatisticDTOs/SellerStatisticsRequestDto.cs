@@ -11,7 +11,8 @@ namespace BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
 public class SellerStatisticsRequestDto
 {
     [DefaultValue(StatisticsTimeRange.Custom)]
-    [Required] public StatisticsTimeRange Range { get; set; } = StatisticsTimeRange.Week;
+    [Required]
+    public StatisticsTimeRange Range { get; set; } = StatisticsTimeRange.Week;
 
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }

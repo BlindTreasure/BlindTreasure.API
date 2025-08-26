@@ -51,7 +51,7 @@ public class BlindyService : IBlindyService
         return await AskStaffAsync(prompt);
     }
 
-    
+
     public async Task<bool> ValidateReviewAsync(string comment)
     {
         if (string.IsNullOrWhiteSpace(comment)) return false;

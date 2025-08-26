@@ -48,5 +48,4 @@ public class User : BaseEntity
     public ICollection<ProbabilityConfig> ApprovedProbabilityConfigs { get; set; }
     public ICollection<CustomerFavourite> CustomerFavourites { get; set; } = new List<CustomerFavourite>();
     public ICollection<PromotionUserUsage> PromotionUserUsages { get; set; } = new List<PromotionUserUsage>();
-
 }
