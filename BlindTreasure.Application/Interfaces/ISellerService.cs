@@ -24,4 +24,5 @@ public interface ISellerService
     Task<string> UpdateSellerAvatarAsync(Guid userId, IFormFile file);
     Task<Pagination<OrderDto>> GetSellerOrdersAsync(OrderQueryParameter param);
     Task<OrderDto> GetSellerOrderByIdAsync(Guid orderId);
+    Task<SellerOverviewDto?> GetSellerOverviewAsync(Guid sellerId);
 }

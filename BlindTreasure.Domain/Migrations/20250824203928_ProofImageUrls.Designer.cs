@@ -3,6 +3,7 @@ using System;
 using BlindTreasure.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlindTreasure.Domain.Migrations
 {
     [DbContext(typeof(BlindTreasureDbContext))]
-    partial class BlindTreasureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250824203928_ProofImageUrls")]
+    partial class ProofImageUrls
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1574,97 +1577,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.ToTable("PayoutLogs", (string)null);
                 });
 
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.PayoutTransaction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("BatchId")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ExternalRef")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FailureReason")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("InitiatedBy")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("InitiatedByName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<Guid>("PayoutId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("PlatformRevenueOfPayoutAmount")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("SellerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("SellerName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("StripeBalanceTransactionId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("StripeDestinationAccount")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("StripeTransferId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("TransferredAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PayoutId");
-
-                    b.ToTable("PayoutTransactions");
-                });
-
             modelBuilder.Entity("BlindTreasure.Domain.Entities.ProbabilityConfig", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3207,17 +3119,6 @@ namespace BlindTreasure.Domain.Migrations
                     b.Navigation("Payout");
 
                     b.Navigation("TriggeredByUser");
-                });
-
-            modelBuilder.Entity("BlindTreasure.Domain.Entities.PayoutTransaction", b =>
-                {
-                    b.HasOne("BlindTreasure.Domain.Entities.Payout", "Payout")
-                        .WithMany()
-                        .HasForeignKey("PayoutId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Payout");
                 });
 
             modelBuilder.Entity("BlindTreasure.Domain.Entities.ProbabilityConfig", b =>

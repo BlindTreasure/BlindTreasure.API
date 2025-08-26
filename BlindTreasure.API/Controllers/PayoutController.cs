@@ -46,14 +46,14 @@ namespace BlindTreasure.API.Controllers
 
                 var success = await _payoutService.RequestPayoutAsync(seller.SellerId);
                 if (success == null )
-                    return BadRequest(ApiResult<object>.Failure("400", "Không có payout hợp lệ hoặc số dư chưa đủ để rút."));
+                    return BadRequest(ApiResult<object>.Failure("400", "Không có payout hợp lệ hoặc doanh thu thực chưa đủ để rút."));
 
                 return Ok(ApiResult<object>.Success(success, "200", "Yêu cầu rút tiền đã được gửi thành công. Chờ staff duyệt."));
             }
             catch (Exception ex)
             {
                 _loggerService.Error($"[RequestPayout] {ex.Message}");
-                return StatusCode(500, ApiResult<bool>.Failure("500", "Có lỗi xảy ra khi gửi yêu cầu rút tiền."));
+                return StatusCode(500, ApiResult<bool>.Failure("500", "Có lỗi xảy ra khi gửi yêu cầu rút tiền" + ex.Message));
             }
         }
 
@@ -72,7 +72,7 @@ namespace BlindTreasure.API.Controllers
                 if (seller == null)
                     return BadRequest(ApiResult<object>.Failure("400", "Không tìm thấy hồ sơ seller."));
 
-                var payout = await _payoutService.GetEligiblePayoutForSellerAsync(seller.SellerId);
+                var payout = await _payoutService.GetEligiblePayoutDtoForSellerAsync(seller.SellerId);
                 if (payout == null)
                     return Ok(ApiResult<object>.Success(null, "200", "Không có payout hợp lệ hoặc chưa đủ điều kiện rút."));
 
@@ -81,7 +81,7 @@ namespace BlindTreasure.API.Controllers
             catch (Exception ex)
             {
                 _loggerService.Error($"[GetEligiblePayout] {ex.Message}");
-                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi kiểm tra payout."));
+                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi kiểm tra payout :"+ex.Message));
             }
         }
 
@@ -130,7 +130,7 @@ namespace BlindTreasure.API.Controllers
             catch (Exception ex)
             {
                 _loggerService.Error($"[CalculateUpcomingPayout] {ex.Message}");
-                return StatusCode(500, ApiResult<PayoutCalculationResultDto>.Failure("500", "Có lỗi xảy ra khi tính toán payout."));
+                return StatusCode(500, ApiResult<PayoutCalculationResultDto>.Failure("500", "Có lỗi xảy ra khi tính toán payout." + ex.Message));
             }
         }
 
@@ -150,7 +150,7 @@ namespace BlindTreasure.API.Controllers
             catch (Exception ex)
             {
                 _loggerService.Error($"[GetSellerPayoutsForPeriod] {ex.Message}");
-                return StatusCode(500, ApiResult<List<PayoutListResponseDto>>.Failure("500", "Có lỗi xảy ra khi lấy lịch sử payout."));
+                return StatusCode(500, ApiResult<List<PayoutListResponseDto>>.Failure("500", "Có lỗi xảy ra khi lấy lịch sử payout." + ex.Message));
             }
         }
 
@@ -173,7 +173,7 @@ namespace BlindTreasure.API.Controllers
             catch (Exception ex)
             {
                 _loggerService.Error($"[GetPayoutDetailById] {ex.Message}");
-                return StatusCode(500, ApiResult<PayoutDetailResponseDto>.Failure("500", "Có lỗi xảy ra khi lấy chi tiết payout."));
+                return StatusCode(500, ApiResult<PayoutDetailResponseDto>.Failure("500", "Có lỗi xảy ra khi lấy chi tiết payout." + ex.Message));
             }
         }
 
@@ -193,7 +193,7 @@ namespace BlindTreasure.API.Controllers
             catch (Exception ex)
             {
                 _loggerService.Error($"[ExportLatestPayoutProof] {ex.Message}");
-                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi export file payout."));
+                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi export file payout." + ex.Message));
             }
         }
 
@@ -213,7 +213,7 @@ namespace BlindTreasure.API.Controllers
             catch (Exception ex)
             {
                 _loggerService.Error($"[ExportPayoutsByPeriod] {ex.Message}");
-                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi export file payout history."));
+                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi export file payout history." + ex.Message));
             }
         }
 
@@ -239,7 +239,7 @@ namespace BlindTreasure.API.Controllers
             catch (Exception ex)
             {
                 _loggerService.Error($"[GetMyPayouts] {ex.Message}");
-                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi lấy danh sách payouts của seller."));
+                return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi lấy danh sách payouts của seller." + ex.Message));
             }
         }
     }

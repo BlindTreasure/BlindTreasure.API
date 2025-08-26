@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace BlindTreasure.Domain.EntityConfiguration;
@@ -81,6 +82,12 @@ public class PayoutConfiguration : IEntityTypeConfiguration<Payout>
             .WithOne(pl => pl.Payout)
             .HasForeignKey(pl => pl.PayoutId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Property(p => p.ProofImageUrls)
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions)null),
+                v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions)null))
+            .HasColumnType("jsonb");
 
         //// Indexes
         //builder.HasIndex(p => p.SellerId)

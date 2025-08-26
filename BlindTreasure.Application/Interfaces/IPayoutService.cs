@@ -2,6 +2,7 @@
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Commons;
+using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,5 +24,7 @@ namespace BlindTreasure.Application.Interfaces
         Task<MemoryStream> ExportLatestPayoutProofAsync();
         Task<Pagination<PayoutListResponseDto>> GetPayoutsForAdminAsync(PayoutAdminQueryParameter param);
         Task<Pagination<PayoutListResponseDto>> GetPayoutsForCurrentSellerAsync(PayoutAdminQueryParameter param);
+        Task<PayoutDetailResponseDto?> AdminConfirmPayoutWithProofAsync(Guid payoutId, List<IFormFile> files, Guid adminUserId);
+        Task<PayoutListResponseDto?> GetEligiblePayoutDtoForSellerAsync(Guid sellerId);
     }
 }
