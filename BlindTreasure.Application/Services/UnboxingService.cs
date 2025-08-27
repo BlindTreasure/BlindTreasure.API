@@ -5,6 +5,7 @@ using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Application.Utils.SharedCacheKeys;
 using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
@@ -32,10 +33,12 @@ public class UnboxingService : IUnboxingService
     private readonly IUserService _userService;
     private readonly IBlindBoxService _blindBoxService;
     private readonly IEmailService _emailService;
+    private readonly ICacheService _cacheService;
+
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
         ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub,
-        IUserService userService, IBlindBoxService blindBoxService, IEmailService emailService)
+        IUserService userService, IBlindBoxService blindBoxService, IEmailService emailService, ICacheService cacheService)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
@@ -46,6 +49,7 @@ public class UnboxingService : IUnboxingService
         _userService = userService;
         _blindBoxService = blindBoxService;
         _emailService = emailService;
+        _cacheService = cacheService;
     }
 
     public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
@@ -566,6 +570,16 @@ public class UnboxingService : IUnboxingService
         await _unitOfWork.CustomerBlindBoxes.Update(customerBox);
         await _unitOfWork.BlindBoxItems.Update(selectedItem);
         await _unitOfWork.SaveChangesAsync();
+        
+        // 7. Invalidate cache: per-inventory item (mới tạo) + user available items (listing)
+        // Xóa cache chi tiết item nếu có
+        var invCacheKey = ListingSharedCacheKeys.GetInventoryItem(inventory.Id);
+        await _cacheService.RemoveAsync(invCacheKey);
+
+        // Xóa cache danh sách items khả dụng của user (ListingService GetAvailableItemsForListingAsync)
+        var userItemsKey = ListingSharedCacheKeys.GetUserAvailableItems(userId);
+        await _cacheService.RemoveAsync(userItemsKey);
+
     }
 
     /// <summary>

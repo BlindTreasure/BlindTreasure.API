@@ -255,6 +255,7 @@ public class SystemController : ControllerBase
             var userService = HttpContext.RequestServices.GetRequiredService<IUserService>();
             var blinboxService = HttpContext.RequestServices.GetRequiredService<IBlindBoxService>();
             var emailService = HttpContext.RequestServices.GetRequiredService<IEmailService>();
+            var cacheService = HttpContext.RequestServices.GetRequiredService<ICacheService>();
 
             // Tạo instance UnboxingService mới với đầy đủ tham số
             var unboxingService = new UnboxingService(
@@ -266,7 +267,9 @@ public class SystemController : ControllerBase
                 notificationHub,
                 userService,
                 blinboxService,
-                emailService
+                emailService,
+                cacheService
+                
             );
 
 

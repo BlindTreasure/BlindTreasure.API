@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Application.Utils.SharedCacheKeys;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
@@ -44,7 +45,8 @@ public class InventoryItemService : IInventoryItemService
 
     public async Task<InventoryItemDto> ForceReleaseHeldItemAsync(Guid inventoryItemId)
     {
-        _loggerService.Warn($"[ForceReleaseHeldItemAsync] Admin forcing release hold for InventoryItem {inventoryItemId}");
+        _loggerService.Warn(
+            $"[ForceReleaseHeldItemAsync] Admin forcing release hold for InventoryItem {inventoryItemId}");
 
         var item = await _unitOfWork.InventoryItems.GetByIdAsync(inventoryItemId,
             i => i.Product,
@@ -64,8 +66,10 @@ public class InventoryItemService : IInventoryItemService
         await _unitOfWork.InventoryItems.Update(item);
         await _unitOfWork.SaveChangesAsync();
 
-        // Invalidate cache
+        // Invalidate cache per-item
         await _cacheService.RemoveAsync(GetCacheKey(inventoryItemId));
+        // Invalidate user-items cache (item đã chuyển sang Available => ảnh hưởng danh sách)
+        await _cacheService.RemoveAsync(ListingSharedCacheKeys.GetUserAvailableItems(item.UserId));
 
         // Map sang DTO trả về
         var dto = InventoryItemMapper.ToInventoryItemDto(item);
@@ -78,7 +82,7 @@ public class InventoryItemService : IInventoryItemService
 
         return dto;
     }
-    
+
     public async Task<List<InventoryItemDto>> GetMyUnboxedItemsFromBlindBoxAsync(Guid blindBoxId)
     {
         var userId = _claimsService.CurrentUserId;
@@ -153,9 +157,10 @@ public class InventoryItemService : IInventoryItemService
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
         await _unitOfWork.SaveChangesAsync();
-
-        // Invalidate cache for this item (should not exist, but for safety)
+        // Invalidate cache per-item
         await _cacheService.RemoveAsync(GetCacheKey(item.Id));
+        // Invalidate cache user-items (listing), vì user có thêm 1 item mới
+        await _cacheService.RemoveAsync(ListingSharedCacheKeys.GetUserAvailableItems(item.UserId));
 
         _loggerService.Success($"[CreateAsync] Inventory item created for user {userId}, product {product.Name}.");
         return InventoryItemMapper.ToInventoryItemDto(result) ??
@@ -260,13 +265,12 @@ public class InventoryItemService : IInventoryItemService
 
         await _unitOfWork.InventoryItems.Update(item);
         await _unitOfWork.SaveChangesAsync();
-
-        // Invalidate cache
         await _cacheService.RemoveAsync(GetCacheKey(id));
+        await _cacheService.RemoveAsync(ListingSharedCacheKeys.GetUserAvailableItems(item.UserId));
 
         _loggerService.Success($"[UpdateAsync] Inventory item {id} updated.");
-        return await GetByIdAsync(id) ?? throw ErrorHelper.Internal(
-            "Đã xảy ra lỗi trong quá trình cập nhật vật phẩm trong kho. Vui lòng thử lại sau. Nếu lỗi vẫn tiếp diễn, hãy liên hệ hỗ trợ.");
+        return await GetByIdAsync(id) ??
+               throw ErrorHelper.Internal("Đã xảy ra lỗi trong quá trình cập nhật vật phẩm trong kho.");
     }
 
     public async Task<bool> DeleteAsync(Guid id)
@@ -282,9 +286,10 @@ public class InventoryItemService : IInventoryItemService
 
         await _unitOfWork.InventoryItems.Update(item);
         await _unitOfWork.SaveChangesAsync();
-
-        // Invalidate cache
+        // Invalidate cache per-item
         await _cacheService.RemoveAsync(GetCacheKey(id));
+        // Invalidate user-items cache
+        await _cacheService.RemoveAsync(ListingSharedCacheKeys.GetUserAvailableItems(item.UserId));
 
         _loggerService.Success($"[DeleteAsync] Inventory item {id} deleted.");
         return true;
