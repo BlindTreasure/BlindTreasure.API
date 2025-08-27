@@ -38,15 +38,13 @@ public class OrderCompletionJob : BackgroundService
                     .Include(o => o.OrderDetails)
                     .ToListAsync();
 
-                int completedCount = 0;
+                var completedCount = 0;
                 foreach (var order in orders)
-                {
                     if (await adminService.TryCompleteOrderAsync(order, stoppingToken))
                     {
                         completedCount++;
                         _logger.LogInformation("Order {OrderId} marked as COMPLETED by cronjob.", order.Id);
                     }
-                }
 
                 _logger.LogInformation("OrderCompletionJob completed. {Count} changed orders updated.", completedCount);
             }

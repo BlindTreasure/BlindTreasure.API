@@ -307,16 +307,14 @@ public class AdminService : IAdminService
                 await _unitOfWork.SaveChangesAsync();
                 return true;
             }
+
             return false;
         }
         catch (Exception ex)
         {
-
             throw ErrorHelper.BadRequest(ex.Message);
         }
     }
-
-
 
 
     // ----------------- PRIVATE HELPER METHODS -----------------

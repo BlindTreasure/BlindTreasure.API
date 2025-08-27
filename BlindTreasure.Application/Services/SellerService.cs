@@ -591,7 +591,8 @@ public class SellerService : ISellerService
             .Count(p => p.ProductType == ProductSaleType.BlindBoxOnly || p.ProductType == ProductSaleType.Both) ?? 0;
 
         // Đếm số lượng BlindBox của seller
-        var blindBoxCount = seller.BlindBoxes?.Where(x=> x.IsDeleted == false && x.Status == BlindBoxStatus.Approved ).Count() ?? 0;
+        var blindBoxCount = seller.BlindBoxes?.Where(x => x.IsDeleted == false && x.Status == BlindBoxStatus.Approved)
+            .Count() ?? 0;
 
         var dto = new SellerOverviewDto
         {

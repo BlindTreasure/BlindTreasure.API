@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.TradeHistoryDTOs;
 using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using BlindTreasure.Domain.Entities;
@@ -35,7 +36,51 @@ public class TradingService : ITradingService
         _notificationHub = notificationHub;
     }
 
-    
+    public async Task<Pagination<TradeRequestDto>> GetAllTradeRequests(PaginationParameter param)
+    {
+        var query = _unitOfWork.TradeRequests.GetQueryable()
+            .Include(tr => tr.Listing)
+            .ThenInclude(l => l.InventoryItem)
+            .ThenInclude(i => i.Product)
+            .Include(tr => tr.Requester)
+            .Include(tr => tr.OfferedItems)
+            .Where(tr => !tr.IsDeleted);
+
+        // Sắp xếp theo RequestedAt
+        query = param.Desc
+            ? query.OrderByDescending(tr => tr.RequestedAt)
+            : query.OrderBy(tr => tr.RequestedAt);
+
+        // Đếm tổng số bản ghi
+        var totalCount = await query.CountAsync();
+
+        // Phân trang
+        var tradeRequests = await query
+            .Skip((param.PageIndex - 1) * param.PageSize)
+            .Take(param.PageSize)
+            .ToListAsync();
+
+        // Map sang DTO
+        var dtos = new List<TradeRequestDto>();
+        foreach (var tr in tradeRequests)
+        {
+            var offeredInventoryItems = new List<InventoryItem>();
+            if (tr.OfferedItems.Any())
+            {
+                var itemIds = tr.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
+                offeredInventoryItems = await _unitOfWork.InventoryItems.GetAllAsync(
+                    i => itemIds.Contains(i.Id),
+                    i => i.Product);
+            }
+
+            var dto = MapTradeRequestToDto(tr, offeredInventoryItems);
+            dto.ListingItemName = tr.Listing?.InventoryItem?.Product?.Name ?? "Unknown";
+            dtos.Add(dto);
+        }
+
+        return new Pagination<TradeRequestDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
+
     public async Task<TradeRequestDto> ForceTimeoutTradeRequestAsync(Guid tradeRequestId)
     {
         _logger.Warn($"[ForceTimeoutTradeRequestAsync] Admin forcing timeout for TradeRequest {tradeRequestId}");
@@ -82,7 +127,6 @@ public class TradingService : ITradingService
                     Type = NotificationType.Trading
                 });
             if (listingItem != null)
-            {
                 await _notificationService.PushNotificationToUser(
                     listingItem.UserId,
                     new NotificationDto
@@ -91,7 +135,6 @@ public class TradingService : ITradingService
                         Message = "Admin has forced this trade to expire for testing.",
                         Type = NotificationType.Trading
                     });
-            }
         }
         catch (Exception ex)
         {
@@ -473,6 +516,7 @@ public class TradingService : ITradingService
         {
             item.Status = InventoryItemStatus.Available;
             item.HoldUntil = null;
+            item.LockedByRequestId = null; // ✅ clear LastTradeId khi hết hold
         }
 
         await _unitOfWork.InventoryItems.UpdateRange(itemsToRelease);
@@ -626,7 +670,7 @@ public class TradingService : ITradingService
             listingItemToUpdate.UserId = newOwnerId;
             listingItemToUpdate.Status = InventoryItemStatus.OnHold;
             listingItemToUpdate.HoldUntil = DateTime.UtcNow.AddDays(3);
-            listingItemToUpdate.LockedByRequestId = null;
+            listingItemToUpdate.LockedByRequestId = tradeRequest.Id; 
             listingItemToUpdate.OrderDetailId = null;
 
             await _unitOfWork.InventoryItems.Update(listingItemToUpdate);
@@ -644,6 +688,7 @@ public class TradingService : ITradingService
                 offeredItemToUpdate.UserId = originalOwnerId;
                 offeredItemToUpdate.Status = InventoryItemStatus.OnHold;
                 offeredItemToUpdate.HoldUntil = DateTime.UtcNow.AddDays(3);
+                offeredItemToUpdate.LockedByRequestId = tradeRequest.Id; // ✅ giữ LastTradeId cho HoldInfo
                 offeredItemToUpdate.OrderDetailId = null;
 
                 await _unitOfWork.InventoryItems.Update(offeredItemToUpdate);
@@ -1116,7 +1161,7 @@ public class TradingService : ITradingService
                 // Tính toán thời gian còn lại
                 if (tradeRequest.RespondedAt.HasValue)
                 {
-                    var timeoutMinutes = 2;
+                    var timeoutMinutes = 10;
                     var elapsedTime = DateTime.UtcNow - tradeRequest.RespondedAt.Value;
                     var remainingTime = TimeSpan.FromMinutes(timeoutMinutes) - elapsedTime;
                     tradeRequest.TimeRemaining = remainingTime.TotalSeconds > 0 ? (int)remainingTime.TotalSeconds : 0;
