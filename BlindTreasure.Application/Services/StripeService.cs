@@ -695,6 +695,7 @@ public class StripeService : IStripeService
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = userId,
                 SellerName = sellerName,
+                SellerId = payout?.SellerId ?? Guid.Empty,
                 InitiatedBy = userId,
                 InitiatedByName = user.FullName
             };
