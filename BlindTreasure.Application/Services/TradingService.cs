@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.TradeHistoryDTOs;
 using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using BlindTreasure.Domain.Entities;
@@ -34,7 +35,50 @@ public class TradingService : ITradingService
         _listingService = listingService;
         _notificationHub = notificationHub;
     }
+    public async Task<Pagination<TradeRequestDto>> GetAllTradeRequests(PaginationParameter param)
+    {
+        var query = _unitOfWork.TradeRequests.GetQueryable()
+            .Include(tr => tr.Listing)
+            .ThenInclude(l => l.InventoryItem)
+            .ThenInclude(i => i.Product)
+            .Include(tr => tr.Requester)
+            .Include(tr => tr.OfferedItems)
+            .Where(tr => !tr.IsDeleted);
 
+        // Sắp xếp theo RequestedAt
+        query = param.Desc
+            ? query.OrderByDescending(tr => tr.RequestedAt)
+            : query.OrderBy(tr => tr.RequestedAt);
+
+        // Đếm tổng số bản ghi
+        var totalCount = await query.CountAsync();
+
+        // Phân trang
+        var tradeRequests = await query
+            .Skip((param.PageIndex - 1) * param.PageSize)
+            .Take(param.PageSize)
+            .ToListAsync();
+
+        // Map sang DTO
+        var dtos = new List<TradeRequestDto>();
+        foreach (var tr in tradeRequests)
+        {
+            var offeredInventoryItems = new List<InventoryItem>();
+            if (tr.OfferedItems.Any())
+            {
+                var itemIds = tr.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
+                offeredInventoryItems = await _unitOfWork.InventoryItems.GetAllAsync(
+                    i => itemIds.Contains(i.Id),
+                    i => i.Product);
+            }
+
+            var dto = MapTradeRequestToDto(tr, offeredInventoryItems);
+            dto.ListingItemName = tr.Listing?.InventoryItem?.Product?.Name ?? "Unknown";
+            dtos.Add(dto);
+        }
+
+        return new Pagination<TradeRequestDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
     
     public async Task<TradeRequestDto> ForceTimeoutTradeRequestAsync(Guid tradeRequestId)
     {

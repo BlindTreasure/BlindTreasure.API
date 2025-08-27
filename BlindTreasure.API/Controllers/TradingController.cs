@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.TradeHistoryDTOs;
 using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using BlindTreasure.Infrastructure.Commons;
@@ -18,6 +19,31 @@ public class TradingController : ControllerBase
     public TradingController(ITradingService tradingService)
     {
         _tradingService = tradingService;
+    }
+
+
+    [HttpGet("trade-requests")]
+    public async Task<IActionResult> GetAllTradeRequests([FromQuery] PaginationParameter param)
+    {
+        try
+        {
+            var result = await _tradingService.GetAllTradeRequests(param);
+            return Ok(ApiResult<object>.Success(new
+                {
+                    result,
+                    count = result.TotalCount,
+                    pageSize = result.PageSize,
+                    currentPage = result.CurrentPage,
+                    totalPages = result.TotalPages
+                }, "200",
+                "Lấy danh sách trade requests thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var error = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, error);
+        }
     }
 
     [HttpGet("histories")]
