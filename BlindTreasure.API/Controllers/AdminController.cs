@@ -39,7 +39,50 @@ public class AdminController : ControllerBase
         _inventoryItemService = inventoryItemService;
     }
 
+    /// <summary>
+    /// Lấy danh sách InventoryItem có trạng thái OnHold (admin view).
+    /// Nếu userId == Guid.Empty => trả về tất cả items OnHold.
+    /// </summary>
+    /// <param name="pageIndex">Số trang (bắt đầu từ 1)</param>
+    /// <param name="pageSize">Số item/trang</param>
+    /// <param name="desc">Sắp xếp giảm dần (true) hay tăng dần (false)</param>
+    /// <param name="userId">(optional) filter theo userId. Nếu không truyền hoặc truyền null => trả về cho tất cả user</param>
+    [HttpGet("inventory/onhold")]
+    [ProducesResponseType(typeof(ApiResult<Pagination<InventoryItemDto>>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 500)]
+    public async Task<IActionResult> GetOnHoldInventoryItems([FromQuery] int pageIndex = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] bool desc = true,
+        [FromQuery] Guid? userId = null)
+    {
+        try
+        {
+            var param = new PaginationParameter
+            {
+                PageIndex = pageIndex < 1 ? 1 : pageIndex,
+                PageSize = pageSize,
+                Desc = desc
+            };
 
+            // Nếu userId null => truyền Guid.Empty để service hiểu là "tất cả user"
+            var result = await _inventoryItemService.GetOnHoldInventoryItemByUser(param, userId ?? Guid.Empty);
+
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách inventory đang OnHold thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 
 
     /// <summary>
@@ -54,7 +97,8 @@ public class AdminController : ControllerBase
         try
         {
             var result = await _inventoryItemService.ForceReleaseHeldItemAsync(inventoryItemId);
-            return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Item đã được force release khỏi trạng thái OnHold."));
+            return Ok(ApiResult<InventoryItemDto>.Success(result, "200",
+                "Item đã được force release khỏi trạng thái OnHold."));
         }
         catch (Exception ex)
         {
@@ -63,7 +107,7 @@ public class AdminController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
-    
+
     /// <summary>
     /// Admin ép buộc một yêu cầu trao đổi (TradeRequest) hết hạn ngay lập tức,
     /// bỏ qua khoảng chờ 10 phút để test exception trong quá trình demo.

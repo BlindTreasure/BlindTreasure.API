@@ -43,6 +43,52 @@ public class InventoryItemService : IInventoryItemService
         _stripeService = stripeService; // initialize stripeService
     }
 
+    public async Task<Pagination<InventoryItemDto>> GetOnHoldInventoryItemByUser(PaginationParameter param, Guid userId)
+    {
+        // Build base query
+        var query = _unitOfWork.InventoryItems.GetQueryable()
+            .Where(i => !i.IsDeleted && i.Status == InventoryItemStatus.OnHold)
+            .Include(i => i.Product)
+            .ThenInclude(p => p.Category)
+            .Include(i => i.Listings)
+            .Include(i => i.Shipment)
+            .AsNoTracking();
+
+        // Filter theo user nếu được truyền
+        if (userId != Guid.Empty)
+        {
+            query = query.Where(i => i.UserId == userId);
+        }
+
+        // Sort theo UpdatedAt/CreatedAt theo param.Desc
+        query = param.Desc
+            ? query.OrderByDescending(i => i.UpdatedAt ?? i.CreatedAt)
+            : query.OrderBy(i => i.UpdatedAt ?? i.CreatedAt);
+
+        // Count total
+        var count = await query.CountAsync();
+
+        List<InventoryItem> items;
+        if (param.PageIndex == 0)
+        {
+            items = await query.ToListAsync();
+        }
+        else
+        {
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+        }
+
+        // Map to DTO (dùng mapper hiện có)
+        var dtos = items.Select(InventoryItemMapper.ToInventoryItemDtoFullIncluded).ToList();
+
+        _loggerService.Info($"[GetOnHoldInventoryItemByUser] Admin requested on-hold items for user {userId}. Returned {dtos.Count}/{count}.");
+
+        return new Pagination<InventoryItemDto>(dtos, count, param.PageIndex, param.PageSize);
+    }
+    
     public async Task<InventoryItemDto> ForceReleaseHeldItemAsync(Guid inventoryItemId)
     {
         _loggerService.Warn(

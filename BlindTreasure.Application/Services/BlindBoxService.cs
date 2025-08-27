@@ -1,5 +1,4 @@
-﻿using System.Text.Json;
-using BlindTreasure.Application.Interfaces;
+﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
@@ -786,6 +785,13 @@ public class BlindBoxService : IBlindBoxService
         }
     }
 
+    
+    public async Task InvalidateBlindBoxCacheAsync(Guid blindBoxId)
+    {
+        // Gọi helper private hiện có để xóa cache chi tiết và list
+        await RemoveBlindBoxCacheAsync(blindBoxId);
+    }
+    
     private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId, Guid? sellerId = null)
     {
         await _cacheService.RemoveAsync(BlindBoxCacheKeys.BlindBoxDetail(blindBoxId));
