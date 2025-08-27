@@ -254,7 +254,7 @@ public class SystemController : ControllerBase
             var currentTime = HttpContext.RequestServices.GetRequiredService<ICurrentTime>();
             var notificationService = HttpContext.RequestServices.GetRequiredService<INotificationService>();
             var notificationHub = HttpContext.RequestServices.GetRequiredService<IHubContext<UnboxingHub>>();
-            var userService = HttpContext.RequestServices.GetRequiredService<IAdminService>();
+            var adminService = HttpContext.RequestServices.GetRequiredService<IAdminService>();
             var blinboxService = HttpContext.RequestServices.GetRequiredService<IBlindBoxService>();
             var emailService = HttpContext.RequestServices.GetRequiredService<IEmailService>();
             var cacheService = HttpContext.RequestServices.GetRequiredService<ICacheService>();
@@ -267,7 +267,7 @@ public class SystemController : ControllerBase
                 currentTime,
                 notificationService,
                 notificationHub,
-                userService,
+                adminService,
                 blinboxService,
                 emailService,
                 cacheService

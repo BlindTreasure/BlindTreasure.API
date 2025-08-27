@@ -30,7 +30,7 @@ public class UnboxingService : IUnboxingService
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<UnboxingHub> _notificationHub;
-    private readonly IUserService _userService;
+    private readonly IAdminService _adminService;
     private readonly IBlindBoxService _blindBoxService;
     private readonly IEmailService _emailService;
     private readonly ICacheService _cacheService;
@@ -38,7 +38,7 @@ public class UnboxingService : IUnboxingService
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
         ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub,
-        IUserService userService, IBlindBoxService blindBoxService, IEmailService emailService, ICacheService cacheService)
+        IAdminService adminService, IBlindBoxService blindBoxService, IEmailService emailService, ICacheService cacheService)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
@@ -46,7 +46,7 @@ public class UnboxingService : IUnboxingService
         _currentTime = currentTime;
         _notificationService = notificationService;
         _notificationHub = notificationHub;
-        _userService = userService;
+        _adminService = adminService;
         _blindBoxService = blindBoxService;
         _emailService = emailService;
         _cacheService = cacheService;
@@ -202,7 +202,7 @@ public class UnboxingService : IUnboxingService
             .AsNoTracking();
 
         var currentUserId = _claimsService.CurrentUserId;
-        var user = await _userService.GetUserById(currentUserId);
+        var user = await _adminService.GetUserById(currentUserId);
 
         // Seller filter giống GetLogsAsync: nếu current user là Seller thì chỉ lấy logs liên quan tới seller đó
         if (user != null && user.RoleName == RoleType.Seller)
@@ -277,7 +277,7 @@ public class UnboxingService : IUnboxingService
             .AsNoTracking(); // Tối ưu performance
 
         var currentUserId = _claimsService.CurrentUserId; // Lấy UserId từ claims
-        var user = await _userService.GetUserById(currentUserId);
+        var user = await _adminService.GetUserById(currentUserId);
 
         // Kiểm tra nếu user là Seller và áp dụng filter theo SellerId
         if (user != null && user.RoleName == RoleType.Seller)
