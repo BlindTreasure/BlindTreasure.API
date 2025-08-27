@@ -630,14 +630,12 @@ public class UnboxingService : IUnboxingService
             {
                 var sellerUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
                 if (sellerUser != null)
-                {
                     await _emailService.SendCommonItemOutOfStockAsync(
                         sellerUser.Email,
                         sellerUser.FullName ?? sellerUser.Email,
                         blindBox.Name,
                         commonItem.Product?.Name ?? "Unknown Product"
                     );
-                }
             }
             catch (Exception ex)
             {

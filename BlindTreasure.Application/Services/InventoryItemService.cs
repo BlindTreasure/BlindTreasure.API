@@ -55,10 +55,7 @@ public class InventoryItemService : IInventoryItemService
             .AsNoTracking();
 
         // Filter theo user nếu được truyền
-        if (userId != Guid.Empty)
-        {
-            query = query.Where(i => i.UserId == userId);
-        }
+        if (userId != Guid.Empty) query = query.Where(i => i.UserId == userId);
 
         // Sort theo UpdatedAt/CreatedAt theo param.Desc
         query = param.Desc
@@ -70,25 +67,27 @@ public class InventoryItemService : IInventoryItemService
 
         List<InventoryItem> items;
         if (param.PageIndex == 0)
-        {
             items = await query.ToListAsync();
-        }
         else
-        {
             items = await query
                 .Skip((param.PageIndex - 1) * param.PageSize)
                 .Take(param.PageSize)
                 .ToListAsync();
-        }
 
-        // Map to DTO (dùng mapper hiện có)
-        var dtos = items.Select(InventoryItemMapper.ToInventoryItemDtoFullIncluded).ToList();
+        var dtos = items.Select(item =>
+        {
+            var dto = InventoryItemMapper.ToInventoryItemDtoFullIncluded(item);
+            dto.HoldInfo = BuildHoldInfo(item);
+            dto.IsOnHold = dto.HoldInfo.IsOnHold; // đồng bộ flag cũ
+            return dto;
+        }).ToList();
 
-        _loggerService.Info($"[GetOnHoldInventoryItemByUser] Admin requested on-hold items for user {userId}. Returned {dtos.Count}/{count}.");
+        _loggerService.Info(
+            $"[GetOnHoldInventoryItemByUser] Admin requested on-hold items for user {userId}. Returned {dtos.Count}/{count}.");
 
         return new Pagination<InventoryItemDto>(dtos, count, param.PageIndex, param.PageSize);
     }
-    
+
     public async Task<InventoryItemDto> ForceReleaseHeldItemAsync(Guid inventoryItemId)
     {
         _loggerService.Warn(
@@ -145,7 +144,13 @@ public class InventoryItemService : IInventoryItemService
 
         var result = await query.ToListAsync();
 
-        return result.Select(InventoryItemMapper.ToInventoryItemDto).ToList();
+        return result.Select(item =>
+        {
+            var dto = InventoryItemMapper.ToInventoryItemDto(item);
+            dto.HoldInfo = BuildHoldInfo(item);
+            dto.IsOnHold = dto.HoldInfo.IsOnHold;
+            return dto;
+        }).ToList();
     }
 
     public async Task<InventoryItemDto> CreateAsync(CreateInventoryItemDto dto, Guid? userId)
@@ -215,14 +220,6 @@ public class InventoryItemService : IInventoryItemService
 
     public async Task<InventoryItemDto?> GetByIdAsync(Guid id)
     {
-        //var cacheKey = GetCacheKey(id);
-        //var cached = await _cacheService.GetAsync<InventoryItem>(cacheKey);
-        //if (cached != null && !cached.IsDeleted)
-        //{
-        //    _loggerService.Info($"[GetByIdAsync] Cache hit for inventory item {id}");
-        //    return InventoryItemMapper.ToInventoryItemDto(cached);
-        //}
-
         var item = await _unitOfWork.InventoryItems.GetQueryable()
             .Where(i => i.Id == id && !i.IsDeleted)
             .Include(i => i.Product).ThenInclude(p => p.Category)
@@ -234,9 +231,10 @@ public class InventoryItemService : IInventoryItemService
         if (item == null || item.IsDeleted)
             return null;
 
-        // await _cacheService.SetAsync(cacheKey, item, TimeSpan.FromMinutes(30));
-        _loggerService.Info($"[GetByIdAsync] Inventory item {id} loaded from DB and cached.");
-        return InventoryItemMapper.ToInventoryItemDtoFullIncluded(item);
+        var dto = InventoryItemMapper.ToInventoryItemDtoFullIncluded(item);
+        dto.HoldInfo = BuildHoldInfo(item);
+        dto.IsOnHold = dto.HoldInfo.IsOnHold;
+        return dto;
     }
 
     public async Task<Pagination<InventoryItemDto>> GetMyInventoryAsync(InventoryItemQueryParameter param)
@@ -290,7 +288,14 @@ public class InventoryItemService : IInventoryItemService
                 .Take(param.PageSize)
                 .ToListAsync();
 
-        var dtos = items.Select(InventoryItemMapper.ToInventoryItemDtoFullIncluded).ToList();
+        var dtos = items.Select(item =>
+        {
+            var dto = InventoryItemMapper.ToInventoryItemDtoFullIncluded(item);
+            dto.HoldInfo = BuildHoldInfo(item);
+            dto.IsOnHold = dto.HoldInfo.IsOnHold;
+            return dto;
+        }).ToList();
+
         return new Pagination<InventoryItemDto>(dtos, count, param.PageIndex, param.PageSize);
     }
 
@@ -639,6 +644,30 @@ public class InventoryItemService : IInventoryItemService
         }
 
         return result;
+    }
+
+    private static HoldInfoDto BuildHoldInfo(InventoryItem item)
+    {
+        var isOnHold = item.Status == InventoryItemStatus.OnHold;
+        var holdUntil = item.HoldUntil;
+
+        double? remainingDays = null;
+        if (isOnHold && holdUntil.HasValue)
+        {
+            var rem = (holdUntil.Value - DateTime.UtcNow).TotalDays;
+            remainingDays = rem > 0 ? Math.Round(rem, 4) : 0;
+        }
+
+        // Dùng LockedByRequestId làm "LastTradeId" hiển thị (đúng ngữ cảnh trading hiện tại)
+        var lastTradeId = item.LockedByRequestId?.ToString();
+
+        return new HoldInfoDto
+        {
+            IsOnHold = isOnHold,
+            HoldUntil = holdUntil,
+            RemainingDays = remainingDays,
+            LastTradeId = lastTradeId
+        };
     }
 
     private static string GetCacheKey(Guid id)

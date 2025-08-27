@@ -18,5 +18,4 @@ public interface IInventoryItemService
     Task<ShipmentItemResponseDTO> RequestShipmentAsync(RequestItemShipmentDTO request);
     Task<InventoryItemDto> ForceReleaseHeldItemAsync(Guid inventoryItemId);
     Task<Pagination<InventoryItemDto>> GetOnHoldInventoryItemByUser(PaginationParameter param, Guid userId);
-
 }
