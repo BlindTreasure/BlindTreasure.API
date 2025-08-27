@@ -1,5 +1,4 @@
-﻿using System.Text.Json;
-using BlindTreasure.Application.Interfaces;
+﻿using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
@@ -25,7 +24,7 @@ public class BlindBoxService : IBlindBoxService
     private readonly INotificationService _notificationService;
     private readonly ICurrentTime _time;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
 
     public BlindBoxService(
         IUnitOfWork unitOfWork,
@@ -35,7 +34,7 @@ public class BlindBoxService : IBlindBoxService
         IBlobService blobService,
         ICacheService cacheService,
         ILoggerService logger, IEmailService emailService, ICategoryService categoryService,
-        INotificationService notificationService, IUserService userService)
+        INotificationService notificationService, IAdminService userService)
     {
         _unitOfWork = unitOfWork;
         _claimsService = claimsService;
@@ -784,6 +783,13 @@ public class BlindBoxService : IBlindBoxService
                 $"[ValidateLeafCategoryAsync] Lỗi: Category Id = {categoryId} vẫn còn category con, không được chọn.");
             throw ErrorHelper.BadRequest(ErrorMessages.CategoryChildrenError);
         }
+    }
+
+
+    public async Task InvalidateBlindBoxCacheAsync(Guid blindBoxId)
+    {
+        // Gọi helper private hiện có để xóa cache chi tiết và list
+        await RemoveBlindBoxCacheAsync(blindBoxId);
     }
 
     private async Task RemoveBlindBoxCacheAsync(Guid blindBoxId, Guid? sellerId = null)

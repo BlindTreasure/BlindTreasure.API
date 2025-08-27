@@ -15,4 +15,8 @@ public class SellerOverviewDto
     public int ProductCount { get; set; }
     public string? CompanyName { get; set; }
     public string? CompanyArea { get; set; }
+
+    public int ProductInSellingCount { get; set; }
+    public int ProductInBlindBoxCount { get; set; }
+    public int BlindBoxCount { get; set; }
 }

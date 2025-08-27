@@ -146,28 +146,22 @@ public class SellerStatisticsService : ISellerStatisticsService
 
         // Growth calculations
         var estimatedRevenueGrowth = lastFinalRevenue != 0
-            ?
-            Math.Round((finalRevenue - lastFinalRevenue) * 100 / Math.Abs(lastFinalRevenue), 2)
-            :
-            finalRevenue > 0
+            ? Math.Round((finalRevenue - lastFinalRevenue) * 100 / Math.Abs(lastFinalRevenue), 2)
+            : finalRevenue > 0
                 ? 100m
                 : 0m;
 
         var ordersGrowth = lastOrders.Count != 0
-            ?
-            Math.Round((decimal)(totalOrders - lastOrders.Count) * 100 / lastOrders.Count, 2)
-            :
-            totalOrders > 0
+            ? Math.Round((decimal)(totalOrders - lastOrders.Count) * 100 / lastOrders.Count, 2)
+            : totalOrders > 0
                 ? 100m
                 : 0m;
 
         var productsGrowth = lastOrderDetails.Sum(od => od.Quantity) != 0
-            ?
-            Math.Round(
+            ? Math.Round(
                 (decimal)(totalProductsSold - lastOrderDetails.Sum(od => od.Quantity)) * 100 /
                 lastOrderDetails.Sum(od => od.Quantity), 2)
-            :
-            totalProductsSold > 0
+            : totalProductsSold > 0
                 ? 100m
                 : 0m;
 

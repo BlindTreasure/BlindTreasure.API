@@ -25,10 +25,11 @@ public class UserServiceTests
     private readonly Mock<IBlobService> _blobServiceMock;
     private readonly Mock<ICacheService> _cacheServiceMock;
     private readonly Mock<ILoggerService> _loggerServiceMock;
+    private readonly Mock<IPayoutService> _payoutServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IGenericRepository<User>> _userRepoMock;
     private readonly Mock<IGenericRepository<Seller>> _sellerRepoMock;
-    private readonly UserService _userService;
+    private readonly AdminService _userService;
 
     public UserServiceTests()
     {
@@ -38,15 +39,17 @@ public class UserServiceTests
         _blobServiceMock = new Mock<IBlobService>();
         _userRepoMock = new Mock<IGenericRepository<User>>();
         _sellerRepoMock = new Mock<IGenericRepository<Seller>>();
+        _payoutServiceMock = new Mock<IPayoutService>();
 
         _unitOfWorkMock.Setup(x => x.Users).Returns(_userRepoMock.Object);
         _unitOfWorkMock.Setup(x => x.Sellers).Returns(_sellerRepoMock.Object);
 
-        _userService = new UserService(
+        _userService = new AdminService(
             _unitOfWorkMock.Object,
             _loggerServiceMock.Object,
             _cacheServiceMock.Object,
-            _blobServiceMock.Object
+            _blobServiceMock.Object,
+            _payoutServiceMock.Object
         );
     }
 

@@ -14,6 +14,7 @@ public interface ITradingService
 
     Task<Pagination<TradeHistoryDto>> GetTradeHistoriesAsync(TradeHistoryQueryParameter param,
         bool onlyMine = false);
+
     Task<TradeRequestDto> ForceTimeoutTradeRequestAsync(Guid tradeRequestId);
     Task<TradeRequestDto> LockDealAsync(Guid tradeRequestId);
     Task ReleaseHeldItemsAsync();

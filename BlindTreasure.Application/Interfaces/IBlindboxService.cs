@@ -16,4 +16,5 @@ public interface IBlindBoxService
     Task<BlindBoxDetailDto> ClearItemsFromBlindBoxAsync(Guid blindBoxId);
     Task<BlindBoxDetailDto> DeleteBlindBoxAsync(Guid blindBoxId);
     Dictionary<BlindBoxItemRequestDto, decimal> CalculateDropRates(List<BlindBoxItemRequestDto> items);
+    Task InvalidateBlindBoxCacheAsync(Guid blindBoxId);
 }

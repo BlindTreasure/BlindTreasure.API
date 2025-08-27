@@ -30,7 +30,7 @@ public class UnboxingService : IUnboxingService
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<UnboxingHub> _notificationHub;
-    private readonly IUserService _userService;
+    private readonly IAdminService _adminService;
     private readonly IBlindBoxService _blindBoxService;
     private readonly IEmailService _emailService;
     private readonly ICacheService _cacheService;
@@ -38,7 +38,8 @@ public class UnboxingService : IUnboxingService
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
         ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub,
-        IUserService userService, IBlindBoxService blindBoxService, IEmailService emailService, ICacheService cacheService)
+        IAdminService adminService, IBlindBoxService blindBoxService, IEmailService emailService,
+        ICacheService cacheService)
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
@@ -46,7 +47,7 @@ public class UnboxingService : IUnboxingService
         _currentTime = currentTime;
         _notificationService = notificationService;
         _notificationHub = notificationHub;
-        _userService = userService;
+        _adminService = adminService;
         _blindBoxService = blindBoxService;
         _emailService = emailService;
         _cacheService = cacheService;
@@ -202,7 +203,7 @@ public class UnboxingService : IUnboxingService
             .AsNoTracking();
 
         var currentUserId = _claimsService.CurrentUserId;
-        var user = await _userService.GetUserById(currentUserId);
+        var user = await _adminService.GetUserById(currentUserId);
 
         // Seller filter giống GetLogsAsync: nếu current user là Seller thì chỉ lấy logs liên quan tới seller đó
         if (user != null && user.RoleName == RoleType.Seller)
@@ -277,7 +278,7 @@ public class UnboxingService : IUnboxingService
             .AsNoTracking(); // Tối ưu performance
 
         var currentUserId = _claimsService.CurrentUserId; // Lấy UserId từ claims
-        var user = await _userService.GetUserById(currentUserId);
+        var user = await _adminService.GetUserById(currentUserId);
 
         // Kiểm tra nếu user là Seller và áp dụng filter theo SellerId
         if (user != null && user.RoleName == RoleType.Seller)
@@ -570,7 +571,7 @@ public class UnboxingService : IUnboxingService
         await _unitOfWork.CustomerBlindBoxes.Update(customerBox);
         await _unitOfWork.BlindBoxItems.Update(selectedItem);
         await _unitOfWork.SaveChangesAsync();
-        
+
         // 7. Invalidate cache: per-inventory item (mới tạo) + user available items (listing)
         // Xóa cache chi tiết item nếu có
         var invCacheKey = ListingSharedCacheKeys.GetInventoryItem(inventory.Id);
@@ -579,7 +580,6 @@ public class UnboxingService : IUnboxingService
         // Xóa cache danh sách items khả dụng của user (ListingService GetAvailableItemsForListingAsync)
         var userItemsKey = ListingSharedCacheKeys.GetUserAvailableItems(userId);
         await _cacheService.RemoveAsync(userItemsKey);
-
     }
 
     /// <summary>
@@ -592,6 +592,8 @@ public class UnboxingService : IUnboxingService
     /// </summary>
     private async Task UpdateDropRatesAfterUnboxingAsync(BlindBox blindBox)
     {
+        if (blindBox == null) return;
+
         // 1. Load toàn bộ items trong box (bao gồm RarityConfig + Product để log)
         var items = await _unitOfWork.BlindBoxItems.GetQueryable()
             .Include(i => i.RarityConfig)
@@ -612,21 +614,37 @@ public class UnboxingService : IUnboxingService
             await _unitOfWork.BlindBoxes.Update(blindBox);
             await _unitOfWork.SaveChangesAsync();
 
-            // Lấy seller để gửi email thông báo cập nhật stock
-            var sellerUser = await _unitOfWork.Users
-                .FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
+            // invalidate cache blindbox (detail + lists) để frontend cập nhật trạng thái
+            try
+            {
+                await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
+            }
+            catch (Exception ex)
+            {
+                _loggerService.Error(
+                    $"[UpdateDropRatesAfterUnboxingAsync] Không thể invalidate cache BlindBox {blindBox.Id}: {ex.Message}");
+            }
 
-            if (sellerUser != null)
-                await _emailService.SendCommonItemOutOfStockAsync(
-                    sellerUser.Email,
-                    sellerUser.FullName ?? sellerUser.Email,
-                    blindBox.Name,
-                    commonItem.Product?.Name ?? "Unknown Product"
-                );
+            // Gửi email thông báo cho seller
+            try
+            {
+                var sellerUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
+                if (sellerUser != null)
+                    await _emailService.SendCommonItemOutOfStockAsync(
+                        sellerUser.Email,
+                        sellerUser.FullName ?? sellerUser.Email,
+                        blindBox.Name,
+                        commonItem.Product?.Name ?? "Unknown Product"
+                    );
+            }
+            catch (Exception ex)
+            {
+                _loggerService.Error(
+                    $"[UpdateDropRatesAfterUnboxingAsync] Lỗi khi gửi email out-of-stock BlindBox {blindBox.Id}: {ex.Message}");
+            }
 
             _loggerService.Warn(
-                $"[DropRate] BlindBox {blindBox.Id} bị disable vì Common '{commonItem.Product?.Name}' hết hàng."
-            );
+                $"[DropRate] BlindBox {blindBox.Id} bị disabled vì Common '{commonItem.Product?.Name}' hết hàng.");
             return;
         }
 
@@ -634,11 +652,8 @@ public class UnboxingService : IUnboxingService
         var sbBefore = new StringBuilder();
         sbBefore.AppendLine($"[DropRate-BEFORE] BlindBox {blindBox.Id}:");
         foreach (var item in items.OrderByDescending(x => x.DropRate))
-            sbBefore.AppendLine($"- {item.Product?.Name ?? "Unknown"} | " +
-                                $"Rarity: {item.RarityConfig?.Name} | " +
-                                $"Qty: {item.Quantity} | " +
-                                $"DropRate: {item.DropRate:N2}%");
-
+            sbBefore.AppendLine(
+                $"- {item.Product?.Name ?? "Unknown"} | Rarity: {item.RarityConfig?.Name} | Qty: {item.Quantity} | DropRate: {item.DropRate:N2}%");
         _loggerService.Info(sbBefore.ToString());
 
         // 4. Convert sang DTO để gọi CalculateDropRates trong BlindBoxService
@@ -649,8 +664,18 @@ public class UnboxingService : IUnboxingService
             Weight = i.RarityConfig?.Weight ?? 1
         }).ToList();
 
-        // 5. Gọi BlindBoxService.CalculateDropRates để tính toán lại drop rates
-        var dropRates = _blindBoxService.CalculateDropRates(dtoItems);
+        Dictionary<BlindBoxItemRequestDto, decimal> dropRates;
+        try
+        {
+            // 5. Gọi BlindBoxService.CalculateDropRates để tính toán lại drop rates
+            dropRates = _blindBoxService.CalculateDropRates(dtoItems);
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error(
+                $"[UpdateDropRatesAfterUnboxingAsync] CalculateDropRates thất bại cho BlindBox {blindBox.Id}: {ex.Message}");
+            return; // giữ an toàn: không cập nhật nếu tính toán lỗi
+        }
 
         // 6. Map kết quả DropRate mới vào các BlindBoxItem trong DB
         foreach (var kvp in dropRates)
@@ -668,36 +693,88 @@ public class UnboxingService : IUnboxingService
 
         await _unitOfWork.SaveChangesAsync();
 
-        // 7. Log DropRate sau khi cập nhật
+        // 7. Invalidate cache blindbox để client lấy về tỷ lệ mới
+        try
+        {
+            await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error(
+                $"[UpdateDropRatesAfterUnboxingAsync] Không thể invalidate cache BlindBox {blindBox.Id}: {ex.Message}");
+        }
+
+        // 8. Log DropRate sau khi cập nhật
         var sbAfter = new StringBuilder();
         sbAfter.AppendLine($"[DropRate-AFTER] BlindBox {blindBox.Id}:");
         foreach (var item in items.OrderByDescending(x => x.DropRate))
-            sbAfter.AppendLine($"- {item.Product?.Name ?? "Unknown"} | " +
-                               $"Rarity: {item.RarityConfig?.Name} | " +
-                               $"Qty: {item.Quantity} | " +
-                               $"DropRate: {item.DropRate:N2}%");
-
+            sbAfter.AppendLine(
+                $"- {item.Product?.Name ?? "Unknown"} | Rarity: {item.RarityConfig?.Name} | Qty: {item.Quantity} | DropRate: {item.DropRate:N2}%");
         _loggerService.Info(sbAfter.ToString());
     }
 
-
     private async Task NotifyOutOfStockAsync(BlindBox blindBox, BlindBoxItem item)
     {
+        if (blindBox == null || item == null) return;
+
         blindBox.Status = BlindBoxStatus.Rejected;
         await _unitOfWork.BlindBoxes.Update(blindBox);
 
-        var sellerUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
-        if (sellerUser != null)
-            await _notificationService.PushNotificationToUser(
-                sellerUser.Id,
-                new NotificationDto
+        // Persist status change ngay lập tức
+        await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate cache để đảm bảo frontend / api client không hiển thị hộp cũ
+        try
+        {
+            await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error(
+                $"[NotifyOutOfStockAsync] Không thể invalidate cache BlindBox {blindBox.Id}: {ex.Message}");
+        }
+
+        // Push notification cho seller nếu có
+        try
+        {
+            var sellerUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
+            if (sellerUser != null)
+            {
+                await _notificationService.PushNotificationToUser(
+                    sellerUser.Id,
+                    new NotificationDto
+                    {
+                        Title = $"Item hết hàng trong {blindBox.Name}",
+                        Message = $"Sản phẩm '{item.Product?.Name ?? "Unknown"}' trong blind box đã hết số lượng.",
+                        Type = NotificationType.System
+                    }
+                );
+
+                // Thông báo qua email (nếu cần)
+                try
                 {
-                    Title = $"Item hết hàng trong {blindBox.Name}",
-                    Message = $"Sản phẩm '{item.Product.Name}' trong blind box đã hết số lượng.",
-                    Type = NotificationType.System
+                    await _emailService.SendCommonItemOutOfStockAsync(
+                        sellerUser.Email,
+                        sellerUser.FullName ?? sellerUser.Email,
+                        blindBox.Name,
+                        item.Product?.Name ?? "Unknown"
+                    );
                 }
-            );
-        // TODO: Gửi email qua EmailService nếu có
+                catch (Exception exEmail)
+                {
+                    _loggerService.Error(
+                        $"[NotifyOutOfStockAsync] Lỗi gửi email out-of-stock BlindBox {blindBox.Id}: {exEmail.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _loggerService.Error(
+                $"[NotifyOutOfStockAsync] Lỗi khi notify seller cho BlindBox {blindBox.Id}: {ex.Message}");
+        }
+
+        _loggerService.Info(
+            $"[NotifyOutOfStockAsync] BlindBox {blindBox.Id} marked as Rejected because item {item.Id} ({item.Product?.Name}) is out of stock.");
     }
 
     private (BlindBoxItem? Item, decimal Roll, Dictionary<BlindBoxItem, decimal> Probabilities)

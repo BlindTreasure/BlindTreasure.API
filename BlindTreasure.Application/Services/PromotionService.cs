@@ -22,10 +22,10 @@ public class PromotionService : IPromotionService
     private readonly IMapperService _mapperService;
     private readonly ISellerService _sellerService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
 
     public PromotionService(IUnitOfWork unitOfWork, ILoggerService loggerService, IMapperService mapperService,
-        IClaimsService claimsService, IUserService userService, ISellerService sellerService,
+        IClaimsService claimsService, IAdminService userService, ISellerService sellerService,
         IEmailService emailService, ICacheService cacheService)
     {
         _unitOfWork = unitOfWork;

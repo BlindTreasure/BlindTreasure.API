@@ -30,7 +30,7 @@ public class OrderCompletionJob : BackgroundService
             {
                 using var scope = _serviceProvider.CreateScope();
                 var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-                var payoutService = scope.ServiceProvider.GetRequiredService<IPayoutService>();
+                var adminService = scope.ServiceProvider.GetRequiredService<IAdminService>();
 
                 // Get all orders that are not completed/cancelled/expired
                 var orders = await unitOfWork.Orders.GetQueryable()
@@ -38,38 +38,22 @@ public class OrderCompletionJob : BackgroundService
                     .Include(o => o.OrderDetails)
                     .ToListAsync();
 
+                var completedCount = 0;
                 foreach (var order in orders)
-                {
-                    if (order.OrderDetails == null || !order.OrderDetails.Any())
-                        continue;
-
-                    var allDelivered = order.OrderDetails.All(od => od.Status == OrderDetailItemStatus.DELIVERED);
-                    var allInInventory3Days = order.OrderDetails.All(od =>
-                        od.Status == OrderDetailItemStatus.IN_INVENTORY &&
-                        od.UpdatedAt.HasValue &&
-                        (DateTime.UtcNow - od.UpdatedAt.Value).TotalDays >= 3);
-
-                    if (allDelivered || allInInventory3Days)
+                    if (await adminService.TryCompleteOrderAsync(order, stoppingToken))
                     {
-                        order.Status = OrderStatus.COMPLETED.ToString();
-                        order.CompletedAt = DateTime.UtcNow;
-                        await unitOfWork.Orders.Update(order);
-                        _logger.LogInformation("Order {OrderId} marked as COMPLETED.", order.Id);
-
-                        // Add to payout
-                        await payoutService.AddCompletedOrderToPayoutAsync(order, stoppingToken);
+                        completedCount++;
+                        _logger.LogInformation("Order {OrderId} marked as COMPLETED by cronjob.", order.Id);
                     }
-                }
 
-                var result = await unitOfWork.SaveChangesAsync();
-                _logger.LogInformation("OrderCompletionJob completed. {Count} changed orders updated.", result);
+                _logger.LogInformation("OrderCompletionJob completed. {Count} changed orders updated.", completedCount);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in OrderCompletionJob: {Message}", ex.Message);
             }
 
-            // Run every 2 minutes
+            // Run every 1 minute
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
         }
     }

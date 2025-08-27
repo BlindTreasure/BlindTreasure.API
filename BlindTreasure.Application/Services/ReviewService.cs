@@ -19,10 +19,10 @@ public class ReviewService : IReviewService
     private readonly ILoggerService _loggerService;
     private readonly IClaimsService _claimService;
     private readonly IBlobService _blobService;
-    private readonly IUserService _userService;
+    private readonly IAdminService _userService;
 
     public ReviewService(IUnitOfWork unitOfWork, ILoggerService loggerService,
-        IClaimsService claimService, IBlobService blobService, IUserService userService)
+        IClaimsService claimService, IBlobService blobService, IAdminService userService)
     {
         _unitOfWork = unitOfWork;
         _loggerService = loggerService;

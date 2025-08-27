@@ -26,7 +26,6 @@ public class PayoutService : IPayoutService
 {
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
-    private readonly IOrderService _orderService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrencyConversionService _currencyConversionService;
     private readonly IStripeService _stripeService;
@@ -41,7 +40,6 @@ public class PayoutService : IPayoutService
     public PayoutService(
         IClaimsService claimsService,
         ILoggerService logger,
-        IOrderService orderService,
         IUnitOfWork unitOfWork,
         ICurrencyConversionService currencyConversionService,
         IStripeService stripeService,
@@ -50,7 +48,6 @@ public class PayoutService : IPayoutService
     {
         _claimsService = claimsService;
         _logger = logger;
-        _orderService = orderService;
         _unitOfWork = unitOfWork;
         _currencyConversionService = currencyConversionService;
         _stripeService = stripeService;
