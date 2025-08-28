@@ -55,7 +55,7 @@ public class BlindTreasureDbContext : DbContext
     public DbSet<PayoutLog> PayoutLogs { get; set; }
     public DbSet<PayoutDetail> PayoutDetails { get; set; }
     public DbSet<GroupPaymentSession> GroupPaymentSessions { get; set; }
-    public DbSet<OrderDetailInventoryItemLog> OrderDetailInventoryItemLogs { get; set; }
+    public DbSet<OrderDetailInventoryItemShipmentLog> OrderDetailInventoryItemLogs { get; set; }
     public DbSet<PromotionUserUsage> PromotionUserUsages { get; set; }
     public DbSet<PayoutTransaction> PayoutTransactions { get; set; }
 

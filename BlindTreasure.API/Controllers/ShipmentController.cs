@@ -2,6 +2,7 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Services;
 using BlindTreasure.Application.Utils;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,11 +15,13 @@ public class ShipmentController : ControllerBase
 {
     private readonly IShipmentService _shipmentService;
     private readonly ILoggerService _logger;
+    private readonly IOrderDetailInventoryItemShipmentLogService _shipmentLogs;
 
-    public ShipmentController(IShipmentService shipmentService, ILoggerService logger)
+    public ShipmentController(IShipmentService shipmentService, ILoggerService logger, IOrderDetailInventoryItemShipmentLogService shipmentLogs )
     {
         _shipmentService = shipmentService;
         _logger = logger;
+        _shipmentLogs = shipmentLogs;
     }
 
     /// <summary>
@@ -83,6 +86,24 @@ public class ShipmentController : ControllerBase
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
             var errorResponse = ExceptionUtils.CreateErrorResponse<List<ShipmentDto>>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    [HttpGet("{id}/logs")]
+    [ProducesResponseType(typeof(ApiResult<List<OrderDetailInventoryItemShipmentLogDto>>), 200)]
+    public async Task<IActionResult> GetInventoryItemLogs(Guid id)
+    {
+        try
+        {
+            var logs = await _shipmentLogs.GetLogForShipmentByIdAsync(id);
+            return Ok(ApiResult<List<OrderDetailInventoryItemShipmentLogDto>>.Success(logs, "200",
+                "Lấy log của InventoryItem thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDetailInventoryItemShipmentLogDto>>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }

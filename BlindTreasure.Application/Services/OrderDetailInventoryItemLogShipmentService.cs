@@ -10,28 +10,25 @@ using System.Text;
 
 namespace BlindTreasure.Application.Services;
 
-public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogService
+public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryItemShipmentLogService
 {
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
-    private readonly IInventoryItemService _inventoryItemService;
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
 
-    public OrderDetailInventoryItemLogService(ICacheService cacheService, IClaimsService claimsService,
-        IInventoryItemService inventoryItemService, ILoggerService logger, IUnitOfWork unitOfWork)
+    public OrderDetailInventoryItemLogShipmentService(ICacheService cacheService, IClaimsService claimsService, ILoggerService logger, IUnitOfWork unitOfWork)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
-        _inventoryItemService = inventoryItemService;
         _logger = logger;
         _unitOfWork = unitOfWork;
     }
 
     // Implement methods for OrderDetailInventoryItemLogService here
-    public async Task<OrderDetailInventoryItemLog> LogOrderDetailCreationAsync(OrderDetail orderDetail, string? msg)
+    public async Task<OrderDetailInventoryItemShipmentLog> LogOrderDetailCreationAsync(OrderDetail orderDetail, string? msg)
     {
-        var log = new OrderDetailInventoryItemLog
+        var log = new OrderDetailInventoryItemShipmentLog
         {
             OrderDetailId = orderDetail.Id,
             ActionType = ActionType.ORDER_DETAIL_CREATED,
@@ -52,11 +49,11 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         return result;
     }
 
-    public async Task<OrderDetailInventoryItemLog> LogShipmentAddedAsync(
+    public async Task<OrderDetailInventoryItemShipmentLog> LogShipmentAddedAsync(
         OrderDetail orderDetail,
         Shipment shipment, string? msg)
     {
-        var log = new OrderDetailInventoryItemLog
+        var log = new OrderDetailInventoryItemShipmentLog
         {
             OrderDetailId = orderDetail.Id,
             ActionType = ActionType.SHIPMENT_ADDED,
@@ -77,12 +74,12 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         return result;
     }
 
-    public async Task<OrderDetailInventoryItemLog> LogShipmentOfOrderDetailChangedStatusAsync(
+    public async Task<OrderDetailInventoryItemShipmentLog> LogShipmentOfOrderDetailChangedStatusAsync(
         OrderDetail orderDetail,
         ShipmentStatus oldStatus,
         Shipment shipmentNewStatus, string? msg)
     {
-        var log = new OrderDetailInventoryItemLog
+        var log = new OrderDetailInventoryItemShipmentLog
         {
             OrderDetailId = orderDetail.Id,
             ActionType = ActionType.SHIPMENT_ADDED,
@@ -103,12 +100,12 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         return result;
     }
 
-    public async Task<OrderDetailInventoryItemLog> LogOrderDetailStatusChangeAsync(
+    public async Task<OrderDetailInventoryItemShipmentLog> LogOrderDetailStatusChangeAsync(
         OrderDetail orderDetail,
         OrderDetailItemStatus oldStatus,
         OrderDetailItemStatus newStatus, string? msg)
     {
-        var log = new OrderDetailInventoryItemLog
+        var log = new OrderDetailInventoryItemShipmentLog
         {
             OrderDetailId = orderDetail.Id,
             ActionType = ActionType.ORDER_DETAIL_STATUS_CHANGED,
@@ -129,14 +126,14 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         return result;
     }
 
-    public async Task<OrderDetailInventoryItemLog> LogInventoryItemOrCustomerBlindboxAddedAsync(
+    public async Task<OrderDetailInventoryItemShipmentLog> LogInventoryItemOrCustomerBlindboxAddedAsync(
         OrderDetail orderDetail,
         InventoryItem? inventoryItem,
         CustomerBlindBox? blindBox, string? msg)
     {
         try
         {
-            var orderDetaillog = new OrderDetailInventoryItemLog
+            var orderDetaillog = new OrderDetailInventoryItemShipmentLog
             {
                 OrderDetailId = orderDetail.Id,
                 ActionType = inventoryItem != null ? ActionType.INVENTORY_ITEM_ADDED : ActionType.BLIND_BOX_ADDED,
@@ -151,7 +148,7 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
                     : Domain.Entities.ValueType.CUSTOM_BLINDBOX
             };
 
-            var InventoryItemlog = new OrderDetailInventoryItemLog
+            var InventoryItemlog = new OrderDetailInventoryItemShipmentLog
             {
                 OrderDetailId = orderDetail.Id,
                 InventoryItemId = inventoryItem?.Id,
@@ -184,7 +181,7 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         }
     }
 
-    public async Task<OrderDetailInventoryItemLog> LogShipmentTrackingInventoryItemUpdateAsync(
+    public async Task<OrderDetailInventoryItemShipmentLog> LogShipmentTrackingInventoryItemUpdateAsync(
         OrderDetail orderDetail,
         InventoryItemStatus oldStatus,
         InventoryItem InventoryItemWithNewStatus,
@@ -196,7 +193,7 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
             return null!;
         }
 
-        var log = new OrderDetailInventoryItemLog
+        var log = new OrderDetailInventoryItemShipmentLog
         {
             OrderDetailId = orderDetail.Id,
             InventoryItemId = InventoryItemWithNewStatus.Id,
@@ -254,6 +251,11 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
                     break;
             }
 
+            var logContent = message.ToString();
+
+            // Log riêng cho entity Shipment
+            await LogShipmentEntityStatusAsync(shipment, oldStatus, newStatus, logContent);
+
             var orderDetails = shipment.OrderDetails?.ToList();
             if (orderDetails == null)
             {
@@ -281,10 +283,41 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         }
     }
 
+    private async Task LogShipmentEntityStatusAsync(
+    Shipment shipment,
+    ShipmentStatus oldStatus,
+    ShipmentStatus newStatus,
+    string logContent)
+    {
+        // Kiểm tra đã có log cho shipment với trạng thái này chưa
+        var existingLog = await _unitOfWork.OrderDetailInventoryItemLogs.GetQueryable()
+            .Where(l => l.ShipmentId == shipment.Id && l.NewValue == newStatus.ToString() && l.OrderDetailId == null && l.InventoryItemId == null)
+            .FirstOrDefaultAsync();
+
+        if (existingLog != null)
+            return;
+
+        var log = new OrderDetailInventoryItemShipmentLog
+        {
+            ShipmentId = shipment.Id,
+            OrderDetailId = null,
+            InventoryItemId = null,
+            LogContent = logContent,
+            LogTime = DateTime.UtcNow,
+            ActionType = ActionType.SHIPMENT_STATUS_CHANGED,
+            ValueStatusType = Domain.Entities.ValueType.SHIPMENT,
+            OldValue = oldStatus.ToString(),
+            NewValue = newStatus.ToString(),
+            ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null
+        };
+
+        await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
+    }
+
     /// <summary>
     /// Lấy danh sách log theo OrderDetailId.
     /// </summary>
-    public async Task<List<OrderDetailInventoryItemLogDto>> GetLogByOrderDetailIdAsync(Guid orderDetailId)
+    public async Task<List<OrderDetailInventoryItemShipmentLogDto>> GetLogByOrderDetailIdAsync(Guid orderDetailId)
     {
         var logs = await _unitOfWork.OrderDetailInventoryItemLogs.GetQueryable()
             .Where(l => l.OrderDetailId == orderDetailId && !l.InventoryItemId.HasValue)
@@ -297,10 +330,20 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
     /// <summary>
     /// Lấy danh sách log theo InventoryItemId.
     /// </summary>
-    public async Task<List<OrderDetailInventoryItemLogDto>> GetLogByInventoryItemIdAsync(Guid inventoryItemId)
+    public async Task<List<OrderDetailInventoryItemShipmentLogDto>> GetLogByInventoryItemIdAsync(Guid inventoryItemId)
     {
         var logs = await _unitOfWork.OrderDetailInventoryItemLogs.GetQueryable()
             .Where(l => l.InventoryItemId == inventoryItemId)
+            .OrderByDescending(l => l.CreatedAt)
+            .ToListAsync();
+
+        return logs.Select(InventoryItemMapper.ToOrderDetailInventoryItemLogDto).ToList();
+    }
+
+    public async Task<List<OrderDetailInventoryItemShipmentLogDto>> GetLogForShipmentByIdAsync(Guid shipmentId)
+    {
+        var logs = await _unitOfWork.OrderDetailInventoryItemLogs.GetQueryable()
+            .Where(l => l.ShipmentId == shipmentId)
             .OrderByDescending(l => l.CreatedAt)
             .ToListAsync();
 

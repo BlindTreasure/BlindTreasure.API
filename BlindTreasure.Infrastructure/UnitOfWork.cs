@@ -46,7 +46,7 @@ public class UnitOfWork : IUnitOfWork
         IGenericRepository<OrderSellerPromotion> orderSellerPromotion,
         IGenericRepository<Review> reviews,
         IGenericRepository<GroupPaymentSession> groupPaymentSessions,
-        IGenericRepository<OrderDetailInventoryItemLog> orderDetailInventoryItemLogs,
+        IGenericRepository<OrderDetailInventoryItemShipmentLog> orderDetailInventoryItemLogs,
         IGenericRepository<PromotionUserUsage> promotionUserUsage,
         IGenericRepository<Payout> payouts,
         IGenericRepository<PayoutDetail> payoutDetails,
@@ -184,7 +184,7 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<OrderSellerPromotion> OrderSellerPromotions { get; }
     public IGenericRepository<Review> Reviews { get; }
     public IGenericRepository<GroupPaymentSession> GroupPaymentSessions { get; }
-    public IGenericRepository<OrderDetailInventoryItemLog> OrderDetailInventoryItemLogs { get; }
+    public IGenericRepository<OrderDetailInventoryItemShipmentLog> OrderDetailInventoryItemLogs { get; }
     public IGenericRepository<PromotionUserUsage> PromotionUserUsages { get; }
     public IGenericRepository<Payout> Payouts { get; }
     public IGenericRepository<PayoutDetail> PayoutDetails { get; }

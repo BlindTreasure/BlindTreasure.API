@@ -26,13 +26,13 @@ public class SystemController : ControllerBase
     private readonly IUnboxingService _unboxService;
     private readonly BlindTreasureDbContext _context;
     private readonly ILoggerService _logger;
-    private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
+    private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemLogService;
     private readonly INotificationService _notificationService;
     private readonly IAdminService _adminService;
 
 
     public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService,
-        IUnboxingService unboxService, IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService,
+        IUnboxingService unboxService, IOrderDetailInventoryItemShipmentLogService orderDetailInventoryItemLogService,
         INotificationService notificationService, IAdminService adminService)
     {
         _context = context;
