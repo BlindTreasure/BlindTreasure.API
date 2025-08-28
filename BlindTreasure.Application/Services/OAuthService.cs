@@ -64,7 +64,7 @@ public class OAuthService : IOAuthService
             var result = await _authService.LoginAsync(new LoginRequestDto
             {
                 Email = user.Email,
-                Password = user.Password, // Mật khẩu tạm thời, sẽ được thay đổi sau khi đăng nhập
+                Password = "", // Mật khẩu tạm thời, sẽ được thay đổi sau khi đăng nhập
                 IsLoginGoole = true // Không cần nhớ đăng nhập cho OAuth
             }, _configuration);
 
