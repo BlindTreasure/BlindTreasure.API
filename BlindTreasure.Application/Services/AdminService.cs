@@ -357,8 +357,18 @@ public class AdminService : IAdminService
         return new Pagination<PayoutTransactionDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
 
+    public async Task<PayoutTransactionDto?> GetPayoutTransactionByIdAsync(Guid id)
+    {
+        var entity = await _unitOfWork.PayoutTransactions.GetQueryable()
+            .Include(pt => pt.Payout)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(pt => pt.Id == id && !pt.IsDeleted);
 
+        if (entity == null)
+            return null;
 
+        return PayoutDtoMapper.ToPayoutTransactionDto(entity);
+    }
 
     // ----------------- PRIVATE HELPER METHODS -----------------
 

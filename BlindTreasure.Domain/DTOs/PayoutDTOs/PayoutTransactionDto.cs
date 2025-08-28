@@ -9,6 +9,7 @@ namespace BlindTreasure.Domain.DTOs.PayoutDTOs
 {
     public class PayoutTransactionDto
     {
+        public Guid Id { get; set; }
         public Guid PayoutId { get; set; }
         public PayoutBaseDto Payout { get; set; }
 

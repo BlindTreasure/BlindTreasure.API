@@ -9,6 +9,7 @@ namespace BlindTreasure.Application.Mappers
         {
             return new PayoutTransactionDto
             {
+                Id = entity.Id,
                 PayoutId = entity.PayoutId,
                 Payout = entity.Payout != null ? ToPayoutBaseDto(entity.Payout) : null,
                 SellerId = entity.SellerId,
