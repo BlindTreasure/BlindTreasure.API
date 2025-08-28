@@ -35,7 +35,7 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         {
             OrderDetailId = orderDetail.Id,
             ActionType = ActionType.ORDER_DETAIL_CREATED,
-            LogContent = msg ?? $"Order detail created for {(orderDetail.ProductId.HasValue ? "product" : "blindbox")}",
+            LogContent = msg ?? $"Tạo chi tiết đơn hàng cho {(orderDetail.ProductId.HasValue ? "sản phẩm" : "blindbox")}",
             OldValue = null,
             NewValue = orderDetail.Status.ToString(),
             ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null,
@@ -44,12 +44,11 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
 
         if (log.ActorId == null)
         {
-            _logger.Warn("This update made by system");
-            log.LogContent += " (System action)";
+            _logger.Warn("Thao tác này được thực hiện bởi hệ thống");
+            log.LogContent += " (Thao tác hệ thống)";
         }
 
         var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-        //await _unitOfWork.SaveChangesAsync();
         return result;
     }
 
@@ -61,7 +60,7 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         {
             OrderDetailId = orderDetail.Id,
             ActionType = ActionType.SHIPMENT_ADDED,
-            LogContent = msg ?? $"Shipment added: {shipment.Id} for this order-detail",
+            LogContent = msg ?? $"Thêm vận chuyển: {shipment.Id} cho chi tiết đơn hàng này",
             OldValue = null,
             NewValue = shipment.Status.ToString(),
             ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null,
@@ -70,12 +69,11 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
 
         if (log.ActorId == null)
         {
-            _logger.Warn("This update made by system");
-            log.LogContent += " (System action)";
+            _logger.Warn("Thao tác này được thực hiện bởi hệ thống");
+            log.LogContent += " (Thao tác hệ thống)";
         }
 
         var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-        //await _unitOfWork.SaveChangesAsync();
         return result;
     }
 
@@ -88,8 +86,7 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         {
             OrderDetailId = orderDetail.Id,
             ActionType = ActionType.SHIPMENT_ADDED,
-            LogContent = msg ??
-                         $"Shipment changed: {shipmentNewStatus.Id} for this order-detail, from {oldStatus} to {shipmentNewStatus.Status}",
+            LogContent = msg ?? $"Vận chuyển thay đổi: {shipmentNewStatus.Id} cho chi tiết đơn hàng này, từ {oldStatus} sang {shipmentNewStatus.Status}",
             OldValue = oldStatus.ToString(),
             NewValue = shipmentNewStatus.Status.ToString(),
             ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null,
@@ -98,12 +95,11 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
 
         if (log.ActorId == null)
         {
-            _logger.Warn("This update made by system");
-            log.LogContent += " (System action)";
+            _logger.Warn("Thao tác này được thực hiện bởi hệ thống");
+            log.LogContent += " (Thao tác hệ thống)";
         }
 
         var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-        //await _unitOfWork.SaveChangesAsync();
         return result;
     }
 
@@ -116,7 +112,7 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         {
             OrderDetailId = orderDetail.Id,
             ActionType = ActionType.ORDER_DETAIL_STATUS_CHANGED,
-            LogContent = msg ?? $"Order detail status updated, become to: {newStatus}",
+            LogContent = msg ?? $"Cập nhật trạng thái chi tiết đơn hàng, chuyển sang: {newStatus}",
             OldValue = oldStatus.ToString(),
             NewValue = newStatus.ToString(),
             ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null,
@@ -125,12 +121,11 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
 
         if (log.ActorId == null)
         {
-            _logger.Warn("This update made by system");
-            log.LogContent += " (System action)";
+            _logger.Warn("Thao tác này được thực hiện bởi hệ thống");
+            log.LogContent += " (Thao tác hệ thống)";
         }
 
         var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-        //await _unitOfWork.SaveChangesAsync();
         return result;
     }
 
@@ -144,13 +139,12 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
             var orderDetaillog = new OrderDetailInventoryItemLog
             {
                 OrderDetailId = orderDetail.Id,
-                //InventoryItemId = inventoryItem?.Id,
                 ActionType = inventoryItem != null ? ActionType.INVENTORY_ITEM_ADDED : ActionType.BLIND_BOX_ADDED,
                 LogContent = msg ?? (inventoryItem != null
-                    ? $"Inventory item created: {inventoryItem.Id}"
-                    : $"Blind box added: {blindBox?.BlindBoxId}"),
+                    ? $"Tạo item kho: {inventoryItem.Id}"
+                    : $"Thêm blindbox: {blindBox?.BlindBoxId}"),
                 OldValue = null,
-                NewValue = inventoryItem != null ? inventoryItem.Status.ToString() : "UNOPENED",
+                NewValue = inventoryItem != null ? inventoryItem.Status.ToString() : "CHƯA MỞ",
                 ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null,
                 ValueStatusType = inventoryItem != null
                     ? Domain.Entities.ValueType.INVENTORY_ITEM
@@ -163,10 +157,10 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
                 InventoryItemId = inventoryItem?.Id,
                 ActionType = inventoryItem != null ? ActionType.INVENTORY_ITEM_ADDED : ActionType.BLIND_BOX_ADDED,
                 LogContent = msg ?? (inventoryItem != null
-                    ? $"Inventory item created: {inventoryItem.Id}"
-                    : $"Blind box added: {blindBox?.BlindBoxId}"),
+                    ? $"Tạo item kho: {inventoryItem.Id}"
+                    : $"Thêm blindbox: {blindBox?.BlindBoxId}"),
                 OldValue = null,
-                NewValue = inventoryItem != null ? inventoryItem.Status.ToString() : "UNOPENED",
+                NewValue = inventoryItem != null ? inventoryItem.Status.ToString() : "CHƯA MỞ",
                 ActorId = _claimsService.CurrentUserId != Guid.Empty ? _claimsService.CurrentUserId : null,
                 ValueStatusType = inventoryItem != null
                     ? Domain.Entities.ValueType.INVENTORY_ITEM
@@ -174,19 +168,18 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
             };
             if (orderDetaillog.ActorId == null)
             {
-                _logger.Warn("This update made by system");
-                orderDetaillog.LogContent += " (System action)";
-                InventoryItemlog.LogContent += " (System action)";
+                _logger.Warn("Thao tác này được thực hiện bởi hệ thống");
+                orderDetaillog.LogContent += " (Thao tác hệ thống)";
+                InventoryItemlog.LogContent += " (Thao tác hệ thống)";
             }
 
             var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(orderDetaillog);
             await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(InventoryItemlog);
-            //await _unitOfWork.SaveChangesAsync();
             return result;
         }
         catch (Exception ex)
         {
-            _logger.Error("Error: " + ex.Message);
+            _logger.Error("Lỗi: " + ex.Message);
             throw;
         }
     }
@@ -199,7 +192,7 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
     {
         if (orderDetail == null)
         {
-            _logger.Warn($"OrderDetail is not linked to any InventoryItem. Cannot log tracking update.");
+            _logger.Warn($"Chi tiết đơn hàng không liên kết với bất kỳ item kho nào. Không thể ghi log cập nhật tracking.");
             return null!;
         }
 
@@ -218,12 +211,11 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
 
         if (log.ActorId == null)
         {
-            _logger.Warn("This update made by system");
-            log.LogContent += " (System action)";
+            _logger.Warn("Thao tác này được thực hiện bởi hệ thống");
+            log.LogContent += " (Thao tác hệ thống)";
         }
 
         var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
-        //await _unitOfWork.SaveChangesAsync();
         return result;
     }
 
@@ -237,38 +229,32 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         try
         {
             var message = new StringBuilder();
-            message.Append($"Shipment {shipment.OrderCode}: Shipment Changed from {oldStatus} to {newStatus}");
+            message.Append($"Vận chuyển {shipment.OrderCode}: Đã chuyển trạng thái từ {oldStatus} sang {newStatus}");
 
             switch (newStatus)
             {
                 case ShipmentStatus.PROCESSING:
-                    message.Append(
-                        $" Shipment requested. Pickup scheduled at {shipment.EstimatedPickupTime:yyyy-MM-dd HH:mm} ");
-                    message.Append($"from {seller?.CompanyAddress}.");
+                    message.Append($" | Đã yêu cầu vận chuyển. Lịch lấy hàng dự kiến: {shipment.EstimatedPickupTime:yyyy-MM-dd HH:mm} tại {seller?.CompanyAddress}.");
                     break;
 
                 case ShipmentStatus.PICKED_UP:
-                    message.Append($" Item picked up from seller at {seller?.CompanyAddress}. ");
-                    message.Append($"Estimated delivery: {shipment.EstimatedDelivery:yyyy-MM-dd}.");
+                    message.Append($" | Đã lấy hàng từ seller tại {seller?.CompanyAddress}. Ngày giao dự kiến: {shipment.EstimatedDelivery:yyyy-MM-dd}.");
                     break;
 
                 case ShipmentStatus.IN_TRANSIT:
-                    message.Append(
-                        $" Item in transit by GHN, estimated Delivery {shipment.EstimatedDelivery:yyyy-MM-dd}.");
+                    message.Append($" | Đang vận chuyển bởi GHN, ngày giao dự kiến: {shipment.EstimatedDelivery:yyyy-MM-dd}.");
                     break;
 
                 case ShipmentStatus.DELIVERED:
-                    message.Append($" Delivered to customer at {customerAddress?.AddressLine} ");
-                    message.Append($"on {DateTime.UtcNow:yyyy-MM-dd HH:mm}.");
+                    message.Append($" | Đã giao cho khách tại {customerAddress?.AddressLine} vào lúc {DateTime.UtcNow:yyyy-MM-dd HH:mm}.");
                     break;
 
                 default:
-                    message.Append($" Status changed from {oldStatus} to {newStatus}.");
+                    message.Append($" | Đã chuyển trạng thái từ {oldStatus} sang {newStatus}.");
                     break;
             }
 
             var orderDetails = shipment.OrderDetails?.ToList();
-            // Log status change for all order-details in this shipment
             if (orderDetails == null)
             {
                 shipment = await _unitOfWork.Shipments.GetQueryable()
@@ -290,8 +276,8 @@ public class OrderDetailInventoryItemLogService : IOrderDetailInventoryItemLogSe
         }
         catch (Exception ex)
         {
-            _logger.Error($"GenerateTrackingMessage error: {ex.Message}");
-            return $"Shipment update: {oldStatus} → {newStatus}";
+            _logger.Error($"Lỗi tạo message tracking: {ex.Message}");
+            return $"Cập nhật vận chuyển: {oldStatus} → {newStatus}";
         }
     }
 
