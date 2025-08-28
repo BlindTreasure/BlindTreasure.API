@@ -59,7 +59,7 @@ public class OAuthService : IOAuthService
 
         try
         {
-            var user = await _userService.GetUserByEmail(payload.Email, false);
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == payload.Email && !u.IsDeleted);
             if (user == null) throw ErrorHelper.BadRequest("Account not found");
             var result = await _authService.LoginAsync(new LoginRequestDto
             {
