@@ -93,7 +93,7 @@ public class DataAnalyzerService : IDataAnalyzerService
             .OrderByDescending(x => x.TotalQuantity)
             .Take(50) // lấy top 50 để đưa cho AI phân tích
             .ToList();
-
+//hehe test
         return grouped;
     }
 }
