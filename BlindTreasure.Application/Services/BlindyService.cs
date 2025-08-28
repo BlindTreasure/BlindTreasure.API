@@ -28,23 +28,22 @@ public class BlindyService : IBlindyService
         if (orders == null || !orders.Any())
             return "Bạn chưa có đơn hàng nào gần đây.";
 
-        // Chuẩn bị dữ liệu dạng bullet list (ReactMarkdown mặc định render được)
-        var rows = string.Join("\n\n", orders.Select(o =>
-            $"- Mã đơn: {o.Id.ToString()[..8]}  \n" +
-            $"  Trạng thái: {o.Status}  \n" +
-            $"  Tổng tiền: {o.FinalAmount:N0}đ  \n" +
-            $"  Ngày đặt: {o.PlacedAt:dd/MM/yyyy}"
+        // Chuẩn bị dữ liệu dạng Markdown table chuẩn
+        var header = "| Mã đơn | Trạng thái | Tổng tiền | Ngày đặt |";
+        var separator = "|--------|------------|-----------:|----------|";
+        var rows = string.Join("\n", orders.Select(o =>
+            $"| {o.Id.ToString()[..8]} | {o.Status} | {o.FinalAmount:N0}đ | {o.PlacedAt:dd/MM/yyyy} |"
         ));
 
-        var formatted = $"**Danh sách đơn hàng gần đây:**\n\n{rows}";
+        var formatted = $"\n{header}\n{separator}\n{rows}\n";
 
         var prompt = $"""
                       Đây là danh sách đơn hàng gần nhất của user trong hệ thống BlindTreasure.
-                      Dữ liệu:
+                      Dữ liệu (Markdown table):
                       {formatted}
 
-                      Hãy trả lời cho người dùng bằng cách hiển thị trạng thái đơn hàng
-                      ngắn gọn, dễ đọc, không dùng bảng Markdown.
+                      Hãy trả lời cho người dùng bằng bảng Markdown giữ nguyên cấu trúc,
+                      hiển thị trạng thái đơn hàng rõ ràng và dễ đọc.
                       """;
 
         return await AskUserAsync(prompt);
