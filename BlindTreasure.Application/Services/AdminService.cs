@@ -86,7 +86,8 @@ public class AdminService : IAdminService
         await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
         _logger.Success($"[UpdateProfileAsync] Profile updated for user {user.Email}");
-        return UserMapper.ToUserDto(user);
+        var result = UserMapper.ToUserDto(user);
+        return result;
     }
 
     public async Task<UpdateAvatarResultDto?> UploadAvatarAsync(Guid userId, IFormFile file)

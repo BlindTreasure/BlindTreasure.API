@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
@@ -10,6 +8,9 @@ using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace BlindTreasure.Application.Services;
 
@@ -746,9 +747,12 @@ public class ReviewService : IReviewService
         if (string.IsNullOrEmpty(orderDetail.Order.Status))
             throw ErrorHelper.BadRequest("Trạng thái đơn hàng không hợp lệ. Vui lòng liên hệ hỗ trợ.");
 
-        if (orderDetail.Order.Status != nameof(OrderStatus.COMPLETED))
+        var notAllowedStatuses = new[] { nameof(OrderStatus.PENDING), nameof(OrderStatus.CANCELLED) };
+        if (notAllowedStatuses.Contains(orderDetail.Order.Status))
+        {
             throw ErrorHelper.BadRequest(
                 "Bạn chỉ có thể đánh giá sau khi đơn hàng đã được giao thành công và thanh toán hoàn tất.");
+        }
 
         // THÊM: Kiểm tra thời gian order (không được quá cũ)
         if (orderDetail.Order.CreatedAt < DateTime.UtcNow.AddMonths(-6))
