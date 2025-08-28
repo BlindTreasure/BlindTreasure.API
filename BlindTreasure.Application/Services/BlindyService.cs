@@ -292,15 +292,8 @@ public class BlindyService : IBlindyService
 
     public async Task<string> AskUserAsync(string prompt)
     {
-        var fullPrompt = $"""
-                              Bạn là AI hỗ trợ người dùng trên nền tảng BlindTreasure. 
-                              Hướng dẫn ngắn gọn, rõ ràng về cách đăng ký tài khoản, mua sản phẩm, mở blind box, 
-                              và bán lại item đã mở.
-
-                              {prompt}
-                          """;
-
-        return await _geminiService.GenerateResponseAsync(fullPrompt);
+        var model = "gemini-2.0-flash";
+        return await _geminiService.GenerateResponseAsync(prompt, model);
     }
 
     private async Task<string> AskStaffAsync(string prompt)
