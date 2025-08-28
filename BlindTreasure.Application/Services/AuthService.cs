@@ -124,7 +124,7 @@ public class AuthService : IAuthService
         _logger.Info($"[LoginAsync] Login attempt for {loginDto.Email}");
 
         // Get user from cache or DBB
-        var user = await GetUserByEmailAsync(loginDto.Email!, true);
+        var user = await GetUserByEmailAsync(loginDto.Email!, false);
         var seller = new Seller();
         if (user.RoleName.ToString() == RoleType.Seller.ToString())
         {
