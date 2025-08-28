@@ -4,6 +4,7 @@ using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
+using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -315,6 +316,48 @@ public class AdminService : IAdminService
             throw ErrorHelper.BadRequest(ex.Message);
         }
     }
+
+    public async Task<Pagination<PayoutTransactionDto>> GetPayoutTransactionsAsync(PayoutTransactionQueryParameter param)
+    {
+        var query = _unitOfWork.PayoutTransactions.GetQueryable()
+            .Where(pt => !pt.IsDeleted)
+            .Include(pt => pt.Payout)
+            .AsNoTracking();
+
+        if (param.SellerId.HasValue)
+            query = query.Where(pt => pt.SellerId == param.SellerId.Value);
+
+        if (param.TransferredFrom.HasValue)
+            query = query.Where(pt => pt.TransferredAt >= param.TransferredFrom.Value);
+
+        if (param.TransferredTo.HasValue)
+            query = query.Where(pt => pt.TransferredAt <= param.TransferredTo.Value);
+
+        if (param.MinAmount.HasValue)
+            query = query.Where(pt => pt.Amount >= param.MinAmount.Value);
+
+        if (param.MaxAmount.HasValue)
+            query = query.Where(pt => pt.Amount <= param.MaxAmount.Value);
+
+        if (param.IsInitiatedBySystem.HasValue)
+            query = param.IsInitiatedBySystem.Value
+                ? query.Where(pt => pt.InitiatedBy == Guid.Empty)
+                : query.Where(pt => pt.InitiatedBy != Guid.Empty);
+
+        query = param.Desc
+            ? query.OrderByDescending(pt => pt.TransferredAt ?? pt.CreatedAt)
+            : query.OrderBy(pt => pt.TransferredAt ?? pt.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+        var items = param.PageIndex == 0
+            ? await query.ToListAsync()
+            : await query.Skip((param.PageIndex - 1) * param.PageSize).Take(param.PageSize).ToListAsync();
+
+        var dtos = items.Select(PayoutDtoMapper.ToPayoutTransactionDto).ToList();
+        return new Pagination<PayoutTransactionDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
+
+
 
 
     // ----------------- PRIVATE HELPER METHODS -----------------

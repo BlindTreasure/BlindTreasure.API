@@ -104,30 +104,45 @@ public class SellerStatisticsService : ISellerStatisticsService
     }
 
     private async Task<SellerOverviewStatisticsDto> BuildOverviewStatisticsAsync(
-        List<Order> orders,
-        List<OrderDetail> orderDetails,
-        SellerStatisticsRequestDto req,
-        DateTime start,
-        DateTime end,
-        CancellationToken ct,
-        Guid sellerId)
+    List<Order> completedOrders,
+    List<OrderDetail> completedOrderDetails,
+    SellerStatisticsRequestDto req,
+    DateTime start,
+    DateTime end,
+    CancellationToken ct,
+    Guid sellerId)
     {
-        var totalOrders = orders.Count;
-        var totalProductsSold = orderDetails.Sum(od => od.Quantity);
+        // Get PAID orders for EstimatedRevenue (filter by PlacedAt)
+        var paidOrders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == sellerId
+                        && o.Status == OrderStatus.PAID.ToString()
+                        && o.PlacedAt >= start && o.PlacedAt < end
+                        && !o.IsDeleted)
+            .Include(o => o.OrderDetails)
+            .AsNoTracking()
+            .ToListAsync(ct);
 
-        // Estimated Revenue: COMPLETED orders (same as actual for new business logic)
-        var estimatedRevenue = orderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+        var estimatedRevenue = paidOrders
+            .SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
 
-        // Refunds for these orders
-        var orderIds = orders.Select(o => o.Id).ToHashSet();
+        // ActualRevenue: from completedOrders (already filtered by CompletedAt)
+        var actualRevenue = completedOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+
+        var totalOrders = completedOrders.Count;
+        var totalProductsSold = completedOrderDetails.Sum(od => od.Quantity);
+
+        // Refunds for these COMPLETED orders
+        var orderIds = completedOrders.Select(o => o.Id).ToHashSet();
         var totalRefunded = await _unitOfWork.Payments.GetQueryable()
             .Where(p => orderIds.Contains(p.OrderId) && p.RefundedAmount > 0)
             .SumAsync(p => (decimal?)p.RefundedAmount, ct) ?? 0m;
 
-        var finalRevenue = estimatedRevenue - totalRefunded;
+        var finalRevenue = actualRevenue - totalRefunded;
         var averageOrderValue = totalOrders > 0 ? Math.Round(finalRevenue / totalOrders, 2) : 0m;
 
-        // Previous period for growth calculation
+        // Previous period for growth calculation (use CompletedAt for previous period)
         var (lastStart, lastEnd) = GetPreviousDateRange(req.Range, start, end);
         var lastOrders = await GetOrdersInRangeAsync(sellerId, lastStart, lastEnd, ct);
         var lastOrderDetails = lastOrders
@@ -135,13 +150,13 @@ public class SellerStatisticsService : ISellerStatisticsService
             .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
             .ToList();
 
-        var lastEstimatedRevenue = lastOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+        var lastActualRevenue = lastOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
         var lastOrderIds = lastOrders.Select(o => o.Id).ToHashSet();
         var lastRefunded = await _unitOfWork.Payments.GetQueryable()
             .Where(p => lastOrderIds.Contains(p.OrderId) && p.RefundedAmount > 0)
             .SumAsync(p => (decimal?)p.RefundedAmount, ct) ?? 0m;
 
-        var lastFinalRevenue = lastEstimatedRevenue - lastRefunded;
+        var lastFinalRevenue = lastActualRevenue - lastRefunded;
         var lastAOV = lastOrders.Count > 0 ? Math.Round(lastFinalRevenue / lastOrders.Count, 2) : 0m;
 
         // Growth calculations
@@ -170,7 +185,7 @@ public class SellerStatisticsService : ISellerStatisticsService
 
         return new SellerOverviewStatisticsDto
         {
-            EstimatedRevenue = decimal.Round(finalRevenue, 2),
+            EstimatedRevenue = decimal.Round(estimatedRevenue, 2),
             EstimatedRevenueLastPeriod = decimal.Round(lastFinalRevenue, 2),
             EstimatedRevenueGrowthPercent = estimatedRevenueGrowth,
 
@@ -254,7 +269,7 @@ public class SellerStatisticsService : ISellerStatisticsService
         DateTime end
     )
     {
-        // Get PAID orders for EstimatedRevenue
+        // Get PAID orders for EstimatedRevenue (filter by PlacedAt)
         var paidOrders = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.SellerId == sellerId
                         && o.Status == OrderStatus.PAID.ToString()
@@ -264,7 +279,7 @@ public class SellerStatisticsService : ISellerStatisticsService
             .AsNoTracking()
             .ToListAsync();
 
-        // Get COMPLETED orders for ActualRevenue
+        // Get COMPLETED orders for ActualRevenue (filter by CompletedAt)
         var completedOrders = await _unitOfWork.Orders.GetQueryable()
             .Where(o => o.SellerId == sellerId
                         && o.Status == OrderStatus.COMPLETED.ToString()
@@ -281,14 +296,13 @@ public class SellerStatisticsService : ISellerStatisticsService
 
         Func<OrderDetail, decimal> revenueSelector = od => od.FinalDetailPrice ?? od.TotalPrice;
 
-        // Example: Daily breakdown
         var totalDays = (end - start).Days;
         for (var day = 0; day < totalDays; day++)
         {
             var date = start.AddDays(day);
             categories.Add(date.ToString("dd/MM"));
 
-            // ActualRevenue: COMPLETED orders for this day
+            // ActualRevenue: COMPLETED orders for this day (by CompletedAt)
             var completedDetails = completedOrders
                 .Where(o => o.CompletedAt.HasValue && o.CompletedAt.Value.Date == date.Date)
                 .SelectMany(o => o.OrderDetails)
@@ -298,7 +312,7 @@ public class SellerStatisticsService : ISellerStatisticsService
             actualRevenue.Add(completedDetails.Sum(revenueSelector));
             sales.Add(completedDetails.Sum(od => od.Quantity));
 
-            // EstimatedRevenue: PAID orders for this day
+            // EstimatedRevenue: PAID orders for this day (by PlacedAt)
             var paidDetails = paidOrders
                 .Where(o => o.PlacedAt.Date == date.Date)
                 .SelectMany(o => o.OrderDetails)

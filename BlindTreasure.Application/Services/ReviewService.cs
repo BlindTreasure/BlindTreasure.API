@@ -746,7 +746,7 @@ public class ReviewService : IReviewService
         if (string.IsNullOrEmpty(orderDetail.Order.Status))
             throw ErrorHelper.BadRequest("Trạng thái đơn hàng không hợp lệ. Vui lòng liên hệ hỗ trợ.");
 
-        if (orderDetail.Order.Status != nameof(OrderStatus.PAID))
+        if (orderDetail.Order.Status != nameof(OrderStatus.COMPLETED))
             throw ErrorHelper.BadRequest(
                 "Bạn chỉ có thể đánh giá sau khi đơn hàng đã được giao thành công và thanh toán hoàn tất.");
 

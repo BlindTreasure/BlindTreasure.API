@@ -298,4 +298,33 @@ public class AdminController : ControllerBase
                 ApiResult<object>.Failure("500", "Error occurred during payout confirmation: ." + ex.Message));
         }
     }
+
+    /// <summary>
+    /// Lấy danh sách giao dịch payout (PayoutTransaction) cho admin, có phân trang và filter.
+    /// </summary>
+    /// <param name="param">Tham số phân trang và filter</param>
+    /// <returns>Danh sách giao dịch payout phân trang</returns>
+    [HttpGet("stripe-transactions")]
+    [ProducesResponseType(typeof(ApiResult<Pagination<PayoutTransactionDto>>), 200)]
+    public async Task<IActionResult> GetPayoutTransactions([FromQuery] PayoutTransactionQueryParameter param)
+    {
+        try
+        {
+            var result = await _userService.GetPayoutTransactionsAsync(param);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Lấy danh sách giao dịch payout thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 }
