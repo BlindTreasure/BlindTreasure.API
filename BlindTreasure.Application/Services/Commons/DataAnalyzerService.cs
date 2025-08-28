@@ -1,5 +1,8 @@
-﻿using BlindTreasure.Application.Interfaces.Commons;
+﻿using BlindTreasure.Application.Interfaces;
+using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
+using BlindTreasure.Domain.DTOs.OrderDTOs;
+using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
@@ -11,12 +14,27 @@ namespace BlindTreasure.Application.Services.Commons;
 public class DataAnalyzerService : IDataAnalyzerService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IOrderService _orderService;
 
-    public DataAnalyzerService(IUnitOfWork unitOfWork)
+    public DataAnalyzerService(IUnitOfWork unitOfWork, IOrderService orderService)
     {
         _unitOfWork = unitOfWork;
+        _orderService = orderService;
     }
 
+    public async Task<List<OrderDto>> GetMyOrdersForAiAsync(int limit = 5)
+    {
+        var param = new OrderQueryParameter
+        {
+            PageIndex = 1,
+            PageSize = limit,
+            Desc = true
+        };
+
+        // tái sử dụng OrderService để lấy theo currentUserId
+        var orders = await _orderService.GetMyOrdersAsync(param);
+        return orders;
+    }
 
     public async Task<List<UserDto>> GetUsersForAiAnalysisAsync()
     {
@@ -93,7 +111,6 @@ public class DataAnalyzerService : IDataAnalyzerService
             .OrderByDescending(x => x.TotalQuantity)
             .Take(50) // lấy top 50 để đưa cho AI phân tích
             .ToList();
-//hehe test
         return grouped;
     }
 }

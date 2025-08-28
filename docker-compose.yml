@@ -16,7 +16,7 @@ services:
       - ConnectionStrings__DefaultConnection=Host=103.211.201.162;Port=5433;Database=BlindTreasureDB;Username=postgres;Password=postgres;Timeout=300;CommandTimeout=300
       - ConnectionStrings__Redis=redis:6379,abortConnect=false
       - JWT__SecretKey=BlindTreasure_SECRETKEY_SIEUCAPBAOMAT_VAYMACHUADU16KYTU
-      - GEMINI_API_KEY=AIzaSyAWFSoZeH7tw0hv8VFZSl81hUFTPptuimo
+      - GEMINI_API_KEY=AIzaSyBAibjXO6OkvcPO_GdvflPXtZR1q3ABMyA
       - JWT__Issuer=BlindTreasure_Issuer
       - JWT__Audience=BlindTreasure_Audience
       - RESEND_APITOKEN=re_gQNBXJvY_ANFdgQphKQBxdW5DNf2UG6Zk

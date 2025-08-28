@@ -20,6 +20,28 @@ public class BlindyService : IBlindyService
         _analyzerService = analyzerService;
     }
 
+    
+    public async Task<string> GetMyOrdersStatusWithAiAsync()
+    {
+        var orders = await _analyzerService.GetMyOrdersForAiAsync();
+
+        if (orders == null || !orders.Any())
+            return "Bạn chưa có đơn hàng nào gần đây.";
+
+        var formatted = string.Join("\n", orders.Select(o =>
+            $"- Mã đơn: {o.Id.ToString()[..8]}, Trạng thái: {o.Status}, Tổng: {o.FinalAmount:N0}đ, Ngày đặt: {o.PlacedAt:dd/MM/yyyy}"
+        ));
+
+        var prompt = $"""
+                      Đây là danh sách đơn hàng gần nhất của user trong hệ thống BlindTreasure:
+                      {formatted}
+
+                      Hãy trả lời ngắn gọn, thân thiện cho người dùng, mô tả tình trạng các đơn.
+                      """;
+
+        return await AskUserAsync(prompt);
+    }
+
     public async Task<string> AnalyzeTrendingProductsWithAi()
     {
         var stats = await _analyzerService.GetTrendingProductsForAiAsync();
