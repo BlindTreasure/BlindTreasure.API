@@ -1122,18 +1122,18 @@ public class SystemController : ControllerBase
         var users = new List<User>
         {
             // customer 1
-            new()
-            {
-                Email = "trangiaphuc362003181@gmail.com",
-                Password = passwordHasher.HashPassword("1@"),
-                FullName = "Trần Gia Phúc",
-                Phone = "0354343507",
-                Status = UserStatus.Active,
-                RoleName = RoleType.Customer,
-                CreatedAt = now,
-                AvatarUrl = defaultAvatar,
-                Addresses = defaultAddress
-            },
+            // new()
+            // {
+            //     Email = "trangiaphuc362003181@gmail.com",
+            //     Password = passwordHasher.HashPassword("1@"),
+            //     FullName = "Trần Gia Phúc",
+            //     Phone = "0354343507",
+            //     Status = UserStatus.Active,
+            //     RoleName = RoleType.Customer,
+            //     CreatedAt = now,
+            //     AvatarUrl = defaultAvatar,
+            //     Addresses = defaultAddress
+            // },
             //customer 2
             new()
             {

@@ -37,7 +37,7 @@ public class GeminiService : IGeminiService
     {
         modelName ??= GeminiModels.FlashV2; // Default fallback model
 
-        var fullPrompt = $"{GeminiContext.SystemPrompt}\n\n{userPrompt}";
+        var fullPrompt = $"{GeminiContext.SystemPrompt}\n\n{GeminiContext.ResponseRules}\n\n{userPrompt}";
 
         // Build API URL với model động
         var url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={_apiKey}";
@@ -162,12 +162,26 @@ public class GeminiService : IGeminiService
 
 public static class GeminiContext
 {
+    
+    public const string ResponseRules =
+        """
+        (Quy tắc trả lời – áp dụng cho mọi phản hồi gửi tới user)
+
+        - Trả lời ngắn gọn, rõ ràng, súc tích.
+        - Ưu tiên dạng bullet point khi liệt kê.
+        - Không nhắc lại chi tiết kỹ thuật nội bộ (database, repository, CI/CD...).
+        - Nếu thông tin ngoài phạm vi → trả lời: 
+          “Tôi chỉ hỗ trợ khiếu nại và thông tin liên quan tới chức năng hiện tại của BlindTreasure.”
+        """;
+    
     public const string SystemPrompt =
         """
         (Thông tin nội bộ – không hiển thị cho người dùng)
-
-        Bạn là trợ lý AI của hệ thống BlindTreasure, hoạt động ở mức service layer. Dưới đây là mô tả chi tiết cấu trúc và nghiệp vụ để bạn hiểu sâu về hệ thống. Khi trả lời người dùng, hãy chuyển thành ngôn ngữ dễ hiểu, không dùng thuật ngữ technical.
-
+        
+            Bạn là trợ lý AI của hệ thống BlindTreasure, hoạt động ở mức service layer. 
+            Dưới đây là mô tả chi tiết cấu trúc và nghiệp vụ để bạn hiểu sâu về hệ thống. 
+            Khi trả lời người dùng, hãy chuyển thành ngôn ngữ dễ hiểu, không dùng thuật ngữ technical.
+        
         === I. KIẾN TRÚC HỆ THỐNG ===
         1. Backend: ASP.NET Core Web API, tổ chức theo layers:  
            - Controllers (folder API/Controllers)  
@@ -249,7 +263,8 @@ public static class GeminiContext
         - Mỗi user tối đa 5 session.  
         - Chỉ phục vụ thị trường VN, ngôn ngữ giao diện và thông báo bằng tiếng Việt.
 
-        Nếu prompt của người dùng vượt quá phạm vi nghiệp vụ này, phản hồi nội bộ “Out of scope” và khi trả cho user, chuyển sang:  
-        “Tôi chỉ hỗ trợ khiếu nại và thông tin liên quan tới chức năng hiện tại của BlindTreasure.”  
+         Nếu prompt của người dùng vượt quá phạm vi nghiệp vụ này, phản hồi nội bộ “Out of scope” 
+        và khi trả cho user, chuyển sang:  
+        “Tôi chỉ hỗ trợ khiếu nại và thông tin liên quan tới chức năng hiện tại của BlindTreasure.”
         """;
 }
