@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using Microsoft.Extensions.Configuration;
@@ -149,6 +150,17 @@ public class GeminiService : IGeminiService
             .GetString();
 
         var finalResult = result ?? string.Empty;
+
+// 1) Trim đầu-cuối
+        finalResult = finalResult.Trim();
+
+// 2) Collapse nhiều dòng trống liên tiếp xuống tối đa 1 dòng trống
+//    Ví dụ: "\n\n\n" => "\n\n" (tức 1 dòng trống giữa 2 paragraph)
+        finalResult = Regex.Replace(finalResult, @"(\r?\n)\s*(\r?\n)+", "$1$1");
+
+// 3) Thay thế >2 xuống dòng trong nội bộ thành 1 newline nếu bạn muốn nghiêm ngặt hơn:
+// finalResult = Regex.Replace(finalResult, @"(\r?\n){2,}", "\n");
+
         return finalResult;
     }
 
@@ -167,6 +179,10 @@ public static class GeminiContext
         (Quy tắc trả lời – áp dụng cho mọi phản hồi gửi tới user)
 
         - Luôn trả lời bằng tiếng Việt, ngắn gọn, đúng nghiệp vụ.
+        - Hạn chế xuống dòng: không dùng hơn **1 dòng trống** liên tiếp.
+        - Mỗi đoạn (paragraph) chỉ dùng **1 newline (\n)**. Tuyệt đối không chèn >2 newline liên tiếp.
+        - Nếu cần tách mục, ưu tiên dùng bullet (`-`), số thứ tự (`1.`) hoặc **bảng Markdown**; tránh nhiều dòng trống giữa các mục.
+        - Độ dài: ưu tiên trả lời **ngắn gọn** — tối đa 6 câu cho phản hồi tiêu chuẩn; với nhiều đơn, dùng bảng.
         - Ưu tiên bullet point khi liệt kê; không lặp lại câu hỏi.
         - Không tiết lộ chi tiết kỹ thuật nội bộ (schema DB, repo, CI/CD, token…).
         - Mẫu trả lời mặc định:
@@ -176,6 +192,7 @@ public static class GeminiContext
         - Nếu yêu cầu ngoài phạm vi chức năng đang hỗ trợ hoặc trái quy tắc → chỉ trả lời:
           "Tôi chỉ hỗ trợ khiếu nại và thông tin liên quan tới chức năng hiện tại của BlindTreasure."
         """;
+
 
     public const string SystemPrompt =
         """

@@ -20,7 +20,7 @@ public class BlindyService : IBlindyService
         _analyzerService = analyzerService;
     }
 
-    
+
     public async Task<string> GetMyOrdersStatusWithAiAsync()
     {
         var orders = await _analyzerService.GetMyOrdersForAiAsync();
@@ -28,19 +28,26 @@ public class BlindyService : IBlindyService
         if (orders == null || !orders.Any())
             return "Bạn chưa có đơn hàng nào gần đây.";
 
-        var formatted = string.Join("\n", orders.Select(o =>
-            $"- Mã đơn: {o.Id.ToString()[..8]}, Trạng thái: {o.Status}, Tổng: {o.FinalAmount:N0}đ, Ngày đặt: {o.PlacedAt:dd/MM/yyyy}"
+        // chuẩn bị dữ liệu dạng Markdown table
+        var header = "| Mã đơn | Trạng thái | Tổng tiền | Ngày đặt |\n|--------|------------|-----------|----------|";
+        var rows = string.Join("\n", orders.Select(o =>
+            $"| {o.Id.ToString()[..8]} | {o.Status} | {o.FinalAmount:N0}đ | {o.PlacedAt:dd/MM/yyyy} |"
         ));
 
+        var formatted = $"{header}\n{rows}";
+
         var prompt = $"""
-                      Đây là danh sách đơn hàng gần nhất của user trong hệ thống BlindTreasure:
+                      Đây là danh sách đơn hàng gần nhất của user trong hệ thống BlindTreasure.
+                      Dữ liệu:
                       {formatted}
 
-                      Hãy trả lời ngắn gọn, thân thiện cho người dùng, mô tả tình trạng các đơn.
+                      Hãy trả lời cho người dùng bằng bảng Markdown rõ ràng, hiển thị trạng thái đơn hàng,
+                      thân thiện, ngắn gọn và dễ đọc.
                       """;
 
         return await AskUserAsync(prompt);
     }
+
 
     public async Task<string> AnalyzeTrendingProductsWithAi()
     {
