@@ -51,7 +51,10 @@ public static class InventoryItemMapper
             OldValue = log.OldValue,
             NewValue = log.NewValue,
             ActorId = log.ActorId,
-            LogTime = log.CreatedAt
+            LogTime = log.CreatedAt,
+            ShipmentId = log.ShipmentId,
+            ValueStatusType = log.ValueStatusType
+
         };
     }
 }
