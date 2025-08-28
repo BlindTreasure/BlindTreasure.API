@@ -327,4 +327,30 @@ public class AdminController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
+    /// <summary>
+    /// Lấy chi tiết giao dịch payout (PayoutTransaction) theo Id.
+    /// </summary>
+    /// <param name="id">Id của giao dịch payout</param>
+    /// <returns>Thông tin chi tiết giao dịch payout</returns>
+    [HttpGet("stripe-transactions/{id}")]
+    [ProducesResponseType(typeof(ApiResult<PayoutTransactionDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<PayoutTransactionDto>), 404)]
+    public async Task<IActionResult> GetPayoutTransactionById(Guid id)
+    {
+        try
+        {
+            var result = await _userService.GetPayoutTransactionByIdAsync(id);
+            if (result == null)
+                return NotFound(ApiResult<PayoutTransactionDto>.Failure("404", "Không tìm thấy giao dịch payout."));
+
+            return Ok(ApiResult<PayoutTransactionDto>.Success(result, "200", "Lấy chi tiết giao dịch payout thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<PayoutTransactionDto>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
 }

@@ -23,6 +23,7 @@ public interface IAdminService
     Task<User?> GetUserById(Guid id, bool useCache = false);
     Task<bool> TryCompleteOrderAsync(Order order, CancellationToken cancellationToken = default);
     Task<Pagination<PayoutTransactionDto>> GetPayoutTransactionsAsync(PayoutTransactionQueryParameter param);
+    Task<PayoutTransactionDto?> GetPayoutTransactionByIdAsync(Guid id);
 
     //AI analysis
 }
