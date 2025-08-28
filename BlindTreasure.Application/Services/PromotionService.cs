@@ -40,20 +40,61 @@ public class PromotionService : IPromotionService
 
     public async Task<Pagination<PromotionDto>> GetPromotionsAsync(PromotionQueryParameter param)
     {
+        // Lấy user hiện tại (nếu có)
+        var currentUserId = _claimsService.CurrentUserId;
+        var currentUser = currentUserId != Guid.Empty
+            ? await _userService.GetUserById(currentUserId, true)
+            : null;
+
         // Base query - chỉ lấy promotions chưa bị xóa
         var query = _unitOfWork.Promotions
             .GetQueryable()
             .Where(p => !p.IsDeleted);
 
-        // Apply basic filters
-        if (param.SellerId.HasValue) query = query.Where(p => p.SellerId == param.SellerId);
-
-        if (param.IsGlobal.HasValue)
+        // Nếu là Seller: áp dụng giới hạn chặt
+        if (currentUser?.RoleName == RoleType.Seller)
         {
+            // Lấy seller profile
+            var sellerProfile = await _unitOfWork.Sellers
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId && !s.IsDeleted && s.IsVerified);
+
+            if (sellerProfile == null)
+                throw ErrorHelper.Forbidden("Tài khoản seller không hợp lệ hoặc chưa được xác minh.");
+
+            // Nếu caller truyền SellerId khác với seller của họ -> cấm
+            if (param.SellerId.HasValue && param.SellerId.Value != sellerProfile.Id)
+                throw ErrorHelper.Forbidden("Không được phép lấy khuyến mãi của seller khác.");
+
+            // Chỉ lấy: (1) promotions do staff tạo, hoặc (2) promotions seller tham gia, hoặc (3) promotions thuộc chính seller
+            query = query.Where(p =>
+                p.CreatedByRole == RoleType.Staff
+                || (p.PromotionParticipants.Any(pp => pp.SellerId == sellerProfile.Id && !pp.IsDeleted))
+                || p.SellerId == sellerProfile.Id);
+
+            // Đảm bảo include PromotionParticipants để lọc đúng
+            query = query.Include(p => p.PromotionParticipants);
+        }
+        else
+        {
+            // Non-seller (staff/admin/...): giữ logic filter chung nhưng vẫn không cho seller khác bị lộ khi param.SellerId được dùng hợp lệ
+            if (param.SellerId.HasValue) query = query.Where(p => p.SellerId == param.SellerId);
+            if (param.IsGlobal.HasValue)
+            {
+                if (param.IsGlobal.Value)
+                    query = query.Where(p => p.SellerId == null); // Global promotions
+                else
+                    query = query.Where(p => p.SellerId != null); // Seller-specific promotions
+            }
+        }
+
+        // Áp dụng các filter chung nếu user là không-seller hoặc đã xử lý ở trên
+        if (param.IsGlobal.HasValue && currentUser?.RoleName == RoleType.Seller)
+        {
+            // Nếu seller vẫn muốn filter theo IsGlobal, tôn trọng nhưng vẫn phải thỏa điều kiện truy xuất ở trên
             if (param.IsGlobal.Value)
-                query = query.Where(p => p.SellerId == null); // Global promotions
+                query = query.Where(p => p.SellerId == null);
             else
-                query = query.Where(p => p.SellerId != null); // Seller-specific promotions
+                query = query.Where(p => p.SellerId != null);
         }
 
         if (param.Status.HasValue) query = query.Where(p => p.Status == param.Status);
@@ -61,22 +102,17 @@ public class PromotionService : IPromotionService
         if (param.IsParticipated.HasValue && param.ParticipantSellerId.HasValue)
         {
             if (param.IsParticipated.Value)
-                // Lấy các promotions mà seller này tham gia
                 query = query.Where(p =>
                     p.PromotionParticipants.Any(pp =>
                         pp.SellerId == param.ParticipantSellerId &&
                         !pp.IsDeleted));
             else
-                // Lấy các promotions mà seller này KHÔNG tham gia
                 query = query.Where(p =>
                     !p.PromotionParticipants.Any(pp =>
                         pp.SellerId == param.ParticipantSellerId &&
                         !pp.IsDeleted));
-        }
-
-        // Include PromotionParticipants nếu cần filter participation
-        if (param.IsParticipated.HasValue || param.ParticipantSellerId.HasValue)
             query = query.Include(p => p.PromotionParticipants);
+        }
 
         // Get total count for pagination
         var totalCount = await query.CountAsync();

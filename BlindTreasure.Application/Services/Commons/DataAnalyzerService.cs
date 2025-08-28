@@ -15,15 +15,18 @@ public class DataAnalyzerService : IDataAnalyzerService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IOrderService _orderService;
+    private readonly IClaimsService  _claimsService;
 
-    public DataAnalyzerService(IUnitOfWork unitOfWork, IOrderService orderService)
+    public DataAnalyzerService(IUnitOfWork unitOfWork, IOrderService orderService, IClaimsService claimsService)
     {
         _unitOfWork = unitOfWork;
         _orderService = orderService;
+        _claimsService = claimsService;
     }
 
     public async Task<List<OrderDto>> GetMyOrdersForAiAsync(int limit = 5)
     {
+        Console.WriteLine($"[DEBUG] CurrentUserId = {_claimsService.CurrentUserId}");
         var param = new OrderQueryParameter
         {
             PageIndex = 1,

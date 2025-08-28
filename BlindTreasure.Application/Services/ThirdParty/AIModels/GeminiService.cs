@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using Microsoft.Extensions.Configuration;
@@ -76,8 +77,9 @@ public class GeminiService : IGeminiService
             .GetProperty("parts")[0]
             .GetProperty("text")
             .GetString();
-
         var finalResult = result ?? string.Empty;
+// --- normalize newlines trước khi trả về ---
+        finalResult = NormalizeNewlines(finalResult);
         return finalResult;
     }
 
@@ -147,8 +149,8 @@ public class GeminiService : IGeminiService
             .GetProperty("parts")[0]
             .GetProperty("text")
             .GetString();
-
         var finalResult = result ?? string.Empty;
+        finalResult = NormalizeNewlines(finalResult);
         return finalResult;
     }
 
@@ -157,6 +159,30 @@ public class GeminiService : IGeminiService
         // Trả về JSON chuẩn khi API lỗi
         return
             "{\"isValid\": false, \"reasons\": [\"API validation không khả dụng, bài đánh giá cần kiểm duyệt thủ công.\"]}";
+    }
+
+    // thêm helper này trong class GeminiService
+    private static string NormalizeNewlines(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+
+        // 1) Nếu model in literal "\n" hoặc "\r\n" dưới dạng text, chuyển về newline thật
+        input = input.Replace("\\r\\n", "\n").Replace("\\n", "\n");
+
+        // 2) chuẩn hoá loại newline khác
+        input = input.Replace("\r\n", "\n").Replace("\r", "\n");
+
+        // 3) xóa khoảng trắng thừa trước/sau newline
+        input = System.Text.RegularExpressions.Regex.Replace(input, @"[ \t]+\n", "\n");
+        input = System.Text.RegularExpressions.Regex.Replace(input, @"\n[ \t]+", "\n");
+
+        // 4) collapse nhiều blank line xuống tối đa 1 blank line (tức <= 2 newline liên tiếp)
+        input = System.Text.RegularExpressions.Regex.Replace(input, @"\n{3,}", "\n\n");
+
+        // 5) trim đầu-cuối
+        input = input.Trim();
+
+        return input;
     }
 }
 
@@ -167,15 +193,22 @@ public static class GeminiContext
         (Quy tắc trả lời – áp dụng cho mọi phản hồi gửi tới user)
 
         - Luôn trả lời bằng tiếng Việt, ngắn gọn, đúng nghiệp vụ.
+        - KHÔNG in ký tự escape '\n' (backslash + n) trong output; nếu cần newline hãy dùng newline thực.
+        - Hạn chế xuống dòng: không dùng hơn **1 dòng trống** liên tiếp (tức không có >2 newline liên tiếp).
+        - Mỗi đoạn (paragraph) chỉ dùng **1 newline (\n)**. Tuyệt đối không chèn >2 newline liên tiếp.
+        - Nếu cần tách mục, ưu tiên dùng bullet (`-`), số thứ tự (`1.`) hoặc **bảng Markdown**; tránh nhiều dòng trống giữa các mục.
+        - Độ dài: ưu tiên trả lời **ngắn gọn** — tối đa 6 câu cho phản hồi tiêu chuẩn; với nhiều đơn, dùng bảng.
         - Ưu tiên bullet point khi liệt kê; không lặp lại câu hỏi.
         - Không tiết lộ chi tiết kỹ thuật nội bộ (schema DB, repo, CI/CD, token…).
         - Mẫu trả lời mặc định:
           1) Kết luận / Trả lời trực tiếp
           2) Căn cứ (dẫn BR/flow liên quan)
           3) Bước tiếp theo (hành động hoặc màn hình/API)
+        - Nếu output chứa literal "\n" (ví dụ model in \\n), hệ thống phải chuyển thành newline thực và tự làm sạch nhiều newline thừa trước khi trả về user.
         - Nếu yêu cầu ngoài phạm vi chức năng đang hỗ trợ hoặc trái quy tắc → chỉ trả lời:
           "Tôi chỉ hỗ trợ khiếu nại và thông tin liên quan tới chức năng hiện tại của BlindTreasure."
         """;
+
 
     public const string SystemPrompt =
         """
