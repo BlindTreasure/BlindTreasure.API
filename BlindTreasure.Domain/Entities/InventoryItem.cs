@@ -39,6 +39,6 @@ public class InventoryItem : BaseEntity
     public Guid? LastTradeHistoryId { get; set; } // ID của giao dịch gần nhất
     public TradeHistory? LastTradeHistory { get; set; } // Navigation property
 
-    public ICollection<OrderDetailInventoryItemLog>? OrderDetailInventoryItemLogs { get; set; } =
-        new List<OrderDetailInventoryItemLog>();
+    public ICollection<OrderDetailInventoryItemShipmentLog>? OrderDetailInventoryItemLogs { get; set; } =
+        new List<OrderDetailInventoryItemShipmentLog>();
 }

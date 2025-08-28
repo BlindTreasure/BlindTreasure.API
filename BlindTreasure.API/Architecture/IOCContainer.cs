@@ -165,7 +165,7 @@ public static class IocContainer
         services.AddScoped<ISellerStatisticsService, SellerStatisticsService>();
         services.AddScoped<IReviewService, ReviewService>();
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
-        services.AddScoped<IOrderDetailInventoryItemLogService, OrderDetailInventoryItemLogService>();
+        services.AddScoped<IOrderDetailInventoryItemShipmentLogService, OrderDetailInventoryItemLogShipmentService>();
         services.AddScoped<IPayoutService, PayoutService>();
 
         services.AddScoped<IAdminService, AdminService>();

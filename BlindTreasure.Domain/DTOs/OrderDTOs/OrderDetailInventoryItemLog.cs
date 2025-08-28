@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace BlindTreasure.Domain.DTOs.OrderDTOs;
 
-public class OrderDetailInventoryItemLogDto
+public class OrderDetailInventoryItemShipmentLogDto
 {
     public Guid Id { get; set; }
     public Guid? OrderDetailId { get; set; }

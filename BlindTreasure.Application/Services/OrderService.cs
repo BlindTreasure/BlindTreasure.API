@@ -28,7 +28,7 @@ public class OrderService : IOrderService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
     private readonly INotificationService _notificationService; // Thêm dòng này
-    private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
+    private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemLogService;
 
     public OrderService(
         ICacheService cacheService,
@@ -41,7 +41,7 @@ public class OrderService : IOrderService
         IPromotionService promotionService,
         IGhnShippingService ghnShippingService,
         INotificationService notificationService,
-        IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
+        IOrderDetailInventoryItemShipmentLogService orderDetailInventoryItemLogService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;

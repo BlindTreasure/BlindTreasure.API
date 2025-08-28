@@ -39,9 +39,9 @@ public static class InventoryItemMapper
         return result;
     }
 
-    public static OrderDetailInventoryItemLogDto ToOrderDetailInventoryItemLogDto(OrderDetailInventoryItemLog log)
+    public static OrderDetailInventoryItemShipmentLogDto ToOrderDetailInventoryItemLogDto(OrderDetailInventoryItemShipmentLog log)
     {
-        return new OrderDetailInventoryItemLogDto
+        return new OrderDetailInventoryItemShipmentLogDto
         {
             Id = log.Id,
             OrderDetailId = log.OrderDetailId,

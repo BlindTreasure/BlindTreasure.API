@@ -21,11 +21,11 @@ public class OrderController : ControllerBase
     private readonly ILoggerService _logger;
     private readonly IOrderService _orderService;
     private readonly ITransactionService _transactionService;
-    private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
+    private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemLogService;
 
 
     public OrderController(IOrderService orderService, ILoggerService logger, ITransactionService transactionService,
-        IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
+        IOrderDetailInventoryItemShipmentLogService orderDetailInventoryItemLogService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _orderService = orderService;
@@ -243,13 +243,13 @@ public class OrderController : ControllerBase
         try
         {
             var logs = await _orderDetailInventoryItemLogService.GetLogByOrderDetailIdAsync(id);
-            return Ok(ApiResult<List<OrderDetailInventoryItemLogDto>>.Success(logs, "200",
+            return Ok(ApiResult<List<OrderDetailInventoryItemShipmentLogDto>>.Success(logs, "200",
                 "Lấy log của OrderDetail thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDetailInventoryItemLogDto>>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDetailInventoryItemShipmentLogDto>>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }
@@ -259,19 +259,19 @@ public class OrderController : ControllerBase
     /// </summary>
     [Authorize]
     [HttpGet("inventory-items/{id}/logs")]
-    [ProducesResponseType(typeof(ApiResult<List<OrderDetailInventoryItemLogDto>>), 200)]
+    [ProducesResponseType(typeof(ApiResult<List<OrderDetailInventoryItemShipmentLogDto>>), 200)]
     public async Task<IActionResult> GetInventoryItemLogs(Guid id)
     {
         try
         {
             var logs = await _orderDetailInventoryItemLogService.GetLogByInventoryItemIdAsync(id);
-            return Ok(ApiResult<List<OrderDetailInventoryItemLogDto>>.Success(logs, "200",
+            return Ok(ApiResult<List<OrderDetailInventoryItemShipmentLogDto>>.Success(logs, "200",
                 "Lấy log của InventoryItem thành công."));
         }
         catch (Exception ex)
         {
             var statusCode = ExceptionUtils.ExtractStatusCode(ex);
-            var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDetailInventoryItemLogDto>>(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<List<OrderDetailInventoryItemShipmentLogDto>>(ex);
             return StatusCode(statusCode, errorResponse);
         }
     }

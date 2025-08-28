@@ -2,13 +2,17 @@
 
 namespace BlindTreasure.Domain.Entities;
 
-public class OrderDetailInventoryItemLog : BaseEntity
+public class OrderDetailInventoryItemShipmentLog : BaseEntity
 {
     public Guid? OrderDetailId { get; set; }
     public OrderDetail? OrderDetail { get; set; }
 
     public Guid? InventoryItemId { get; set; }
     public InventoryItem? InventoryItem { get; set; }
+    
+    public Guid? ShipmentId { get; set; }
+    //public Shipment? Shipment { get; set; }
+
     [MaxLength(1000)] public string? LogContent { get; set; } = string.Empty; // Lưu trữ nhật ký trạng thái
     public DateTime? LogTime { get; set; } = DateTime.UtcNow; // Lưu trữ thời gian nhật ký, định dạng ISO 8601
 

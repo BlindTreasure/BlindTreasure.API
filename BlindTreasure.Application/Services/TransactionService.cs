@@ -27,7 +27,7 @@ public class TransactionService : ITransactionService
     private readonly IGhnShippingService _ghnShippingService;
     private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService; // Thêm dòng này
-    private readonly IOrderDetailInventoryItemLogService _orderDetailInventoryItemLogService;
+    private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemLogService;
 
     public TransactionService(
         ICacheService cacheService,
@@ -41,7 +41,7 @@ public class TransactionService : ITransactionService
         IGhnShippingService ghnShippingService,
         IEmailService emailService,
         INotificationService notificationService,
-        IOrderDetailInventoryItemLogService orderDetailInventoryItemLogService)
+        IOrderDetailInventoryItemShipmentLogService orderDetailInventoryItemLogService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
