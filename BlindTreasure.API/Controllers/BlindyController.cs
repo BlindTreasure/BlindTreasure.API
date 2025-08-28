@@ -15,6 +15,21 @@ public class BlindyController : ControllerBase
         _blindyService = blindyService;
     }
 
+    [HttpGet("my-orders-status")]
+    public async Task<IActionResult> GetMyOrdersStatus()
+    {
+        try
+        {
+            var result = await _blindyService.GetMyOrdersStatusWithAiAsync();
+            return Ok(ApiResult<string>.Success(result, "200", "Lấy tình trạng đơn hàng thành công."));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResult<string>.Failure("500", ex.Message));
+        }
+    }
+
+    
     [HttpPost("ask-gemini")]
     public async Task<IActionResult> AskGemini([FromBody] string prompt)
     {

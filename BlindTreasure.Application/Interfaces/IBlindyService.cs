@@ -7,4 +7,5 @@ public interface IBlindyService
     Task<string> AskGeminiAsync(string prompt);
     Task<string> AskUserAsync(string prompt);
     Task<bool> ValidateReviewAsync(string comment);
+    Task<string> GetMyOrdersStatusWithAiAsync();
 }
