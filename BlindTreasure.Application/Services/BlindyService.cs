@@ -42,7 +42,9 @@ public class BlindyService : IBlindyService
         var prompt = $"""
                       Đây là danh sách đơn hàng gần nhất của user trong hệ thống BlindTreasure.
 
-                      Dựa vào danh sách đơn hàng và sau đó thông tin chi tiết với khách hàng. Nếu trạng thái đơn hàng chưa thanh toán thì hướng dẫn customer thanh toán qua Stripe và lưu ý đơn hàng sẽ hết hạn dựa vào requirement của hệ thống. List ra tất cả đơn hàng theo dạng bảng:
+                      Dựa vào danh sách đơn hàng, hãy cung cấp thông tin chi tiết và hướng dẫn khách hàng:
+                      - Nếu trạng thái đơn hàng chưa thanh toán thì nhắc khách hàng thanh toán qua Stripe và lưu ý đơn sẽ hết hạn theo quy định.
+                      - Liệt kê toàn bộ đơn hàng theo dạng bảng.
 
                       **Đơn hàng của bạn:**
 
@@ -54,10 +56,16 @@ public class BlindyService : IBlindyService
                       - **Shipping**: Đang vận chuyển
                       - **Completed**: Hoàn thành
                       - **Cancelled**: Đã hủy
+
+                      Phân tích thêm ở góc nhìn khách hàng:
+                      - Đơn hàng nào của bạn đang cần chú ý nhất (ví dụ: chưa thanh toán, đang vận chuyển).
+                      - Có đơn nào bị hủy hoặc hết hạn gần đây không.
+                      - Gợi ý bước tiếp theo để đảm bảo bạn không bỏ lỡ (thanh toán ngay, theo dõi vận chuyển, chờ nhận hàng).
                       """;
 
         return await AskUserAsync(prompt);
     }
+
 
     public async Task<string> AnalyzeTrendingProductsWithAi()
     {
