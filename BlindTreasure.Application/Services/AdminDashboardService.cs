@@ -27,35 +27,35 @@ namespace BlindTreasure.Application.Services
         {
             var (periodStart, periodEnd) = GetPeriodRange(req);
 
-            // Orders
-            var orders = await _unitOfWork.Orders.GetQueryable()
-                .Where(o => o.CreatedAt >= periodStart && o.CreatedAt < periodEnd && !o.IsDeleted)
-                .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-                .Include(o => o.Seller)
-                .ToListAsync();
+            var revenueSummary = await GetRevenueSummaryAsync(req);
+            var orderSummary = await GetOrderSummaryAsync(req);
+            var sellerSummary = await GetSellerSummaryAsync(req);
+            var customerSummary = await GetCustomerSummaryAsync(req);
+            var topCategories = await GetTopCategoriesAsync(req);
+            var timeSeries = await GetTimeSeriesAsync(req);
 
-            // Payouts
+            return new AdminDashBoardDtos
+            {
+                RevenueSummary = revenueSummary,
+                OrderSummary = orderSummary,
+                SellerSummary = sellerSummary,
+                CustomerSummary = customerSummary,
+                TopCategories = topCategories,
+                TimeSeries = timeSeries,
+                PeriodStart = periodStart,
+                PeriodEnd = periodEnd,
+                GeneratedAt = DateTime.UtcNow
+            };
+        }
+
+        public async Task<RevenueSummaryDto> GetRevenueSummaryAsync(AdminDashboardRequestDto req)
+        {
+            var (periodStart, periodEnd) = GetPeriodRange(req);
+
             var payouts = await _unitOfWork.Payouts.GetQueryable()
                 .Where(p => p.PeriodStart >= periodStart && p.PeriodEnd < periodEnd && !p.IsDeleted)
                 .ToListAsync();
 
-            // Sellers
-            var sellers = await _unitOfWork.Sellers.GetQueryable()
-                .Where(s => !s.IsDeleted && s.IsVerified)
-                .ToListAsync();
-
-            // Customers
-            var customers = await _unitOfWork.Users.GetQueryable()
-                .Where(u => !u.IsDeleted && u.RoleName == RoleType.Admin)
-                .ToListAsync();
-
-            // Categories
-            var categories = await _unitOfWork.Categories.GetQueryable()
-                .Where(c => !c.IsDeleted)
-                .Include(c => c.Products)
-                .ToListAsync();
-
-            // ----------- DOANH THU THỰC TẾ (COMPLETED/PROCESSING) -----------
             var validPayouts = payouts
                 .Where(p => p.Status == PayoutStatus.PROCESSING || p.Status == PayoutStatus.COMPLETED)
                 .ToList();
@@ -65,11 +65,12 @@ namespace BlindTreasure.Application.Services
             var totalNetAmount = validPayouts.Sum(p => p.NetAmount);
             var totalPayouts = validPayouts.Count;
 
-            // ----------- DOANH THU ƯỚC TÍNH (PAID) -----------
-            var paidOrders = orders
-                .Where(o => o.Status == OrderStatus.PAID.ToString())
-                .ToList();
+            var orders = await _unitOfWork.Orders.GetQueryable()
+                .Where(o => o.CreatedAt >= periodStart && o.CreatedAt < periodEnd && !o.IsDeleted)
+                .Include(o => o.OrderDetails)
+                .ToListAsync();
 
+            var paidOrders = orders.Where(o => o.Status == OrderStatus.PAID.ToString()).ToList();
             var paidOrderDetails = paidOrders
                 .SelectMany(o => o.OrderDetails)
                 .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
@@ -80,7 +81,6 @@ namespace BlindTreasure.Application.Services
             var estimatedNetAmount = estimatedGrossAmount - estimatedPlatformFee;
             var estimatedOrderCount = paidOrders.Count;
 
-            // ----------- Revenue Summary DTO -----------
             var platformFeeRate = validPayouts.FirstOrDefault()?.PlatformFeeRate ?? 5.0m;
             var revenueTakingRate = totalGrossAmount != 0
                 ? Math.Round(totalPlatformFee * 100 / totalGrossAmount, 2)
@@ -98,7 +98,7 @@ namespace BlindTreasure.Application.Services
                 ? Math.Round((totalNetAmount - prevRevenue) * 100 / Math.Abs(prevRevenue), 2)
                 : totalNetAmount > 0 ? 100m : 0m;
 
-            var revenueSummary = new RevenueSummaryDto
+            return new RevenueSummaryDto
             {
                 TotalGrossAmount = totalGrossAmount,
                 TotalPlatformFee = totalPlatformFee,
@@ -113,8 +113,17 @@ namespace BlindTreasure.Application.Services
                 EstimatedNetAmount = estimatedNetAmount,
                 EstimatedOrderCount = estimatedOrderCount
             };
+        }
 
-            // ----------- Order Summary DTO -----------
+        public async Task<OrderSummaryDto> GetOrderSummaryAsync(AdminDashboardRequestDto req)
+        {
+            var (periodStart, periodEnd) = GetPeriodRange(req);
+
+            var orders = await _unitOfWork.Orders.GetQueryable()
+                .Where(o => o.CreatedAt >= periodStart && o.CreatedAt < periodEnd && !o.IsDeleted)
+                .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+                .ToListAsync();
+
             var completedOrders = orders.Where(o => o.Status == OrderStatus.COMPLETED.ToString()).ToList();
             var completedOrderDetails = completedOrders.SelectMany(o => o.OrderDetails)
                 .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
@@ -153,12 +162,19 @@ namespace BlindTreasure.Application.Services
 
             var totalItemsSold = completedOrderDetails.Sum(od => od.Quantity);
 
+            var paidOrders = orders.Where(o => o.Status == OrderStatus.PAID.ToString()).ToList();
+            var paidOrderDetails = paidOrders.SelectMany(o => o.OrderDetails)
+                .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+                .ToList();
+
             var estimatedItemsSold = paidOrderDetails.Sum(od => od.Quantity);
+            var estimatedOrderCount = paidOrders.Count;
+            var estimatedGrossAmount = paidOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
             var estimatedAverageOrderValue = estimatedOrderCount > 0
                 ? Math.Round(estimatedGrossAmount / estimatedOrderCount, 2)
                 : 0m;
 
-            var orderSummary = new OrderSummaryDto
+            return new OrderSummaryDto
             {
                 TotalOrders = orders.Count,
                 PendingOrders = pendingOrders,
@@ -174,8 +190,33 @@ namespace BlindTreasure.Application.Services
                 EstimatedAverageOrderValue = estimatedAverageOrderValue,
                 EstimatedItemsSold = estimatedItemsSold
             };
+        }
 
-            // ----------- Seller Summary DTO -----------
+        public async Task<SellerSummaryDto> GetSellerSummaryAsync(AdminDashboardRequestDto req)
+        {
+            var (periodStart, periodEnd) = GetPeriodRange(req);
+
+            var sellers = await _unitOfWork.Sellers.GetQueryable()
+                .Where(s => !s.IsDeleted && s.IsVerified)
+                .Include(s => s.User)
+                .ToListAsync();
+
+            var payouts = await _unitOfWork.Payouts.GetQueryable()
+                .Where(p => p.PeriodStart >= periodStart && p.PeriodEnd < periodEnd && !p.IsDeleted)
+                .ToListAsync();
+
+            var orders = await _unitOfWork.Orders.GetQueryable()
+                .Where(o => o.CreatedAt >= periodStart && o.CreatedAt < periodEnd && !o.IsDeleted)
+                .Include(o => o.OrderDetails)
+                .ToListAsync();
+
+            var validPayouts = payouts
+                .Where(p => p.Status == PayoutStatus.PROCESSING || p.Status == PayoutStatus.COMPLETED)
+                .ToList();
+
+            var paidOrders = orders.Where(o => o.Status == OrderStatus.PAID.ToString()).ToList();
+            var completedOrders = orders.Where(o => o.Status == OrderStatus.COMPLETED.ToString()).ToList();
+
             var activeSellerIds = completedOrders.Select(o => o.SellerId).Distinct().ToList();
             var estimatedActiveSellerIds = paidOrders.Select(o => o.SellerId).Distinct().ToList();
 
@@ -219,7 +260,7 @@ namespace BlindTreasure.Application.Services
                 .Take(5)
                 .ToList();
 
-            var sellerSummary = new SellerSummaryDto
+            return new SellerSummaryDto
             {
                 TotalSellers = sellers.Count,
                 ActiveSellers = activeSellerIds.Count,
@@ -227,23 +268,55 @@ namespace BlindTreasure.Application.Services
                 EstimatedActiveSellers = estimatedActiveSellerIds.Count,
                 EstimatedTopSellers = estimatedTopSellers
             };
+        }
 
-            // ----------- Customer Summary DTO -----------
+        public async Task<CustomerSummaryDto> GetCustomerSummaryAsync(AdminDashboardRequestDto req)
+        {
+            var (periodStart, periodEnd) = GetPeriodRange(req);
+
+            var customers = await _unitOfWork.Users.GetQueryable()
+                .Where(u => !u.IsDeleted && u.RoleName == RoleType.Admin)
+                .ToListAsync();
+
             var newCustomersThisPeriod = customers.Count(u => u.CreatedAt >= periodStart && u.CreatedAt < periodEnd);
-            var customerSummary = new CustomerSummaryDto
+
+            return new CustomerSummaryDto
             {
                 TotalCustomers = customers.Count,
                 NewCustomersThisPeriod = newCustomersThisPeriod
             };
+        }
 
-            // ----------- Category Revenue DTO -----------
+        public async Task<List<CategoryRevenueDto>> GetTopCategoriesAsync(AdminDashboardRequestDto req)
+        {
+            var (periodStart, periodEnd) = GetPeriodRange(req);
+
+            var categories = await _unitOfWork.Categories.GetQueryable()
+                .Where(c => !c.IsDeleted)
+                .Include(c => c.Products)
+                .ToListAsync();
+
+            var orders = await _unitOfWork.Orders.GetQueryable()
+                .Where(o => o.CreatedAt >= periodStart && o.CreatedAt < periodEnd && !o.IsDeleted)
+                .Include(o => o.OrderDetails)
+                .ToListAsync();
+
+            var completedOrders = orders.Where(o => o.Status == OrderStatus.COMPLETED.ToString()).ToList();
+            var completedOrderDetails = completedOrders.SelectMany(o => o.OrderDetails)
+                .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+                .ToList();
+
+            var paidOrders = orders.Where(o => o.Status == OrderStatus.PAID.ToString()).ToList();
+            var paidOrderDetails = paidOrders.SelectMany(o => o.OrderDetails)
+                .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+                .ToList();
+
             var topCategories = new List<CategoryRevenueDto>();
 
             foreach (var category in categories)
             {
                 var products = category.Products ?? new List<Product>();
 
-                // Completed
                 var completedCategoryOrderDetails = completedOrderDetails
                     .Where(od => products.Any(p => p.Id == od.ProductId))
                     .ToList();
@@ -256,7 +329,6 @@ namespace BlindTreasure.Application.Services
                 var completedRevenue = completedCategoryOrderDetails
                     .Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
 
-                // Estimated
                 var estimatedCategoryOrderDetails = paidOrderDetails
                     .Where(od => products.Any(p => p.Id == od.ProductId))
                     .ToList();
@@ -278,9 +350,29 @@ namespace BlindTreasure.Application.Services
                     EstimatedRevenue = estimatedCategoryRevenue
                 });
             }
-            topCategories = topCategories.OrderByDescending(cr => cr.Revenue).Take(5).ToList();
+            return topCategories.OrderByDescending(cr => cr.Revenue).Take(5).ToList();
+        }
 
-            // ----------- Time Series DTO -----------
+        public async Task<TimeSeriesDto> GetTimeSeriesAsync(AdminDashboardRequestDto req)
+        {
+            var (periodStart, periodEnd) = GetPeriodRange(req);
+
+            var payouts = await _unitOfWork.Payouts.GetQueryable()
+                .Where(p => p.PeriodStart >= periodStart && p.PeriodEnd < periodEnd && !p.IsDeleted)
+                .ToListAsync();
+
+            var validPayouts = payouts
+                .Where(p => p.Status == PayoutStatus.PROCESSING || p.Status == PayoutStatus.COMPLETED)
+                .ToList();
+
+            var orders = await _unitOfWork.Orders.GetQueryable()
+                .Where(o => o.CreatedAt >= periodStart && o.CreatedAt < periodEnd && !o.IsDeleted)
+                .Include(o => o.OrderDetails)
+                .ToListAsync();
+
+            var completedOrders = orders.Where(o => o.Status == OrderStatus.COMPLETED.ToString()).ToList();
+            var paidOrders = orders.Where(o => o.Status == OrderStatus.PAID.ToString()).ToList();
+
             var days = (periodEnd - periodStart).Days;
             var timeSeries = new TimeSeriesDto
             {
@@ -327,18 +419,7 @@ namespace BlindTreasure.Application.Services
                 timeSeries.EstimatedOrderCounts.Add(dayPaidOrders.Count);
             }
 
-            return new AdminDashBoardDtos
-            {
-                RevenueSummary = revenueSummary,
-                OrderSummary = orderSummary,
-                SellerSummary = sellerSummary,
-                CustomerSummary = customerSummary,
-                TopCategories = topCategories,
-                TimeSeries = timeSeries,
-                PeriodStart = periodStart,
-                PeriodEnd = periodEnd,
-                GeneratedAt = DateTime.UtcNow
-            };
+            return timeSeries;
         }
 
         private (DateTime Start, DateTime End) GetPeriodRange(AdminDashboardRequestDto req)
