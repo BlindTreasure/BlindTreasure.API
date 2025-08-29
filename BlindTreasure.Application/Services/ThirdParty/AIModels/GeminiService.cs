@@ -11,6 +11,8 @@ public class GeminiService : IGeminiService
 {
     private readonly string _apiKey;
     private readonly HttpClient _httpClient;
+    private readonly ICacheService _cache;
+
 
     // Danh sách model khả dụng
     public static class GeminiModels
@@ -24,9 +26,92 @@ public class GeminiService : IGeminiService
 
     public GeminiService(IHttpClientFactory httpClientFactory, IConfiguration config, ICacheService cache)
     {
+        _cache = cache;
         _httpClient = httpClientFactory.CreateClient();
         _apiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY")
                   ?? throw new Exception("Gemini API key not configured.");
+    }
+
+    private async Task<AiMemory> LoadMemoryAsync(Guid userId)
+    {
+        var mem = await _cache.GetAsync<AiMemory>(AiMemKeys.MemoryKey(userId));
+        return mem ?? new AiMemory();
+    }
+
+    private async Task SaveMemoryAsync(Guid userId, AiMemory mem)
+    {
+        mem.UpdatedAt = DateTime.UtcNow;
+        await _cache.SetAsync(AiMemKeys.MemoryKey(userId), mem, TimeSpan.FromDays(90));
+    }
+
+    private static string BuildMemoryPreface(AiMemory mem)
+    {
+        var facts = mem.Facts?.Count > 0
+            ? "- " + string.Join("\n- ", mem.Facts)
+            : "- (chưa có)";
+        var summary = string.IsNullOrWhiteSpace(mem.Summary) ? "(chưa có)" : mem.Summary;
+
+        return $"""
+                [USER PROFILE – dùng nội bộ]
+                Summary: {summary}
+                Facts:
+                {facts}
+                """;
+    }
+
+    private static void ApplyPatch(AiMemory mem, MemoryPatch patch, int maxFacts = 20)
+    {
+        if (!patch.ShouldRemember) return;
+
+        var set = new HashSet<string>(mem.Facts ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+        foreach (var f in patch.Facts) set.Add(f.Trim());
+        mem.Facts = set.Where(x => !string.IsNullOrWhiteSpace(x)).Take(maxFacts).ToList();
+
+        if (!string.IsNullOrWhiteSpace(patch.SummaryDelta))
+        {
+            var combined = (mem.Summary + " " + patch.SummaryDelta).Trim();
+            mem.Summary = combined.Length > 320 ? combined[..320] : combined;
+        }
+    }
+
+    private async Task<MemoryPatch> ExtractMemoryPatchAsync(string userUtterance)
+    {
+        var extractorPrompt = """
+                              Bạn là "Memory Extractor". Trích xuất các thông tin nên ghi nhớ lâu dài từ câu nói của user.
+
+                              CHỈ TRẢ VỀ JSON, KHÔNG THÊM TEXT KHÁC. Mẫu:
+                              {
+                                "shouldRemember": true,
+                                "facts": ["...","..."],
+                                "summaryDelta": "..."
+                              }
+                              """;
+
+        var full = extractorPrompt + "\n\n---\nUser said:\n" + userUtterance;
+
+        var url =
+            $"https://generativelanguage.googleapis.com/v1beta/models/{GeminiModels.Flash}:generateContent?key={_apiKey}";
+        var body = new
+        {
+            contents = new[] { new { parts = new[] { new { text = full } } } },
+            generationConfig = new { temperature = 0.1, maxOutputTokens = 400 }
+        };
+
+        var req = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
+        };
+        var res = await _httpClient.SendAsync(req);
+        var json = await res.Content.ReadAsStringAsync();
+
+        if (!res.IsSuccessStatusCode) return new MemoryPatch();
+
+        using var doc = JsonDocument.Parse(json);
+        var text = doc.RootElement.GetProperty("candidates")[0]
+            .GetProperty("content").GetProperty("parts")[0]
+            .GetProperty("text").GetString() ?? "{}";
+
+        return JsonSerializer.Deserialize<MemoryPatch>(text) ?? new MemoryPatch();
     }
 
     /// <summary>
@@ -34,28 +119,21 @@ public class GeminiService : IGeminiService
     /// </summary>
     /// <param name="userPrompt">Prompt của người dùng</param>
     /// <param name="modelName">Tên model (ví dụ: gemini-2.5-pro)</param>
-    public async Task<string> GenerateResponseAsync(string userPrompt, string? modelName = null)
+    public async Task<string> GenerateResponseAsync(Guid userId, string userPrompt, string? modelName = null)
     {
-        modelName ??= GeminiModels.FlashV2; // Default fallback model
+        modelName ??= GeminiModels.FlashV2;
 
-        var fullPrompt = $"{GeminiContext.SystemPrompt}\n\n{GeminiContext.ResponseRules}\n\n{userPrompt}";
+        // 1) Load memory
+        var mem = await LoadMemoryAsync(userId);
 
-        // Build API URL với model động
+        // 2) Build prompt
+        var memPreface = BuildMemoryPreface(mem);
+        var fullPrompt =
+            $"{GeminiContext.SystemPrompt}\n\n{GeminiContext.ResponseRules}\n\n{memPreface}\n\n[USER REQUEST]\n{userPrompt}";
+
+        // 3) Call Gemini
         var url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={_apiKey}";
-
-        var body = new
-        {
-            contents = new[]
-            {
-                new
-                {
-                    parts = new[]
-                    {
-                        new { text = fullPrompt }
-                    }
-                }
-            }
-        };
+        var body = new { contents = new[] { new { parts = new[] { new { text = fullPrompt } } } } };
 
         var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
@@ -71,21 +149,26 @@ public class GeminiService : IGeminiService
 
         var json = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(json);
-        var result = doc.RootElement
-            .GetProperty("candidates")[0]
-            .GetProperty("content")
-            .GetProperty("parts")[0]
-            .GetProperty("text")
-            .GetString();
-        var finalResult = result ?? string.Empty;
-// --- normalize newlines trước khi trả về ---
-        finalResult = NormalizeNewlines(finalResult);
-        return finalResult;
+        var result = doc.RootElement.GetProperty("candidates")[0]
+            .GetProperty("content").GetProperty("parts")[0]
+            .GetProperty("text").GetString();
+        var final = NormalizeNewlines(result ?? "");
+
+        // 4) Update memory
+        try
+        {
+            var patch = await ExtractMemoryPatchAsync(userPrompt);
+            ApplyPatch(mem, patch);
+            await SaveMemoryAsync(userId, mem);
+        }
+        catch
+        {
+            /* bỏ qua nếu update lỗi */
+        }
+
+        return final;
     }
 
-    /// <summary>
-    /// Generate response cho các task validation ngắn với model tối ưu
-    /// </summary>
     public async Task<string> GenerateValidationResponseAsync(string userPrompt)
     {
         // Sử dụng model nhẹ nhất và context tối thiểu
@@ -173,11 +256,11 @@ public class GeminiService : IGeminiService
         input = input.Replace("\r\n", "\n").Replace("\r", "\n");
 
         // 3) xóa khoảng trắng thừa trước/sau newline
-        input = System.Text.RegularExpressions.Regex.Replace(input, @"[ \t]+\n", "\n");
-        input = System.Text.RegularExpressions.Regex.Replace(input, @"\n[ \t]+", "\n");
+        input = Regex.Replace(input, @"[ \t]+\n", "\n");
+        input = Regex.Replace(input, @"\n[ \t]+", "\n");
 
         // 4) collapse nhiều blank line xuống tối đa 1 blank line (tức <= 2 newline liên tiếp)
-        input = System.Text.RegularExpressions.Regex.Replace(input, @"\n{3,}", "\n\n");
+        input = Regex.Replace(input, @"\n{3,}", "\n\n");
 
         // 5) trim đầu-cuối
         input = input.Trim();
@@ -202,8 +285,7 @@ public static class GeminiContext
         - Không tiết lộ chi tiết kỹ thuật nội bộ (schema DB, repo, CI/CD, token…).
         - Mẫu trả lời mặc định:
           1) Kết luận / Trả lời trực tiếp
-          2) Căn cứ (dẫn BR/flow liên quan)
-          3) Bước tiếp theo (hành động hoặc màn hình/API)
+          2) Bước tiếp theo (hành động hoặc màn hình/API)
         - Nếu output chứa literal "\n" (ví dụ model in \\n), hệ thống phải chuyển thành newline thực và tự làm sạch nhiều newline thừa trước khi trả về user.
         - Nếu yêu cầu ngoài phạm vi chức năng đang hỗ trợ hoặc trái quy tắc → chỉ trả lời:
           "Tôi chỉ hỗ trợ khiếu nại và thông tin liên quan tới chức năng hiện tại của BlindTreasure."
@@ -249,4 +331,28 @@ public static class GeminiContext
         - Câu từ chối chuẩn (dùng nguyên văn khi out-of-scope hoặc trái BR):
           "Tôi chỉ hỗ trợ khiếu nại và thông tin liên quan tới chức năng hiện tại của BlindTreasure."
         """;
+}
+
+// --- Add: DTO cho memory cơ bản ---
+public sealed class AiMemory
+{
+    public string Summary { get; set; } = ""; // 1–3 câu tóm tắt hồ sơ user
+    public List<string> Facts { get; set; } = new(); // Facts bền vững (sở thích, ràng buộc)
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public sealed class MemoryPatch
+{
+    public bool ShouldRemember { get; set; }
+    public List<string> Facts { get; set; } = new();
+    public string? SummaryDelta { get; set; } // bổ sung cho phần tóm tắt
+}
+
+// --- Add: helper key ---
+internal static class AiMemKeys
+{
+    public static string MemoryKey(Guid userId)
+    {
+        return $"ai:mem:{userId}";
+    }
 }

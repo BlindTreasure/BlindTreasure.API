@@ -317,7 +317,8 @@ public class AdminService : IAdminService
         }
     }
 
-    public async Task<Pagination<PayoutTransactionDto>> GetPayoutTransactionsAsync(PayoutTransactionQueryParameter param)
+    public async Task<Pagination<PayoutTransactionDto>> GetPayoutTransactionsAsync(
+        PayoutTransactionQueryParameter param)
     {
         var query = _unitOfWork.PayoutTransactions.GetQueryable()
             .Where(pt => !pt.IsDeleted)
@@ -356,8 +357,6 @@ public class AdminService : IAdminService
         var dtos = items.Select(PayoutDtoMapper.ToPayoutTransactionDto).ToList();
         return new Pagination<PayoutTransactionDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
-
-
 
 
     // ----------------- PRIVATE HELPER METHODS -----------------

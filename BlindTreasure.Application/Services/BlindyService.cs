@@ -6,6 +6,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
 using BlindTreasure.Application.Services.ThirdParty.AIModels;
 using BlindTreasure.Domain.DTOs.GeminiDTOs;
+using BlindTreasure.Infrastructure.Interfaces;
 
 namespace BlindTreasure.Application.Services;
 
@@ -13,13 +14,15 @@ public class BlindyService : IBlindyService
 {
     private readonly IDataAnalyzerService _analyzerService;
     private readonly IGeminiService _geminiService;
+    private readonly IClaimsService _claimsService;
 
-    public BlindyService(IGeminiService geminiService, IDataAnalyzerService analyzerService)
+    public BlindyService(IGeminiService geminiService, IDataAnalyzerService analyzerService,
+        IClaimsService claimsService)
     {
         _geminiService = geminiService;
         _analyzerService = analyzerService;
+        _claimsService = claimsService;
     }
-
 
     public async Task<string> GetMyOrdersStatusWithAiAsync()
     {
@@ -28,27 +31,33 @@ public class BlindyService : IBlindyService
         if (orders == null || !orders.Any())
             return "Bạn chưa có đơn hàng nào gần đây.";
 
-        // Chuẩn bị dữ liệu dạng Markdown table chuẩn
+        // Tạo bảng Markdown gọn gàng
         var header = "| Mã đơn | Trạng thái | Tổng tiền | Ngày đặt |";
-        var separator = "|--------|------------|-----------:|----------|";
+        var separator = "|:--------:|:----------:|:---------:|:---------:|";
         var rows = string.Join("\n", orders.Select(o =>
-            $"| {o.Id.ToString()[..8]} | {o.Status} | {o.FinalAmount:N0}đ | {o.PlacedAt:dd/MM/yyyy} |"
+            $"| `{o.Id.ToString()[..8]}` | **{o.Status}** | {o.FinalAmount:N0}đ | {o.PlacedAt:dd/MM/yyyy} |"
         ));
-
-        var formatted = $"\n{header}\n{separator}\n{rows}\n";
+        var formattedTable = $"{header}\n{separator}\n{rows}";
 
         var prompt = $"""
                       Đây là danh sách đơn hàng gần nhất của user trong hệ thống BlindTreasure.
-                      Dữ liệu (Markdown table):
-                      {formatted}
 
-                      Hãy trả lời cho người dùng bằng bảng Markdown giữ nguyên cấu trúc,
-                      hiển thị trạng thái đơn hàng rõ ràng và dễ đọc.
+                      Dựa vào danh sách đơn hàng và sau đó thông tin chi tiết với khách hàng. Nếu trạng thái đơn hàng chưa thanh toán thì hướng dẫn customer thanh toán qua Stripe và lưu ý đơn hàng sẽ hết hạn dựa vào requirement của hệ thống. List ra tất cả đơn hàng theo dạng bảng:
+
+                      **Đơn hàng của bạn:**
+
+                      {formattedTable}
+
+                      *Chú thích trạng thái:*
+                      - **Pending**: Chờ xử lý
+                      - **Processing**: Đang xử lý
+                      - **Shipping**: Đang vận chuyển
+                      - **Completed**: Hoàn thành
+                      - **Cancelled**: Đã hủy
                       """;
 
         return await AskUserAsync(prompt);
     }
-
 
     public async Task<string> AnalyzeTrendingProductsWithAi()
     {
@@ -317,23 +326,26 @@ public class BlindyService : IBlindyService
 
     public async Task<string> AskGeminiAsync(string prompt)
     {
-        return await _geminiService.GenerateResponseAsync(prompt);
+        var userId = _claimsService.CurrentUserId;
+        return await _geminiService.GenerateResponseAsync(userId, prompt);
     }
 
     public async Task<string> AskUserAsync(string prompt)
     {
+        var userId = _claimsService.CurrentUserId;
         var model = "gemini-2.0-flash";
-        return await _geminiService.GenerateResponseAsync(prompt, model);
+        return await _geminiService.GenerateResponseAsync(userId, prompt, model);
     }
 
     private async Task<string> AskStaffAsync(string prompt)
     {
+        var userId = _claimsService.CurrentUserId;
         var fullPrompt = $"""
                               Bạn là AI nội bộ hỗ trợ nghiệp vụ dành cho nhân viên (staff) nền tảng BlindTreasure. Ưu tiên trả lời ngắn gọn, súc tích, đúng quy trình và nghiệp vụ quản trị.
 
                               {prompt}
                           """;
-        return await _geminiService.GenerateResponseAsync(fullPrompt);
+        return await _geminiService.GenerateResponseAsync(userId, fullPrompt);
     }
 
     #endregion

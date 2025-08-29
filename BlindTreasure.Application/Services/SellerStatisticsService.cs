@@ -104,13 +104,13 @@ public class SellerStatisticsService : ISellerStatisticsService
     }
 
     private async Task<SellerOverviewStatisticsDto> BuildOverviewStatisticsAsync(
-    List<Order> completedOrders,
-    List<OrderDetail> completedOrderDetails,
-    SellerStatisticsRequestDto req,
-    DateTime start,
-    DateTime end,
-    CancellationToken ct,
-    Guid sellerId)
+        List<Order> completedOrders,
+        List<OrderDetail> completedOrderDetails,
+        SellerStatisticsRequestDto req,
+        DateTime start,
+        DateTime end,
+        CancellationToken ct,
+        Guid sellerId)
     {
         // Get PAID orders for EstimatedRevenue (filter by PlacedAt)
         var paidOrders = await _unitOfWork.Orders.GetQueryable()
