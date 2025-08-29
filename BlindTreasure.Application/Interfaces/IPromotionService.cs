@@ -10,7 +10,7 @@ public interface IPromotionService
     Task<PromotionDto> GetPromotionByIdAsync(Guid id);
     Task<PromotionDto> CreatePromotionAsync(CreatePromotionDto dto);
     Task<PromotionDto> DeletePromotionAsync(Guid id);
-    Task<PromotionDto> UpdatePromotionAsync(Guid id, CreatePromotionDto dto);
+    Task<PromotionDto> UpdatePromotionAsync(Guid id, UpdatePromotionDto dto);
     Task<PromotionDto> ReviewPromotionAsync(ReviewPromotionDto dto);
     Task<PromotionApplicationResultDto> ApplyVoucherAsync(string voucherCode, Guid orderId);
     Task<ParticipantPromotionDto> ParticipatePromotionAsync(Guid id);
