@@ -15,7 +15,7 @@ public class DataAnalyzerService : IDataAnalyzerService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IOrderService _orderService;
-    private readonly IClaimsService  _claimsService;
+    private readonly IClaimsService _claimsService;
 
     public DataAnalyzerService(IUnitOfWork unitOfWork, IOrderService orderService, IClaimsService claimsService)
     {

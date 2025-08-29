@@ -315,7 +315,7 @@ public class TransactionService : ITransactionService
         transaction.Payment.Status = PaymentStatus.Paid;
         transaction.Payment.PaidAt = DateTime.UtcNow;
         order.Status = OrderStatus.PAID.ToString();
-       // order.CompletedAt = DateTime.UtcNow; order chưa mới paid chứ chưa completed
+        // order.CompletedAt = DateTime.UtcNow; order chưa mới paid chứ chưa completed
         order.UpdatedAt = DateTime.UtcNow;
         order.Payment.UpdatedAt = DateTime.UtcNow;
         transaction.UpdatedAt = DateTime.UtcNow;

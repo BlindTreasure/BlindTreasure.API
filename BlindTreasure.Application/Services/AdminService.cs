@@ -318,7 +318,8 @@ public class AdminService : IAdminService
         }
     }
 
-    public async Task<Pagination<PayoutTransactionDto>> GetPayoutTransactionsAsync(PayoutTransactionQueryParameter param)
+    public async Task<Pagination<PayoutTransactionDto>> GetPayoutTransactionsAsync(
+        PayoutTransactionQueryParameter param)
     {
         var query = _unitOfWork.PayoutTransactions.GetQueryable()
             .Where(pt => !pt.IsDeleted)

@@ -670,7 +670,7 @@ public class TradingService : ITradingService
             listingItemToUpdate.UserId = newOwnerId;
             listingItemToUpdate.Status = InventoryItemStatus.OnHold;
             listingItemToUpdate.HoldUntil = DateTime.UtcNow.AddDays(3);
-            listingItemToUpdate.LockedByRequestId = tradeRequest.Id; 
+            listingItemToUpdate.LockedByRequestId = tradeRequest.Id;
             listingItemToUpdate.OrderDetailId = null;
 
             await _unitOfWork.InventoryItems.Update(listingItemToUpdate);

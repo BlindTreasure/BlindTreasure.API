@@ -68,7 +68,7 @@ public class PromotionService : IPromotionService
             // Chỉ lấy: (1) promotions do staff tạo, hoặc (2) promotions seller tham gia, hoặc (3) promotions thuộc chính seller
             query = query.Where(p =>
                 p.CreatedByRole == RoleType.Staff
-                || (p.PromotionParticipants.Any(pp => pp.SellerId == sellerProfile.Id && !pp.IsDeleted))
+                || p.PromotionParticipants.Any(pp => pp.SellerId == sellerProfile.Id && !pp.IsDeleted)
                 || p.SellerId == sellerProfile.Id);
 
             // Đảm bảo include PromotionParticipants để lọc đúng
