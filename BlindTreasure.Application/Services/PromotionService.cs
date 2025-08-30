@@ -395,11 +395,7 @@ public class PromotionService : IPromotionService
 
         await ValidateParticipantPromotionAsync(currentUser, id);
 
-        // Kiểm tra đã tham gia chưa
-        var existed = await _unitOfWork.PromotionParticipants
-            .FirstOrDefaultAsync(pp => pp.PromotionId == id && pp.SellerId == currentUser.Seller.Id && !pp.IsDeleted);
-        if (existed != null)
-            throw ErrorHelper.Conflict("Seller đã tham gia chiến dịch này.");
+   
 
         var participantPromotion = await SetParticipantPromotionDataAsync(currentUser.Id, id);
         await _unitOfWork.PromotionParticipants.AddAsync(participantPromotion);
@@ -596,6 +592,12 @@ public class PromotionService : IPromotionService
         if (activeParticipantCount >= 2)
             throw ErrorHelper.BadRequest(
                 "Bạn chỉ được tham gia tối đa 2 chiến dịch toàn sàn cùng lúc. Vui lòng chờ chiến dịch hiện tại kết thúc.");
+
+        // Kiểm tra đã tham gia chưa
+        var existed = await _unitOfWork.PromotionParticipants
+            .FirstOrDefaultAsync(pp => pp.PromotionId == promotionId && pp.SellerId == seller.Id && !pp.IsDeleted);
+        if (existed != null)
+            throw ErrorHelper.Conflict("Seller đã tham gia chiến dịch này.");
     }
 
     private async Task ValidatePromotionInputAsync(CreatePromotionDto dto)
