@@ -276,7 +276,7 @@ public class AdminService : IAdminService
             var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
             if (cachedUser != null) return cachedUser;
 
-            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted, x=> x.Seller);
             if (user != null)
                 await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
             return user;
