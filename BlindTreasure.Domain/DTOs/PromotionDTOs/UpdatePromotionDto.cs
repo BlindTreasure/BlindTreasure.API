@@ -5,7 +5,6 @@ namespace BlindTreasure.Domain.DTOs.PromotionDTOs;
 
 public class UpdatePromotionDto
 {
-    [DefaultValue("")] public string? Code { get; set; } = string.Empty;
 
     [DefaultValue("mã giảm 100% cho đơn 1k")]
     public string? Description { get; set; } = "mã giảm 100% cho đơn 1k";
@@ -16,14 +15,11 @@ public class UpdatePromotionDto
 
     [DefaultValue(100)] public decimal? DiscountValue { get; set; } = 100;
 
-    [DefaultValue(typeof(DateTime), "2000-01-01T00:00:00Z")]
-    public DateTime? StartDate { get; set; } =
-        DateTime.SpecifyKind(DateTime.Parse("2000-01-01T00:00:00Z"), DateTimeKind.Utc);
+    [DefaultValue(typeof(DateTime), "2025-09-30T00:00:00Z")]
+    public DateTime? StartDate { get; set; } 
 
-    [DefaultValue(typeof(DateTime), "2100-01-01T00:00:00Z")]
-    public DateTime? EndDate { get; set; } =
-        DateTime.SpecifyKind(DateTime.Parse("2100-01-01T00:00:00Z"), DateTimeKind.Utc);
-
+    [DefaultValue(typeof(DateTime), "2025-09-30T00:00:00Z")]
+    public DateTime? EndDate { get; set; } 
     [DefaultValue(100)] public int? UsageLimit { get; set; } = 100;
 
     [DefaultValue(2)] public int? MaxUsagePerUser { get; set; } = 2;

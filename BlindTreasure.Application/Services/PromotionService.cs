@@ -199,17 +199,27 @@ public class PromotionService : IPromotionService
         if (promotion == null)
             throw ErrorHelper.NotFound("Không tìm thấy voucher.");
 
-        // Áp dụng từng trường nếu có giá trị, nếu null thì dùng default value từ UpdatePromotionDto
-        promotion.Code = (dto.Code ?? string.Empty).Trim().ToUpper();
-        promotion.Description = dto.Description ?? "mã giảm 100% cho đơn 1k";
+        // Chỉ cập nhật nếu có giá trị
+        if (dto.Description != null)
+            promotion.Description = dto.Description;
+
+        // DiscountType là kiểu enum, luôn có giá trị mặc định, nên luôn cập nhật
         promotion.DiscountType = dto.DiscountType;
-        promotion.DiscountValue = dto.DiscountValue ?? 100;
-        promotion.StartDate =
-            dto.StartDate ?? DateTime.SpecifyKind(DateTime.Parse("2000-01-01T00:00:00Z"), DateTimeKind.Utc);
-        promotion.EndDate =
-            dto.EndDate ?? DateTime.SpecifyKind(DateTime.Parse("2100-01-01T00:00:00Z"), DateTimeKind.Utc);
-        promotion.UsageLimit = dto.UsageLimit ?? 100;
-        promotion.MaxUsagePerUser = dto.MaxUsagePerUser ?? 2;
+
+        if (dto.DiscountValue.HasValue)
+            promotion.DiscountValue = dto.DiscountValue.Value;
+
+        if (dto.StartDate.HasValue)
+            promotion.StartDate = dto.StartDate.Value;
+
+        if (dto.EndDate.HasValue)
+            promotion.EndDate = dto.EndDate.Value;
+
+        if (dto.UsageLimit.HasValue)
+            promotion.UsageLimit = dto.UsageLimit.Value;
+
+        if (dto.MaxUsagePerUser.HasValue)
+            promotion.MaxUsagePerUser = dto.MaxUsagePerUser.Value;
 
         promotion.UpdatedAt = DateTime.UtcNow;
         promotion.CreatedByRole = user.RoleName;
@@ -217,7 +227,6 @@ public class PromotionService : IPromotionService
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
 
-        // Xóa cache detail và list
         await _cacheService.RemoveAsync($"Promotion:Detail:{id}");
         await _cacheService.RemoveByPatternAsync("Promotion:List:*");
 
