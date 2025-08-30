@@ -131,7 +131,7 @@ public class TimeSeriesDto
 {
     public List<string> Categories { get; set; } = new(); // Date labels
     public List<decimal> PlatformRevenue { get; set; } = new();
-    public List<decimal> GrossSales { get; set; } = new();
+    public List<decimal> GrossSales { get; set; } = new(); 
     public List<int> PayoutCounts { get; set; } = new();
     public List<int> OrderCounts { get; set; } = new();
 

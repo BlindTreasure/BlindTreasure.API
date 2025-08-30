@@ -340,7 +340,7 @@ public class OrderService : IOrderService
         if (shippingAddressId.HasValue && !hasPhysical)
             throw ErrorHelper.BadRequest("Cannot ship: no physical products in cart.");
 
-        Address? shippingAddress = null;
+        Domain.Entities.Address? shippingAddress = null;
         if (shippingAddressId.HasValue)
         {
             shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(shippingAddressId.Value);
@@ -916,6 +916,9 @@ public class OrderService : IOrderService
 
         return orders.Select(OrderDtoMapper.ToOrderDto).ToList();
     }
+
+  
+
 
     /// <summary>
     /// Rollback product, blindbox, promotion usage, and user usage count for a canceled or expired order.

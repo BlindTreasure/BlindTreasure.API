@@ -7,5 +7,6 @@ public enum InventoryItemStatus
     Delivering,
     Listed,
     OnHold,
-    Delivered
+    Delivered,
+    Archived
 }

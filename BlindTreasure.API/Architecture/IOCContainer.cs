@@ -176,6 +176,7 @@ public static class IocContainer
         services.AddHostedService<TradeRequestLockJob>();
         services.AddHostedService<ItemHoldReleaseJob>();
         services.AddHostedService<OrderCompletionJob>();
+        services.AddHostedService<InventoryItemHandlingJob>();
 
         //3rd party
         services.AddHttpClient();

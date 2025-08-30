@@ -23,25 +23,25 @@ namespace BlindTreasure.API.Controllers;
 public class SystemController : ControllerBase
 {
     private readonly ICacheService _cacheService;
-    private readonly IUnboxingService _unboxService;
     private readonly BlindTreasureDbContext _context;
     private readonly ILoggerService _logger;
     private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemLogService;
     private readonly INotificationService _notificationService;
     private readonly IAdminService _adminService;
+    private readonly IInventoryItemService _inventoryItemService;   
 
 
     public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService,
-        IUnboxingService unboxService, IOrderDetailInventoryItemShipmentLogService orderDetailInventoryItemLogService,
-        INotificationService notificationService, IAdminService adminService)
+        IOrderDetailInventoryItemShipmentLogService orderDetailInventoryItemLogService,
+        INotificationService notificationService, IAdminService adminService, IInventoryItemService inventoryItemService)
     {
         _context = context;
         _logger = logger;
         _cacheService = cacheService;
-        _unboxService = unboxService;
         _orderDetailInventoryItemLogService = orderDetailInventoryItemLogService;
         _notificationService = notificationService;
         _adminService = adminService;
+        _inventoryItemService = inventoryItemService;
     }
 
     [HttpPost("seed-all-data")]
@@ -1091,6 +1091,207 @@ public class SystemController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Giả lập toàn bộ các mốc lifecycle cho một InventoryItem (30, 60, 83, 90 ngày).
+    /// Sau mỗi mốc sẽ gọi HandleInventoryItemLifecycleAsync để kiểm tra flow.
+    /// </summary>
+    [HttpPost("dev/simulate-inventory-item-archived/{inventoryItemId}")]
+    public async Task<IActionResult> SimulateInventoryItemFullLifecycle(Guid inventoryItemId)
+    {
+        if (inventoryItemId == Guid.Empty)
+            return BadRequest("InventoryItemId is required.");
+
+        var item = await _context.InventoryItems
+            .Include(i => i.Product).ThenInclude(i => i.Seller)
+            .Include(i => i.Listings)
+            .FirstOrDefaultAsync(i => i.Id == inventoryItemId && !i.IsDeleted);
+
+        if (item == null)
+            return NotFound("InventoryItem not found.");
+
+        if(item.Status != InventoryItemStatus.Available)
+        {
+            throw ErrorHelper.BadRequest("InventoryItem must be in Available status to simulate lifecycle.");
+        }
+
+    
+
+        var results = new List<object>();
+        var milestones = new[] { 30, 60, 83, 90 };
+
+        foreach (var days in milestones)
+        {
+            var now = DateTime.UtcNow;
+            var simulatedDate = now.AddDays(-days);
+
+            if (item.UpdatedAt.HasValue)
+                item.UpdatedAt = simulatedDate;
+            else
+                item.CreatedAt = simulatedDate;
+
+            if (days < 90)
+            {
+                item.Status = InventoryItemStatus.Available;
+                item.ArchivedAt = null;
+                item.ArchivedReason = null;
+            }
+            else
+            {
+                item.Status = InventoryItemStatus.Available;
+            }
+
+            _context.InventoryItems.Update(item);
+            await _context.SaveChangesAsync();
+
+            await _inventoryItemService.HandleInventoryItemLifecycleAsync(item);
+
+            var updatedItem = await _context.InventoryItems
+                .Include(i => i.Product)
+                .FirstOrDefaultAsync(i => i.Id == inventoryItemId);
+
+            results.Add(new
+            {
+                MilestoneDays = days,
+                Status = updatedItem.Status,
+                UpdatedAt = updatedItem.UpdatedAt,
+                ArchivedAt = updatedItem.ArchivedAt,
+                ArchivedReason = updatedItem.ArchivedReason,
+                ProductName = updatedItem.Product?.Name
+            });
+        }
+
+        return Ok(new
+        {
+            Message = "Đã giả lập đủ các mốc lifecycle cho InventoryItem.",
+            Results = results
+        });
+    }
+
+    /// <summary>
+    /// Simulate the inventory item lifecycle at a specific milestone (30, 60, 83, 90 days).
+    /// <para>
+    /// <b>Milestone enum values (InventoryItemLifecycleMilestone):</b>
+    /// <list type="table">
+    /// <item>
+    ///   <term>Notify30Days</term>
+    ///   <description>30 days inactive: Sends first reminder notification to user.</description>
+    /// </item>
+    /// <item>
+    ///   <term>Notify60Days</term>
+    ///   <description>60 days inactive: Sends warning notification to user.</description>
+    /// </item>
+    /// <item>
+    ///   <term>Notify83Days</term>
+    ///   <description>83 days inactive: Sends final warning notification to user.</description>
+    /// </item>
+    /// <item>
+    ///   <term>Archive90Days</term>
+    ///   <description>90 days inactive: Archives the item, notifies user and seller.</description>
+    /// </item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// Example request:
+    /// <code>
+    /// {
+    ///   "InventoryItemId": "GUID_HERE",
+    ///   "Milestone": "Notify60Days"
+    /// }
+    /// </code>
+    /// </para>
+    /// </summary>
+    [HttpPost("dev/simulate-inventory-item-lifecycle-at-milestone")]
+    public async Task<IActionResult> SimulateInventoryItemLifecycleAtMilestone([FromBody] SimulateInventoryItemLifecycleAtMilestoneRequest req)
+    {
+        if (req.InventoryItemId == Guid.Empty)
+            return BadRequest("InventoryItemId is required.");
+
+        var item = await _context.InventoryItems
+            .Include(i => i.Product).ThenInclude(i => i.Seller)
+            .Include(i => i.Listings)
+            .FirstOrDefaultAsync(i => i.Id == req.InventoryItemId && !i.IsDeleted);
+
+        if (item == null)
+            return NotFound("InventoryItem not found.");
+
+        if (item.Status != InventoryItemStatus.Available)
+            return BadRequest("InventoryItem must be in Available status to simulate lifecycle.");
+
+        // Xác định số ngày từ enum
+        var days = (int)req.Milestone;
+        var now = DateTime.UtcNow;
+        var simulatedDate = now.AddDays(-days);
+
+        if (item.UpdatedAt.HasValue)
+            item.UpdatedAt = simulatedDate;
+        else
+            item.CreatedAt = simulatedDate;
+
+        // Reset trạng thái nếu chưa archive
+        if (days < 90)
+        {
+            item.Status = InventoryItemStatus.Available;
+            item.ArchivedAt = null;
+            item.ArchivedReason = null;
+        }
+        else
+        {
+            item.Status = InventoryItemStatus.Available;
+        }
+
+        _context.InventoryItems.Update(item);
+        await _context.SaveChangesAsync();
+
+        await _inventoryItemService.HandleInventoryItemLifecycleAsync(item);
+
+        var updatedItem = await _context.InventoryItems
+            .Include(i => i.Product)
+            .FirstOrDefaultAsync(i => i.Id == req.InventoryItemId);
+
+        return Ok(new
+        {
+            Milestone = req.Milestone,
+            DaysInactive = days,
+            Status = updatedItem.Status,
+            UpdatedAt = updatedItem.UpdatedAt,
+            ArchivedAt = updatedItem.ArchivedAt,
+            ArchivedReason = updatedItem.ArchivedReason,
+            ProductName = updatedItem.Product?.Name,
+            Message = $"Đã giả lập lifecycle cho InventoryItem tại mốc {days} ngày ({req.Milestone})."
+        });
+    }
+
+    /// <summary>
+    /// Request DTO cho API simulate lifecycle tại mốc.
+    /// </summary>
+    public class SimulateInventoryItemLifecycleAtMilestoneRequest
+    {
+        public Guid InventoryItemId { get; set; }
+        public InventoryItemLifecycleMilestone Milestone { get; set; }
+    }
+
+    public enum InventoryItemLifecycleMilestone
+    {
+        /// <summary>
+        /// 30 ngày không hoạt động: Gửi thông báo nhắc nhở đầu tiên cho user.
+        /// </summary>
+        Notify30Days = 30,
+
+        /// <summary>
+        /// 60 ngày không hoạt động: Gửi cảnh báo cho user.
+        /// </summary>
+        Notify60Days = 60,
+
+        /// <summary>
+        /// 83 ngày không hoạt động: Gửi cảnh báo cuối cùng cho user.
+        /// </summary>
+        Notify83Days = 83,
+
+        /// <summary>
+        /// 90 ngày không hoạt động: Khoá vật phẩm, gửi thông báo cho user và seller.
+        /// </summary>
+        Archive90Days = 90
+    }
     private List<User> GetPredefinedUsers()
     {
         var passwordHasher = new PasswordHasher();
@@ -1549,7 +1750,7 @@ public class SystemController : ControllerBase
                         new Product
                         {
                             Id = Guid.NewGuid(),
-                            Name = "Búp Bê Baby Three V3 Check Card Blindbox Thỏ Màu Hồng",
+                            Name = $"Búp Bê Baby Three V3 Check Card Blindbox Thỏ Màu Hồng",
                             Description =
                                 "Búp Bê Baby Three V3 Check Card Blindbox Thỏ Màu Hồng là món đồ chơi giải trí được nhiều bạn trẻ yêu thích và săn đón hiện nay. Món đồ chơi này được lấy hình tượng từ nhân vật hoạt hình quen thuộc trong cuộc sống với thiết kế kiểu dáng đáng yêu, ngộ nghĩnh và có chút cá tính. Với chất liệu bền đẹp cùng tính ứng dụng cao, búp bê Baby Three luôn nhận được sự yêu thích của người dùng. ",
                             CategoryId = category.Id,
@@ -1570,7 +1771,7 @@ public class SystemController : ControllerBase
                         new Product
                         {
                             Id = Guid.NewGuid(),
-                            Name = "Búp Bê Baby Three V3 Vinyl Plush Dinosaur Màu Xanh Lá",
+                            Name = $"Búp Bê Baby Three V3 Vinyl Plush Dinosaur Màu Xanh Lá",
                             Description =
                                 "Búp Bê Baby Three V3 Vinyl Plush Dinosaur Màu Xanh Lá là món đồ chơi giải trí được nhiều bạn trẻ yêu thích và săn đón hiện nay. Vinyl Plush Dinosaur được lấy hình tượng từ chú khủng long xanh lạ mắt, thiết kế với kiểu dáng đáng yêu, ngộ nghĩnh và có chút cá tính. Với chất liệu bền đẹp cùng tính ứng dụng cao, búp bê Baby Three luôn nhận được sự yêu thích của người dùng. ",
                             CategoryId = category.Id,
@@ -1592,7 +1793,7 @@ public class SystemController : ControllerBase
                         new Product
                         {
                             Id = Guid.NewGuid(),
-                            Name = "Búp Bê Baby Three Chinese Zodiac Plush Doll Blind Box Mặt Dâu Màu Hồng",
+                            Name = $"Búp Bê Baby Three Chinese Zodiac Plush Doll Blind Box Mặt Dâu Màu Hồng",
                             Description =
                                 "Búp Bê Baby Three Chinese Zodiac Plush Doll Blind Box Mặt Dâu Màu Hồng là món đồ chơi giải trí được nhiều bạn trẻ yêu thích và săn đón hiện nay. Zodiac Plush Doll Mặt Dâu được lấy hình tượng từ nhân vật hoạt hình quen thuộc trong cuộc sống với thiết kế kiểu dáng đáng yêu, ngộ nghĩnh và có chút cá tính. Với chất liệu bền đẹp cùng tính ứng dụng cao, búp bê Baby Three luôn nhận được sự yêu thích của người dùng. ",
                             CategoryId = category.Id,
@@ -2209,7 +2410,7 @@ public class SystemController : ControllerBase
             return;
         }
 
-        // Tạo mới 6 sản phẩm cho blind box, ProductSaleType là BlindBoxOnly
+        // Tạo mới 6 sản phẩm cho mỗi category, ProductSaleType là BlindBoxOnly
         var blindBoxProducts = new List<Product>
         {
             new()
@@ -2367,8 +2568,8 @@ public class SystemController : ControllerBase
                 BlindBoxItemId = item.Id,
                 Probability = item.DropRate,
                 EffectiveFrom = now,
-                EffectiveTo = now.AddYears(1), // đảm bảo NOW nằm trong range này
-                ApprovedBy = sellerUser.Id, // hoặc Id của user staff test (nếu có)
+                EffectiveTo = now.AddYears(1),
+                ApprovedBy = sellerUser.Id,
                 ApprovedAt = now,
                 CreatedAt = now
             };
@@ -2549,18 +2750,17 @@ public class SystemController : ControllerBase
     //         await _context.Products.AddRangeAsync(blindBoxProducts);
     //         await _context.SaveChangesAsync();
     //
-    //         // Rarity cấu hình với tỉ lệ SECRET cao (25%)
+    //         // Rarity cấu hình cho từng item (chuẩn theo enum RarityName)
     //         var rarityArr = new[]
     //         {
-    //             new { Rarity = RarityName.Common, Weight = 30, Quantity = 6 },
-    //             new { Rarity = RarityName.Rare, Weight = 20, Quantity = 5 },
-    //             new { Rarity = RarityName.Rare, Weight = 10, Quantity = 5 },
+    //             new { Rarity = RarityName.Common, Weight = 40, Quantity = 10 },
+    //             new { Rarity = RarityName.Rare, Weight = 25, Quantity = 8 },
+    //             new { Rarity = RarityName.Rare, Weight = 10, Quantity = 8 },
+    //             new { Rarity = RarityName.Epic, Weight = 10, Quantity = 5 },
     //             new { Rarity = RarityName.Epic, Weight = 10, Quantity = 4 },
-    //             new { Rarity = RarityName.Epic, Weight = 5, Quantity = 3 },
-    //             new { Rarity = RarityName.Secret, Weight = 25, Quantity = 5 } // Tăng weight và quantity cho SECRET
+    //             new { Rarity = RarityName.Secret, Weight = 5, Quantity = 2 }
     //         };
     //
-    //         // Tổng quantity * weight để tính drop rate
     //         var totalWeightQty = rarityArr.Sum(x => x.Quantity * x.Weight);
     //
     //         var blindBox = new BlindBox
@@ -2628,7 +2828,7 @@ public class SystemController : ControllerBase
     //                 BlindBoxItemId = item.Id,
     //                 Probability = item.DropRate,
     //                 EffectiveFrom = now,
-    //                 EffectiveTo = now.AddYears(1), // đảm bảo NOW nằm trong range này
+    //                 EffectiveTo = now.AddYears(1),
     //                 ApprovedBy = sellerUser.Id,
     //                 ApprovedAt = now,
     //                 CreatedAt = now
@@ -2638,9 +2838,7 @@ public class SystemController : ControllerBase
     //
     //         await _context.SaveChangesAsync();
     //
-    //         _logger.Success(
-    //             $"[SeedHighSecretBlindBoxes] Đã seed high secret blind box cho category {category.Name} thành công.");
-    //     }
+    //         _logger.Success("[SeedHighSecretBlindBoxes] Đã seed high secret blind box cho SMISKI Series1 thành công.");
     // }
 
     private async Task SeedPromotions()

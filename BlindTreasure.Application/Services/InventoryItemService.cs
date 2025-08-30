@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Application.Utils.SharedCacheKeys;
+using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
@@ -23,6 +24,7 @@ public class InventoryItemService : IInventoryItemService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
     private readonly IStripeService _stripeService;
+    private readonly INotificationService _notificationService;
 
 
     public InventoryItemService(
@@ -32,7 +34,8 @@ public class InventoryItemService : IInventoryItemService
         IUnitOfWork unitOfWork,
         ICategoryService categoryService,
         IGhnShippingService ghnShippingService,
-        IStripeService stripeService)
+        IStripeService stripeService, 
+        INotificationService notificationService)
     {
         _cacheService = cacheService;
         _claimsService = claimsService;
@@ -41,6 +44,7 @@ public class InventoryItemService : IInventoryItemService
         _categoryService = categoryService; // initialize categoryService
         _ghnShippingService = ghnShippingService; // initialize ghnShippingService
         _stripeService = stripeService; // initialize stripeService
+        _notificationService = notificationService;
     }
 
     public async Task<Pagination<InventoryItemDto>> GetOnHoldInventoryItemByUser(PaginationParameter param, Guid userId)
@@ -644,6 +648,202 @@ public class InventoryItemService : IInventoryItemService
         }
 
         return result;
+    }
+
+    //public async Task HandleInventoryItemLifecycleAsync()
+    //{
+    //    var now = DateTime.UtcNow;
+    //    _loggerService.Info("[HandleInventoryItemLifecycleAsync] Start inventory item lifecycle check.");
+
+    //    var items = await _unitOfWork.InventoryItems.GetQueryable()
+    //        .Include(i => i.Product).ThenInclude(p => p.Seller)
+    //        .Include(i => i.Listings)
+    //        .Where(i => !i.IsDeleted && i.Status == InventoryItemStatus.Available)
+    //        .ToListAsync();
+
+    //    int notified30 = 0, notified60 = 0, notified83 = 0, archived = 0;
+
+    //    foreach (var item in items)
+    //    {
+    //        var lastActive = item.UpdatedAt ?? item.CreatedAt;
+    //        var daysInactive = (now - lastActive).TotalDays;
+
+    //        // Kiểm tra các điều kiện hoạt động: shipment, trade, listing
+    //        var hasShipmentRequest = item.ShipmentId != null &&
+    //            (item.Status == InventoryItemStatus.Shipment_requested || item.Status == InventoryItemStatus.Delivering);
+
+    //        var hasTradeRequest = item.LockedByRequestId != null;
+
+    //        var hasActiveListing = item.Listings != null && item.Listings.Any(l => l.Status == ListingStatus.Active);
+
+    //        // Nếu có hoạt động, bỏ qua item này
+    //        if (hasShipmentRequest || hasTradeRequest || hasActiveListing)
+    //        {
+    //            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Skip item {item.Id} ({item.Product?.Name}) - has activity.");
+    //            continue;
+    //        }
+
+    //        // 30 ngày: Thông báo lần đầu
+    //        if (daysInactive >= 30 && daysInactive < 60)
+    //        {
+    //            await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
+    //            {
+    //                Title = "Vật phẩm của bạn đã không hoạt động 30 ngày",
+    //                Message = $"Vật phẩm {item.Product?.Name} đã không có hoạt động trong 30 ngày. Vui lòng kiểm tra để tránh bị khóa.",
+    //                Type = NotificationType.InventoryItem,
+    //                SourceUrl = null
+    //            });
+    //            notified30++;
+    //            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Notified 30 days for item {item.Id} ({item.Product?.Name})");
+    //        }
+    //        // 60 ngày: Thông báo cảnh báo
+    //        else if (daysInactive >= 60 && daysInactive < 83)
+    //        {
+    //            await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
+    //            {
+    //                Title = "Cảnh báo: Vật phẩm sắp bị khóa",
+    //                Message = $"Vật phẩm {item.Product?.Name} đã không hoạt động trong 60 ngày. Nếu không có tác động trong 30 ngày tới, vật phẩm sẽ bị khóa.",
+    //                Type = NotificationType.InventoryItem,
+    //                SourceUrl = null
+    //            });
+    //            notified60++;
+    //            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Notified 60 days for item {item.Id} ({item.Product?.Name})");
+    //        }
+    //        // 83 ngày: Cảnh báo cuối cùng
+    //        else if (daysInactive >= 83 && daysInactive < 90)
+    //        {
+    //            await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
+    //            {
+    //                Title = "Cảnh báo cuối: Vật phẩm sắp bị khóa",
+    //                Message = $"Vật phẩm {item.Product?.Name} sẽ bị khóa sau 7 ngày nữa nếu không có hoạt động.",
+    //                Type = NotificationType.InventoryItem,
+    //                SourceUrl = null
+    //            });
+    //            notified83++;
+    //            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Notified 83 days for item {item.Id} ({item.Product?.Name})");
+    //        }
+    //        // 90 ngày: Khóa vật phẩm và thông báo cho user + seller
+    //        else if (daysInactive >= 90)
+    //        {
+    //            item.Status = InventoryItemStatus.Archived;
+    //            item.ArchivedAt = now;
+    //            item.ArchivedReason = "Inactive for over 90 days";
+    //            item.UpdatedAt = now;
+    //            await _unitOfWork.InventoryItems.Update(item);
+
+    //            await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
+    //            {
+    //                Title = "Vật phẩm của bạn đã bị khóa",
+    //                Message = $"Vật phẩm {item.Product?.Name} đã bị khóa do không có hoạt động trong 90 ngày.",
+    //                Type = NotificationType.InventoryItem,
+    //                SourceUrl = null
+    //            });
+
+    //            var sellerUserId = item.Product?.Seller?.UserId;
+    //            if (sellerUserId != null && sellerUserId != Guid.Empty)
+    //            {
+    //                await _notificationService.PushNotificationToUser(sellerUserId.Value, new NotificationDto
+    //                {
+    //                    Title = "Vật phẩm của khách hàng đã bị thu hồi",
+    //                    Message = $"Vật phẩm {item.Product?.Name} của khách hàng đã bị khóa do không hoạt động trong 90 ngày.",
+    //                    Type = NotificationType.InventoryItem,
+    //                    SourceUrl = null
+    //                });
+    //            }
+    //            archived++;
+    //            _loggerService.Warn($"[HandleInventoryItemLifecycleAsync] Archived item {item.Id} ({item.Product?.Name})");
+    //        }
+    //    }
+
+    //    await _unitOfWork.SaveChangesAsync();
+    //    _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Done. Notified 30d: {notified30}, 60d: {notified60}, 83d: {notified83}, archived: {archived}.");
+    //}
+
+    public async Task HandleInventoryItemLifecycleAsync(InventoryItem item)
+    {
+        var now = DateTime.UtcNow;
+        _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Start for item {item.Id}");
+
+        var lastActive = item.UpdatedAt ?? item.CreatedAt;
+        var daysInactive = (now - lastActive).TotalDays;
+
+        var hasShipmentRequest = item.ShipmentId != null &&
+            (item.Status == InventoryItemStatus.Shipment_requested || item.Status == InventoryItemStatus.Delivering);
+
+        var hasTradeRequest = item.LockedByRequestId != null;
+        var hasActiveListing = item.Listings != null && item.Listings.Any(l => l.Status == ListingStatus.Active);
+
+        if (hasShipmentRequest || hasTradeRequest || hasActiveListing)
+        {
+            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Skip item {item.Id} ({item.Product?.Name}) - has activity.");
+            return;
+        }
+
+        if (daysInactive >= 30 && daysInactive < 60)
+        {
+            await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
+            {
+                Title = "Vật phẩm của bạn đã không hoạt động 30 ngày",
+                Message = $"Vật phẩm {item.Product?.Name} đã không có hoạt động trong 30 ngày. Vui lòng kiểm tra để tránh bị khóa.",
+                Type = NotificationType.InventoryItem,
+                SourceUrl = null
+            });
+            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Notified 30 days for item {item.Id} ({item.Product?.Name})");
+        }
+        else if (daysInactive >= 60 && daysInactive < 83)
+        {
+            await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
+            {
+                Title = "Cảnh báo: Vật phẩm sắp bị khóa",
+                Message = $"Vật phẩm {item.Product?.Name} đã không hoạt động trong 60 ngày. Nếu không có tác động trong 30 ngày tới, vật phẩm sẽ bị khóa.",
+                Type = NotificationType.InventoryItem,
+                SourceUrl = null
+            });
+            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Notified 60 days for item {item.Id} ({item.Product?.Name})");
+        }
+        else if (daysInactive >= 83 && daysInactive < 90)
+        {
+            await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
+            {
+                Title = "Cảnh báo cuối: Vật phẩm sắp bị khóa",
+                Message = $"Vật phẩm {item.Product?.Name} sẽ bị khóa sau 7 ngày nữa nếu không có hoạt động.",
+                Type = NotificationType.InventoryItem,
+                SourceUrl = null
+            });
+            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Notified 83 days for item {item.Id} ({item.Product?.Name})");
+        }
+        else if (daysInactive >= 90)
+        {
+            item.Status = InventoryItemStatus.Archived;
+            item.ArchivedAt = now;
+            item.ArchivedReason = "Inactive for over 90 days";
+            item.UpdatedAt = now;
+            await _unitOfWork.InventoryItems.Update(item);
+
+            await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
+            {
+                Title = "Vật phẩm của bạn đã bị khóa",
+                Message = $"Vật phẩm {item.Product?.Name} đã bị khóa do không có hoạt động trong 90 ngày.",
+                Type = NotificationType.InventoryItem,
+                SourceUrl = null
+            });
+
+            var sellerUserId = item.Product?.Seller?.UserId;
+            if (sellerUserId != null && sellerUserId != Guid.Empty)
+            {
+                await _notificationService.PushNotificationToUser(sellerUserId.Value, new NotificationDto
+                {
+                    Title = "Vật phẩm của khách hàng đã bị thu hồi",
+                    Message = $"Vật phẩm {item.Product?.Name} của khách hàng đã bị khóa do không hoạt động trong 90 ngày.",
+                    Type = NotificationType.InventoryItem,
+                    SourceUrl = null
+                });
+            }
+            _loggerService.Warn($"[HandleInventoryItemLifecycleAsync] Archived item {item.Id} ({item.Product?.Name})");
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+        _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Done for item {item.Id}.");
     }
 
     private static HoldInfoDto BuildHoldInfo(InventoryItem item)

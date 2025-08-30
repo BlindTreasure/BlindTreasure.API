@@ -24,7 +24,9 @@ public static class InventoryItemMapper
             OrderDetailId = item.OrderDetailId,
             Tier = item.Tier,
             //OrderDetail = item.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(item.OrderDetail) : null,
-            ShipmentId = item.ShipmentId
+            ShipmentId = item.ShipmentId,
+            ArchivedAt = item.ArchivedAt,
+            ArchivedReason = item.ArchivedReason,
             //Shipment = item.Shipment != null ? ShipmentDtoMapper.ToShipmentDto(item.Shipment) : null
         };
     }

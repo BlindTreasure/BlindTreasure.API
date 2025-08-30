@@ -761,41 +761,6 @@ public class StripeService : IStripeService
         return session.Url;
     }
 
-    // 2. Hoàn lại tiền cho khách (refund)
-    public async Task<Refund> RefundPaymentAsync(string paymentIntentId, decimal amount)
-    {
-        var refundService = new RefundService(_stripeClient);
-        var refundOptions = new RefundCreateOptions
-        {
-            PaymentIntent = paymentIntentId,
-            Amount = (long)amount // Stripe expects smallest unit
-        };
-
-        try
-        {
-            var refund = await refundService.CreateAsync(refundOptions);
-            if (refund == null)
-                throw ErrorHelper.Internal("Stripe refund failed.");
-            // TODO: Lưu transaction refund vào DB nếu cần
-            var transaction = new Transaction
-            {
-                Type = TransactionType.Refund.ToString(),
-                Amount = amount,
-                Currency = refund.Currency,
-                ExternalRef = refund.Id,
-                OccurredAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = _claimsService.CurrentUserId
-            };
-            await _unitOfWork.Transactions.AddAsync(transaction);
-            await _unitOfWork.SaveChangesAsync();
-            return refund;
-        }
-        catch (StripeException ex)
-        {
-            throw ErrorHelper.BadRequest($"Stripe error: {ex.StripeError?.Message ?? ex.Message}");
-        }
-    }
 
     // 3. Tạo onboarding link cho seller (Stripe Express)
     public async Task<string> GenerateSellerOnboardingLinkAsync(Guid sellerId)
@@ -875,4 +840,130 @@ public class StripeService : IStripeService
         var options = new TransferReversalCreateOptions();
         return await reversalService.CreateAsync(transferId, options);
     }
+
+
+    // 2. Hoàn lại tiền cho khách (refund)
+    public async Task<Refund> RefundPaymentAsync(string paymentIntentId, decimal amount, Order refundOrder)
+    {
+        var refundService = new RefundService(_stripeClient);
+        var refundOptions = new RefundCreateOptions
+        {
+            PaymentIntent = paymentIntentId,
+            Amount = (long)amount // Stripe expects smallest unit
+        };
+
+        try
+        {
+            var refund = await refundService.CreateAsync(refundOptions);
+            if (refund == null)
+                throw ErrorHelper.Internal("Stripe refund failed.");
+
+            // Tìm Payment liên quan
+            var payment = refundOrder.Payment;
+            if (payment == null)
+            {
+                // Nếu chưa có Payment, tạo mới (tham khảo UpsertPaymentAndTransactionForOrder)
+                payment = new Payment
+                {
+                    Order = refundOrder,
+                    OrderId = refundOrder.Id,
+                    Amount = refundOrder.TotalAmount + (refundOrder.TotalShippingFee ?? 0m),
+                    DiscountRate = 0,
+                    NetAmount = refundOrder.FinalAmount ?? refundOrder.TotalAmount,
+                    Method = "Stripe",
+                    Status = PaymentStatus.Refunded,
+                    PaymentIntentId = paymentIntentId,
+                    SessionId = null,
+                    PaidAt = DateTime.UtcNow,
+                    RefundedAmount = amount,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = _claimsService.CurrentUserId,
+                    Transactions = new List<Transaction>()
+                };
+                payment = await _unitOfWork.Payments.AddAsync(payment);
+                refundOrder.Payment = payment;
+                await _unitOfWork.Orders.Update(refundOrder);
+            }
+            else
+            {
+                // Cộng dồn số tiền đã refund
+                payment.RefundedAmount += amount;
+                payment.Status = PaymentStatus.Refunded;
+                await _unitOfWork.Payments.Update(payment);
+            }
+
+            // Tạo Transaction cho refund
+            var transaction = new Transaction
+            {
+                Payment = payment,
+                PaymentId = payment.Id,
+                Type = TransactionType.Refund.ToString(),
+                Amount = amount,
+                Currency = refund.Currency,
+                Status = refund.Status, // Stripe trả về "succeeded" hoặc "pending"
+                OccurredAt = DateTime.UtcNow,
+                CompleteAt = refund.Created,
+                ExternalRef = refund.Id, // Stripe refund id
+                Notes = refund.Reason ?? "", // Stripe lý do refund nếu có
+                RefundAmount = amount,
+                StripeTransactionId = refund.BalanceTransactionId,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = _claimsService.CurrentUserId
+            };
+
+            payment.Transactions.Add(transaction);
+            await _unitOfWork.Transactions.AddAsync(transaction);
+
+            await _unitOfWork.SaveChangesAsync();
+            return refund;
+        }
+        catch (StripeException ex)
+        {
+            throw ErrorHelper.BadRequest($"Stripe error: {ex.StripeError?.Message ?? ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Refund một order thuộc group payment (multi-order Stripe session).
+    /// Tự động lấy paymentIntentId từ GroupPaymentSession, kiểm tra số tiền, gọi Stripe refund và lưu transaction.
+    /// </summary>
+    public async Task<Refund> RefundOrderAsync(Guid orderId)
+    {
+        // 1. Lấy order
+        var order = await _unitOfWork.Orders.GetQueryable()
+            .Include(o => o.OrderDetails)
+            .Include(o => o.OrderSellerPromotions)
+            .Include(o => o.Payment)
+            .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted)
+            ?? throw ErrorHelper.NotFound("Order not found.");
+
+        // 2. Lấy group payment session
+        if (order.CheckoutGroupId == null)
+            throw ErrorHelper.BadRequest("Order does not belong to a group payment session.");
+
+        var groupSession = await _unitOfWork.GroupPaymentSessions
+            .FirstOrDefaultAsync(s => s.CheckoutGroupId == order.CheckoutGroupId)
+            ?? throw ErrorHelper.NotFound("Group payment session not found.");
+
+        if (string.IsNullOrEmpty(groupSession.PaymentIntentId))
+            throw ErrorHelper.BadRequest("PaymentIntentId not found for group session.");
+
+        // 3. Xác định số tiền cần refund cho order này
+        var refundAmount = order.FinalAmount ?? order.TotalAmount;
+        if (refundAmount <= 0)
+            throw ErrorHelper.BadRequest("Refund amount must be greater than zero.");
+
+        // 4. Gọi Stripe refund
+        var refund = await RefundPaymentAsync(groupSession.PaymentIntentId, refundAmount, order);
+
+        // 5. Lưu lại tổng số tiền đã refund cho order (nếu cần)
+        order.TotalRefundAmount = (order.TotalRefundAmount ?? 0) + refundAmount;
+        await _unitOfWork.Orders.Update(order);
+        await _unitOfWork.SaveChangesAsync();
+
+        _loggerService.Success($"Refunded {refundAmount} VND for order {order.Id} (Stripe refundId: {refund.Id})");
+
+        return refund;
+    }
+
 }
