@@ -210,10 +210,10 @@ public class PromotionService : IPromotionService
             promotion.DiscountValue = dto.DiscountValue.Value;
 
         if (dto.StartDate.HasValue)
-            promotion.StartDate = dto.StartDate.Value;
+            promotion.StartDate = DateTime.SpecifyKind(dto.StartDate.Value, DateTimeKind.Utc);
 
         if (dto.EndDate.HasValue)
-            promotion.EndDate = dto.EndDate.Value;
+            promotion.EndDate = DateTime.SpecifyKind(dto.EndDate.Value, DateTimeKind.Utc);
 
         if (dto.UsageLimit.HasValue)
             promotion.UsageLimit = dto.UsageLimit.Value;

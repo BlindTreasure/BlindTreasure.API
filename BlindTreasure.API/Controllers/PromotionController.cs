@@ -119,7 +119,7 @@ public class PromotionController : ControllerBase
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(ApiResult<PromotionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResult<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UpdatePromotion(Guid id, [FromBody] UpdatePromotionDto dto)
+    public async Task<IActionResult> UpdatePromotion(Guid id, [FromForm] UpdatePromotionDto dto)
     {
         try
         {
