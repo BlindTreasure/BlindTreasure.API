@@ -21,7 +21,6 @@ public interface IStripeService
     Task<Transfer> PayoutToSellerAsync(Guid payoutId, string sellerStripeAccountId, decimal amount,
         string currency = "usd",
         string description = "Payout to seller");
-
-    Task<Refund> RefundPaymentAsync(string paymentIntentId, decimal amount);
+    Task<Refund> RefundOrderAsync(Guid orderId);
     Task<TransferReversal> ReversePayoutAsync(string transferId);
 }

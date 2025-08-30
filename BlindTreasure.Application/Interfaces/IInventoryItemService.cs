@@ -2,6 +2,7 @@
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
+using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Commons;
 
 namespace BlindTreasure.Application.Interfaces;
@@ -18,4 +19,5 @@ public interface IInventoryItemService
     Task<ShipmentItemResponseDTO> RequestShipmentAsync(RequestItemShipmentDTO request);
     Task<InventoryItemDto> ForceReleaseHeldItemAsync(Guid inventoryItemId);
     Task<Pagination<InventoryItemDto>> GetOnHoldInventoryItemByUser(PaginationParameter param, Guid userId);
+    Task HandleInventoryItemLifecycleAsync(InventoryItem item);
 }

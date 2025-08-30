@@ -9,5 +9,6 @@ public enum NotificationType
     Voucher,
     Chat,
     Promotion,
-    Shipment
+    Shipment,
+    InventoryItem
 }
