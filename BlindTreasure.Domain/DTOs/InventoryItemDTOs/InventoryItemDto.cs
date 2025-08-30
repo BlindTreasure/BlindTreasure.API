@@ -12,9 +12,9 @@ public class InventoryItemDto
     public Guid UserId { get; set; }
     public Guid ProductId { get; set; }
     public ProducDetailDto? Product { get; set; }
-    public string ProductName { get; set; }
-    public string Image { get; set; }
-    public string Location { get; set; }
+    public string? ProductName { get; set; }
+    public string? Image { get; set; }
+    public string? Location { get; set; }
     public InventoryItemStatus Status { get; set; } // enum
     public DateTime CreatedAt { get; set; }
 
