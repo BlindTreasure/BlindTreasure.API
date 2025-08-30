@@ -12,26 +12,17 @@ namespace BlindTreasure.Application.Services;
 
 public class CartItemService : ICartItemService
 {
-    private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _loggerService;
-    private readonly IMapperService _mapper;
-    private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
 
     public CartItemService(
-        ICacheService cacheService,
         IClaimsService claimsService,
         ILoggerService loggerService,
-        IMapperService mapper,
-        IProductService productService,
         IUnitOfWork unitOfWork)
     {
-        _cacheService = cacheService;
         _claimsService = claimsService;
         _loggerService = loggerService;
-        _mapper = mapper;
-        _productService = productService;
         _unitOfWork = unitOfWork;
     }
 
@@ -104,13 +95,24 @@ public class CartItemService : ICartItemService
             throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOrBlindBoxRequired);
 
         decimal unitPrice;
+
+        // Kiểm tra tồn tại item trong cart trước
+        var existed = await _unitOfWork.CartItems.FirstOrDefaultAsync(c =>
+            c.UserId == userId &&
+            c.ProductId == dto.ProductId &&
+            c.BlindBoxId == dto.BlindBoxId &&
+            !c.IsDeleted);
+
         if (dto.ProductId.HasValue)
         {
             var product = await _unitOfWork.Products.GetByIdAsync(dto.ProductId.Value);
             if (product == null || product.IsDeleted)
                 throw ErrorHelper.NotFound(ErrorMessages.CartItemProductNotFound);
-            if (product.TotalStockQuantity < dto.Quantity)
+
+            var totalRequested = dto.Quantity + (existed?.Quantity ?? 0);
+            if (product.AvailableToSell < totalRequested)
                 throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOutOfStock);
+
             unitPrice = product.RealSellingPrice;
         }
         else
@@ -118,14 +120,13 @@ public class CartItemService : ICartItemService
             var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(dto.BlindBoxId.Value);
             if (blindBox == null || blindBox.IsDeleted || blindBox.Status == BlindBoxStatus.Rejected)
                 throw ErrorHelper.NotFound(ErrorMessages.CartItemBlindBoxNotFoundOrRejected);
+
+            var totalRequested = dto.Quantity + (existed?.Quantity ?? 0);
+            if (blindBox.TotalQuantity < totalRequested)
+                throw ErrorHelper.BadRequest("Blindbox đã hết hàng, vui lòng thử lại sau vài ngày");
+
             unitPrice = blindBox.Price;
         }
-
-        var existed = await _unitOfWork.CartItems.FirstOrDefaultAsync(c => c.UserId == userId
-                                                                           && c.ProductId == dto.ProductId
-                                                                           && c.BlindBoxId == dto.BlindBoxId
-                                                                           && !c.IsDeleted
-        );
 
         if (existed != null)
         {
@@ -179,8 +180,9 @@ public class CartItemService : ICartItemService
             var product = cartItem.Product;
             if (product == null || product.IsDeleted)
                 throw ErrorHelper.NotFound(ErrorMessages.CartItemProductNotFound);
-            if (product.TotalStockQuantity < dto.Quantity)
+            if (product.AvailableToSell < dto.Quantity)
                 throw ErrorHelper.BadRequest(ErrorMessages.CartItemProductOutOfStock);
+
             cartItem.UnitPrice = product.RealSellingPrice;
         }
         else if (cartItem.BlindBoxId.HasValue)
@@ -188,6 +190,9 @@ public class CartItemService : ICartItemService
             var blindBox = cartItem.BlindBox;
             if (blindBox == null || blindBox.IsDeleted)
                 throw ErrorHelper.NotFound(ErrorMessages.CartItemBlindBoxNotFound);
+            if (blindBox.TotalQuantity < dto.Quantity)
+                throw ErrorHelper.BadRequest("Blindbox đã hết hàng, vui lòng thử lại sau vài ngày");
+
             cartItem.UnitPrice = blindBox.Price;
         }
 
