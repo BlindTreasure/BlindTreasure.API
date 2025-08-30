@@ -394,6 +394,13 @@ public class PromotionService : IPromotionService
             throw ErrorHelper.Unauthorized("Chỉ có seller mới có quyền tham gia voucher.");
 
         await ValidateParticipantPromotionAsync(currentUser, id);
+
+        // Kiểm tra đã tham gia chưa
+        var existed = await _unitOfWork.PromotionParticipants
+            .FirstOrDefaultAsync(pp => pp.PromotionId == id && pp.SellerId == currentUser.Seller.Id && !pp.IsDeleted);
+        if (existed != null)
+            throw ErrorHelper.Conflict("Seller đã tham gia chiến dịch này.");
+
         var participantPromotion = await SetParticipantPromotionDataAsync(currentUser.Id, id);
         await _unitOfWork.PromotionParticipants.AddAsync(participantPromotion);
         await _unitOfWork.SaveChangesAsync();
