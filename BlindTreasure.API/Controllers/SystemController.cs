@@ -1376,6 +1376,13 @@ public class SystemController : ControllerBase
                 Description = "Mẫu đồ chơi sưu tầm dòng Smiski.",
                 ParentId = collectibleToys.Id,
                 CreatedAt = now
+            },
+            new()
+            {
+                Name = "Gundam",
+                Description = "Đồ chơi sưu tầm thương hiệu Gundam.",
+                ParentId = collectibleToys.Id,
+                CreatedAt = now
             }
         };
 
