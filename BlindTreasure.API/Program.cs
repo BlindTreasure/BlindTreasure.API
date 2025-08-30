@@ -147,7 +147,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-// app.MapHub<NotificationHub>("/hubs/notification");
+app.MapHub<NotificationHub>("/hubs/notification");
 app.MapHub<UnboxingHub>("/hubs/unboxing");
 app.MapHub<ChatHub>("/hubs/chat");
 
