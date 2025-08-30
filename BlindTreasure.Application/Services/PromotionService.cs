@@ -187,7 +187,7 @@ public class PromotionService : IPromotionService
         return await GetPromotionByIdAsync(promotion.Id);
     }
 
-    public async Task<PromotionDto> UpdatePromotionAsync(Guid id, CreatePromotionDto dto)
+    public async Task<PromotionDto> UpdatePromotionAsync(Guid id, UpdatePromotionDto dto)
     {
         var currentUserId = _claimsService.CurrentUserId;
         var user = await _userService.GetUserById(currentUserId, true);
@@ -199,20 +199,18 @@ public class PromotionService : IPromotionService
         if (promotion == null)
             throw ErrorHelper.NotFound("Không tìm thấy voucher.");
 
-        await ValidatePromotionInputAsync(dto);
+        // Áp dụng từng trường nếu có giá trị, nếu null thì dùng default value từ UpdatePromotionDto
+        promotion.Code = (dto.Code ?? string.Empty).Trim().ToUpper();
+        promotion.Description = dto.Description ?? "mã giảm 100% cho đơn 1k";
+        promotion.DiscountType = dto.DiscountType ;
+        promotion.DiscountValue = dto.DiscountValue ?? 100;
+        promotion.StartDate = dto.StartDate ?? DateTime.SpecifyKind(DateTime.Parse("2000-01-01T00:00:00Z"), DateTimeKind.Utc);
+        promotion.EndDate = dto.EndDate ?? DateTime.SpecifyKind(DateTime.Parse("2100-01-01T00:00:00Z"), DateTimeKind.Utc);
+        promotion.UsageLimit = dto.UsageLimit ?? 100;
+        promotion.MaxUsagePerUser = dto.MaxUsagePerUser ?? 2;
 
-        promotion.Code = dto.Code.Trim().ToUpper();
-        promotion.Description = dto.Description;
-        promotion.DiscountType = dto.DiscountType;
-        promotion.DiscountValue = dto.DiscountValue;
-        promotion.StartDate = dto.StartDate;
-        promotion.EndDate = dto.EndDate;
-        promotion.UsageLimit = dto.UsageLimit;
         promotion.UpdatedAt = DateTime.UtcNow;
         promotion.CreatedByRole = user.RoleName;
-
-        if (promotion.MaxUsagePerUser != dto.MaxUsagePerUser)
-            promotion.MaxUsagePerUser = dto.MaxUsagePerUser;
 
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
@@ -221,6 +219,7 @@ public class PromotionService : IPromotionService
         await _cacheService.RemoveAsync($"Promotion:Detail:{id}");
         await _cacheService.RemoveByPatternAsync("Promotion:List:*");
 
+        _loggerService.Success($"[UpdatePromotionAsync] Đã cập nhật Promotion {promotion.Id} bởi user {currentUserId}.");
         return await GetPromotionByIdAsync(promotion.Id);
     }
 

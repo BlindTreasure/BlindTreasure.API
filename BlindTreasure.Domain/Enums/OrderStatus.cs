@@ -12,7 +12,10 @@ public enum OrderStatus
     EXPIRED,
 
     [Description("Đã hoàn thành, tất cả order-detail đã được giao thành công hoặc Item In-inventory hơn 3 ngày")]
-    COMPLETED
+    COMPLETED,
+
+    [Description("Đã hoàn tiền")]
+    REFUNDED
 }
 
 public enum OrderDetailItemStatus

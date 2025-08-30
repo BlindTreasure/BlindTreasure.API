@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace BlindTreasure.Domain.DTOs.PayoutDTOs
 {
-    public class PayoutTransactionDto
+    public class PayoutTransactionDto // tạo khi transfer thành công để lưu lại thông tin giao dịch trong StripeService
     {
         public Guid Id { get; set; }
         public Guid PayoutId { get; set; }
