@@ -199,7 +199,8 @@ public class StripeService : IStripeService
                 Type = PaymentType.Order,
                 IsCompleted = false,
                 CouponId = couponId,
-                PaymentIntentId = session.PaymentIntentId
+                PaymentIntentId = session.PaymentIntentId,
+                Amount = Convert.ToDecimal(session.AmountTotal)
             };
             groupSession = await _unitOfWork.GroupPaymentSessions.AddAsync(groupSession);
         }
