@@ -432,7 +432,7 @@ public class PromotionService : IPromotionService
             .GetQueryable()
             .Include(pp => pp.Seller)
             .ThenInclude(s => s.User)
-            .ToListAsync(); // ✅ Thêm await và ToListAsync()
+            .ToListAsync(); 
 
         var result = participants.Select(pp => new SellerParticipantDto
         {
@@ -445,7 +445,7 @@ public class PromotionService : IPromotionService
             CompanyAddress = pp.Seller.CompanyAddress,
             IsVerified = pp.Seller.IsVerified,
             JoinedAt = pp.JoinedAt
-        }).ToList(); // ✅ Bây giờ ToList() trên memory
+        }).ToList(); 
 
         return result;
     }

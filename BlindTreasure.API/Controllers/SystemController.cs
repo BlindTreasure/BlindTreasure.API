@@ -1634,7 +1634,6 @@ public class SystemController : ControllerBase
                     break;
 
                 case "Smiski":
-                    // Find the Smiski seller
                     if (sellerSmiski == null)
                     {
                         _logger.Error(
@@ -1651,6 +1650,7 @@ public class SystemController : ControllerBase
 
                     products.AddRange(new[]
                     {
+                        //direct section
                         new Product
                         {
                             Id = Guid.NewGuid(),
@@ -1776,6 +1776,135 @@ public class SystemController : ControllerBase
                             Brand = seller.CompanyName,
                             Material = "PVC",
                             ProductType = ProductSaleType.DirectSale,
+                            Height = 30
+                        },
+                        
+                        // blindbox Only
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Smiski Kneeling\n",
+                            Description =
+                                "Often sits with knees folded. Has a kind heart but is a little awkward showing it in front of other people.\n\n",
+                            CategoryId = category.Id,
+                            SellerId = smiskiSeller.Id,
+                            RealSellingPrice = 299000,
+                            TotalStockQuantity = 40,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/wp-content/uploads/2016/03/s2_01.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.BlindBoxOnly,
+                            Height = 9
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Smiski Climbing",
+                            Description =
+                                "Found:On top of books, shelves or seen climbing out from tissue boxes\nThis Smiski’ s action is too slow. Often spotted trying to climb over things but never quite making it.",
+                            CategoryId = category.Id,
+                            SellerId = smiskiSeller.Id,
+                            RealSellingPrice = 255000,
+                            TotalStockQuantity = 25,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/wp-content/uploads/2016/03/s2_02.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "Fabric",
+                            ProductType = ProductSaleType.BlindBoxOnly,
+                            Height = 15
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Smiski Daydreaming\n",
+                            Description =
+                                "Likes to daydream all day long. Most of the time, this Smiski is lost in it's own world.\n\n",
+                            CategoryId = category.Id,
+                            SellerId = smiskiSeller.Id,
+                            RealSellingPrice = 319000,
+                            TotalStockQuantity = 10,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/wp-content/uploads/2016/03/s2_03.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.BlindBoxOnly,
+                            Height = 11
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Smiski Pushing",
+                            Description =
+                                "Always pushing things together to create the perfect hiding spot.\n\n",
+                            CategoryId = category.Id,
+                            SellerId = smiskiSeller.Id,
+                            RealSellingPrice = 275000,
+                            TotalStockQuantity = 70,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/wp-content/uploads/2016/03/s2_04.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.BlindBoxOnly,
+                            Height = 30
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Smiski Peeking\n",
+                            Description =
+                                "A playful Smiski who likes to look out at the world from an upside down point of view.\n\n",
+                            CategoryId = category.Id,
+                            SellerId = smiskiSeller.Id,
+                            RealSellingPrice = 319000,
+                            ListedPrice = 409000,
+                            TotalStockQuantity = 10,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/wp-content/uploads/2016/03/s2_05.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.BlindBoxOnly,
+                            Height = 11
+                        },
+                        new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "Smiski Listening\n",
+                            Description =
+                                "Curious about the sounds coming in from next door, this Smiski is always listening in.\n\n",
+                            CategoryId = category.Id,
+                            SellerId = smiskiSeller.Id,
+                            RealSellingPrice = 275000,
+                            TotalStockQuantity = 70,
+                            Status = ProductStatus.Active,
+                            CreatedAt = now,
+                            ImageUrls = new List<string>
+                            {
+                                "https://smiski.com/wp-content/uploads/2016/03/s2_06.png"
+                            },
+                            Brand = seller.CompanyName,
+                            Material = "PVC",
+                            ProductType = ProductSaleType.BlindBoxOnly,
                             Height = 30
                         }
                     });
