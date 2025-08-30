@@ -1223,7 +1223,7 @@ public class SystemController : ControllerBase
                 Phone = "0900000001",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
-                CreatedAt = now,
+                CreatedAt = now,    
                 AvatarUrl = defaultAvatar
             }
         };
@@ -1249,9 +1249,9 @@ public class SystemController : ControllerBase
                     () => context.PayoutLogs.ExecuteDeleteAsync(),
                     () => context.PayoutDetails.ExecuteDeleteAsync(),
                     () => context.OrderDetailInventoryItemLogs.ExecuteDeleteAsync(),
-                    () => context.InventoryItems.ExecuteDeleteAsync(),
 
                     () => context.ChatMessages.ExecuteDeleteAsync(),
+                    () => context.InventoryItems.ExecuteDeleteAsync(),
 
                     () => context.CustomerFavourites.ExecuteDeleteAsync(),
                     () => context.BlindBoxUnboxLogs.ExecuteDeleteAsync(),
