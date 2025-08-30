@@ -31,8 +31,10 @@ public class CartItemService : ICartItemService
     public async Task<CartDto> GetCurrentUserCartAsync()
     {
         var userId = _claimsService.CurrentUserId;
-        var cartItems = await _unitOfWork.CartItems.GetQueryable().Where(c => c.UserId == userId && !c.IsDeleted)
-            .Include(c => c.Product).ThenInclude(c => c.Seller).Include(c => c.BlindBox).ThenInclude(c => c.Seller)
+        var cartItems = await _unitOfWork.CartItems.GetQueryable()
+            .Where(c => c.UserId == userId && !c.IsDeleted)
+            .Include(c => c.Product).ThenInclude(c => c.Seller)
+            .Include(c => c.BlindBox).ThenInclude(c => c.Seller)
             .ToListAsync();
 
         // Group by SellerId (ưu tiên Product, nếu là BlindBox thì lấy SellerId từ BlindBox)
@@ -66,7 +68,11 @@ public class CartItemService : ICartItemService
                 Quantity = c.Quantity,
                 UnitPrice = c.UnitPrice,
                 TotalPrice = c.TotalPrice,
-                CreatedAt = c.CreatedAt
+                CreatedAt = c.CreatedAt,
+
+                AvailableStock = c.ProductId.HasValue
+                    ? (c.Product?.AvailableToSell ?? 0)
+                    : (c.BlindBox?.TotalQuantity ?? 0)
             }).ToList();
 
             sellerItems.Add(new CartSellerItemDto
