@@ -120,7 +120,8 @@ public class AdminController : ControllerBase
         try
         {
             var result = await _tradingService.ForceTimeoutTradeRequestAsync(tradeRequestId);
-            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", "Yêu cầu trao đổi đã được ép buộc hết hạn thành công."));
+            return Ok(ApiResult<TradeRequestDto>.Success(result, "200",
+                "Yêu cầu trao đổi đã được ép buộc hết hạn thành công."));
         }
         catch (Exception ex)
         {
@@ -218,7 +219,8 @@ public class AdminController : ControllerBase
             if (result == null)
                 return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
 
-            return Ok(ApiResult<UserDto>.Success(result, "200", "Thông tin chi tiết của người dùng đã được lấy thành công."));
+            return Ok(ApiResult<UserDto>.Success(result, "200",
+                "Thông tin chi tiết của người dùng đã được lấy thành công."));
         }
         catch (Exception ex)
         {
@@ -344,7 +346,8 @@ public class AdminController : ControllerBase
             if (result == null)
                 return NotFound(ApiResult<PayoutTransactionDto>.Failure("404", "Không tìm thấy giao dịch payout."));
 
-            return Ok(ApiResult<PayoutTransactionDto>.Success(result, "200", "Chi tiết giao dịch thanh toán đã được lấy thành công."));
+            return Ok(ApiResult<PayoutTransactionDto>.Success(result, "200",
+                "Chi tiết giao dịch thanh toán đã được lấy thành công."));
         }
         catch (Exception ex)
         {

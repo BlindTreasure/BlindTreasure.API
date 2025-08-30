@@ -23,5 +23,4 @@ public class OrderDetailInventoryItemShipmentLogDto
     public string? NewValue { get; set; } // Trạng thái mới
     public Guid? ActorId { get; set; }
     public ValueType? ValueStatusType { get; set; }
-
 }

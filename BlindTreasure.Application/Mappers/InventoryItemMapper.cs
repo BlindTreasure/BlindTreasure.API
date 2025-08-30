@@ -39,7 +39,8 @@ public static class InventoryItemMapper
         return result;
     }
 
-    public static OrderDetailInventoryItemShipmentLogDto ToOrderDetailInventoryItemLogDto(OrderDetailInventoryItemShipmentLog log)
+    public static OrderDetailInventoryItemShipmentLogDto ToOrderDetailInventoryItemLogDto(
+        OrderDetailInventoryItemShipmentLog log)
     {
         return new OrderDetailInventoryItemShipmentLogDto
         {
@@ -54,7 +55,6 @@ public static class InventoryItemMapper
             LogTime = log.CreatedAt,
             ShipmentId = log.ShipmentId,
             ValueStatusType = log.ValueStatusType
-
         };
     }
 }

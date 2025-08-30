@@ -202,10 +202,12 @@ public class PromotionService : IPromotionService
         // Áp dụng từng trường nếu có giá trị, nếu null thì dùng default value từ UpdatePromotionDto
         promotion.Code = (dto.Code ?? string.Empty).Trim().ToUpper();
         promotion.Description = dto.Description ?? "mã giảm 100% cho đơn 1k";
-        promotion.DiscountType = dto.DiscountType ;
+        promotion.DiscountType = dto.DiscountType;
         promotion.DiscountValue = dto.DiscountValue ?? 100;
-        promotion.StartDate = dto.StartDate ?? DateTime.SpecifyKind(DateTime.Parse("2000-01-01T00:00:00Z"), DateTimeKind.Utc);
-        promotion.EndDate = dto.EndDate ?? DateTime.SpecifyKind(DateTime.Parse("2100-01-01T00:00:00Z"), DateTimeKind.Utc);
+        promotion.StartDate =
+            dto.StartDate ?? DateTime.SpecifyKind(DateTime.Parse("2000-01-01T00:00:00Z"), DateTimeKind.Utc);
+        promotion.EndDate =
+            dto.EndDate ?? DateTime.SpecifyKind(DateTime.Parse("2100-01-01T00:00:00Z"), DateTimeKind.Utc);
         promotion.UsageLimit = dto.UsageLimit ?? 100;
         promotion.MaxUsagePerUser = dto.MaxUsagePerUser ?? 2;
 
@@ -219,7 +221,8 @@ public class PromotionService : IPromotionService
         await _cacheService.RemoveAsync($"Promotion:Detail:{id}");
         await _cacheService.RemoveByPatternAsync("Promotion:List:*");
 
-        _loggerService.Success($"[UpdatePromotionAsync] Đã cập nhật Promotion {promotion.Id} bởi user {currentUserId}.");
+        _loggerService.Success(
+            $"[UpdatePromotionAsync] Đã cập nhật Promotion {promotion.Id} bởi user {currentUserId}.");
         return await GetPromotionByIdAsync(promotion.Id);
     }
 

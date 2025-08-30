@@ -749,10 +749,8 @@ public class ReviewService : IReviewService
 
         var notAllowedStatuses = new[] { nameof(OrderStatus.PENDING), nameof(OrderStatus.CANCELLED) };
         if (notAllowedStatuses.Contains(orderDetail.Order.Status))
-        {
             throw ErrorHelper.BadRequest(
                 "Bạn chỉ có thể đánh giá sau khi đơn hàng đã được giao thành công và thanh toán hoàn tất.");
-        }
 
         // THÊM: Kiểm tra thời gian order (không được quá cũ)
         if (orderDetail.Order.CreatedAt < DateTime.UtcNow.AddMonths(-6))

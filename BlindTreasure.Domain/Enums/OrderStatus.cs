@@ -14,8 +14,7 @@ public enum OrderStatus
     [Description("Đã hoàn thành, tất cả order-detail đã được giao thành công hoặc Item In-inventory hơn 3 ngày")]
     COMPLETED,
 
-    [Description("Đã hoàn tiền")]
-    REFUNDED
+    [Description("Đã hoàn tiền")] REFUNDED
 }
 
 public enum OrderDetailItemStatus

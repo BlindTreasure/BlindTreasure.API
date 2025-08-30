@@ -29,7 +29,7 @@ public class BlindyController : ControllerBase
         }
     }
 
-    
+
     [HttpPost("ask-gemini")]
     public async Task<IActionResult> AskGemini([FromBody] string prompt)
     {

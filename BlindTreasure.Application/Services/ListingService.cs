@@ -97,52 +97,24 @@ public class ListingService : IListingService
         var userId = _claimsService.CurrentUserId;
         var cacheKey = CacheKeys.GetUserAvailableItems(userId);
 
-        // Check cache
         var cachedItems = await _cacheService.GetAsync<List<InventoryItemDto>>(cacheKey);
         if (cachedItems != null)
-        {
-            _logger.Info($"[GetAvailableItems] Cache hit cho user: {userId}");
             return cachedItems;
-        }
 
-        _logger.Info($"[GetAvailableItems] Cache miss cho user: {userId}");
-
-        // Lấy tất cả inventory items có status = Available
-        var items = await _unitOfWork.InventoryItems.GetAllAsync(
-            x => x.UserId == userId
-                 && !x.IsDeleted
-                 && x.Status == InventoryItemStatus.Available,
-            i => i.Product,
-            i => i.Listings,
-            i => i.LastTradeHistory
-        );
+        var items = await GetUserListableItemsAsync(userId);
 
         var result = items.Select(item =>
-            {
-                var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
+        {
+            var dto = _mapper.Map<InventoryItem, InventoryItemDto>(item);
+            dto.ProductName = item.Product?.Name;
+            dto.Image = item.Product?.ImageUrls?.FirstOrDefault() ?? "";
+            dto.IsOnHold = item.HoldUntil.HasValue && item.HoldUntil > DateTime.UtcNow;
+            dto.HasActiveListing = item.Listings?.Any(l => l.Status == ListingStatus.Active) ?? false;
+            dto.Status = item.Status;
+            return dto;
+        }).ToList();
 
-                // Thông tin sản phẩm
-                if (item.Product != null)
-                {
-                    dto.ProductName = item.Product.Name;
-                    dto.Image = item.Product.ImageUrls?.FirstOrDefault() ?? "";
-                }
-
-                // Trạng thái hold sau giao dịch (3 ngày)
-                dto.IsOnHold = item.HoldUntil.HasValue && item.HoldUntil.Value > DateTime.UtcNow;
-
-                // Kiểm tra có listing active không
-                dto.HasActiveListing = item.Listings?.Any(l => l.Status == ListingStatus.Active) ?? false;
-
-                dto.Status = item.Status;
-
-                return dto;
-            })
-            .ToList();
-
-        // Cache kết quả
         await _cacheService.SetAsync(cacheKey, result, CacheDurations.UserItems);
-
         return result;
     }
 
@@ -344,43 +316,50 @@ public class ListingService : IListingService
 
     private async Task EnsureItemCanBeListedAsync(Guid inventoryId, Guid userId)
     {
-        _logger.Info($"[EnsureItemCanBeListed] Kiểm tra item {inventoryId} của user {userId}");
+        var items = await GetUserListableItemsAsync(userId, inventoryId);
+        if (!items.Any()) throw ErrorHelper.Conflict("Không tìm thấy vật phẩm hợp lệ để tạo bài đăng.");
+    }
 
-        // Kiểm tra vật phẩm tồn tại và hợp lệ
-        var inventoryItem = await _unitOfWork.InventoryItems.FirstOrDefaultAsync(
-            x => x.Id == inventoryId &&
-                 x.UserId == userId &&
-                 !x.IsDeleted &&
-                 x.Status == InventoryItemStatus.Available,
-            i => i.Listings
-        );
+    /// <summary>
+    /// Lấy các item khả dụng để tạo listing hoặc kiểm tra 1 item cụ thể.
+    /// </summary>
+    private async Task<List<InventoryItem>> GetUserListableItemsAsync(Guid userId, Guid? specificInventoryId = null)
+    {
+        var query = _unitOfWork.InventoryItems.GetQueryable()
+            .Include(i => i.Product)
+            .Include(i => i.Listings)
+            .Include(i => i.LastTradeHistory)
+            .Include(i => i.SourceCustomerBlindBox)
+            .Where(x => x.UserId == userId
+                        && !x.IsDeleted
+                        && x.Status == InventoryItemStatus.Available
+                        && x.SourceCustomerBlindBoxId != null); // chỉ từ BlindBox
 
-        if (inventoryItem == null)
+        if (specificInventoryId.HasValue)
+            query = query.Where(x => x.Id == specificInventoryId.Value);
+
+        var items = await query.ToListAsync();
+
+        // Filter thêm: loại bỏ item có listing active hoặc đang trong trade pending
+        var result = new List<InventoryItem>();
+        foreach (var item in items)
         {
-            _logger.Warn($"[EnsureItemCanBeListed] Không tìm thấy item {inventoryId} hợp lệ");
-            throw ErrorHelper.Conflict("Không tìm thấy vật phẩm hợp lệ để tạo bài đăng.");
+            if (item.Listings?.Any(l => l.Status == ListingStatus.Active) == true)
+                continue;
+
+            var hasPendingTrade = await _unitOfWork.TradeRequests
+                .GetQueryable()
+                .Include(t => t.OfferedItems)
+                .Where(t => t.Status == TradeRequestStatus.PENDING)
+                .AnyAsync(t => t.OfferedItems.Any(oi => oi.InventoryItemId == item.Id));
+
+            if (hasPendingTrade)
+                continue;
+
+            result.Add(item);
         }
 
-        // Kiểm tra bài đăng active
-        if (inventoryItem.Listings?.Any(l => l.Status == ListingStatus.Active) == true)
-        {
-            _logger.Warn($"[EnsureItemCanBeListed] Item {inventoryId} đã có bài đăng active");
-            throw ErrorHelper.Conflict("Vật phẩm này đã có bài đăng đang hoạt động.");
-        }
-
-        // Kiểm tra giao dịch pending
-        var hasPendingTrade = await _unitOfWork.TradeRequests
-            .GetQueryable()
-            .Include(t => t.OfferedItems)
-            .Where(t => t.Status == TradeRequestStatus.PENDING)
-            .AnyAsync(t => t.OfferedItems.Any(item => item.InventoryItemId == inventoryId));
-
-        if (hasPendingTrade)
-        {
-            _logger.Warn($"[EnsureItemCanBeListed] Item {inventoryId} đang có giao dịch pending");
-            throw ErrorHelper.Conflict(
-                "Vật phẩm này hiện đang có giao dịch chờ xử lý. Vui lòng thử lại sau khi giao dịch kết thúc.");
-        }
+        return result;
     }
 
     #endregion

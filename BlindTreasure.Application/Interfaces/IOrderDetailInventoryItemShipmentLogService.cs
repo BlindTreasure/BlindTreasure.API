@@ -17,6 +17,7 @@ public interface IOrderDetailInventoryItemShipmentLogService
     Task<List<OrderDetailInventoryItemShipmentLogDto>> GetLogByInventoryItemIdAsync(Guid inventoryItemId);
     Task<List<OrderDetailInventoryItemShipmentLogDto>> GetLogByOrderDetailIdAsync(Guid orderDetailId);
     Task<List<OrderDetailInventoryItemShipmentLogDto>> GetLogForShipmentByIdAsync(Guid shipmentId);
+
     Task<OrderDetailInventoryItemShipmentLog> LogInventoryItemOrCustomerBlindboxAddedAsync(OrderDetail orderDetail,
         InventoryItem? inventoryItem, CustomerBlindBox? blindBox, string? msg);
 
@@ -25,7 +26,8 @@ public interface IOrderDetailInventoryItemShipmentLogService
     Task<OrderDetailInventoryItemShipmentLog> LogOrderDetailStatusChangeAsync(OrderDetail orderDetail,
         OrderDetailItemStatus oldStatus, OrderDetailItemStatus newStatus, string? msg);
 
-    Task<OrderDetailInventoryItemShipmentLog> LogShipmentAddedAsync(OrderDetail orderDetail, Shipment shipment, string? msg);
+    Task<OrderDetailInventoryItemShipmentLog> LogShipmentAddedAsync(OrderDetail orderDetail, Shipment shipment,
+        string? msg);
 
     Task<OrderDetailInventoryItemShipmentLog> LogShipmentOfOrderDetailChangedStatusAsync(OrderDetail orderDetail,
         ShipmentStatus oldStatus, Shipment shipmentNewStatus, string? msg);

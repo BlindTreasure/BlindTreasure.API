@@ -9,6 +9,7 @@ public interface ITradingService
 {
     Task<Pagination<TradeRequestDto>> GetAllTradeRequests(PaginationParameter param,
         bool onlyActive = false);
+
     Task<List<TradeRequestDto>> GetTradeRequestsAsync(Guid listingId);
     Task<TradeRequestDto> CreateTradeRequestAsync(Guid listingId, CreateTradeRequestDto request);
     Task<TradeRequestDto> RespondTradeRequestAsync(Guid tradeRequestId, bool isAccepted);

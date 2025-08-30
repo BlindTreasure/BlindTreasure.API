@@ -51,10 +51,7 @@ public class TradingService : ITradingService
             .Where(tr => !tr.IsDeleted);
 
         // ✅ Nếu chỉ muốn lấy các trade request còn đang đếm ngược
-        if (onlyActive)
-        {
-            query = query.Where(tr => tr.TimeRemaining != 0);
-        }
+        if (onlyActive) query = query.Where(tr => tr.TimeRemaining != 0);
 
         // Sắp xếp theo RequestedAt
         query = param.Desc
@@ -1190,21 +1187,15 @@ public class TradingService : ITradingService
         var listingProduct = listingItem?.Product;
 
         if (listingItem == null || listingProduct == null)
-        {
             _logger.Warn($"[MapTradeRequestToDto] Listing {tradeRequest.ListingId} thiếu InventoryItem/Product");
-        }
 
         var requester = tradeRequest.Requester;
         if (requester == null)
-        {
             _logger.Warn($"[MapTradeRequestToDto] Requester {tradeRequest.RequesterId} chưa được load");
-        }
 
         var owner = listingItem?.User;
         if (owner == null)
-        {
             _logger.Warn($"[MapTradeRequestToDto] Owner của Listing {tradeRequest.ListingId} chưa được load");
-        }
 
         var offeredItemDtos = offeredItems.Select(item => new OfferedItemDto
         {
