@@ -42,8 +42,11 @@ public class TradingService : ITradingService
             .Include(tr => tr.Listing)
             .ThenInclude(l => l.InventoryItem)
             .ThenInclude(i => i.Product)
-            .Include(tr => tr.Requester)
+            .Include(tr => tr.Listing.InventoryItem.User) // load luôn owner
+            .Include(tr => tr.Requester) // load requester
             .Include(tr => tr.OfferedItems)
+            .ThenInclude(oi => oi.InventoryItem)
+            .ThenInclude(ii => ii.Product) // load offered item product
             .Where(tr => !tr.IsDeleted);
 
         // Sắp xếp theo RequestedAt
@@ -51,30 +54,25 @@ public class TradingService : ITradingService
             ? query.OrderByDescending(tr => tr.RequestedAt)
             : query.OrderBy(tr => tr.RequestedAt);
 
-        // Đếm tổng số bản ghi
         var totalCount = await query.CountAsync();
 
-        // Phân trang
         var tradeRequests = await query
             .Skip((param.PageIndex - 1) * param.PageSize)
             .Take(param.PageSize)
+            .AsNoTracking()
             .ToListAsync();
 
-        // Map sang DTO
         var dtos = new List<TradeRequestDto>();
+
         foreach (var tr in tradeRequests)
         {
-            var offeredInventoryItems = new List<InventoryItem>();
-            if (tr.OfferedItems.Any())
-            {
-                var itemIds = tr.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
-                offeredInventoryItems = await _unitOfWork.InventoryItems.GetAllAsync(
-                    i => itemIds.Contains(i.Id),
-                    i => i.Product);
-            }
+            // Lấy offered items trực tiếp từ navigation đã include
+            var offeredInventoryItems = tr.OfferedItems?
+                .Select(oi => oi.InventoryItem)
+                .Where(ii => ii != null)
+                .ToList() ?? new List<InventoryItem>();
 
             var dto = MapTradeRequestToDto(tr, offeredInventoryItems);
-            dto.ListingItemName = tr.Listing?.InventoryItem?.Product?.Name ?? "Unknown";
             dtos.Add(dto);
         }
 
@@ -147,35 +145,35 @@ public class TradingService : ITradingService
 
     public async Task<List<TradeRequestDto>> GetTradeRequestsAsync(Guid listingId)
     {
-        // Lấy thông tin listing
+        // Lấy thông tin listing đầy đủ
         var listing = await _unitOfWork.Listings.GetByIdAsync(listingId,
             l => l.InventoryItem,
-            l => l.InventoryItem.Product!);
+            l => l.InventoryItem.Product!,
+            l => l.InventoryItem.User!);
 
         if (listing == null)
             throw ErrorHelper.NotFound("Bài đăng không tồn tại hoặc đã bị xóa. Vui lòng kiểm tra lại.");
 
-        // Lấy tất cả các trade requests cho listing
-        var tradeRequests = await _unitOfWork.TradeRequests.GetAllAsync(
-            t => t.ListingId == listingId,
-            t => t.Requester!,
-            t => t.OfferedItems);
+        // Lấy tất cả trade requests cho listing với navigation đầy đủ
+        var tradeRequests = await _unitOfWork.TradeRequests.GetQueryable()
+            .Where(t => t.ListingId == listingId)
+            .Include(t => t.Requester)
+            .Include(t => t.OfferedItems)
+            .ThenInclude(oi => oi.InventoryItem)
+            .ThenInclude(ii => ii.Product)
+            .AsNoTracking()
+            .ToListAsync();
 
         var dtos = new List<TradeRequestDto>();
         foreach (var tradeRequest in tradeRequests)
         {
-            // Load offered items cho mỗi trade request
-            var offeredInventoryItems = new List<InventoryItem>();
-            if (tradeRequest.OfferedItems.Any())
-            {
-                var itemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
-                offeredInventoryItems = await _unitOfWork.InventoryItems.GetAllAsync(
-                    i => itemIds.Contains(i.Id),
-                    i => i.Product);
-            }
+            // Lấy offered items trực tiếp từ navigation
+            var offeredInventoryItems = tradeRequest.OfferedItems?
+                .Select(oi => oi.InventoryItem)
+                .Where(ii => ii != null)
+                .ToList() ?? new List<InventoryItem>();
 
             var dto = MapTradeRequestToDto(tradeRequest, offeredInventoryItems);
-            dto.ListingItemName = listing.InventoryItem?.Product?.Name ?? "Unknown";
             dtos.Add(dto);
         }
 
@@ -536,25 +534,26 @@ public class TradingService : ITradingService
 
     public async Task<TradeRequestDto> GetTradeRequestByIdAsync(Guid tradeRequestId)
     {
-        var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
-            t => t.Listing!,
-            t => t.Listing!.InventoryItem,
-            t => t.Listing!.InventoryItem.Product!,
-            t => t.Requester!,
-            t => t.OfferedItems);
+        var tradeRequest = await _unitOfWork.TradeRequests.GetQueryable()
+            .Where(t => t.Id == tradeRequestId)
+            .Include(t => t.Listing!)
+            .ThenInclude(l => l.InventoryItem)
+            .ThenInclude(ii => ii.Product)
+            .Include(t => t.Listing!.InventoryItem.User)
+            .Include(t => t.Requester!)
+            .Include(t => t.OfferedItems)
+            .ThenInclude(oi => oi.InventoryItem)
+            .ThenInclude(ii => ii.Product)
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
-        if (tradeRequest == null) throw ErrorHelper.NotFound("Không tìm thấy yêu cầu trao đổi.");
+        if (tradeRequest == null)
+            throw ErrorHelper.NotFound("Không tìm thấy yêu cầu trao đổi.");
 
-        var offeredInventoryItems = new List<InventoryItem>();
-        if (tradeRequest.OfferedItems.Any())
-        {
-            var itemIds = tradeRequest.OfferedItems.Select(oi => oi.InventoryItemId).ToList();
-
-            offeredInventoryItems = await _unitOfWork.InventoryItems.GetQueryable()
-                .Include(i => i.Product)
-                .Where(i => itemIds.Contains(i.Id))
-                .ToListAsync();
-        }
+        var offeredInventoryItems = tradeRequest.OfferedItems?
+            .Select(oi => oi.InventoryItem)
+            .Where(ii => ii != null)
+            .ToList() ?? new List<InventoryItem>();
 
         var dto = MapTradeRequestToDto(tradeRequest, offeredInventoryItems);
         return dto;
@@ -1178,49 +1177,58 @@ public class TradingService : ITradingService
         }
     }
 
-    private static TradeRequestDto MapTradeRequestToDto(TradeRequest tradeRequest, List<InventoryItem> offeredItems)
+    private TradeRequestDto MapTradeRequestToDto(TradeRequest tradeRequest, List<InventoryItem?> offeredItems)
     {
         var listingItem = tradeRequest.Listing?.InventoryItem;
-        var listingItemName = listingItem?.Product?.Name ?? "Unknown";
-        var listingItemImgUrl = listingItem?.Product?.ImageUrls?.FirstOrDefault();
-        var listingItemTier = listingItem?.Tier ?? RarityName.Common;
-        var requesterName = tradeRequest.Requester?.FullName ?? "Unknown";
-        var listingOwnerName = tradeRequest.Listing?.InventoryItem.User?.FullName ?? "Unknown";
-        var listingOwnerAvatarUrl = tradeRequest.Listing?.InventoryItem.User?.AvatarUrl;
-        var requesterAvatarUrl = tradeRequest.Requester?.AvatarUrl;
+        var listingProduct = listingItem?.Product;
+
+        if (listingItem == null || listingProduct == null)
+        {
+            _logger.Warn($"[MapTradeRequestToDto] Listing {tradeRequest.ListingId} thiếu InventoryItem/Product");
+        }
+
+        var requester = tradeRequest.Requester;
+        if (requester == null)
+        {
+            _logger.Warn($"[MapTradeRequestToDto] Requester {tradeRequest.RequesterId} chưa được load");
+        }
+
+        var owner = listingItem?.User;
+        if (owner == null)
+        {
+            _logger.Warn($"[MapTradeRequestToDto] Owner của Listing {tradeRequest.ListingId} chưa được load");
+        }
 
         var offeredItemDtos = offeredItems.Select(item => new OfferedItemDto
         {
             InventoryItemId = item.Id,
-            ItemName = item.Product?.Name,
+            ItemName = item.Product?.Name ?? string.Empty,
             ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
             Tier = item.Tier ?? RarityName.Common
         }).ToList();
 
-        // Tính toán thời gian còn lại
+        // Tính thời gian còn lại
         var timeRemaining = 0;
         if (tradeRequest.Status == TradeRequestStatus.ACCEPTED && tradeRequest.RespondedAt.HasValue)
         {
-            var timeoutMinutes = 10; // 10 phút timeout
+            var timeoutMinutes = 10;
             var elapsedTime = DateTime.UtcNow - tradeRequest.RespondedAt.Value;
             var remainingTime = TimeSpan.FromMinutes(timeoutMinutes) - elapsedTime;
-
-            // Nếu còn thời gian thì tính bằng giây, nếu không thì = 0
             timeRemaining = remainingTime.TotalSeconds > 0 ? (int)remainingTime.TotalSeconds : 0;
         }
 
-        var dto = new TradeRequestDto
+        return new TradeRequestDto
         {
             Id = tradeRequest.Id,
             ListingId = tradeRequest.ListingId,
-            ListingItemName = listingItemName,
-            ListingItemTier = listingItemTier,
-            ListingItemImgUrl = listingItemImgUrl,
+            ListingItemName = listingProduct?.Name ?? string.Empty,
+            ListingItemTier = listingItem?.Tier ?? RarityName.Common,
+            ListingItemImgUrl = listingProduct?.ImageUrls?.FirstOrDefault(),
             RequesterId = tradeRequest.RequesterId,
-            RequesterName = requesterName,
-            ListingOwnerName = listingOwnerName,
-            ListingOwnerAvatarUrl = listingOwnerAvatarUrl,
-            RequesterAvatarUrl = requesterAvatarUrl,
+            RequesterName = requester?.FullName ?? string.Empty,
+            ListingOwnerName = owner?.FullName ?? string.Empty,
+            ListingOwnerAvatarUrl = owner?.AvatarUrl,
+            RequesterAvatarUrl = requester?.AvatarUrl,
             OfferedItems = offeredItemDtos,
             Status = tradeRequest.Status,
             RequestedAt = tradeRequest.RequestedAt,
@@ -1228,10 +1236,8 @@ public class TradingService : ITradingService
             OwnerLocked = tradeRequest.OwnerLocked,
             RequesterLocked = tradeRequest.RequesterLocked,
             LockedAt = tradeRequest.LockedAt,
-            TimeRemaining = timeRemaining // Gán giá trị tính toán được
+            TimeRemaining = timeRemaining
         };
-
-        return dto;
     }
 
     #endregion
@@ -1317,7 +1323,7 @@ public class TradingService : ITradingService
             ListingItemName = tradeHistory.Listing.InventoryItem?.Product?.Name ?? "Unknown",
             ListingItemImage = tradeHistory.Listing?.InventoryItem?.Product?.ImageUrls?.FirstOrDefault() ?? "",
             RequesterId = tradeHistory.RequesterId,
-            RequesterName = tradeHistory.Requester.FullName ?? tradeHistory.Requester?.FullName ?? "Unknown",
+            RequesterName = tradeHistory.Requester.FullName ?? tradeHistory.Requester.FullName ?? "Unknown",
 
             // Giữ nguyên offered item logic
             OfferedInventoryId = tradeHistory.OfferedInventoryId,
