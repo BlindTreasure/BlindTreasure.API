@@ -13,6 +13,5 @@ public class CartItemDto
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public DateTime CreatedAt { get; set; }
-    public int AvailableStock { get; set; }    // số lượng còn lại trong kho
-
+    public int AvailableStock { get; set; } // số lượng còn lại trong kho
 }

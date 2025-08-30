@@ -71,8 +71,8 @@ public class CartItemService : ICartItemService
                 CreatedAt = c.CreatedAt,
 
                 AvailableStock = c.ProductId.HasValue
-                    ? (c.Product?.AvailableToSell ?? 0)
-                    : (c.BlindBox?.TotalQuantity ?? 0)
+                    ? c.Product?.AvailableToSell ?? 0
+                    : c.BlindBox?.TotalQuantity ?? 0
             }).ToList();
 
             sellerItems.Add(new CartSellerItemDto

@@ -1223,7 +1223,7 @@ public class SystemController : ControllerBase
                 Phone = "0900000001",
                 Status = UserStatus.Active,
                 RoleName = RoleType.Seller,
-                CreatedAt = now,    
+                CreatedAt = now,
                 AvatarUrl = defaultAvatar
             }
         };
@@ -1967,7 +1967,8 @@ public class SystemController : ControllerBase
             SellerId = seller.Id,
             CategoryId = category.Id,
             Name = "HACIPUPU Snuggle With You Series Figures",
-            Description = "Hacipupu Snuggle With You mang đến cảm giác ấm áp và dễ thương qua từng thiết kế. Mô hình phiên bản giới hạn với màu sắc pastel nhẹ nhàng, phù hợp sưu tầm hoặc làm quà tặng. Sản phẩm chính hãng, full box – nguyên seal, hiện có tại BlindTreasure với mức giá cực kỳ ưu đãi.",
+            Description =
+                "Hacipupu Snuggle With You mang đến cảm giác ấm áp và dễ thương qua từng thiết kế. Mô hình phiên bản giới hạn với màu sắc pastel nhẹ nhàng, phù hợp sưu tầm hoặc làm quà tặng. Sản phẩm chính hãng, full box – nguyên seal, hiện có tại BlindTreasure với mức giá cực kỳ ưu đãi.",
             Price = 330000,
             TotalQuantity = 5,
             HasSecretItem = true,

@@ -21,13 +21,28 @@ public class TradingController : ControllerBase
         _tradingService = tradingService;
     }
 
-
+    /// <summary>
+    /// Lấy danh sách tất cả trade requests trong hệ thống.
+    /// </summary>
+    /// <param name="param">
+    /// Tham số phân trang, bao gồm: PageIndex, PageSize, Desc (sắp xếp giảm dần).
+    /// </param>
+    /// <param name="onlyActive">
+    /// Nếu = true: chỉ lấy các trade request còn đang đếm ngược (TimeRemaining != 0).  
+    /// Nếu = false (mặc định): lấy tất cả trade request.
+    /// </param>
+    /// <returns>
+    /// Trả về danh sách trade requests có phân trang kèm theo thông tin tổng số bản ghi, trang hiện tại, và tổng số trang.
+    /// </returns>
     [HttpGet("trade-requests")]
-    public async Task<IActionResult> GetAllTradeRequests([FromQuery] PaginationParameter param)
+    public async Task<IActionResult> GetAllTradeRequests(
+        [FromQuery] PaginationParameter param,
+        [FromQuery] bool onlyActive = false) // ✅ thêm query param
     {
         try
         {
-            var result = await _tradingService.GetAllTradeRequests(param);
+            var result = await _tradingService.GetAllTradeRequests(param, onlyActive);
+
             return Ok(ApiResult<object>.Success(new
                 {
                     result,
@@ -45,6 +60,7 @@ public class TradingController : ControllerBase
             return StatusCode(statusCode, error);
         }
     }
+
 
     [HttpGet("histories")]
     public async Task<IActionResult> GetAllListings([FromQuery] TradeHistoryQueryParameter param,

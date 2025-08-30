@@ -36,7 +36,8 @@ public class TradingService : ITradingService
         _notificationHub = notificationHub;
     }
 
-    public async Task<Pagination<TradeRequestDto>> GetAllTradeRequests(PaginationParameter param)
+    public async Task<Pagination<TradeRequestDto>> GetAllTradeRequests(PaginationParameter param,
+        bool onlyActive = false)
     {
         var query = _unitOfWork.TradeRequests.GetQueryable()
             .Include(tr => tr.Listing)
@@ -48,6 +49,9 @@ public class TradingService : ITradingService
             .ThenInclude(oi => oi.InventoryItem)
             .ThenInclude(ii => ii.Product) // load offered item product
             .Where(tr => !tr.IsDeleted);
+
+        // ✅ Nếu chỉ muốn lấy các trade request còn đang đếm ngược
+        if (onlyActive) query = query.Where(tr => tr.TimeRemaining != 0);
 
         // Sắp xếp theo RequestedAt
         query = param.Desc
@@ -66,7 +70,6 @@ public class TradingService : ITradingService
 
         foreach (var tr in tradeRequests)
         {
-            // Lấy offered items trực tiếp từ navigation đã include
             var offeredInventoryItems = tr.OfferedItems?
                 .Select(oi => oi.InventoryItem)
                 .Where(ii => ii != null)
@@ -81,7 +84,8 @@ public class TradingService : ITradingService
 
     public async Task<TradeRequestDto> ForceTimeoutTradeRequestAsync(Guid tradeRequestId)
     {
-        _logger.Warn($"[ForceTimeoutTradeRequestAsync] Admin forcing timeout for TradeRequest {tradeRequestId}");
+        _logger.Warn(
+            $"[ForceTimeoutTradeRequestAsync] Admin đang ép buộc hết hạn cho yêu cầu trao đổi {tradeRequestId}");
 
         var tradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequestId,
             t => t.Listing,
@@ -89,10 +93,10 @@ public class TradingService : ITradingService
             t => t.Listing!.InventoryItem.Product!);
 
         if (tradeRequest == null)
-            throw ErrorHelper.NotFound("Trade request not found.");
+            throw ErrorHelper.NotFound("Yêu cầu trao đổi không tồn tại.");
 
         if (tradeRequest.Status != TradeRequestStatus.ACCEPTED)
-            throw ErrorHelper.BadRequest("Only accepted trade requests can be forced to timeout.");
+            throw ErrorHelper.BadRequest("Chỉ có thể ép buộc hết hạn các yêu cầu trao đổi đã được chấp nhận.");
 
         // Reset giống cronjob khi timeout
         tradeRequest.Status = TradeRequestStatus.PENDING;
@@ -120,8 +124,8 @@ public class TradingService : ITradingService
                 tradeRequest.RequesterId,
                 new NotificationDto
                 {
-                    Title = "Trade expired (forced)",
-                    Message = "Admin has forced this trade to expire for testing.",
+                    Title = "Yêu cầu trao đổi đã hết hạn (ép buộc)",
+                    Message = "Quản trị viên đã ép buộc yêu cầu trao đổi này hết hạn để kiểm tra hệ thống.",
                     Type = NotificationType.Trading
                 });
             if (listingItem != null)
@@ -129,8 +133,8 @@ public class TradingService : ITradingService
                     listingItem.UserId,
                     new NotificationDto
                     {
-                        Title = "Trade expired (forced)",
-                        Message = "Admin has forced this trade to expire for testing.",
+                        Title = "Yêu cầu trao đổi đã hết hạn (ép buộc)",
+                        Message = "Quản trị viên đã ép buộc yêu cầu trao đổi này hết hạn để kiểm tra hệ thống.",
                         Type = NotificationType.Trading
                     });
         }
@@ -1183,21 +1187,15 @@ public class TradingService : ITradingService
         var listingProduct = listingItem?.Product;
 
         if (listingItem == null || listingProduct == null)
-        {
             _logger.Warn($"[MapTradeRequestToDto] Listing {tradeRequest.ListingId} thiếu InventoryItem/Product");
-        }
 
         var requester = tradeRequest.Requester;
         if (requester == null)
-        {
             _logger.Warn($"[MapTradeRequestToDto] Requester {tradeRequest.RequesterId} chưa được load");
-        }
 
         var owner = listingItem?.User;
         if (owner == null)
-        {
             _logger.Warn($"[MapTradeRequestToDto] Owner của Listing {tradeRequest.ListingId} chưa được load");
-        }
 
         var offeredItemDtos = offeredItems.Select(item => new OfferedItemDto
         {

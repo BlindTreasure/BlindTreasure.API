@@ -9,7 +9,7 @@ public class OrderDetailInventoryItemShipmentLog : BaseEntity
 
     public Guid? InventoryItemId { get; set; }
     public InventoryItem? InventoryItem { get; set; }
-    
+
     public Guid? ShipmentId { get; set; }
     //public Shipment? Shipment { get; set; }
 

@@ -33,18 +33,19 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<OrderDetailInventoryItemShipmentLog> LogOrderDetailCreationAsync(OrderDetail orderDetail, string? msg)
+    public async Task<OrderDetailInventoryItemShipmentLog> LogOrderDetailCreationAsync(OrderDetail orderDetail,
+        string? msg)
     {
         var itemType = orderDetail.ProductId.HasValue ? "sản phẩm" : "blindbox";
         var logContent = msg ?? $"Tạo chi tiết đơn hàng cho {itemType}";
 
         var log = CreateBaseLog(
-            orderDetailId: orderDetail.Id,
-            actionType: ActionType.ORDER_DETAIL_CREATED,
-            logContent: logContent,
-            oldValue: null,
-            newValue: orderDetail.Status.ToString(),
-            valueStatusType: Domain.Entities.ValueType.ORDER_DETAIL
+            orderDetail.Id,
+            ActionType.ORDER_DETAIL_CREATED,
+            logContent,
+            null,
+            orderDetail.Status.ToString(),
+            Domain.Entities.ValueType.ORDER_DETAIL
         );
 
         return await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
@@ -58,12 +59,12 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
         var logContent = msg ?? $"Thêm vận chuyển: {shipment.Id} cho chi tiết đơn hàng này";
 
         var log = CreateBaseLog(
-            orderDetailId: orderDetail.Id,
-            actionType: ActionType.SHIPMENT_ADDED,
-            logContent: logContent,
-            oldValue: null,
-            newValue: shipment.Status.ToString(),
-            valueStatusType: Domain.Entities.ValueType.SHIPMENT
+            orderDetail.Id,
+            ActionType.SHIPMENT_ADDED,
+            logContent,
+            null,
+            shipment.Status.ToString(),
+            Domain.Entities.ValueType.SHIPMENT
         );
 
         return await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
@@ -75,15 +76,16 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
         Shipment shipmentNewStatus,
         string? msg)
     {
-        var logContent = msg ?? $"Vận chuyển thay đổi: {shipmentNewStatus.Id} cho chi tiết đơn hàng này, từ {oldStatus} sang {shipmentNewStatus.Status}";
+        var logContent = msg ??
+                         $"Vận chuyển thay đổi: {shipmentNewStatus.Id} cho chi tiết đơn hàng này, từ {oldStatus} sang {shipmentNewStatus.Status}";
 
         var log = CreateBaseLog(
-            orderDetailId: orderDetail.Id,
-            actionType: ActionType.SHIPMENT_ADDED,
-            logContent: logContent,
-            oldValue: oldStatus.ToString(),
-            newValue: shipmentNewStatus.Status.ToString(),
-            valueStatusType: Domain.Entities.ValueType.SHIPMENT
+            orderDetail.Id,
+            ActionType.SHIPMENT_ADDED,
+            logContent,
+            oldStatus.ToString(),
+            shipmentNewStatus.Status.ToString(),
+            Domain.Entities.ValueType.SHIPMENT
         );
 
         return await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
@@ -98,12 +100,12 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
         var logContent = msg ?? $"Cập nhật trạng thái chi tiết đơn hàng, chuyển sang: {newStatus}";
 
         var log = CreateBaseLog(
-            orderDetailId: orderDetail.Id,
-            actionType: ActionType.ORDER_DETAIL_STATUS_CHANGED,
-            logContent: logContent,
-            oldValue: oldStatus.ToString(),
-            newValue: newStatus.ToString(),
-            valueStatusType: Domain.Entities.ValueType.ORDER_DETAIL
+            orderDetail.Id,
+            ActionType.ORDER_DETAIL_STATUS_CHANGED,
+            logContent,
+            oldStatus.ToString(),
+            newStatus.ToString(),
+            Domain.Entities.ValueType.ORDER_DETAIL
         );
 
         return await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
@@ -119,7 +121,9 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
         {
             var isInventoryItem = inventoryItem != null;
             var actionType = isInventoryItem ? ActionType.INVENTORY_ITEM_ADDED : ActionType.BLIND_BOX_ADDED;
-            var valueType = isInventoryItem ? Domain.Entities.ValueType.INVENTORY_ITEM : Domain.Entities.ValueType.CUSTOM_BLINDBOX;
+            var valueType = isInventoryItem
+                ? Domain.Entities.ValueType.INVENTORY_ITEM
+                : Domain.Entities.ValueType.CUSTOM_BLINDBOX;
 
             var logContent = msg ?? (isInventoryItem
                 ? $"Tạo item kho: {inventoryItem.Id}"
@@ -129,23 +133,23 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
 
             // Create order detail log
             var orderDetailLog = CreateBaseLog(
-                orderDetailId: orderDetail.Id,
-                actionType: actionType,
-                logContent: logContent,
-                oldValue: null,
-                newValue: newValue,
-                valueStatusType: valueType
+                orderDetail.Id,
+                actionType,
+                logContent,
+                null,
+                newValue,
+                valueType
             );
 
             // Create inventory item log with InventoryItemId
             var inventoryItemLog = CreateBaseLog(
-                orderDetailId: orderDetail.Id,
-                actionType: actionType,
-                logContent: logContent,
-                oldValue: null,
-                newValue: newValue,
-                valueStatusType: valueType,
-                inventoryItemId: inventoryItem?.Id
+                orderDetail.Id,
+                actionType,
+                logContent,
+                null,
+                newValue,
+                valueType,
+                inventoryItem?.Id
             );
 
             var result = await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(orderDetailLog);
@@ -168,18 +172,19 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
     {
         if (orderDetail == null)
         {
-            _logger.Warn("Chi tiết đơn hàng không liên kết với bất kỳ item kho nào. Không thể ghi log cập nhật tracking.");
+            _logger.Warn(
+                "Chi tiết đơn hàng không liên kết với bất kỳ item kho nào. Không thể ghi log cập nhật tracking.");
             return null!;
         }
 
         var log = CreateBaseLog(
-            orderDetailId: orderDetail.Id,
-            actionType: ActionType.SHIPMENT_STATUS_CHANGED,
-            logContent: trackingMessage,
-            oldValue: oldStatus.ToString(),
-            newValue: inventoryItemWithNewStatus.Status.ToString(),
-            valueStatusType: Domain.Entities.ValueType.INVENTORY_ITEM,
-            inventoryItemId: inventoryItemWithNewStatus.Id
+            orderDetail.Id,
+            ActionType.SHIPMENT_STATUS_CHANGED,
+            trackingMessage,
+            oldStatus.ToString(),
+            inventoryItemWithNewStatus.Status.ToString(),
+            Domain.Entities.ValueType.INVENTORY_ITEM,
+            inventoryItemWithNewStatus.Id
         );
 
         log.LogTime = DateTime.UtcNow;
@@ -300,19 +305,23 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
         switch (newStatus)
         {
             case ShipmentStatus.PROCESSING:
-                message.Append($" | Đã yêu cầu vận chuyển. Lịch lấy hàng dự kiến: {shipment.EstimatedPickupTime:yyyy-MM-dd HH:mm} tại {seller?.CompanyAddress}.");
+                message.Append(
+                    $" | Đã yêu cầu vận chuyển. Lịch lấy hàng dự kiến: {shipment.EstimatedPickupTime:yyyy-MM-dd HH:mm} tại {seller?.CompanyAddress}.");
                 break;
 
             case ShipmentStatus.PICKED_UP:
-                message.Append($" | Đã lấy hàng từ seller tại {seller?.CompanyAddress}. Ngày giao dự kiến: {shipment.EstimatedDelivery:yyyy-MM-dd}.");
+                message.Append(
+                    $" | Đã lấy hàng từ seller tại {seller?.CompanyAddress}. Ngày giao dự kiến: {shipment.EstimatedDelivery:yyyy-MM-dd}.");
                 break;
 
             case ShipmentStatus.IN_TRANSIT:
-                message.Append($" | Đang vận chuyển bởi GHN, ngày giao dự kiến: {shipment.EstimatedDelivery:yyyy-MM-dd}.");
+                message.Append(
+                    $" | Đang vận chuyển bởi GHN, ngày giao dự kiến: {shipment.EstimatedDelivery:yyyy-MM-dd}.");
                 break;
 
             case ShipmentStatus.DELIVERED:
-                message.Append($" | Đã giao cho khách tại {customerAddress?.AddressLine} vào lúc {DateTime.UtcNow:yyyy-MM-dd HH:mm}.");
+                message.Append(
+                    $" | Đã giao cho khách tại {customerAddress?.AddressLine} vào lúc {DateTime.UtcNow:yyyy-MM-dd HH:mm}.");
                 break;
 
             default:
@@ -348,9 +357,9 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
         // Check if log already exists for this shipment status
         var existingLog = await _unitOfWork.OrderDetailInventoryItemLogs.GetQueryable()
             .Where(l => l.ShipmentId == shipment.Id &&
-                       l.NewValue == newStatus.ToString() &&
-                       l.OrderDetailId == null &&
-                       l.InventoryItemId == null)
+                        l.NewValue == newStatus.ToString() &&
+                        l.OrderDetailId == null &&
+                        l.InventoryItemId == null)
             .FirstOrDefaultAsync();
 
         if (existingLog != null)

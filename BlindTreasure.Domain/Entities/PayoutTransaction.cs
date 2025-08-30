@@ -15,7 +15,7 @@ public class PayoutTransaction : BaseEntity
     // Seller info (denormalized for quick access)
     public Guid SellerId { get; set; }
     public string SellerName { get; set; }
-   // public Seller? Seller { get; set; }
+    // public Seller? Seller { get; set; }
 
     // Stripe info
     public string StripeTransferId { get; set; }

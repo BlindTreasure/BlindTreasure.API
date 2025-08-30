@@ -74,7 +74,7 @@ public class AdminController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách inventory đang OnHold thành công."));
+            }, "200", "Danh sách các vật phẩm đang được giữ đã được lấy thành công."));
         }
         catch (Exception ex)
         {
@@ -98,7 +98,7 @@ public class AdminController : ControllerBase
         {
             var result = await _inventoryItemService.ForceReleaseHeldItemAsync(inventoryItemId);
             return Ok(ApiResult<InventoryItemDto>.Success(result, "200",
-                "Item đã được force release khỏi trạng thái OnHold."));
+                "Vật phẩm đã được giải phóng khỏi trạng thái giữ thành công."));
         }
         catch (Exception ex)
         {
@@ -120,7 +120,8 @@ public class AdminController : ControllerBase
         try
         {
             var result = await _tradingService.ForceTimeoutTradeRequestAsync(tradeRequestId);
-            return Ok(ApiResult<TradeRequestDto>.Success(result, "200", "Trade request has been forced to timeout."));
+            return Ok(ApiResult<TradeRequestDto>.Success(result, "200",
+                "Yêu cầu trao đổi đã được ép buộc hết hạn thành công."));
         }
         catch (Exception ex)
         {
@@ -147,7 +148,7 @@ public class AdminController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách user thành công."));
+            }, "200", "Danh sách người dùng đã được lấy thành công."));
         }
         catch (Exception ex)
         {
@@ -172,7 +173,7 @@ public class AdminController : ControllerBase
             if (result == null)
                 return BadRequest(ApiResult<UserDto>.Failure("400", "Email đã tồn tại hoặc dữ liệu không hợp lệ."));
 
-            return Ok(ApiResult<UserDto>.Success(result, "200", "Tạo user thành công."));
+            return Ok(ApiResult<UserDto>.Success(result, "200", "Người dùng mới đã được tạo thành công."));
         }
         catch (Exception ex)
         {
@@ -194,7 +195,7 @@ public class AdminController : ControllerBase
             var result = await _userService.UpdateUserStatusAsync(userId, dto.Status, dto.Reason);
             if (result == null)
                 return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
-            return Ok(ApiResult<UserDto>.Success(result, "200", "Cập nhật trạng thái user thành công."));
+            return Ok(ApiResult<UserDto>.Success(result, "200", "Admin đã thay đổi trạng thái thành công."));
         }
         catch (Exception ex)
         {
@@ -218,7 +219,8 @@ public class AdminController : ControllerBase
             if (result == null)
                 return NotFound(ApiResult<UserDto>.Failure("404", "Không tìm thấy user."));
 
-            return Ok(ApiResult<UserDto>.Success(result, "200", "Lấy thông tin user thành công."));
+            return Ok(ApiResult<UserDto>.Success(result, "200",
+                "Thông tin chi tiết của người dùng đã được lấy thành công."));
         }
         catch (Exception ex)
         {
@@ -242,7 +244,7 @@ public class AdminController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách đơn hàng thành công."));
+            }, "200", "Danh sách đơn hàng đã được lấy thành công."));
         }
         catch (Exception ex)
         {
@@ -266,7 +268,7 @@ public class AdminController : ControllerBase
                 pageSize = param.PageSize,
                 currentPage = param.PageIndex,
                 totalPages = (int)Math.Ceiling((double)result.Count / param.PageSize)
-            }, "200", "Lấy danh sách payouts thành công."));
+            }, "200", "Danh sách thanh toán đã được lấy thành công."));
         }
         catch (Exception ex)
         {
@@ -289,7 +291,7 @@ public class AdminController : ControllerBase
                 return BadRequest(ApiResult<object>.Failure("400", "Payout confirmation failed."));
 
             return Ok(ApiResult<PayoutDetailResponseDto>.Success(result, "200",
-                "Payout confirmed and completed successfully."));
+                "Thanh toán đã được xác nhận và hoàn tất thành công."));
         }
         catch (Exception ex)
         {
@@ -318,7 +320,7 @@ public class AdminController : ControllerBase
                 pageSize = result.PageSize,
                 currentPage = result.CurrentPage,
                 totalPages = result.TotalPages
-            }, "200", "Lấy danh sách giao dịch payout thành công."));
+            }, "200", "Danh sách giao dịch thanh toán đã được lấy thành công."));
         }
         catch (Exception ex)
         {
@@ -344,7 +346,8 @@ public class AdminController : ControllerBase
             if (result == null)
                 return NotFound(ApiResult<PayoutTransactionDto>.Failure("404", "Không tìm thấy giao dịch payout."));
 
-            return Ok(ApiResult<PayoutTransactionDto>.Success(result, "200", "Lấy chi tiết giao dịch payout thành công."));
+            return Ok(ApiResult<PayoutTransactionDto>.Success(result, "200",
+                "Chi tiết giao dịch thanh toán đã được lấy thành công."));
         }
         catch (Exception ex)
         {

@@ -17,7 +17,8 @@ public class ShipmentController : ControllerBase
     private readonly ILoggerService _logger;
     private readonly IOrderDetailInventoryItemShipmentLogService _shipmentLogs;
 
-    public ShipmentController(IShipmentService shipmentService, ILoggerService logger, IOrderDetailInventoryItemShipmentLogService shipmentLogs )
+    public ShipmentController(IShipmentService shipmentService, ILoggerService logger,
+        IOrderDetailInventoryItemShipmentLogService shipmentLogs)
     {
         _shipmentService = shipmentService;
         _logger = logger;
