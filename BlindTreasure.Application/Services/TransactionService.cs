@@ -266,24 +266,15 @@ public class TransactionService : ITransactionService
             await _emailService.SendOrderPaymentSuccessToBuyerAsync(order);
 
             // Notify user (buyer)
-            if (order.User != null)
-                await _notificationService.PushNotificationToUser(order.UserId, new NotificationDto
-                {
-                    Title = $"Thanh toán thành công đơn hàng #{order.Id}",
-                    Message =
-                        "Đơn hàng của bạn đã được xác nhận. Nếu có giao hàng, hệ thống sẽ tiến hành xử lý vận chuyển.",
-                    Type = NotificationType.Order,
-                    SourceUrl = null
-                });
-
             // Notify seller
             if (order.Seller?.User != null)
             {
                 var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
-                var sellerMsg = $@"
-                    Sản phẩm của bạn vừa được khách hàng <b>{buyerName}</b> thanh toán thành công.<br/>
-                    Đơn hàng #{order.Id} - Tổng tiền: <b>{order.FinalAmount:N0}đ</b>.<br/>
-                    Vui lòng kiểm tra trạng thái đơn hàng và chuẩn bị giao hàng nếu có.";
+                var sellerMsg =
+                    $"Sản phẩm của bạn vừa được khách hàng {buyerName} thanh toán thành công.\n" +
+                    $"Đơn hàng #{order.Id} - Tổng tiền: {order.FinalAmount:N0}đ.\n" +
+                    $"Vui lòng kiểm tra trạng thái đơn hàng và chuẩn bị giao hàng nếu có.";
+
                 await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
                 {
                     Title = "Đơn hàng mới đã được thanh toán",
@@ -292,6 +283,7 @@ public class TransactionService : ITransactionService
                     SourceUrl = null
                 });
             }
+
 
             _logger.Success($"[HandleSuccessfulPaymentAsync] Đã xác nhận thanh toán thành công cho order {orderId}.");
             _logger.Success($"[HandleSuccessfulPaymentAsync] Đã cập nhật trạng thái PAID thành công cho {orderId}.");

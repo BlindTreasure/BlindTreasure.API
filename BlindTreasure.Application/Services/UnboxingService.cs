@@ -82,15 +82,15 @@ public class UnboxingService : IUnboxingService
             CustomerBlindBoxId = customerBox.Id,
             UserId = userId,
             ProductId = selectedItem.ProductId,
-            ProductName = selectedItem.Product?.Name ?? "",
-            Rarity = selectedItem.RarityConfig?.Name ?? RarityName.Common,
+            ProductName = selectedItem.Product.Name,
+            Rarity = selectedItem.RarityConfig.Name,
             DropRate = selectedItem.DropRate,
             RollValue = roll,
             ProbabilityTableJson = JsonSerializer.Serialize(probabilityMap.Select(p => new
             {
                 p.Key.ProductId,
-                ProductName = p.Key.Product?.Name,
-                Rarity = p.Key.RarityConfig?.Name,
+                ProductName = p.Key.Product.Name,
+                Rarity = p.Key.RarityConfig.Name,
                 DropRate = p.Value
             })),
             UnboxedAt = now,
@@ -108,8 +108,8 @@ public class UnboxingService : IUnboxingService
             CustomerBlindBoxId = customerBox.Id,
             CustomerName = (await _unitOfWork.Users.GetByIdAsync(userId))?.FullName ?? "Anonymous",
             ProductId = selectedItem.ProductId,
-            ProductName = selectedItem.Product?.Name ?? "Unknown",
-            Rarity = selectedItem.RarityConfig?.Name ?? RarityName.Common,
+            ProductName = selectedItem.Product.Name,
+            Rarity = selectedItem.RarityConfig.Name,
             DropRate = selectedItem.DropRate,
             UnboxedAt = now,
             BlindBoxName = blindBox?.Name ?? "Unknown"
@@ -122,9 +122,9 @@ public class UnboxingService : IUnboxingService
         return new UnboxResultDto
         {
             ProductId = selectedItem.ProductId,
-            Rarity = selectedItem.RarityConfig?.Name,
+            Rarity = selectedItem.RarityConfig.Name,
             DropRate = selectedItem.DropRate,
-            Weight = selectedItem.RarityConfig?.Weight ?? 0,
+            Weight = selectedItem.RarityConfig.Weight,
             UnboxedAt = now
         };
     }
@@ -401,8 +401,8 @@ public class UnboxingService : IUnboxingService
             var end = start + kvp.Value;
             cumulative = end;
 
-            var itemName = kvp.Key.Product?.Name ?? "NULL";
-            var rarity = GetRarityBadge(kvp.Key.RarityConfig?.Name.ToString());
+            var itemName = kvp.Key.Product.Name;
+            var rarity = GetRarityBadge(kvp.Key.RarityConfig.Name.ToString());
             var dropRate = Math.Round(kvp.Value, 4);
             var range = $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
 
@@ -425,9 +425,9 @@ public class UnboxingService : IUnboxingService
         sb.AppendLine();
         sb.AppendLine("### Chi Tiết Sản Phẩm Được Chọn");
         sb.AppendLine();
-        sb.AppendLine($"- **Product Name:** {selectedItem.Product?.Name ?? "NULL"}");
+        sb.AppendLine($"- **Product Name:** {selectedItem.Product.Name}");
         sb.AppendLine($"- **Configured Drop Rate:** {Math.Round(selectedItem.DropRate, 4)}%");
-        sb.AppendLine($"- **Rarity Level:** {GetRarityBadge(selectedItem.RarityConfig?.Name.ToString())}");
+        sb.AppendLine($"- **Rarity Level:** {GetRarityBadge(selectedItem.RarityConfig.Name.ToString())}");
         sb.AppendLine($"- **Roll Hit Range:** {GetHitRange(probabilities, selectedItem)}");
         sb.AppendLine();
 
@@ -584,16 +584,11 @@ public class UnboxingService : IUnboxingService
 
     /// <summary>
     ///     Cập nhật DropRate cho tất cả item trong BlindBox sau khi stock thay đổi
-    /// </summary>
-    /// <summary>
-    ///     Cập nhật DropRate cho tất cả item trong BlindBox sau khi stock thay đổi
     ///     - Nếu có item Common hết hàng => disable box + gửi email cho Seller
     ///     - Nếu còn stock => tính toán lại DropRate dựa trên Quantity và Weight
     /// </summary>
     private async Task UpdateDropRatesAfterUnboxingAsync(BlindBox blindBox)
     {
-        if (blindBox == null) return;
-
         // 1. Load toàn bộ items trong box (bao gồm RarityConfig + Product để log)
         var items = await _unitOfWork.BlindBoxItems.GetQueryable()
             .Include(i => i.RarityConfig)
@@ -605,8 +600,7 @@ public class UnboxingService : IUnboxingService
             return;
 
         // 2. Check rule: nếu có item Common mà hết hàng (Quantity == 0) → disable box
-        var commonItem = items.FirstOrDefault(i => i.RarityConfig != null
-                                                   && i.RarityConfig.Name == RarityName.Common
+        var commonItem = items.FirstOrDefault(i => i.RarityConfig.Name == RarityName.Common
                                                    && i.Quantity == 0);
         if (commonItem != null)
         {
@@ -615,33 +609,17 @@ public class UnboxingService : IUnboxingService
             await _unitOfWork.SaveChangesAsync();
 
             // invalidate cache blindbox (detail + lists) để frontend cập nhật trạng thái
-            try
-            {
-                await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Error(
-                    $"[UpdateDropRatesAfterUnboxingAsync] Không thể invalidate cache BlindBox {blindBox.Id}: {ex.Message}");
-            }
+            await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
 
             // Gửi email thông báo cho seller
-            try
-            {
-                var sellerUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
-                if (sellerUser != null)
-                    await _emailService.SendCommonItemOutOfStockAsync(
-                        sellerUser.Email,
-                        sellerUser.FullName ?? sellerUser.Email,
-                        blindBox.Name,
-                        commonItem.Product?.Name ?? "Unknown Product"
-                    );
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Error(
-                    $"[UpdateDropRatesAfterUnboxingAsync] Lỗi khi gửi email out-of-stock BlindBox {blindBox.Id}: {ex.Message}");
-            }
+            var sellerUser = blindBox.Seller?.User;
+            if (sellerUser != null)
+                await _emailService.SendCommonItemOutOfStockAsync(
+                    sellerUser.Email,
+                    sellerUser.FullName ?? sellerUser.Email,
+                    blindBox.Name,
+                    commonItem.Product?.Name ?? "Unknown Product"
+                );
 
             _loggerService.Warn(
                 $"[DropRate] BlindBox {blindBox.Id} bị disabled vì Common '{commonItem.Product?.Name}' hết hàng.");
@@ -664,18 +642,8 @@ public class UnboxingService : IUnboxingService
             Weight = i.RarityConfig?.Weight ?? 1
         }).ToList();
 
-        Dictionary<BlindBoxItemRequestDto, decimal> dropRates;
-        try
-        {
-            // 5. Gọi BlindBoxService.CalculateDropRates để tính toán lại drop rates
-            dropRates = _blindBoxService.CalculateDropRates(dtoItems);
-        }
-        catch (Exception ex)
-        {
-            _loggerService.Error(
-                $"[UpdateDropRatesAfterUnboxingAsync] CalculateDropRates thất bại cho BlindBox {blindBox.Id}: {ex.Message}");
-            return; // giữ an toàn: không cập nhật nếu tính toán lỗi
-        }
+        // 5. Gọi BlindBoxService.CalculateDropRates để tính toán lại drop rates
+        var dropRates = _blindBoxService.CalculateDropRates(dtoItems);
 
         // 6. Map kết quả DropRate mới vào các BlindBoxItem trong DB
         foreach (var kvp in dropRates)
@@ -694,15 +662,7 @@ public class UnboxingService : IUnboxingService
         await _unitOfWork.SaveChangesAsync();
 
         // 7. Invalidate cache blindbox để client lấy về tỷ lệ mới
-        try
-        {
-            await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
-        }
-        catch (Exception ex)
-        {
-            _loggerService.Error(
-                $"[UpdateDropRatesAfterUnboxingAsync] Không thể invalidate cache BlindBox {blindBox.Id}: {ex.Message}");
-        }
+        await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
 
         // 8. Log DropRate sau khi cập nhật
         var sbAfter = new StringBuilder();
@@ -713,69 +673,52 @@ public class UnboxingService : IUnboxingService
         _loggerService.Info(sbAfter.ToString());
     }
 
+
+    /// <summary>
+    ///     Thông báo khi một item trong BlindBox hết hàng
+    ///     - Đổi trạng thái BlindBox sang PendingApproval
+    ///     - Gửi notification và email cho Seller
+    /// </summary>
     private async Task NotifyOutOfStockAsync(BlindBox blindBox, BlindBoxItem item)
     {
-        if (blindBox == null || item == null) return;
-
+        // 1. Cập nhật trạng thái BlindBox
         blindBox.Status = BlindBoxStatus.PendingApproval;
         await _unitOfWork.BlindBoxes.Update(blindBox);
 
-        // Persist status change ngay lập tức
+        // 2. Lưu thay đổi ngay lập tức
         await _unitOfWork.SaveChangesAsync();
 
-        // Invalidate cache để đảm bảo frontend / api client không hiển thị hộp cũ
-        try
-        {
-            await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
-        }
-        catch (Exception ex)
-        {
-            _loggerService.Error(
-                $"[NotifyOutOfStockAsync] Không thể invalidate cache BlindBox {blindBox.Id}: {ex.Message}");
-        }
+        // 3. Invalidate cache để đảm bảo frontend / api client không hiển thị hộp cũ
+        await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
 
-        // Push notification cho seller nếu có
-        try
+        // 4. Gửi thông báo cho Seller
+        var sellerUser = blindBox.Seller?.User;
+        if (sellerUser != null)
         {
-            var sellerUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == blindBox.Seller.UserId);
-            if (sellerUser != null)
-            {
-                await _notificationService.PushNotificationToUser(
-                    sellerUser.Id,
-                    new NotificationDto
-                    {
-                        Title = $"Item hết hàng trong {blindBox.Name}",
-                        Message = $"Sản phẩm '{item.Product?.Name ?? "Unknown"}' trong blind box đã hết số lượng.",
-                        Type = NotificationType.System
-                    }
-                );
+            // Push notification
+            await _notificationService.PushNotificationToUser(
+                sellerUser.Id,
+                new NotificationDto
+                {
+                    Title = $"Item hết hàng trong {blindBox.Name}",
+                    Message = $"Sản phẩm '{item.Product?.Name ?? "Unknown"}' trong blind box đã hết số lượng.",
+                    Type = NotificationType.System
+                }
+            );
 
-                // Thông báo qua email (nếu cần)
-                try
-                {
-                    await _emailService.SendCommonItemOutOfStockAsync(
-                        sellerUser.Email,
-                        sellerUser.FullName ?? sellerUser.Email,
-                        blindBox.Name,
-                        item.Product?.Name ?? "Unknown"
-                    );
-                }
-                catch (Exception exEmail)
-                {
-                    _loggerService.Error(
-                        $"[NotifyOutOfStockAsync] Lỗi gửi email out-of-stock BlindBox {blindBox.Id}: {exEmail.Message}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _loggerService.Error(
-                $"[NotifyOutOfStockAsync] Lỗi khi notify seller cho BlindBox {blindBox.Id}: {ex.Message}");
+            // Gửi email
+            await _emailService.SendCommonItemOutOfStockAsync(
+                sellerUser.Email,
+                sellerUser.FullName ?? sellerUser.Email,
+                blindBox.Name,
+                item.Product?.Name ?? "Unknown"
+            );
         }
 
         _loggerService.Info(
             $"[NotifyOutOfStockAsync] BlindBox {blindBox.Id} marked as Rejected because item {item.Id} ({item.Product?.Name}) is out of stock.");
     }
+
 
     private (BlindBoxItem? Item, decimal Roll, Dictionary<BlindBoxItem, decimal> Probabilities)
         GetRandomItemByProbability(List<BlindBoxItem> items, DateTime now)
