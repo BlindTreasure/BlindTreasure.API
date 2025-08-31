@@ -5,17 +5,13 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Services;
 
 public class AdminDashboardService : IAdminDashboardService
 {
-    private readonly IUnitOfWork _unitOfWork;
     private readonly ILoggerService _loggerService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AdminDashboardService(IUnitOfWork unitOfWork, ILoggerService loggerService)
     {

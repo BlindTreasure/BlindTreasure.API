@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
@@ -8,18 +10,15 @@ using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace BlindTreasure.Application.Services;
 
 public class ReviewService : IReviewService
 {
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ILoggerService _loggerService;
-    private readonly IClaimsService _claimService;
     private readonly IBlobService _blobService;
+    private readonly IClaimsService _claimService;
+    private readonly ILoggerService _loggerService;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IAdminService _userService;
 
     public ReviewService(IUnitOfWork unitOfWork, ILoggerService loggerService,
@@ -103,36 +102,6 @@ public class ReviewService : IReviewService
             $"Review created successfully for OrderDetail {createDto.OrderDetailId} by user {userId}");
 
         return await GetByIdAsync(review.Id);
-    }
-
-    private async Task<Guid?> DetermineSellerId(OrderDetail orderDetail)
-    {
-        if (orderDetail.Product?.Seller != null)
-            return orderDetail.Product.Seller.Id;
-
-        if (orderDetail.BlindBox?.Seller != null)
-            return orderDetail.BlindBox.Seller.Id;
-
-        // Fallback: tìm seller từ database
-        if (orderDetail.ProductId.HasValue)
-        {
-            var product = await _unitOfWork.Products
-                .GetQueryable()
-                .Include(p => p.Seller)
-                .FirstOrDefaultAsync(p => p.Id == orderDetail.ProductId);
-            return product?.SellerId;
-        }
-
-        if (orderDetail.BlindBoxId.HasValue)
-        {
-            var blindBox = await _unitOfWork.BlindBoxes
-                .GetQueryable()
-                .Include(b => b.Seller)
-                .FirstOrDefaultAsync(b => b.Id == orderDetail.BlindBoxId);
-            return blindBox?.SellerId;
-        }
-
-        return null;
     }
 
     public async Task<ReviewResponseDto> ReplyToReviewAsync(Guid reviewId, string replyContent)
@@ -328,11 +297,41 @@ public class ReviewService : IReviewService
         return MapToReviewResponseDto(review);
     }
 
+    private async Task<Guid?> DetermineSellerId(OrderDetail orderDetail)
+    {
+        if (orderDetail.Product?.Seller != null)
+            return orderDetail.Product.Seller.Id;
+
+        if (orderDetail.BlindBox?.Seller != null)
+            return orderDetail.BlindBox.Seller.Id;
+
+        // Fallback: tìm seller từ database
+        if (orderDetail.ProductId.HasValue)
+        {
+            var product = await _unitOfWork.Products
+                .GetQueryable()
+                .Include(p => p.Seller)
+                .FirstOrDefaultAsync(p => p.Id == orderDetail.ProductId);
+            return product?.SellerId;
+        }
+
+        if (orderDetail.BlindBoxId.HasValue)
+        {
+            var blindBox = await _unitOfWork.BlindBoxes
+                .GetQueryable()
+                .Include(b => b.Seller)
+                .FirstOrDefaultAsync(b => b.Id == orderDetail.BlindBoxId);
+            return blindBox?.SellerId;
+        }
+
+        return null;
+    }
+
     #region private methods
 
     /// <summary>
-    /// CORE METHOD: Map Review entity sang ReviewResponseDto
-    /// Tất cả methods khác sẽ dùng method này để đảm bảo data mapping nhất quán
+    ///     CORE METHOD: Map Review entity sang ReviewResponseDto
+    ///     Tất cả methods khác sẽ dùng method này để đảm bảo data mapping nhất quán
     /// </summary>
     private ReviewResponseDto MapToReviewResponseDto(Review review)
     {
@@ -384,7 +383,7 @@ public class ReviewService : IReviewService
     }
 
     /// <summary>
-    /// Kiểm tra tính hợp lệ của các tham số truy vấn đánh giá
+    ///     Kiểm tra tính hợp lệ của các tham số truy vấn đánh giá
     /// </summary>
     private void ValidateReviewQueryParameters(ReviewQueryParameter param)
     {
@@ -435,7 +434,7 @@ public class ReviewService : IReviewService
     }
 
     /// <summary>
-    /// Áp dụng các bộ lọc và sắp xếp cho truy vấn đánh giá
+    ///     Áp dụng các bộ lọc và sắp xếp cho truy vấn đánh giá
     /// </summary>
     private IQueryable<Review> ApplyFiltersAndSorting(IQueryable<Review> query, ReviewQueryParameter param)
     {
@@ -513,7 +512,7 @@ public class ReviewService : IReviewService
     }
 
     /// <summary>
-    /// Xác thực nội dung phản hồi của người bán
+    ///     Xác thực nội dung phản hồi của người bán
     /// </summary>
     private async Task ValidateReplyContentAsync(string replyContent)
     {
@@ -532,7 +531,7 @@ public class ReviewService : IReviewService
     }
 
     /// <summary>
-    /// Xác thực và lấy ID của người bán hiện tại
+    ///     Xác thực và lấy ID của người bán hiện tại
     /// </summary>
     private async Task<Guid> ValidateAndGetSellerIdAsync()
     {
@@ -575,7 +574,7 @@ public class ReviewService : IReviewService
     }
 
     /// <summary>
-    /// Validate basic input data for CreateReviewDto
+    ///     Validate basic input data for CreateReviewDto
     /// </summary>
     private void ValidateCreateReviewInput(CreateReviewDto createDto)
     {
@@ -618,7 +617,7 @@ public class ReviewService : IReviewService
         // THÊM: Kiểm tra từ ngữ không phù hợp (có thể dùng list từ cấm)
         if (ContainsInappropriateContent(createDto.Comment))
         {
-            _loggerService.Warn($"Comment contains inappropriate content");
+            _loggerService.Warn("Comment contains inappropriate content");
             throw ErrorHelper.BadRequest("Nội dung đánh giá chứa từ ngữ không phù hợp. Vui lòng chỉnh sửa nội dung.");
         }
 
@@ -862,7 +861,7 @@ public class ReviewService : IReviewService
     }
 
     /// <summary>
-    /// Upload review images and return list of URLs
+    ///     Upload review images and return list of URLs
     /// </summary>
     private async Task<List<string>> UploadReviewImages(List<IFormFile>? images, Guid userId)
     {

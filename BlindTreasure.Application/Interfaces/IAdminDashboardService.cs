@@ -1,7 +1,4 @@
 ﻿using BlindTreasure.Domain.DTOs.AdminStatisticDTOs;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Interfaces;
 

@@ -1,6 +1,5 @@
 ﻿using BlindTreasure.Domain.DTOs.ChatDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
-using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Http;
 

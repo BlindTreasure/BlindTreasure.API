@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Drawing;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
@@ -12,30 +13,22 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
 using OfficeOpenXml.Style;
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Services;
 
 public class PayoutService : IPayoutService
 {
-    private readonly IClaimsService _claimsService;
-    private readonly ILoggerService _logger;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ICurrencyConversionService _currencyConversionService;
-    private readonly IStripeService _stripeService;
-    private readonly INotificationService _notificationService;
-    private readonly IBlobService _blobService;
-
     private const decimal MINIMUM_PAYOUT_AMOUNT = 100_000m;
     private const decimal PLATFORM_FEE_RATE = 5.0m;
     private const int MINIMUM_DAYS_BETWEEN_PAYOUTS = 7;
     private const int MAX_PROOF_IMAGES = 6;
+    private readonly IBlobService _blobService;
+    private readonly IClaimsService _claimsService;
+    private readonly ICurrencyConversionService _currencyConversionService;
+    private readonly ILoggerService _logger;
+    private readonly INotificationService _notificationService;
+    private readonly IStripeService _stripeService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public PayoutService(
         IClaimsService claimsService,

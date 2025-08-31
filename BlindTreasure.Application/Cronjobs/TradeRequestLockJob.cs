@@ -1,12 +1,11 @@
 ﻿using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace BlindTreasure.Application.Cronjobs;
-
-using Microsoft.Extensions.DependencyInjection;
 
 public class TradeRequestLockJob : IHostedService, IDisposable
 {
@@ -20,6 +19,13 @@ public class TradeRequestLockJob : IHostedService, IDisposable
         _serviceScopeFactory = serviceScopeFactory;
     }
 
+    // Phương thức giải phóng tài nguyên
+    public void Dispose()
+    {
+        _logger.LogInformation("Disposing TradeRequestLockJob resources.");
+        _timer.Dispose();
+    }
+
     // Phương thức bắt đầu cronjob
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -28,6 +34,14 @@ public class TradeRequestLockJob : IHostedService, IDisposable
         // Khởi động cronjob kiểm tra mỗi 2 phút
         _timer = new Timer(CheckTradeRequests!, null, TimeSpan.Zero, TimeSpan.FromMinutes(2));
 
+        return Task.CompletedTask;
+    }
+
+    // Phương thức dừng cronjob
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("TradeRequestLockJob is stopping at {Time}", DateTime.UtcNow);
+        _timer.Change(Timeout.Infinite, 0);
         return Task.CompletedTask;
     }
 
@@ -140,20 +154,5 @@ public class TradeRequestLockJob : IHostedService, IDisposable
                 _logger.LogError(ex, "An error occurred while checking trade requests: {ErrorMessage}", ex.Message);
             }
         }
-    }
-
-    // Phương thức dừng cronjob
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("TradeRequestLockJob is stopping at {Time}", DateTime.UtcNow);
-        _timer.Change(Timeout.Infinite, 0);
-        return Task.CompletedTask;
-    }
-
-    // Phương thức giải phóng tài nguyên
-    public void Dispose()
-    {
-        _logger.LogInformation("Disposing TradeRequestLockJob resources.");
-        _timer.Dispose();
     }
 }

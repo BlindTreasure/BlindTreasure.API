@@ -7,19 +7,17 @@ using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Google.Apis.Auth;
 using Microsoft.Extensions.Configuration;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace BlindTreasure.Application.Services;
 
 public class OAuthService : IOAuthService
 {
+    public readonly IAuthService _authService;
     private readonly IConfiguration _configuration;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAdminService _userService;
     private readonly string clientId;
     private readonly string passwordCharacters;
-    public readonly IAuthService _authService;
 
     public OAuthService(IAdminService userService, IUnitOfWork unitOfWork, IConfiguration configuration,
         IAuthService authService)

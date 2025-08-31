@@ -1,5 +1,5 @@
-﻿using BlindTreasure.Domain.Entities;
-using BlindTreasure.Domain.DTOs.PayoutDTOs;
+﻿using BlindTreasure.Domain.DTOs.PayoutDTOs;
+using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Application.Mappers;
 

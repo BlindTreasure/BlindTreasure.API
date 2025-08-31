@@ -1,19 +1,14 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Text.Json;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Utils;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Services;
 
 public class CurrencyConversionService : ICurrencyConversionService
 {
-    private readonly HttpClient _httpClient;
-    private readonly string _apiKey;
     private const string CurrencyFreaksUrl = "https://api.currencyfreaks.com/v2.0/rates/latest";
+    private readonly string _apiKey;
+    private readonly HttpClient _httpClient;
 
     public CurrencyConversionService(string apiKey = "a2ac8e200bfb44d39c48c5f54f28b29b")
     {

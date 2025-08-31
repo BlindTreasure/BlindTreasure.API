@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Web;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
@@ -14,7 +15,6 @@ using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using System.Web;
 
 namespace BlindTreasure.Application.Services;
 
@@ -49,61 +49,6 @@ public class SellerService : ISellerService
         _claimsService = claimsService;
         _productService = productService;
         _notificationService = notificationService;
-    }
-
-    public async Task<SellerSalesStatisticsDto> GetSalesStatisticsAsync(Guid? sellerId = null, DateTime? from = null,
-        DateTime? to = null)
-    {
-        // Lấy sellerId hiện tại nếu không truyền vào
-        sellerId ??= (await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == _claimsService.CurrentUserId))?.Id
-                     ?? throw ErrorHelper.Forbidden("Không tìm thấy seller.");
-
-        // Lấy các OrderDetail đã bán thành công của seller
-        var orderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable()
-            .Include(od => od.Order)
-            .Where(od => od.Product.SellerId == sellerId
-                         && od.Order.Status == OrderStatus.PAID.ToString()
-                         && !od.Order.IsDeleted);
-
-        if (from.HasValue)
-            orderDetailsQuery = orderDetailsQuery.Where(od => od.Order.PlacedAt >= from.Value);
-        if (to.HasValue)
-            orderDetailsQuery = orderDetailsQuery.Where(od => od.Order.PlacedAt <= to.Value);
-
-        var orderDetails = await orderDetailsQuery.ToListAsync();
-
-        var totalOrders = orderDetails.Select(od => od.OrderId).Distinct().Count();
-        var totalProductsSold = orderDetails.Sum(od => od.Quantity);
-        var grossSales = orderDetails.Sum(od => od.TotalPrice);
-
-        // Tính tổng discount từ OrderSellerPromotion
-        var orderIds = orderDetails.Select(od => od.OrderId).Distinct().ToList();
-        var discounts = await _unitOfWork.OrderSellerPromotions.GetQueryable()
-            .Where(osp => osp.SellerId == sellerId && orderIds.Contains(osp.OrderId))
-            .SumAsync(osp => osp.DiscountAmount);
-
-        // Tính tổng refund từ Transaction
-        var paymentIds = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => orderIds.Contains(o.Id) && o.PaymentId != null)
-            .Select(o => o.PaymentId.Value)
-            .ToListAsync();
-
-        var totalRefunded = await _unitOfWork.Transactions.GetQueryable()
-            .Where(t => paymentIds.Contains(t.PaymentId) && t.Type == "Refund")
-            .SumAsync(t => (decimal?)t.RefundAmount ?? 0);
-
-        var netSales = grossSales - discounts - totalRefunded;
-
-        return new SellerSalesStatisticsDto
-        {
-            SellerId = sellerId.Value,
-            TotalOrders = totalOrders,
-            TotalProductsSold = totalProductsSold,
-            GrossSales = grossSales,
-            NetSales = netSales,
-            TotalRefunded = totalRefunded,
-            TotalDiscount = discounts
-        };
     }
 
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
@@ -532,12 +477,6 @@ public class SellerService : ISellerService
         return new Pagination<OrderDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
 
-    private async Task RemoveSellerCacheAsync(Guid sellerId, Guid userId)
-    {
-        await _cacheService.RemoveAsync($"seller:{sellerId}");
-        await _cacheService.RemoveAsync($"seller:user:{userId}");
-    }
-
     public async Task<OrderDto> GetSellerOrderByIdAsync(Guid orderId)
     {
         var userId = _claimsService.CurrentUserId;
@@ -609,6 +548,67 @@ public class SellerService : ISellerService
         };
 
         return dto;
+    }
+
+    public async Task<SellerSalesStatisticsDto> GetSalesStatisticsAsync(Guid? sellerId = null, DateTime? from = null,
+        DateTime? to = null)
+    {
+        // Lấy sellerId hiện tại nếu không truyền vào
+        sellerId ??= (await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == _claimsService.CurrentUserId))?.Id
+                     ?? throw ErrorHelper.Forbidden("Không tìm thấy seller.");
+
+        // Lấy các OrderDetail đã bán thành công của seller
+        var orderDetailsQuery = _unitOfWork.OrderDetails.GetQueryable()
+            .Include(od => od.Order)
+            .Where(od => od.Product.SellerId == sellerId
+                         && od.Order.Status == OrderStatus.PAID.ToString()
+                         && !od.Order.IsDeleted);
+
+        if (from.HasValue)
+            orderDetailsQuery = orderDetailsQuery.Where(od => od.Order.PlacedAt >= from.Value);
+        if (to.HasValue)
+            orderDetailsQuery = orderDetailsQuery.Where(od => od.Order.PlacedAt <= to.Value);
+
+        var orderDetails = await orderDetailsQuery.ToListAsync();
+
+        var totalOrders = orderDetails.Select(od => od.OrderId).Distinct().Count();
+        var totalProductsSold = orderDetails.Sum(od => od.Quantity);
+        var grossSales = orderDetails.Sum(od => od.TotalPrice);
+
+        // Tính tổng discount từ OrderSellerPromotion
+        var orderIds = orderDetails.Select(od => od.OrderId).Distinct().ToList();
+        var discounts = await _unitOfWork.OrderSellerPromotions.GetQueryable()
+            .Where(osp => osp.SellerId == sellerId && orderIds.Contains(osp.OrderId))
+            .SumAsync(osp => osp.DiscountAmount);
+
+        // Tính tổng refund từ Transaction
+        var paymentIds = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => orderIds.Contains(o.Id) && o.PaymentId != null)
+            .Select(o => o.PaymentId.Value)
+            .ToListAsync();
+
+        var totalRefunded = await _unitOfWork.Transactions.GetQueryable()
+            .Where(t => paymentIds.Contains(t.PaymentId) && t.Type == "Refund")
+            .SumAsync(t => t.RefundAmount ?? 0);
+
+        var netSales = grossSales - discounts - totalRefunded;
+
+        return new SellerSalesStatisticsDto
+        {
+            SellerId = sellerId.Value,
+            TotalOrders = totalOrders,
+            TotalProductsSold = totalProductsSold,
+            GrossSales = grossSales,
+            NetSales = netSales,
+            TotalRefunded = totalRefunded,
+            TotalDiscount = discounts
+        };
+    }
+
+    private async Task RemoveSellerCacheAsync(Guid sellerId, Guid userId)
+    {
+        await _cacheService.RemoveAsync($"seller:{sellerId}");
+        await _cacheService.RemoveAsync($"seller:user:{userId}");
     }
 
     // ----------------- PRIVATE HELPER METHODS -----------------

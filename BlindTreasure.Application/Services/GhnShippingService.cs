@@ -1,23 +1,16 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
-using BlindTreasure.Application.Services.Commons;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
-using BlindTreasure.Infrastructure.Interfaces;
-using Microsoft.Extensions.Logging;
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Services;
 
 public class GhnShippingService : IGhnShippingService
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILoggerService _logger;
     private const string TOKEN = "28729d34-5751-11f0-9b81-222185cb68c8";
     private const string SHOP_ID = "197002";
     private const string BASE_URL = "https://dev-online-gateway.ghn.vn";
@@ -28,6 +21,7 @@ public class GhnShippingService : IGhnShippingService
     private const string GET_WARD = "/shiip/public-api/master-data/ward";
     private const string GET_SERVICES = "/shiip/public-api/v2/shipping-order/available-services";
     private const string CALCULATE_FEE = "/shiip/public-api/v2/shipping-order/fee";
+    private readonly IHttpClientFactory _httpClientFactory;
 
 
     private readonly JsonSerializerOptions _jsonOptions = new()
@@ -35,6 +29,8 @@ public class GhnShippingService : IGhnShippingService
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         PropertyNameCaseInsensitive = true
     };
+
+    private readonly ILoggerService _logger;
 
     public GhnShippingService(
         IHttpClientFactory httpClientFactory,
@@ -44,18 +40,9 @@ public class GhnShippingService : IGhnShippingService
         _logger = logger;
     }
 
-    private HttpClient CreateClient()
-    {
-        var client = _httpClientFactory.CreateClient();
-        client.BaseAddress = new Uri(BASE_URL);
-        client.DefaultRequestHeaders.Add("Token", TOKEN);
-        client.DefaultRequestHeaders.Add("ShopId", SHOP_ID);
-        client.DefaultRequestHeaders.Add("Accept", "application/json");
-        return client;
-    }
-
     /// <summary>
-    /// Xem thông tin trả về của đơn hàng trước khi tạo (GHN Preview) để preview và biết trước được thông tin + phí dịch vụ.
+    ///     Xem thông tin trả về của đơn hàng trước khi tạo (GHN Preview) để preview và biết trước được thông tin + phí dịch
+    ///     vụ.
     /// </summary>
     public async Task<GhnPreviewResponse?> PreviewOrderAsync(GhnOrderRequest req)
     {
@@ -95,7 +82,7 @@ public class GhnShippingService : IGhnShippingService
     }
 
     /// <summary>
-    /// Tạo đơn hàng chính thức trên GHN.
+    ///     Tạo đơn hàng chính thức trên GHN.
     /// </summary>
     public async Task<GhnCreateResponse?> CreateOrderAsync(GhnOrderRequest req)
     {
@@ -311,6 +298,16 @@ public class GhnShippingService : IGhnShippingService
             ServiceTypeId = 2,
             Items = ghnOrderItems.ToArray()
         };
+    }
+
+    private HttpClient CreateClient()
+    {
+        var client = _httpClientFactory.CreateClient();
+        client.BaseAddress = new Uri(BASE_URL);
+        client.DefaultRequestHeaders.Add("Token", TOKEN);
+        client.DefaultRequestHeaders.Add("ShopId", SHOP_ID);
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        return client;
     }
 }
 

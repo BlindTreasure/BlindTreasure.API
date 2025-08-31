@@ -1,11 +1,6 @@
 ﻿using BlindTreasure.Application.Services;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Interfaces;
 

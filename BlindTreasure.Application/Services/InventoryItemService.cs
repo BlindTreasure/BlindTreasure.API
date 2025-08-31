@@ -20,11 +20,11 @@ public class InventoryItemService : IInventoryItemService
     private readonly ICacheService _cacheService;
     private readonly ICategoryService _categoryService;
     private readonly IClaimsService _claimsService;
-    private readonly ILoggerService _loggerService;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IGhnShippingService _ghnShippingService;
-    private readonly IStripeService _stripeService;
+    private readonly ILoggerService _loggerService;
     private readonly INotificationService _notificationService;
+    private readonly IStripeService _stripeService;
+    private readonly IUnitOfWork _unitOfWork;
 
 
     public InventoryItemService(
@@ -34,7 +34,7 @@ public class InventoryItemService : IInventoryItemService
         IUnitOfWork unitOfWork,
         ICategoryService categoryService,
         IGhnShippingService ghnShippingService,
-        IStripeService stripeService, 
+        IStripeService stripeService,
         INotificationService notificationService)
     {
         _cacheService = cacheService;
@@ -352,9 +352,9 @@ public class InventoryItemService : IInventoryItemService
 
 
     /// <summary>
-    /// Yêu cầu giao hàng cho một InventoryItem.
-    /// Nếu chưa có địa chỉ thì phải truyền vào addressId.
-    /// Tạo Shipment và cập nhật trạng thái OrderDetail liên quan.
+    ///     Yêu cầu giao hàng cho một InventoryItem.
+    ///     Nếu chưa có địa chỉ thì phải truyền vào addressId.
+    ///     Tạo Shipment và cập nhật trạng thái OrderDetail liên quan.
     /// </summary>
     public async Task<ShipmentItemResponseDTO> RequestShipmentAsync(RequestItemShipmentDTO request)
     {
@@ -461,7 +461,7 @@ public class InventoryItemService : IInventoryItemService
                 Provider = "GHN",
                 OrderCode = ghnCreateResponse?.OrderCode,
                 TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0,
-                MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0),
+                MainServiceFee = ghnCreateResponse?.Fee?.MainService ?? 0,
                 TrackingNumber = ghnCreateResponse?.OrderCode ?? "",
                 //ShippedAt = DateTime.UtcNow,
                 EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime.AddDays(1) != default
@@ -768,14 +768,16 @@ public class InventoryItemService : IInventoryItemService
         var daysInactive = (now - lastActive).TotalDays;
 
         var hasShipmentRequest = item.ShipmentId != null &&
-            (item.Status == InventoryItemStatus.Shipment_requested || item.Status == InventoryItemStatus.Delivering);
+                                 (item.Status == InventoryItemStatus.Shipment_requested ||
+                                  item.Status == InventoryItemStatus.Delivering);
 
         var hasTradeRequest = item.LockedByRequestId != null;
         var hasActiveListing = item.Listings != null && item.Listings.Any(l => l.Status == ListingStatus.Active);
 
         if (hasShipmentRequest || hasTradeRequest || hasActiveListing)
         {
-            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Skip item {item.Id} ({item.Product?.Name}) - has activity.");
+            _loggerService.Info(
+                $"[HandleInventoryItemLifecycleAsync] Skip item {item.Id} ({item.Product?.Name}) - has activity.");
             return;
         }
 
@@ -784,22 +786,26 @@ public class InventoryItemService : IInventoryItemService
             await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
             {
                 Title = "Vật phẩm của bạn đã không hoạt động 30 ngày",
-                Message = $"Vật phẩm {item.Product?.Name} đã không có hoạt động trong 30 ngày. Vui lòng kiểm tra để tránh bị khóa.",
+                Message =
+                    $"Vật phẩm {item.Product?.Name} đã không có hoạt động trong 30 ngày. Vui lòng kiểm tra để tránh bị khóa.",
                 Type = NotificationType.InventoryItem,
                 SourceUrl = null
             });
-            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Notified 30 days for item {item.Id} ({item.Product?.Name})");
+            _loggerService.Info(
+                $"[HandleInventoryItemLifecycleAsync] Notified 30 days for item {item.Id} ({item.Product?.Name})");
         }
         else if (daysInactive >= 60 && daysInactive < 83)
         {
             await _notificationService.PushNotificationToUser(item.UserId, new NotificationDto
             {
                 Title = "Cảnh báo: Vật phẩm sắp bị khóa",
-                Message = $"Vật phẩm {item.Product?.Name} đã không hoạt động trong 60 ngày. Nếu không có tác động trong 30 ngày tới, vật phẩm sẽ bị khóa.",
+                Message =
+                    $"Vật phẩm {item.Product?.Name} đã không hoạt động trong 60 ngày. Nếu không có tác động trong 30 ngày tới, vật phẩm sẽ bị khóa.",
                 Type = NotificationType.InventoryItem,
                 SourceUrl = null
             });
-            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Notified 60 days for item {item.Id} ({item.Product?.Name})");
+            _loggerService.Info(
+                $"[HandleInventoryItemLifecycleAsync] Notified 60 days for item {item.Id} ({item.Product?.Name})");
         }
         else if (daysInactive >= 83 && daysInactive < 90)
         {
@@ -810,7 +816,8 @@ public class InventoryItemService : IInventoryItemService
                 Type = NotificationType.InventoryItem,
                 SourceUrl = null
             });
-            _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Notified 83 days for item {item.Id} ({item.Product?.Name})");
+            _loggerService.Info(
+                $"[HandleInventoryItemLifecycleAsync] Notified 83 days for item {item.Id} ({item.Product?.Name})");
         }
         else if (daysInactive >= 90)
         {
@@ -830,15 +837,14 @@ public class InventoryItemService : IInventoryItemService
 
             var sellerUserId = item.Product?.Seller?.UserId;
             if (sellerUserId != null && sellerUserId != Guid.Empty)
-            {
                 await _notificationService.PushNotificationToUser(sellerUserId.Value, new NotificationDto
                 {
                     Title = "Vật phẩm của khách hàng đã bị thu hồi",
-                    Message = $"Vật phẩm {item.Product?.Name} của khách hàng đã bị khóa do không hoạt động trong 90 ngày.",
+                    Message =
+                        $"Vật phẩm {item.Product?.Name} của khách hàng đã bị khóa do không hoạt động trong 90 ngày.",
                     Type = NotificationType.InventoryItem,
                     SourceUrl = null
                 });
-            }
             _loggerService.Warn($"[HandleInventoryItemLifecycleAsync] Archived item {item.Id} ({item.Product?.Name})");
         }
 

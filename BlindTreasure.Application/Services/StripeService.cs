@@ -5,12 +5,10 @@ using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Stripe;
 using Stripe.Checkout;
-using System.Text;
 
 namespace BlindTreasure.Application.Services;
 
@@ -18,12 +16,12 @@ public class StripeService : IStripeService
 {
     private readonly IClaimsService _claimsService;
     private readonly IConfiguration _configuration;
+    private readonly string _createdAccountRedirectUrl;
     private readonly string _failRedirectUrl;
+    private readonly ILoggerService _loggerService;
     private readonly IStripeClient _stripeClient;
     private readonly string _successRedirectUrl;
-    private readonly string _createdAccountRedirectUrl;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ILoggerService _loggerService;
 
     public StripeService(IUnitOfWork unitOfWork, IStripeClient stripeClient,
         IClaimsService claimsService, IConfiguration configuration, ILoggerService loggerService)
@@ -412,50 +410,7 @@ public class StripeService : IStripeService
     }
 
     /// <summary>
-    /// Tạo Stripe Coupon động cho đơn hàng
-    /// </summary>
-    private async Task<string> CreateStripeCouponForOrder(Guid orderId, decimal discountAmount)
-    {
-        try
-        {
-            var couponService = new CouponService(_stripeClient);
-
-            // Tạo coupon ID duy nhất cho đơn hàng (rút gọn để tránh quá dài)
-            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var shortOrderId = orderId.ToString("N")[..8]; // Lấy 8 ký tự đầu của GUID
-            var couponId = $"ord-{shortOrderId}-{timestamp}";
-
-            var couponOptions = new CouponCreateOptions
-            {
-                Id = couponId,
-                Name = $"Discount-{shortOrderId}", // Rút gọn name để <= 40 ký tự
-                Currency = "vnd",
-                AmountOff = (long)Math.Round(discountAmount), // Số tiền giảm cố định (VND)
-                Duration = "once", // Chỉ sử dụng một lần
-                MaxRedemptions = 1, // Chỉ có thể sử dụng 1 lần
-                RedeemBy = DateTime.UtcNow.AddHours(25),
-                Metadata = new Dictionary<string, string>
-                {
-                    ["orderId"] = orderId.ToString(),
-                    ["discountAmount"] = discountAmount.ToString("F2"),
-                    ["createdAt"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
-                    ["fullOrderId"] = orderId.ToString("N") // Lưu full order ID trong metadata
-                }
-            };
-
-            var coupon = await couponService.CreateAsync(couponOptions);
-            return coupon.Id;
-        }
-        catch (StripeException ex)
-        {
-            // Nếu tạo coupon thất bại, log lỗi nhưng không làm crash process
-            // Có thể fallback về cách tính toán trực tiếp
-            throw new InvalidOperationException($"Không thể tạo coupon giảm giá: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Vô hiệu hóa session thanh toán Stripe (hủy PaymentIntent và xóa coupon nếu còn hiệu lực)
+    ///     Vô hiệu hóa session thanh toán Stripe (hủy PaymentIntent và xóa coupon nếu còn hiệu lực)
     /// </summary>
     public async Task<GroupPaymentSession> DisableStripeGroupPaymentSessionAsync(Guid checkoutGroupId,
         List<Order> orders)
@@ -512,7 +467,7 @@ public class StripeService : IStripeService
     }
 
     /// <summary>
-    /// Vô hiệu hóa session thanh toán Stripe cho đơn lẻ (hủy PaymentIntent và xóa coupon nếu còn hiệu lực)
+    ///     Vô hiệu hóa session thanh toán Stripe cho đơn lẻ (hủy PaymentIntent và xóa coupon nếu còn hiệu lực)
     /// </summary>
     public async Task DisableStripeOrderPaymentSessionAsync(Guid orderId)
     {
@@ -560,7 +515,7 @@ public class StripeService : IStripeService
 
 
     /// <summary>
-    /// Xóa coupon sau khi sử dụng (gọi trong webhook hoặc sau khi thanh toán thành công)
+    ///     Xóa coupon sau khi sử dụng (gọi trong webhook hoặc sau khi thanh toán thành công)
     /// </summary>
     public async Task CleanupStripeCoupon(string couponId)
     {
@@ -574,77 +529,6 @@ public class StripeService : IStripeService
         catch (StripeException)
         {
             // Log error nhưng không throw - việc cleanup không quan trọng bằng main flow
-        }
-    }
-
-    private async Task UpsertPaymentAndTransactionForOrder(
-        Order order,
-        string? sessionId,
-        Guid userId,
-        bool isRenew,
-        decimal netAmount,
-        string? couponId,
-        string? paymentIntentId)
-    {
-        var now = DateTime.UtcNow;
-        var type = isRenew ? "Renew" : "Checkout";
-
-        if (order.Payment == null)
-        {
-            var payment = new Payment
-            {
-                Order = order,
-                OrderId = order.Id,
-                Amount = order.TotalAmount + (order.TotalShippingFee ?? 0m),
-                DiscountRate = 0,
-                NetAmount = netAmount,
-                Method = "Stripe",
-                Status = PaymentStatus.Pending,
-                PaymentIntentId = paymentIntentId,
-                SessionId = sessionId,
-                PaidAt = now,
-                RefundedAmount = 0,
-                CreatedAt = now,
-                CreatedBy = userId,
-                Transactions = new List<Transaction>(),
-                CouponId = couponId
-            };
-            payment = await _unitOfWork.Payments.AddAsync(payment);
-
-
-            payment.Transactions.Add(new Transaction
-            {
-                Payment = payment,
-                PaymentId = payment.Id,
-                Type = type,
-                Amount = netAmount,
-                Currency = "vnd",
-                Status = "PENDING",
-                OccurredAt = now,
-                ExternalRef = sessionId,
-                CreatedAt = now,
-                CreatedBy = userId
-            });
-
-            order.Payment = payment;
-            await _unitOfWork.Orders.Update(order);
-        }
-        else
-        {
-            var tx = new Transaction
-            {
-                Payment = order.Payment,
-                Type = type,
-                Amount = netAmount,
-                Currency = "vnd",
-                Status = "PENDING",
-                OccurredAt = now,
-                ExternalRef = sessionId,
-                CreatedAt = now,
-                CreatedBy = userId
-            };
-            order.Payment.Transactions.Add(tx);
-            await _unitOfWork.Payments.Update(order.Payment);
         }
     }
 
@@ -842,6 +726,120 @@ public class StripeService : IStripeService
         return await reversalService.CreateAsync(transferId, options);
     }
 
+    /// <summary>
+    ///     Tạo Stripe Coupon động cho đơn hàng
+    /// </summary>
+    private async Task<string> CreateStripeCouponForOrder(Guid orderId, decimal discountAmount)
+    {
+        try
+        {
+            var couponService = new CouponService(_stripeClient);
+
+            // Tạo coupon ID duy nhất cho đơn hàng (rút gọn để tránh quá dài)
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var shortOrderId = orderId.ToString("N")[..8]; // Lấy 8 ký tự đầu của GUID
+            var couponId = $"ord-{shortOrderId}-{timestamp}";
+
+            var couponOptions = new CouponCreateOptions
+            {
+                Id = couponId,
+                Name = $"Discount-{shortOrderId}", // Rút gọn name để <= 40 ký tự
+                Currency = "vnd",
+                AmountOff = (long)Math.Round(discountAmount), // Số tiền giảm cố định (VND)
+                Duration = "once", // Chỉ sử dụng một lần
+                MaxRedemptions = 1, // Chỉ có thể sử dụng 1 lần
+                RedeemBy = DateTime.UtcNow.AddHours(25),
+                Metadata = new Dictionary<string, string>
+                {
+                    ["orderId"] = orderId.ToString(),
+                    ["discountAmount"] = discountAmount.ToString("F2"),
+                    ["createdAt"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"),
+                    ["fullOrderId"] = orderId.ToString("N") // Lưu full order ID trong metadata
+                }
+            };
+
+            var coupon = await couponService.CreateAsync(couponOptions);
+            return coupon.Id;
+        }
+        catch (StripeException ex)
+        {
+            // Nếu tạo coupon thất bại, log lỗi nhưng không làm crash process
+            // Có thể fallback về cách tính toán trực tiếp
+            throw new InvalidOperationException($"Không thể tạo coupon giảm giá: {ex.Message}");
+        }
+    }
+
+    private async Task UpsertPaymentAndTransactionForOrder(
+        Order order,
+        string? sessionId,
+        Guid userId,
+        bool isRenew,
+        decimal netAmount,
+        string? couponId,
+        string? paymentIntentId)
+    {
+        var now = DateTime.UtcNow;
+        var type = isRenew ? "Renew" : "Checkout";
+
+        if (order.Payment == null)
+        {
+            var payment = new Payment
+            {
+                Order = order,
+                OrderId = order.Id,
+                Amount = order.TotalAmount + (order.TotalShippingFee ?? 0m),
+                DiscountRate = 0,
+                NetAmount = netAmount,
+                Method = "Stripe",
+                Status = PaymentStatus.Pending,
+                PaymentIntentId = paymentIntentId,
+                SessionId = sessionId,
+                PaidAt = now,
+                RefundedAmount = 0,
+                CreatedAt = now,
+                CreatedBy = userId,
+                Transactions = new List<Transaction>(),
+                CouponId = couponId
+            };
+            payment = await _unitOfWork.Payments.AddAsync(payment);
+
+
+            payment.Transactions.Add(new Transaction
+            {
+                Payment = payment,
+                PaymentId = payment.Id,
+                Type = type,
+                Amount = netAmount,
+                Currency = "vnd",
+                Status = "PENDING",
+                OccurredAt = now,
+                ExternalRef = sessionId,
+                CreatedAt = now,
+                CreatedBy = userId
+            });
+
+            order.Payment = payment;
+            await _unitOfWork.Orders.Update(order);
+        }
+        else
+        {
+            var tx = new Transaction
+            {
+                Payment = order.Payment,
+                Type = type,
+                Amount = netAmount,
+                Currency = "vnd",
+                Status = "PENDING",
+                OccurredAt = now,
+                ExternalRef = sessionId,
+                CreatedAt = now,
+                CreatedBy = userId
+            };
+            order.Payment.Transactions.Add(tx);
+            await _unitOfWork.Payments.Update(order.Payment);
+        }
+    }
+
 
     // 2. Hoàn lại tiền cho khách (refund)
     public async Task<Refund> RefundPaymentAsync(string paymentIntentId, decimal amount, Order refundOrder)
@@ -932,7 +930,8 @@ public class StripeService : IStripeService
     {
         // 1. Lấy order
         var order = await _unitOfWork.Orders.GetQueryable()
-            .Include(o => o.OrderDetails)
+            .Include(o => o.OrderDetails).ThenInclude(o => o.InventoryItems)
+            .Include(o=> o.OrderDetails).ThenInclude(o=>o.Shipments)
             .Include(o => o.OrderSellerPromotions)
             .Include(o => o.Payment).ThenInclude(o=>o.Transactions)
             .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted)
