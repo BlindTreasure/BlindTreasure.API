@@ -269,17 +269,17 @@ public class BlindBoxService : IBlindBoxService
     public async Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemRequestDto> items)
     {
         if (items == null || items.Count == 0)
-            throw ErrorHelper.BadRequest("Blind Box cần có ít nhất 1 sản phẩm.");
+            throw ErrorHelper.BadRequest("Vui lòng thêm ít nhất một sản phẩm vào Blind Box.");
 
         if (items.Count != 6 && items.Count != 12)
-            throw ErrorHelper.BadRequest("Mỗi Blind Box chỉ được chứa 6 hoặc 12 sản phẩm.");
+            throw ErrorHelper.BadRequest("Mỗi Blind Box phải chứa đúng 6 hoặc 12 sản phẩm.");
 
         var blindBox = await _unitOfWork.BlindBoxes.FirstOrDefaultAsync(
             x => x.Id == blindBoxId && !x.IsDeleted,
             b => b.BlindBoxItems
         );
         if (blindBox == null)
-            throw ErrorHelper.NotFound("Không tìm thấy Blind Box.");
+            throw ErrorHelper.NotFound("Không tìm thấy Blind Box được chỉ định.");
 
         var currentUserId = _claimsService.CurrentUserId;
 
@@ -287,7 +287,7 @@ public class BlindBoxService : IBlindBoxService
             x.Id == blindBox.SellerId && x.UserId == currentUserId && !x.IsDeleted);
 
         if (seller == null)
-            throw ErrorHelper.Forbidden("Bạn không có quyền chỉnh sửa Blind Box này.");
+            throw ErrorHelper.Forbidden("Rất tiếc, bạn không có quyền chỉnh sửa Blind Box này.");
 
         ValidateBlindBoxItemsFullRule(items);
 
@@ -312,9 +312,9 @@ public class BlindBoxService : IBlindBoxService
             var item = items[i];
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
-                throw ErrorHelper.BadRequest($"Sản phẩm tại vị trí {i + 1} không hợp lệ.");
+                throw ErrorHelper.BadRequest($"Sản phẩm được chọn không hợp lệ hoặc không thuộc về bạn.");
             if (item.Quantity > product.TotalStockQuantity)
-                throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ tồn kho.");
+                throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ số lượng trong kho.");
 
             var dropRate = dropRates[item];
 
@@ -412,12 +412,12 @@ public class BlindBoxService : IBlindBoxService
         {
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
-                throw ErrorHelper.BadRequest("Không tìm thấy sản phẩm cho item trong BlindBox.");
+                throw ErrorHelper.BadRequest("Một hoặc nhiều sản phẩm trong Blind Box không còn tồn tại hoặc đã bị xóa.");
 
             // Kiểm tra AvailableToSell thay vì Stock
             if (item.Quantity > product.AvailableToSell)
                 throw ErrorHelper.BadRequest(
-                    $"Sản phẩm '{product.Name}' không đủ số lượng khả dụng để submit BlindBox.");
+                    $"Sản phẩm '{product.Name}' không đủ số lượng khả dụng để đưa vào Blind Box.");
 
             // Reserve stock thay vì trừ TotalStockQuantity
             product.ReservedInBlindBox += item.Quantity;
@@ -693,7 +693,7 @@ public class BlindBoxService : IBlindBoxService
         {
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
-                throw ErrorHelper.BadRequest($"Không tìm thấy sản phẩm {item.ProductId}.");
+                throw ErrorHelper.BadRequest($"Không tìm thấy sản phẩm với ID: {item.ProductId}. Vui lòng kiểm tra lại.");
 
             // Tổng số lượng cần thiết cho product này
             var requiredQuantity = item.Quantity * blindBox.TotalQuantity;
@@ -713,7 +713,7 @@ public class BlindBoxService : IBlindBoxService
         {
             _logger.Warn(
                 $"[ValidateBlindBoxItemsFullRule] Số lượng item không hợp lệ [ActualCount={items.Count}]. Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
-            throw ErrorHelper.BadRequest("Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
+            throw ErrorHelper.BadRequest("Mỗi Blind Box phải chứa đúng 6 hoặc 12 sản phẩm.");
         }
 
         // ✅ Validate ProductId không trùng nhau
@@ -728,8 +728,7 @@ public class BlindBoxService : IBlindBoxService
             _logger.Warn(
                 $"[ValidateBlindBoxItemsFullRule] Phát hiện ProductId trùng nhau [DuplicateProductIds={duplicateList}].");
             throw ErrorHelper.BadRequest(
-                $"Blind Box chứa nhiều item trùng ProductId: {duplicateList}. " +
-                $"Mỗi sản phẩm chỉ được khai báo một lần."
+                $"Mỗi sản phẩm chỉ được thêm một lần vào Blind Box. Các sản phẩm sau đã bị trùng: {duplicateList}."
             );
         }
 
@@ -738,14 +737,14 @@ public class BlindBoxService : IBlindBoxService
         {
             _logger.Warn(
                 $"[ValidateBlindBoxItemsFullRule] Không có item Secret [SecretCount={countSecret}]. Blind Box phải có ít nhất 1 item Secret.");
-            throw ErrorHelper.BadRequest("Blind Box phải có ít nhất 1 item Secret.");
+            throw ErrorHelper.BadRequest("Mỗi Blind Box phải có ít nhất một vật phẩm được đánh dấu là 'Secret'.");
         }
 
         if (countSecret > 1)
         {
             _logger.Warn(
                 $"[ValidateBlindBoxItemsFullRule] Có nhiều hơn 1 item Secret [SecretCount={countSecret}]. Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
-            throw ErrorHelper.BadRequest("Mỗi BlindBox chỉ được phép có nhiều nhất 1 item Secret.");
+            throw ErrorHelper.BadRequest("Mỗi Blind Box chỉ được phép có tối đa một vật phẩm 'Secret'.");
         }
 
         var validRarities = Enum.GetValues(typeof(RarityName)).Cast<RarityName>().ToList();
@@ -755,7 +754,7 @@ public class BlindBoxService : IBlindBoxService
             var invalidList = string.Join(", ", invalids.Select(i => $"{i.Rarity}"));
             _logger.Warn(
                 $"[ValidateBlindBoxItemsFullRule] Phát hiện rarity không hợp lệ [InvalidRarity={invalidList}]. Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
-            throw ErrorHelper.BadRequest("Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
+            throw ErrorHelper.BadRequest("Độ hiếm của vật phẩm không hợp lệ. Vui lòng chỉ sử dụng các giá trị: Common, Rare, Epic, Secret.");
         }
 
         var totalWeight = items.Sum(i => i.Weight);
@@ -763,7 +762,7 @@ public class BlindBoxService : IBlindBoxService
         {
             _logger.Warn(
                 $"[ValidateBlindBoxItemsFullRule] Tổng trọng số không hợp lệ [TotalWeight={totalWeight}]. Tổng trọng số (Weight) phải đúng bằng 100.");
-            throw ErrorHelper.BadRequest("Tổng trọng số (Weight) phải đúng bằng 100.");
+            throw ErrorHelper.BadRequest("Tổng trọng số (Weight) của tất cả vật phẩm phải chính xác là 100.");
         }
 
         // Validate thứ tự weight: Common >= Rare >= Epic >= Secret
@@ -780,7 +779,7 @@ public class BlindBoxService : IBlindBoxService
                 _logger.Warn(
                     $"[ValidateBlindBoxItemsFullRule] Tổng trọng số tier sau lớn hơn tier trước [TierOrder={detail}]. Không cho phép trọng số của tier sau lớn hơn tier trước.");
                 throw ErrorHelper.BadRequest(
-                    "Không cho phép trọng số của tier sau lớn hơn tier trước (Common ≥ Rare ≥ Epic ≥ Secret).");
+                    "Trọng số của các bậc độ hiếm phải tuân theo quy tắc: Common ≥ Rare ≥ Epic ≥ Secret.");
             }
     }
 
