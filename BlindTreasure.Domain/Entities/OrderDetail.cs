@@ -31,7 +31,6 @@ public class OrderDetail : BaseEntity
     // Many → Shipments
     public ICollection<Shipment>? Shipments { get; set; } = new List<Shipment>();
     public ICollection<InventoryItem> InventoryItems { get; set; } = new List<InventoryItem>();
-    public ICollection<CustomerBlindBox> CustomerBlindBoxes { get; set; } = new List<CustomerBlindBox>();
     public ICollection<CustomerBlindBox>? CustomerBlindBoxes { get; set; } = new List<CustomerBlindBox>();
     public ICollection<Review>? Reviews { get; set; } = new List<Review>();
 
