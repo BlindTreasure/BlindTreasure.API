@@ -369,7 +369,6 @@ public class UnboxingService : IUnboxingService
         sb.AppendLine("# Báo Cáo Kết Quả Mở Hộp");
         sb.AppendLine();
         sb.AppendLine($"**Thời gian:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-        sb.AppendLine($"**Hộp ID:** `{selectedItem.BlindBoxId}`");
         sb.AppendLine();
 
         // TECHNICAL INFO
