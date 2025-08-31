@@ -357,92 +357,91 @@ public class UnboxingService : IUnboxingService
 
     #region Private methods
 
-    private string BuildUnboxReasonForFrontend(
-        Dictionary<BlindBoxItem, decimal> probabilities,
-        decimal roll,
-        BlindBoxItem selectedItem)
+private string BuildUnboxReasonForFrontend(
+    Dictionary<BlindBoxItem, decimal> probabilities,
+    decimal roll,
+    BlindBoxItem selectedItem)
+{
+    var sb = new StringBuilder();
+    var totalProbability = probabilities.Values.Sum();
+
+    // HEADER
+    sb.AppendLine("# Báo Cáo Kết Quả Mở Hộp");
+    sb.AppendLine();
+    sb.AppendLine($"**Thời gian:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+    sb.AppendLine();
+
+    // TECHNICAL INFO
+    sb.AppendLine("## Thông Số Kỹ Thuật");
+    sb.AppendLine();
+    sb.AppendLine($"- **Random Seed:** `{roll:F6}`");
+    sb.AppendLine($"- **Tổng xác suất:** {totalProbability:F4}%");
+    sb.AppendLine("- **Thuật toán:** Weighted Random");
+    sb.AppendLine();
+
+    // PROBABILITY DISTRIBUTION
+    sb.AppendLine("## Phân Phối Xác Suất");
+    sb.AppendLine();
+    sb.AppendLine("| # | Sản phẩm | Độ hiếm | Drop Rate (%) | Range |");
+    sb.AppendLine("|---|-----------|---------|---------------|-------|");
+
+    int index = 1;
+    decimal cumulative = 0;
+
+    foreach (var kvp in probabilities.OrderByDescending(p => p.Value).ThenBy(p => p.Key.ProductId))
     {
-        var sb = new StringBuilder();
-        var totalProbability = probabilities.Values.Sum();
+        var start = cumulative;
+        var end = start + kvp.Value;
+        cumulative = end;
 
-        // HEADER SECTION
-        sb.AppendLine("# Báo Cáo Kết Quả Mở Hộp");
-        sb.AppendLine();
-        sb.AppendLine($"**Thời gian:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-        sb.AppendLine();
+        var itemName = kvp.Key.Product.Name;
+        var rarity = $"`{kvp.Key.RarityConfig.Name}`";
+        var dropRate = $"{kvp.Value:F4}";
+        var range = $"{start:F4} - {end:F4}";
 
-        // TECHNICAL INFO
-        sb.AppendLine("## Thông Số Kỹ Thuật");
-        sb.AppendLine();
-        sb.AppendLine($"- **Random Seed:** `{Math.Round(roll, 6)}`");
-        sb.AppendLine($"- **Tổng xác suất:** {Math.Round(totalProbability, 4)}%");
-        sb.AppendLine("- **Thuật toán:** Weighted Random");
-        sb.AppendLine();
+        if (kvp.Key.Id == selectedItem.Id)
+            sb.AppendLine($"| **{index}** | **{itemName} (ĐÃ CHỌN)** | {rarity} | **{dropRate}** | **{range}** |");
+        else
+            sb.AppendLine($"| {index} | {itemName} | {rarity} | {dropRate} | {range} |");
 
-        // PROBABILITY DISTRIBUTION TABLE
-        sb.AppendLine("## Phân Phối Xác Suất");
-        sb.AppendLine();
-        sb.AppendLine("| # | Sản phẩm | Độ hiếm | Drop Rate (%) | Range |");
-        sb.AppendLine("|---|-----------|---------|---------------|-------|");
-
-        var index = 1;
-        decimal cumulative = 0;
-
-        foreach (var kvp in probabilities
-                     .OrderByDescending(p => p.Value)
-                     .ThenBy(p => p.Key.ProductId))
-        {
-            var start = cumulative;
-            var end = start + kvp.Value;
-            cumulative = end;
-
-            var itemName = kvp.Key.Product.Name;
-            var rarity = $"`{kvp.Key.RarityConfig.Name}`";
-            var dropRate = Math.Round(kvp.Value, 4);
-            var range = $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
-
-            if (kvp.Key.Id == selectedItem.Id)
-                sb.AppendLine($"| **{index}** | **{itemName} (ĐÃ CHỌN)** | {rarity} | **{dropRate}** | **{range}** |");
-            else
-                sb.AppendLine($"| {index} | {itemName} | {rarity} | {dropRate} | {range} |");
-
-            index++;
-        }
-
-        sb.AppendLine();
-
-        // SELECTION RESULT
-        sb.AppendLine("## Kết Quả Lựa Chọn");
-        sb.AppendLine();
-        sb.AppendLine("| Thuộc tính | Giá trị |");
-        sb.AppendLine("|------------|---------|");
-        sb.AppendLine($"| Product Name | **{selectedItem.Product.Name}** |");
-        sb.AppendLine($"| Configured Drop Rate | {Math.Round(selectedItem.DropRate, 4)}% |");
-        sb.AppendLine($"| Rarity Level | `{selectedItem.RarityConfig.Name}` |");
-        sb.AppendLine($"| Roll Hit Range | {GetHitRange(probabilities, selectedItem)} |");
-        sb.AppendLine();
-
-        // VALIDATION
-        sb.AppendLine("## Kiểm Tra Validation");
-        sb.AppendLine();
-        sb.AppendLine("| Kiểm tra | Kết quả |");
-        sb.AppendLine("|----------|---------|");
-        sb.AppendLine(
-            $"| Tổng xác suất | {Math.Round(totalProbability, 4)}% {(Math.Abs(totalProbability - 100) < 0.01m ? "Hợp lệ" : "Cảnh báo")} |");
-        sb.AppendLine($"| Roll trong khoảng hợp lệ | 0 ≤ {roll} ≤ {totalProbability} | Hợp lệ |");
-        sb.AppendLine($"| Lựa chọn Item | Thuật toán đã thực thi | Thành công |");
-        sb.AppendLine();
-
-        // NOTES
-        sb.AppendLine("---");
-        sb.AppendLine();
-        sb.AppendLine("**Lưu ý kỹ thuật:**");
-        sb.AppendLine("- Log này chỉ dành cho mục đích kiểm tra và debug");
-        sb.AppendLine("- Không chia sẻ thông tin này với khách hàng");
-        sb.AppendLine("- Liên hệ team dev nếu có bất thường trong thuật toán");
-
-        return sb.ToString();
+        index++;
     }
+
+    sb.AppendLine();
+
+    // SELECTION RESULT
+    sb.AppendLine("## Kết Quả Lựa Chọn");
+    sb.AppendLine();
+    sb.AppendLine("| Thuộc tính | Giá trị |");
+    sb.AppendLine("|------------|---------|");
+    sb.AppendLine($"| Product Name | **{selectedItem.Product.Name}** |");
+    sb.AppendLine($"| Configured Drop Rate | {selectedItem.DropRate:F4}% |");
+    sb.AppendLine($"| Rarity Level | `{selectedItem.RarityConfig.Name}` |");
+    sb.AppendLine($"| Roll Hit Range | {GetHitRange(probabilities, selectedItem)} |");
+    sb.AppendLine();
+
+    // VALIDATION
+    sb.AppendLine("## Kiểm Tra Validation");
+    sb.AppendLine();
+    sb.AppendLine("| Kiểm tra | Kết quả |");
+    sb.AppendLine("|----------|---------|");
+    sb.AppendLine($"| Tổng xác suất | {totalProbability:F4}% {(Math.Abs(totalProbability - 100) < 0.01m ? "Hợp lệ" : "⚠️ Cảnh báo")} |");
+    sb.AppendLine($"| Roll trong khoảng hợp lệ | 0 ≤ {roll} ≤ {totalProbability} | Hợp lệ |");
+    sb.AppendLine($"| Lựa chọn Item | Thuật toán đã thực thi | Thành công |");
+    sb.AppendLine();
+
+    // NOTES
+    sb.AppendLine("---");
+    sb.AppendLine();
+    sb.AppendLine("**Lưu ý kỹ thuật:**");
+    sb.AppendLine("- Log này chỉ dành cho mục đích kiểm tra và debug");
+    sb.AppendLine("- Không chia sẻ thông tin này với khách hàng");
+    sb.AppendLine("- Liên hệ team dev nếu có bất thường trong thuật toán");
+
+
+    return sb.ToString();
+}
+
 
     private string GetHitRange(Dictionary<BlindBoxItem, decimal> probabilities, BlindBoxItem selectedItem)
     {
