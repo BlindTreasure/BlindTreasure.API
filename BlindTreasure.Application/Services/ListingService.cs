@@ -321,7 +321,7 @@ public class ListingService : IListingService
     }
 
     /// <summary>
-    /// Lấy các item khả dụng để tạo listing hoặc kiểm tra 1 item cụ thể.
+    ///     Lấy các item khả dụng để tạo listing hoặc kiểm tra 1 item cụ thể.
     /// </summary>
     private async Task<List<InventoryItem>> GetUserListableItemsAsync(Guid userId, Guid? specificInventoryId = null)
     {

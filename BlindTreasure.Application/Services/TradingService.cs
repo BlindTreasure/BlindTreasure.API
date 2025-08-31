@@ -18,11 +18,11 @@ namespace BlindTreasure.Application.Services;
 public class TradingService : ITradingService
 {
     private readonly IClaimsService _claimsService;
-    private readonly ILoggerService _logger;
     private readonly IListingService _listingService;
+    private readonly ILoggerService _logger;
+    private readonly IHubContext<NotificationHub> _notificationHub;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IHubContext<NotificationHub> _notificationHub;
 
     public TradingService(IClaimsService claimsService, ILoggerService logger,
         IUnitOfWork unitOfWork, INotificationService notificationService,
@@ -585,7 +585,7 @@ public class TradingService : ITradingService
         // Rest of the method remains the same...
         if (tradeRequest.OfferedItems == null || !tradeRequest.OfferedItems.Any())
         {
-            _logger.Info($"[CreateTradeHistoryAsync] Creating single record with null OfferedInventoryId");
+            _logger.Info("[CreateTradeHistoryAsync] Creating single record with null OfferedInventoryId");
 
             var tradeHistory = new TradeHistory
             {
@@ -632,7 +632,7 @@ public class TradingService : ITradingService
         // Nếu OfferedItems chưa được load, load lại
         if (tradeRequest.OfferedItems == null || !tradeRequest.OfferedItems.Any())
         {
-            _logger.Warn($"[CompleteTradeExchangeAsync] OfferedItems is empty, reloading...");
+            _logger.Warn("[CompleteTradeExchangeAsync] OfferedItems is empty, reloading...");
 
             var reloadedTradeRequest = await _unitOfWork.TradeRequests.GetByIdAsync(tradeRequest.Id,
                 t => t.OfferedItems);
@@ -728,9 +728,9 @@ public class TradingService : ITradingService
                 {
                     TradeRequestId = tradeRequest.Id,
                     Message = "Đối tác đã lock giao dịch. Hãy kiểm tra!",
-                    OwnerLocked = tradeRequest.OwnerLocked,
-                    RequesterLocked = tradeRequest.RequesterLocked,
-                    TimeRemaining = tradeRequest.TimeRemaining
+                    tradeRequest.OwnerLocked,
+                    tradeRequest.RequesterLocked,
+                    tradeRequest.TimeRemaining
                 });
 
             _logger.Success(
@@ -1146,7 +1146,7 @@ public class TradingService : ITradingService
             // Kiểm tra nếu cả hai đã lock
             if (tradeRequest.OwnerLocked && tradeRequest.RequesterLocked)
             {
-                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Cả hai bên đã lock, bắt đầu hoàn thành giao dịch");
+                _logger.Info("[ProcessLockAndCompleteIfReadySafe] Cả hai bên đã lock, bắt đầu hoàn thành giao dịch");
 
                 tradeRequest.LockedAt = DateTime.UtcNow;
                 tradeRequest.TimeRemaining = 0;
@@ -1159,7 +1159,7 @@ public class TradingService : ITradingService
             }
             else
             {
-                _logger.Info($"[ProcessLockAndCompleteIfReadySafe] Chưa đủ điều kiện hoàn thành, chờ bên còn lại lock");
+                _logger.Info("[ProcessLockAndCompleteIfReadySafe] Chưa đủ điều kiện hoàn thành, chờ bên còn lại lock");
 
                 // Tính toán thời gian còn lại
                 if (tradeRequest.RespondedAt.HasValue)

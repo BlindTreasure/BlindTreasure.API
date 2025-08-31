@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Application.Interfaces;
+﻿using System.Text;
+using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
@@ -6,20 +7,19 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System.Text;
+using ValueType = BlindTreasure.Domain.Entities.ValueType;
 
 namespace BlindTreasure.Application.Services;
 
 public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryItemShipmentLogService
 {
+    // Constants for system messages
+    private const string SYSTEM_OPERATION_SUFFIX = " (Thao tác hệ thống)";
+    private const string SYSTEM_OPERATION_WARNING = "Thao tác này được thực hiện bởi hệ thống";
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IUnitOfWork _unitOfWork;
-
-    // Constants for system messages
-    private const string SYSTEM_OPERATION_SUFFIX = " (Thao tác hệ thống)";
-    private const string SYSTEM_OPERATION_WARNING = "Thao tác này được thực hiện bởi hệ thống";
 
     public OrderDetailInventoryItemLogShipmentService(
         ICacheService cacheService,
@@ -45,7 +45,7 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
             logContent,
             null,
             orderDetail.Status.ToString(),
-            Domain.Entities.ValueType.ORDER_DETAIL
+            ValueType.ORDER_DETAIL
         );
 
         return await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
@@ -64,7 +64,7 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
             logContent,
             null,
             shipment.Status.ToString(),
-            Domain.Entities.ValueType.SHIPMENT
+            ValueType.SHIPMENT
         );
 
         return await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
@@ -85,7 +85,7 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
             logContent,
             oldStatus.ToString(),
             shipmentNewStatus.Status.ToString(),
-            Domain.Entities.ValueType.SHIPMENT
+            ValueType.SHIPMENT
         );
 
         return await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
@@ -105,7 +105,7 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
             logContent,
             oldStatus.ToString(),
             newStatus.ToString(),
-            Domain.Entities.ValueType.ORDER_DETAIL
+            ValueType.ORDER_DETAIL
         );
 
         return await _unitOfWork.OrderDetailInventoryItemLogs.AddAsync(log);
@@ -122,8 +122,8 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
             var isInventoryItem = inventoryItem != null;
             var actionType = isInventoryItem ? ActionType.INVENTORY_ITEM_ADDED : ActionType.BLIND_BOX_ADDED;
             var valueType = isInventoryItem
-                ? Domain.Entities.ValueType.INVENTORY_ITEM
-                : Domain.Entities.ValueType.CUSTOM_BLINDBOX;
+                ? ValueType.INVENTORY_ITEM
+                : ValueType.CUSTOM_BLINDBOX;
 
             var logContent = msg ?? (isInventoryItem
                 ? $"Tạo item kho: {inventoryItem.Id}"
@@ -183,7 +183,7 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
             trackingMessage,
             oldStatus.ToString(),
             inventoryItemWithNewStatus.Status.ToString(),
-            Domain.Entities.ValueType.INVENTORY_ITEM,
+            ValueType.INVENTORY_ITEM,
             inventoryItemWithNewStatus.Id
         );
 
@@ -266,7 +266,7 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
         string logContent,
         string? oldValue,
         string newValue,
-        Domain.Entities.ValueType valueStatusType,
+        ValueType valueStatusType,
         Guid? inventoryItemId = null)
     {
         var currentUserId = _claimsService.CurrentUserId;
@@ -376,7 +376,7 @@ public class OrderDetailInventoryItemLogShipmentService : IOrderDetailInventoryI
             LogContent = logContent,
             LogTime = DateTime.UtcNow,
             ActionType = ActionType.SHIPMENT_STATUS_CHANGED,
-            ValueStatusType = Domain.Entities.ValueType.SHIPMENT,
+            ValueStatusType = ValueType.SHIPMENT,
             OldValue = oldStatus.ToString(),
             NewValue = newStatus.ToString(),
             ActorId = currentUserId != Guid.Empty ? currentUserId : Guid.Empty

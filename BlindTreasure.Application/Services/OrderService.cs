@@ -13,7 +13,6 @@ using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
-
 namespace BlindTreasure.Application.Services;
 
 public class OrderService : IOrderService
@@ -21,14 +20,14 @@ public class OrderService : IOrderService
     private readonly ICacheService _cacheService;
     private readonly ICartItemService _cartItemService;
     private readonly IClaimsService _claimsService;
+    private readonly IGhnShippingService _ghnShippingService;
     private readonly ILoggerService _loggerService;
+    private readonly INotificationService _notificationService; // Thêm dòng này
+    private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemLogService;
     private readonly IProductService _productService;
     private readonly IPromotionService _promotionService;
     private readonly IStripeService _stripeService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IGhnShippingService _ghnShippingService;
-    private readonly INotificationService _notificationService; // Thêm dòng này
-    private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemLogService;
 
     public OrderService(
         ICacheService cacheService,
@@ -322,6 +321,343 @@ public class OrderService : IOrderService
         _loggerService.Success($"Order {orderId} deleted (soft) successfully.");
     }
 
+    public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(
+        List<CartSellerItemDto> sellerItems, bool? isPreview = false)
+    {
+        _loggerService.Info("Preview shipping checkout (by seller items) started.");
+        var userId = _claimsService.CurrentUserId;
+        if (sellerItems == null || !sellerItems.Any())
+            throw ErrorHelper.BadRequest("Cart trống.");
+
+        var address = await _unitOfWork.Addresses.GetQueryable()
+            .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
+            .FirstOrDefaultAsync();
+        if (address == null)
+            throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
+
+        var result = new List<ShipmentCheckoutResponseDTO>();
+
+        foreach (var sellerGroup in sellerItems)
+        {
+            var productItems = sellerGroup.Items.Where(i => i.ProductId.HasValue).ToList();
+            if (!productItems.Any())
+                continue;
+
+            var productIds = productItems.Select(i => i.ProductId.Value).ToList();
+            var products = await _unitOfWork.Products.GetQueryable()
+                .Where(p => productIds.Contains(p.Id))
+                .Include(p => p.Category)
+                .Include(p => p.Seller)
+                .ToListAsync();
+
+            var seller = products.FirstOrDefault()?.Seller;
+            if (seller == null)
+                continue;
+
+            var itemsWithProduct = productItems.Select(item => new
+            {
+                Product = products.First(p => p.Id == item.ProductId), item.Quantity
+            });
+
+            var ghnOrderRequest = _ghnShippingService.BuildGhnOrderRequest(
+                itemsWithProduct,
+                seller,
+                address,
+                x => x.Product,
+                x => x.Quantity
+            );
+
+            var ghnPreviewResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest);
+
+            result.Add(new ShipmentCheckoutResponseDTO
+            {
+                SellerId = seller.Id,
+                SellerCompanyName = seller.CompanyName,
+                Shipment = null,
+                GhnPreviewResponse = ghnPreviewResponse
+            });
+        }
+
+        _loggerService.Info("Preview shipping checkout (by seller items) completed.");
+        return result;
+    }
+
+    /// <summary>
+    ///     Hủy thanh toán cho một đơn hàng (chủ động từ user).
+    /// </summary>
+    public async Task CancelOrderPaymentAsync(Guid orderId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var order = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.Payment).ThenInclude(o => o.Transactions)
+            .Include(o => o.User)
+            .Include(o => o.Seller)
+            .Include(o => o.OrderSellerPromotions)
+            .FirstOrDefaultAsync();
+
+        if (order == null)
+            throw ErrorHelper.NotFound("Không tìm thấy đơn hàng.");
+
+        if (order.Status == OrderStatus.PAID.ToString())
+            throw ErrorHelper.BadRequest("Đơn hàng đã thanh toán, không thể hủy.");
+
+        order.Status = OrderStatus.CANCELLED.ToString();
+        order.UpdatedAt = DateTime.UtcNow;
+
+        if (order.Payment != null)
+        {
+            order.Payment.Status = PaymentStatus.Cancelled;
+            order.Payment.UpdatedAt = DateTime.UtcNow;
+            order.Payment.Transactions.ToList().ForEach(t => t.Status = TransactionStatus.Canceled.ToString());
+            await _unitOfWork.Payments.Update(order.Payment);
+        }
+
+        foreach (var detail in order.OrderDetails)
+        {
+            detail.Status = OrderDetailItemStatus.CANCELLED;
+            detail.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.OrderDetails.Update(detail);
+
+            if (detail.Shipments != null)
+                foreach (var shipment in detail.Shipments)
+                {
+                    shipment.Status = ShipmentStatus.CANCELLED;
+                    shipment.UpdatedAt = DateTime.UtcNow;
+                    await _unitOfWork.Shipments.Update(shipment);
+                }
+        }
+
+        // Trả lại hàng tồn kho và khuyến mãi
+        await RollbackOrderInventoryAndPromotionAsync(order);
+
+        await _unitOfWork.Orders.Update(order);
+
+        // Vô hiệu hóa link/session thanh toán Stripe cho đơn lẻ
+        await _stripeService.DisableStripeOrderPaymentSessionAsync(order.Id);
+
+        await _unitOfWork.SaveChangesAsync();
+
+        // Thông báo cho user và seller
+        if (order.User != null)
+            await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
+            {
+                Title = $"Đơn hàng #{order.Id} đã được hủy",
+                Message = "Bạn đã chủ động hủy thanh toán cho đơn hàng này.",
+                Type = NotificationType.Order,
+                SourceUrl = null
+            });
+        if (order.Seller?.User != null)
+        {
+            var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
+            var sellerMsg = $@"
+            Đơn hàng #{order.Id} của khách {buyerName} đã bị hủy bởi khách hàng.
+            Vui lòng kiểm tra lại trạng thái đơn hàng trong hệ thống.";
+            await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
+            {
+                Title = $"Đơn hàng #{order.Id} đã bị hủy",
+                Message = sellerMsg,
+                Type = NotificationType.Order,
+                SourceUrl = null
+            });
+        }
+    }
+
+    /// <summary>
+    ///     Hủy thanh toán cho nhóm đơn hàng (chủ động từ user).
+    /// </summary>
+    public async Task CancelGroupOrderPaymentAsync(Guid checkoutGroupId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var orders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.CheckoutGroupId == checkoutGroupId && o.UserId == userId && !o.IsDeleted)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.Payment).ThenInclude(o => o.Transactions)
+            .Include(o => o.User)
+            .Include(o => o.Seller)
+            .Include(o => o.OrderSellerPromotions)
+            .ToListAsync();
+
+        if (!orders.Any())
+            throw ErrorHelper.NotFound("Không tìm thấy đơn hàng hợp lệ trong nhóm.");
+
+        foreach (var order in orders)
+        {
+            if (order.Status == OrderStatus.PAID.ToString())
+                continue;
+
+            order.Status = OrderStatus.CANCELLED.ToString();
+            order.UpdatedAt = DateTime.UtcNow;
+
+            if (order.Payment != null)
+            {
+                order.Payment.Status = PaymentStatus.Cancelled;
+                order.Payment.UpdatedAt = DateTime.UtcNow;
+                order.Payment.Transactions.ToList().ForEach(t => t.Status = TransactionStatus.Canceled.ToString());
+                await _unitOfWork.Payments.Update(order.Payment);
+            }
+
+            foreach (var detail in order.OrderDetails)
+            {
+                detail.Status = OrderDetailItemStatus.CANCELLED;
+                detail.UpdatedAt = DateTime.UtcNow;
+                await _unitOfWork.OrderDetails.Update(detail);
+
+                if (detail.Shipments != null)
+                    foreach (var shipment in detail.Shipments)
+                    {
+                        shipment.Status = ShipmentStatus.CANCELLED;
+                        shipment.UpdatedAt = DateTime.UtcNow;
+                        await _unitOfWork.Shipments.Update(shipment);
+                    }
+            }
+
+            await RollbackOrderInventoryAndPromotionAsync(order);
+            await _unitOfWork.Orders.Update(order);
+
+            // Thông báo cho user và seller
+            if (order.User != null)
+                await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
+                {
+                    Title = $"Đơn hàng #{order.Id} đã được hủy",
+                    Message = "Bạn đã chủ động hủy thanh toán cho đơn hàng này.",
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            if (order.Seller?.User != null)
+            {
+                var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
+                var sellerMsg = $@"
+                Đơn hàng #{order.Id} của khách <b>{buyerName}</b> đã bị hủy bởi khách hàng.<br/>
+                Vui lòng kiểm tra lại trạng thái đơn hàng trong hệ thống.";
+                await _notificationService.PushNotificationToUser(order.Seller.UserId, new NotificationDto
+                {
+                    Title = $"Đơn hàng #{order.Id} đã bị hủy",
+                    Message = sellerMsg,
+                    Type = NotificationType.Order,
+                    SourceUrl = null
+                });
+            }
+        }
+
+        // Vô hiệu hóa link/session thanh toán Stripe cho nhóm
+        await _stripeService.DisableStripeGroupPaymentSessionAsync(checkoutGroupId, orders);
+        _loggerService.Info($"Cancelled succesfully payment for group order {checkoutGroupId}.");
+
+        await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task<List<OrderDto>> GetOrderByCheckoutGroupId(Guid groupId)
+    {
+        var userId = _claimsService.CurrentUserId;
+        var orders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.UserId == userId && !o.IsDeleted && o.CheckoutGroupId == groupId)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
+            .Include(o => o.ShippingAddress)
+            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+            .OrderByDescending(o => o.PlacedAt)
+            .ToListAsync();
+
+        return orders.Select(OrderDtoMapper.ToOrderDto).ToList();
+    }
+
+
+    /// <summary>
+    ///     Rollback product, blindbox, promotion usage, and user usage count for a canceled or expired order.
+    /// </summary>
+    public async Task RollbackOrderInventoryAndPromotionAsync(Order order)
+    {
+        // 1. Rollback product quantity
+        foreach (var detail in order.OrderDetails)
+            if (detail.ProductId.HasValue)
+            {
+                var product = await _unitOfWork.Products.GetByIdAsync(detail.ProductId.Value);
+                if (product != null)
+                {
+                    product.TotalStockQuantity += detail.Quantity;
+                    await _unitOfWork.Products.Update(product);
+                }
+            }
+            else if (detail.BlindBoxId.HasValue)
+            {
+                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(detail.BlindBoxId.Value);
+                if (blindBox != null)
+                {
+                    blindBox.TotalQuantity += detail.Quantity;
+                    await _unitOfWork.BlindBoxes.Update(blindBox);
+                }
+            }
+
+        // 2. Rollback promotion usage limit and user usage count
+        foreach (var osp in order.OrderSellerPromotions)
+        {
+            // Rollback Promotion.UsageLimit
+            var promotion = await _unitOfWork.Promotions.GetByIdAsync(osp.PromotionId);
+            if (promotion != null && promotion.UsageLimit.HasValue)
+            {
+                promotion.UsageLimit += 1;
+                await _unitOfWork.Promotions.Update(promotion);
+            }
+
+            // Rollback PromotionUserUsage.UsageCount
+            var userUsage = await _unitOfWork.PromotionUserUsages.GetQueryable()
+                .Where(u => u.PromotionId == osp.PromotionId && u.UserId == order.UserId)
+                .FirstOrDefaultAsync();
+
+            if (userUsage != null && userUsage.UsageCount > 0)
+            {
+                userUsage.UsageCount -= 1;
+                userUsage.LastUsedAt = DateTime.UtcNow;
+                await _unitOfWork.PromotionUserUsages.Update(userUsage);
+            }
+        }
+
+        // await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task<Pagination<OrderDto>> GetAllOrdersForAdminAsync(OrderAdminQueryParameter param)
+    {
+        var query = _unitOfWork.Orders.GetQueryable()
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
+            .Include(o => o.ShippingAddress)
+            .Include(o => o.User)
+            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+            .AsNoTracking()
+            .Where(o => !o.IsDeleted);
+
+        if (param.Status.HasValue)
+            query = query.Where(o => o.Status == param.Status.Value.ToString());
+        if (param.PlacedFrom.HasValue)
+            query = query.Where(o => o.PlacedAt >= param.PlacedFrom.Value);
+        if (param.PlacedTo.HasValue)
+            query = query.Where(o => o.PlacedAt <= param.PlacedTo.Value);
+        if (param.CheckoutGroupId.HasValue && param.CheckoutGroupId.Value != Guid.Empty)
+            query = query.Where(o => o.CheckoutGroupId == param.CheckoutGroupId.Value);
+        if (param.SellerId.HasValue)
+            query = query.Where(o => o.SellerId == param.SellerId.Value);
+        if (param.UserId.HasValue)
+            query = query.Where(o => o.UserId == param.UserId.Value);
+
+        query = param.Desc
+            ? query.OrderByDescending(o => o.UpdatedAt ?? o.CreatedAt)
+            : query.OrderBy(o => o.UpdatedAt ?? o.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+        var orders = param.PageIndex == 0
+            ? await query.ToListAsync()
+            : await query.Skip((param.PageIndex - 1) * param.PageSize).Take(param.PageSize).ToListAsync();
+
+        var dtos = orders.Select(OrderDtoMapper.ToOrderDto).ToList();
+        return new Pagination<OrderDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
+
     private async Task<MultiOrderCheckoutResultDto> CheckoutCore(
         List<SellerCheckoutGroup> groups,
         Guid? shippingAddressId)
@@ -340,7 +676,7 @@ public class OrderService : IOrderService
         if (shippingAddressId.HasValue && !hasPhysical)
             throw ErrorHelper.BadRequest("Cannot ship: no physical products in cart.");
 
-        Domain.Entities.Address? shippingAddress = null;
+        Address? shippingAddress = null;
         if (shippingAddressId.HasValue)
         {
             shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(shippingAddressId.Value);
@@ -551,7 +887,7 @@ public class OrderService : IOrderService
                         Provider = "GHN",
                         OrderCode = ghnResp?.OrderCode ?? string.Empty,
                         TotalFee = (int?)ghnResp?.TotalFee ?? 0,
-                        MainServiceFee = (int?)ghnResp?.Fee?.MainService ?? 0,
+                        MainServiceFee = ghnResp?.Fee?.MainService ?? 0,
                         TrackingNumber = ghnResp?.OrderCode ?? string.Empty,
                         EstimatedDelivery = ghnResp?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3),
                         Status = ShipmentStatus.WAITING_PAYMENT
@@ -603,7 +939,7 @@ public class OrderService : IOrderService
 
 
     /// <summary>
-    /// Apply promotion discount to individual OrderDetails
+    ///     Apply promotion discount to individual OrderDetails
     /// </summary>
     private void ApplyPromotionToOrderDetails(List<OrderDetail> orderDetails, Promotion promotion)
     {
@@ -670,345 +1006,5 @@ public class OrderService : IOrderService
         public Guid SellerId { get; set; }
         public Guid? PromotionId { get; set; }
         public List<CheckoutItem> Items { get; set; } = new();
-    }
-
-    public async Task<List<ShipmentCheckoutResponseDTO>> PreviewShippingCheckoutAsync(
-        List<CartSellerItemDto> sellerItems, bool? isPreview = false)
-    {
-        _loggerService.Info("Preview shipping checkout (by seller items) started.");
-        var userId = _claimsService.CurrentUserId;
-        if (sellerItems == null || !sellerItems.Any())
-            throw ErrorHelper.BadRequest("Cart trống.");
-
-        var address = await _unitOfWork.Addresses.GetQueryable()
-            .Where(a => a.UserId == userId && a.IsDefault && !a.IsDeleted)
-            .FirstOrDefaultAsync();
-        if (address == null)
-            throw ErrorHelper.BadRequest("Không tìm thấy địa chỉ mặc định của khách hàng.");
-
-        var result = new List<ShipmentCheckoutResponseDTO>();
-
-        foreach (var sellerGroup in sellerItems)
-        {
-            var productItems = sellerGroup.Items.Where(i => i.ProductId.HasValue).ToList();
-            if (!productItems.Any())
-                continue;
-
-            var productIds = productItems.Select(i => i.ProductId.Value).ToList();
-            var products = await _unitOfWork.Products.GetQueryable()
-                .Where(p => productIds.Contains(p.Id))
-                .Include(p => p.Category)
-                .Include(p => p.Seller)
-                .ToListAsync();
-
-            var seller = products.FirstOrDefault()?.Seller;
-            if (seller == null)
-                continue;
-
-            var itemsWithProduct = productItems.Select(item => new
-            {
-                Product = products.First(p => p.Id == item.ProductId),
-                Quantity = item.Quantity
-            });
-
-            var ghnOrderRequest = _ghnShippingService.BuildGhnOrderRequest(
-                itemsWithProduct,
-                seller,
-                address,
-                x => x.Product,
-                x => x.Quantity
-            );
-
-            var ghnPreviewResponse = await _ghnShippingService.PreviewOrderAsync(ghnOrderRequest);
-
-            result.Add(new ShipmentCheckoutResponseDTO
-            {
-                SellerId = seller.Id,
-                SellerCompanyName = seller.CompanyName,
-                Shipment = null,
-                GhnPreviewResponse = ghnPreviewResponse
-            });
-        }
-
-        _loggerService.Info("Preview shipping checkout (by seller items) completed.");
-        return result;
-    }
-
-    /// <summary>
-    /// Hủy thanh toán cho một đơn hàng (chủ động từ user).
-    /// </summary>
-    public async Task CancelOrderPaymentAsync(Guid orderId)
-    {
-        var userId = _claimsService.CurrentUserId;
-        var order = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.Id == orderId && o.UserId == userId && !o.IsDeleted)
-            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.Payment).ThenInclude(o => o.Transactions)
-            .Include(o => o.User)
-            .Include(o => o.Seller)
-            .Include(o => o.OrderSellerPromotions)
-            .FirstOrDefaultAsync();
-
-        if (order == null)
-            throw ErrorHelper.NotFound("Không tìm thấy đơn hàng.");
-
-        if (order.Status == OrderStatus.PAID.ToString())
-            throw ErrorHelper.BadRequest("Đơn hàng đã thanh toán, không thể hủy.");
-
-        order.Status = OrderStatus.CANCELLED.ToString();
-        order.UpdatedAt = DateTime.UtcNow;
-
-        if (order.Payment != null)
-        {
-            order.Payment.Status = PaymentStatus.Cancelled;
-            order.Payment.UpdatedAt = DateTime.UtcNow;
-            order.Payment.Transactions.ToList().ForEach(t => t.Status = TransactionStatus.Canceled.ToString());
-            await _unitOfWork.Payments.Update(order.Payment);
-        }
-
-        foreach (var detail in order.OrderDetails)
-        {
-            detail.Status = OrderDetailItemStatus.CANCELLED;
-            detail.UpdatedAt = DateTime.UtcNow;
-            await _unitOfWork.OrderDetails.Update(detail);
-
-            if (detail.Shipments != null)
-                foreach (var shipment in detail.Shipments)
-                {
-                    shipment.Status = ShipmentStatus.CANCELLED;
-                    shipment.UpdatedAt = DateTime.UtcNow;
-                    await _unitOfWork.Shipments.Update(shipment);
-                }
-        }
-
-        // Trả lại hàng tồn kho và khuyến mãi
-        await RollbackOrderInventoryAndPromotionAsync(order);
-
-        await _unitOfWork.Orders.Update(order);
-
-        // Vô hiệu hóa link/session thanh toán Stripe cho đơn lẻ
-        await _stripeService.DisableStripeOrderPaymentSessionAsync(order.Id);
-
-        await _unitOfWork.SaveChangesAsync();
-
-        // Thông báo cho user và seller
-        if (order.User != null)
-            await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
-            {
-                Title = $"Đơn hàng #{order.Id} đã được hủy",
-                Message = "Bạn đã chủ động hủy thanh toán cho đơn hàng này.",
-                Type = NotificationType.Order,
-                SourceUrl = null
-            });
-        if (order.Seller?.User != null)
-        {
-            var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
-            var sellerMsg = $@"
-            Đơn hàng #{order.Id} của khách {buyerName} đã bị hủy bởi khách hàng.
-            Vui lòng kiểm tra lại trạng thái đơn hàng trong hệ thống.";
-            await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
-            {
-                Title = $"Đơn hàng #{order.Id} đã bị hủy",
-                Message = sellerMsg,
-                Type = NotificationType.Order,
-                SourceUrl = null
-            });
-        }
-    }
-
-    /// <summary>
-    /// Hủy thanh toán cho nhóm đơn hàng (chủ động từ user).
-    /// </summary>
-    public async Task CancelGroupOrderPaymentAsync(Guid checkoutGroupId)
-    {
-        var userId = _claimsService.CurrentUserId;
-        var orders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.CheckoutGroupId == checkoutGroupId && o.UserId == userId && !o.IsDeleted)
-            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.Payment).ThenInclude(o => o.Transactions)
-            .Include(o => o.User)
-            .Include(o => o.Seller)
-            .Include(o => o.OrderSellerPromotions)
-            .ToListAsync();
-
-        if (!orders.Any())
-            throw ErrorHelper.NotFound("Không tìm thấy đơn hàng hợp lệ trong nhóm.");
-
-        foreach (var order in orders)
-        {
-            if (order.Status == OrderStatus.PAID.ToString())
-                continue;
-
-            order.Status = OrderStatus.CANCELLED.ToString();
-            order.UpdatedAt = DateTime.UtcNow;
-
-            if (order.Payment != null)
-            {
-                order.Payment.Status = PaymentStatus.Cancelled;
-                order.Payment.UpdatedAt = DateTime.UtcNow;
-                order.Payment.Transactions.ToList().ForEach(t => t.Status = TransactionStatus.Canceled.ToString());
-                await _unitOfWork.Payments.Update(order.Payment);
-            }
-
-            foreach (var detail in order.OrderDetails)
-            {
-                detail.Status = OrderDetailItemStatus.CANCELLED;
-                detail.UpdatedAt = DateTime.UtcNow;
-                await _unitOfWork.OrderDetails.Update(detail);
-
-                if (detail.Shipments != null)
-                    foreach (var shipment in detail.Shipments)
-                    {
-                        shipment.Status = ShipmentStatus.CANCELLED;
-                        shipment.UpdatedAt = DateTime.UtcNow;
-                        await _unitOfWork.Shipments.Update(shipment);
-                    }
-            }
-
-            await RollbackOrderInventoryAndPromotionAsync(order);
-            await _unitOfWork.Orders.Update(order);
-
-            // Thông báo cho user và seller
-            if (order.User != null)
-                await _notificationService.PushNotificationToUser(order.User.Id, new NotificationDto
-                {
-                    Title = $"Đơn hàng #{order.Id} đã được hủy",
-                    Message = "Bạn đã chủ động hủy thanh toán cho đơn hàng này.",
-                    Type = NotificationType.Order,
-                    SourceUrl = null
-                });
-            if (order.Seller?.User != null)
-            {
-                var buyerName = order.User?.FullName ?? order.User?.Email ?? "Khách hàng";
-                var sellerMsg = $@"
-                Đơn hàng #{order.Id} của khách <b>{buyerName}</b> đã bị hủy bởi khách hàng.<br/>
-                Vui lòng kiểm tra lại trạng thái đơn hàng trong hệ thống.";
-                await _notificationService.PushNotificationToUser(order.Seller.UserId, new NotificationDto
-                {
-                    Title = $"Đơn hàng #{order.Id} đã bị hủy",
-                    Message = sellerMsg,
-                    Type = NotificationType.Order,
-                    SourceUrl = null
-                });
-            }
-        }
-
-        // Vô hiệu hóa link/session thanh toán Stripe cho nhóm
-        await _stripeService.DisableStripeGroupPaymentSessionAsync(checkoutGroupId, orders);
-        _loggerService.Info($"Cancelled succesfully payment for group order {checkoutGroupId}.");
-
-        await _unitOfWork.SaveChangesAsync();
-    }
-
-    public async Task<List<OrderDto>> GetOrderByCheckoutGroupId(Guid groupId)
-    {
-        var userId = _claimsService.CurrentUserId;
-        var orders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.UserId == userId && !o.IsDeleted && o.CheckoutGroupId == groupId)
-            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
-            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
-            .Include(o => o.ShippingAddress)
-            .Include(o => o.Seller).ThenInclude(s => s.User)
-            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
-            .OrderByDescending(o => o.PlacedAt)
-            .ToListAsync();
-
-        return orders.Select(OrderDtoMapper.ToOrderDto).ToList();
-    }
-
-  
-
-
-    /// <summary>
-    /// Rollback product, blindbox, promotion usage, and user usage count for a canceled or expired order.
-    /// </summary>
-    public async Task RollbackOrderInventoryAndPromotionAsync(Order order)
-    {
-        // 1. Rollback product quantity
-        foreach (var detail in order.OrderDetails)
-            if (detail.ProductId.HasValue)
-            {
-                var product = await _unitOfWork.Products.GetByIdAsync(detail.ProductId.Value);
-                if (product != null)
-                {
-                    product.TotalStockQuantity += detail.Quantity;
-                    await _unitOfWork.Products.Update(product);
-                }
-            }
-            else if (detail.BlindBoxId.HasValue)
-            {
-                var blindBox = await _unitOfWork.BlindBoxes.GetByIdAsync(detail.BlindBoxId.Value);
-                if (blindBox != null)
-                {
-                    blindBox.TotalQuantity += detail.Quantity;
-                    await _unitOfWork.BlindBoxes.Update(blindBox);
-                }
-            }
-
-        // 2. Rollback promotion usage limit and user usage count
-        foreach (var osp in order.OrderSellerPromotions)
-        {
-            // Rollback Promotion.UsageLimit
-            var promotion = await _unitOfWork.Promotions.GetByIdAsync(osp.PromotionId);
-            if (promotion != null && promotion.UsageLimit.HasValue)
-            {
-                promotion.UsageLimit += 1;
-                await _unitOfWork.Promotions.Update(promotion);
-            }
-
-            // Rollback PromotionUserUsage.UsageCount
-            var userUsage = await _unitOfWork.PromotionUserUsages.GetQueryable()
-                .Where(u => u.PromotionId == osp.PromotionId && u.UserId == order.UserId)
-                .FirstOrDefaultAsync();
-
-            if (userUsage != null && userUsage.UsageCount > 0)
-            {
-                userUsage.UsageCount -= 1;
-                userUsage.LastUsedAt = DateTime.UtcNow;
-                await _unitOfWork.PromotionUserUsages.Update(userUsage);
-            }
-        }
-
-        // await _unitOfWork.SaveChangesAsync();
-    }
-
-    public async Task<Pagination<OrderDto>> GetAllOrdersForAdminAsync(OrderAdminQueryParameter param)
-    {
-        var query = _unitOfWork.Orders.GetQueryable()
-            .Include(o => o.OrderDetails).ThenInclude(od => od.Product)
-            .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-            .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
-            .Include(o => o.ShippingAddress)
-            .Include(o => o.User)
-            .Include(o => o.Seller).ThenInclude(s => s.User)
-            .Include(o => o.Payment).ThenInclude(p => p.Transactions)
-            .AsNoTracking()
-            .Where(o => !o.IsDeleted);
-
-        if (param.Status.HasValue)
-            query = query.Where(o => o.Status == param.Status.Value.ToString());
-        if (param.PlacedFrom.HasValue)
-            query = query.Where(o => o.PlacedAt >= param.PlacedFrom.Value);
-        if (param.PlacedTo.HasValue)
-            query = query.Where(o => o.PlacedAt <= param.PlacedTo.Value);
-        if (param.CheckoutGroupId.HasValue && param.CheckoutGroupId.Value != Guid.Empty)
-            query = query.Where(o => o.CheckoutGroupId == param.CheckoutGroupId.Value);
-        if (param.SellerId.HasValue)
-            query = query.Where(o => o.SellerId == param.SellerId.Value);
-        if (param.UserId.HasValue)
-            query = query.Where(o => o.UserId == param.UserId.Value);
-
-        query = param.Desc
-            ? query.OrderByDescending(o => o.UpdatedAt ?? o.CreatedAt)
-            : query.OrderBy(o => o.UpdatedAt ?? o.CreatedAt);
-
-        var totalCount = await query.CountAsync();
-        var orders = param.PageIndex == 0
-            ? await query.ToListAsync()
-            : await query.Skip((param.PageIndex - 1) * param.PageSize).Take(param.PageSize).ToListAsync();
-
-        var dtos = orders.Select(OrderDtoMapper.ToOrderDto).ToList();
-        return new Pagination<OrderDto>(dtos, totalCount, param.PageIndex, param.PageSize);
     }
 }

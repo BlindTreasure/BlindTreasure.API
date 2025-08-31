@@ -5,12 +5,11 @@ using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System.Globalization;
 
 namespace BlindTreasure.Application.Services;
 
 /// <summary>
-/// DTO dùng cho thống kê order detail, thay thế anonymous type.
+///     DTO dùng cho thống kê order detail, thay thế anonymous type.
 /// </summary>
 public class OrderDetailStatisticsItem
 {
@@ -81,8 +80,127 @@ public class SellerStatisticsService : ISellerStatisticsService
         };
     }
 
+    // API methods - FIX: All use centralized GetOrdersInRangeAsync
+    public async Task<SellerOverviewStatisticsDto> GetOverviewStatisticsAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
+        var orderDetails = orders.SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .ToList();
+
+        return await BuildOverviewStatisticsAsync(orders, orderDetails, req, start, end, ct, sellerId);
+    }
+
+    public async Task<List<TopSellingProductDto>> GetTopProductsAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
+        var orderDetails = orders.SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .ToList();
+
+        return BuildTopProducts(orderDetails);
+    }
+
+    public async Task<List<TopSellingBlindBoxDto>> GetTopBlindBoxesAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
+        var orderDetails = orders.SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .ToList();
+
+        return BuildTopBlindBoxes(orderDetails);
+    }
+
+    public async Task<List<OrderStatusStatisticsDto>> GetOrderStatusStatisticsAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
+        var orderDetails = orders.SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .ToList();
+
+        return BuildOrderStatusStatistics(orderDetails);
+    }
+
+    public async Task<SellerStatisticsResponseDto> GetTimeSeriesStatisticsAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
+        var orderDetails = orders.SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .ToList();
+        var result = await BuildTimeSeriesData(sellerId, req.Range, start, end);
+        return result;
+    }
+
+    public async Task<SellerRevenueSummaryDto> GetRevenueSummaryAsync(
+        Guid sellerId,
+        SellerStatisticsRequestDto req,
+        CancellationToken ct = default)
+    {
+        var (start, end) = GetStatisticsDateRange(req);
+
+        // Estimated: PAID orders (using PlacedAt)
+        var paidOrders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == sellerId
+                        && o.Status == OrderStatus.PAID.ToString()
+                        && o.PlacedAt >= start && o.PlacedAt < end
+                        && !o.IsDeleted)
+            .Include(o => o.OrderDetails)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var estimatedRevenue = paidOrders
+            .SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+
+        // Actual: COMPLETED orders (using CompletedAt)
+        var completedOrders = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == sellerId
+                        && o.Status == OrderStatus.COMPLETED.ToString()
+                        && o.CompletedAt >= start && o.CompletedAt < end
+                        && !o.IsDeleted)
+            .Include(o => o.OrderDetails)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var actualRevenue = completedOrders
+            .SelectMany(o => o.OrderDetails)
+            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
+            .Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
+
+        return new SellerRevenueSummaryDto
+        {
+            EstimatedRevenue = decimal.Round(estimatedRevenue, 2),
+            ActualRevenue = decimal.Round(actualRevenue, 2),
+            EstimatedOrderCount = paidOrders.Count,
+            ActualOrderCount = completedOrders.Count,
+            PeriodStart = start,
+            PeriodEnd = end
+        };
+    }
+
     /// <summary>
-    /// Centralized method to get orders in date range - FIX: Use COMPLETED orders and CompletedAt
+    ///     Centralized method to get orders in date range - FIX: Use COMPLETED orders and CompletedAt
     /// </summary>
     private async Task<List<Order>> GetOrdersInRangeAsync(
         Guid sellerId,
@@ -405,125 +523,6 @@ public class SellerStatisticsService : ISellerStatisticsService
             StatisticsTimeRange.Year => (start.AddYears(-1), start),
             StatisticsTimeRange.Custom => (start - period, start),
             _ => (start.AddDays(-1), start)
-        };
-    }
-
-    // API methods - FIX: All use centralized GetOrdersInRangeAsync
-    public async Task<SellerOverviewStatisticsDto> GetOverviewStatisticsAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
-        var orderDetails = orders.SelectMany(o => o.OrderDetails)
-            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
-            .ToList();
-
-        return await BuildOverviewStatisticsAsync(orders, orderDetails, req, start, end, ct, sellerId);
-    }
-
-    public async Task<List<TopSellingProductDto>> GetTopProductsAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
-        var orderDetails = orders.SelectMany(o => o.OrderDetails)
-            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
-            .ToList();
-
-        return BuildTopProducts(orderDetails);
-    }
-
-    public async Task<List<TopSellingBlindBoxDto>> GetTopBlindBoxesAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
-        var orderDetails = orders.SelectMany(o => o.OrderDetails)
-            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
-            .ToList();
-
-        return BuildTopBlindBoxes(orderDetails);
-    }
-
-    public async Task<List<OrderStatusStatisticsDto>> GetOrderStatusStatisticsAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
-        var orderDetails = orders.SelectMany(o => o.OrderDetails)
-            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
-            .ToList();
-
-        return BuildOrderStatusStatistics(orderDetails);
-    }
-
-    public async Task<SellerStatisticsResponseDto> GetTimeSeriesStatisticsAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-        var orders = await GetOrdersInRangeAsync(sellerId, start, end, ct);
-        var orderDetails = orders.SelectMany(o => o.OrderDetails)
-            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
-            .ToList();
-        var result = await BuildTimeSeriesData(sellerId, req.Range, start, end);
-        return result;
-    }
-
-    public async Task<SellerRevenueSummaryDto> GetRevenueSummaryAsync(
-        Guid sellerId,
-        SellerStatisticsRequestDto req,
-        CancellationToken ct = default)
-    {
-        var (start, end) = GetStatisticsDateRange(req);
-
-        // Estimated: PAID orders (using PlacedAt)
-        var paidOrders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == sellerId
-                        && o.Status == OrderStatus.PAID.ToString()
-                        && o.PlacedAt >= start && o.PlacedAt < end
-                        && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .AsNoTracking()
-            .ToListAsync(ct);
-
-        var estimatedRevenue = paidOrders
-            .SelectMany(o => o.OrderDetails)
-            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
-            .Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
-
-        // Actual: COMPLETED orders (using CompletedAt)
-        var completedOrders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.SellerId == sellerId
-                        && o.Status == OrderStatus.COMPLETED.ToString()
-                        && o.CompletedAt >= start && o.CompletedAt < end
-                        && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .AsNoTracking()
-            .ToListAsync(ct);
-
-        var actualRevenue = completedOrders
-            .SelectMany(o => o.OrderDetails)
-            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
-            .Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
-
-        return new SellerRevenueSummaryDto
-        {
-            EstimatedRevenue = decimal.Round(estimatedRevenue, 2),
-            ActualRevenue = decimal.Round(actualRevenue, 2),
-            EstimatedOrderCount = paidOrders.Count,
-            ActualOrderCount = completedOrders.Count,
-            PeriodStart = start,
-            PeriodEnd = end
         };
     }
 }

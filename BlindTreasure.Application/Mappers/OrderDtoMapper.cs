@@ -6,7 +6,6 @@ using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.TransactionDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.IdentityModel.Tokens;
 
 namespace BlindTreasure.Application.Mappers;

@@ -3,11 +3,6 @@ using BlindTreasure.Domain.DTOs.AdminStatisticDTOs;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BlindTreasure.Application.Services;
 
@@ -23,78 +18,6 @@ public class AdminPlatformRevenueService
         _logger = logger;
         _unitOfWork = unitOfWork;
     }
-
-    #region Helper Methods
-
-    private (DateTime Start, DateTime End) GetDateRange(AdminRevenueRequestDto req)
-    {
-        var now = DateTime.UtcNow;
-        DateTime start, end;
-
-        switch (req.Range)
-        {
-            case AdminRevenueRange.Today:
-                start = DateTime.SpecifyKind(now.Date, DateTimeKind.Utc);
-                end = start.AddDays(1);
-                break;
-
-            case AdminRevenueRange.Week:
-                var weekBase = now.Date;
-                var diff = (7 + (int)weekBase.DayOfWeek - (int)DayOfWeek.Monday) % 7;
-                start = DateTime.SpecifyKind(weekBase.AddDays(-diff), DateTimeKind.Utc);
-                end = start.AddDays(7);
-                break;
-
-            case AdminRevenueRange.Month:
-                start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-                end = start.AddMonths(1);
-                break;
-
-            case AdminRevenueRange.Quarter:
-                var quarter = (now.Month - 1) / 3 + 1;
-                start = new DateTime(now.Year, (quarter - 1) * 3 + 1, 1, 0, 0, 0, DateTimeKind.Utc);
-                end = start.AddMonths(3);
-                break;
-
-            case AdminRevenueRange.Year:
-                start = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-                end = start.AddYears(1);
-                break;
-
-            case AdminRevenueRange.Custom:
-                start = req.StartDate.HasValue
-                    ? DateTime.SpecifyKind(req.StartDate.Value.Date, DateTimeKind.Utc)
-                    : DateTime.SpecifyKind(now.Date, DateTimeKind.Utc);
-                end = req.EndDate.HasValue
-                    ? DateTime.SpecifyKind(req.EndDate.Value.Date, DateTimeKind.Utc).AddDays(1)
-                    : start.AddDays(1);
-                break;
-
-            default:
-                start = DateTime.SpecifyKind(now.Date, DateTimeKind.Utc);
-                end = start.AddDays(1);
-                break;
-        }
-
-        return (start, end);
-    }
-
-    private (DateTime Start, DateTime End) GetPreviousDateRange(AdminRevenueRange range, DateTime start, DateTime end)
-    {
-        var period = end - start;
-        return range switch
-        {
-            AdminRevenueRange.Today => (start.AddDays(-1), start),
-            AdminRevenueRange.Week => (start.AddDays(-7), start),
-            AdminRevenueRange.Month => (start.AddMonths(-1), start),
-            AdminRevenueRange.Quarter => (start.AddMonths(-3), start),
-            AdminRevenueRange.Year => (start.AddYears(-1), start),
-            AdminRevenueRange.Custom => (start - period, start),
-            _ => (start.AddDays(-1), start)
-        };
-    }
-
-    #endregion
 
     private async Task<PlatformTimeSeriesDto> BuildTimeSeriesDataAsync(
         DateTime start,
@@ -202,4 +125,76 @@ public class AdminPlatformRevenueService
             PeriodEnd = endDate
         };
     }
+
+    #region Helper Methods
+
+    private (DateTime Start, DateTime End) GetDateRange(AdminRevenueRequestDto req)
+    {
+        var now = DateTime.UtcNow;
+        DateTime start, end;
+
+        switch (req.Range)
+        {
+            case AdminRevenueRange.Today:
+                start = DateTime.SpecifyKind(now.Date, DateTimeKind.Utc);
+                end = start.AddDays(1);
+                break;
+
+            case AdminRevenueRange.Week:
+                var weekBase = now.Date;
+                var diff = (7 + (int)weekBase.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+                start = DateTime.SpecifyKind(weekBase.AddDays(-diff), DateTimeKind.Utc);
+                end = start.AddDays(7);
+                break;
+
+            case AdminRevenueRange.Month:
+                start = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+                end = start.AddMonths(1);
+                break;
+
+            case AdminRevenueRange.Quarter:
+                var quarter = (now.Month - 1) / 3 + 1;
+                start = new DateTime(now.Year, (quarter - 1) * 3 + 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                end = start.AddMonths(3);
+                break;
+
+            case AdminRevenueRange.Year:
+                start = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                end = start.AddYears(1);
+                break;
+
+            case AdminRevenueRange.Custom:
+                start = req.StartDate.HasValue
+                    ? DateTime.SpecifyKind(req.StartDate.Value.Date, DateTimeKind.Utc)
+                    : DateTime.SpecifyKind(now.Date, DateTimeKind.Utc);
+                end = req.EndDate.HasValue
+                    ? DateTime.SpecifyKind(req.EndDate.Value.Date, DateTimeKind.Utc).AddDays(1)
+                    : start.AddDays(1);
+                break;
+
+            default:
+                start = DateTime.SpecifyKind(now.Date, DateTimeKind.Utc);
+                end = start.AddDays(1);
+                break;
+        }
+
+        return (start, end);
+    }
+
+    private (DateTime Start, DateTime End) GetPreviousDateRange(AdminRevenueRange range, DateTime start, DateTime end)
+    {
+        var period = end - start;
+        return range switch
+        {
+            AdminRevenueRange.Today => (start.AddDays(-1), start),
+            AdminRevenueRange.Week => (start.AddDays(-7), start),
+            AdminRevenueRange.Month => (start.AddMonths(-1), start),
+            AdminRevenueRange.Quarter => (start.AddMonths(-3), start),
+            AdminRevenueRange.Year => (start.AddYears(-1), start),
+            AdminRevenueRange.Custom => (start - period, start),
+            _ => (start.AddDays(-1), start)
+        };
+    }
+
+    #endregion
 }

@@ -24,16 +24,16 @@ namespace BlindTreasure.Application.Services;
 
 public class UnboxingService : IUnboxingService
 {
-    private readonly IClaimsService _claimsService;
-    private readonly ICurrentTime _currentTime;
-    private readonly ILoggerService _loggerService;
-    private readonly INotificationService _notificationService;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IHubContext<UnboxingHub> _notificationHub;
     private readonly IAdminService _adminService;
     private readonly IBlindBoxService _blindBoxService;
-    private readonly IEmailService _emailService;
     private readonly ICacheService _cacheService;
+    private readonly IClaimsService _claimsService;
+    private readonly ICurrentTime _currentTime;
+    private readonly IEmailService _emailService;
+    private readonly ILoggerService _loggerService;
+    private readonly IHubContext<UnboxingHub> _notificationHub;
+    private readonly INotificationService _notificationService;
+    private readonly IUnitOfWork _unitOfWork;
 
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
@@ -133,7 +133,7 @@ public class UnboxingService : IUnboxingService
     {
         // Nếu request giữ nguyên mặc định paging => coi như không phân trang
         PaginationParameter? paging = null;
-        if (!(request.PageIndex == 1 && request.PageSize == 5 && request.Desc == true)) paging = request;
+        if (!(request.PageIndex == 1 && request.PageSize == 5 && request.Desc)) paging = request;
 
         var logs = await GetLogsForExportAsync(
             paging,
@@ -192,82 +192,6 @@ public class UnboxingService : IUnboxingService
             if (stream.CanSeek) stream.Position = 0;
             return stream;
         }
-    }
-
-    private async Task<List<UnboxLogDto>> GetLogsForExportAsync(PaginationParameter? param, Guid? userId,
-        Guid? productId, DateTime? fromDate, DateTime? toDate)
-    {
-        var query = _unitOfWork.BlindBoxUnboxLogs.GetQueryable()
-            .Include(x => x.User)
-            .Where(x => !x.IsDeleted)
-            .AsNoTracking();
-
-        var currentUserId = _claimsService.CurrentUserId;
-        var user = await _adminService.GetUserById(currentUserId);
-
-        // Seller filter giống GetLogsAsync: nếu current user là Seller thì chỉ lấy logs liên quan tới seller đó
-        if (user != null && user.RoleName == RoleType.Seller)
-        {
-            var seller = await _unitOfWork.Sellers.GetQueryable()
-                .FirstOrDefaultAsync(s => s.UserId == currentUserId);
-
-            if (seller != null)
-                query = query.Where(x => _unitOfWork.Products.GetQueryable()
-                    .Any(p => p.Id == x.ProductId && p.SellerId == seller.Id));
-            else
-                return new List<UnboxLogDto>();
-        }
-
-        // Filter theo userId/productId nếu có
-        if (userId.HasValue)
-            query = query.Where(x => x.UserId == userId.Value);
-
-        if (productId.HasValue)
-            query = query.Where(x => x.ProductId == productId.Value);
-
-        // Filter theo fromDate/toDate nếu có (inclusive)
-        if (fromDate.HasValue)
-            query = query.Where(x => x.UnboxedAt >= fromDate.Value);
-
-        if (toDate.HasValue)
-            query = query.Where(x => x.UnboxedAt <= toDate.Value);
-
-        // Sort mới nhất trước
-        query = query.OrderByDescending(x => x.UnboxedAt);
-
-        // Nếu client truyền paging (param != null && param.PageIndex > 0) => áp dụng paging
-        List<BlindBoxUnboxLog> items;
-        if (param != null && param.PageIndex > 0)
-        {
-            var pageSize = param.PageSize > 0 ? param.PageSize : 50;
-            items = await query
-                .Skip((param.PageIndex - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-        }
-        else
-        {
-            // Mặc định xuất hết dữ liệu — BE CẢNH BÁO: nếu bảng quá lớn có thể ảnh hưởng performance
-            items = await query.ToListAsync();
-        }
-
-        // Map sang DTO
-        var dtos = items.Select(x => new UnboxLogDto
-        {
-            Id = x.Id,
-            CustomerBlindBoxId = x.CustomerBlindBoxId,
-            CustomerName = x.User?.FullName ?? "N/A",
-            ProductId = x.ProductId,
-            ProductName = x.ProductName,
-            Rarity = x.Rarity,
-            DropRate = x.DropRate,
-            RollValue = x.RollValue,
-            UnboxedAt = x.UnboxedAt,
-            BlindBoxName = x.BlindBoxName ?? "N/A",
-            Reason = x.Reason ?? "N/A"
-        }).ToList();
-
-        return dtos;
     }
 
     public async Task<Pagination<UnboxLogDto>> GetLogsAsync(PaginationParameter param, Guid? userId, Guid? productId)
@@ -355,6 +279,82 @@ public class UnboxingService : IUnboxingService
             .ToList();
     }
 
+    private async Task<List<UnboxLogDto>> GetLogsForExportAsync(PaginationParameter? param, Guid? userId,
+        Guid? productId, DateTime? fromDate, DateTime? toDate)
+    {
+        var query = _unitOfWork.BlindBoxUnboxLogs.GetQueryable()
+            .Include(x => x.User)
+            .Where(x => !x.IsDeleted)
+            .AsNoTracking();
+
+        var currentUserId = _claimsService.CurrentUserId;
+        var user = await _adminService.GetUserById(currentUserId);
+
+        // Seller filter giống GetLogsAsync: nếu current user là Seller thì chỉ lấy logs liên quan tới seller đó
+        if (user != null && user.RoleName == RoleType.Seller)
+        {
+            var seller = await _unitOfWork.Sellers.GetQueryable()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId);
+
+            if (seller != null)
+                query = query.Where(x => _unitOfWork.Products.GetQueryable()
+                    .Any(p => p.Id == x.ProductId && p.SellerId == seller.Id));
+            else
+                return new List<UnboxLogDto>();
+        }
+
+        // Filter theo userId/productId nếu có
+        if (userId.HasValue)
+            query = query.Where(x => x.UserId == userId.Value);
+
+        if (productId.HasValue)
+            query = query.Where(x => x.ProductId == productId.Value);
+
+        // Filter theo fromDate/toDate nếu có (inclusive)
+        if (fromDate.HasValue)
+            query = query.Where(x => x.UnboxedAt >= fromDate.Value);
+
+        if (toDate.HasValue)
+            query = query.Where(x => x.UnboxedAt <= toDate.Value);
+
+        // Sort mới nhất trước
+        query = query.OrderByDescending(x => x.UnboxedAt);
+
+        // Nếu client truyền paging (param != null && param.PageIndex > 0) => áp dụng paging
+        List<BlindBoxUnboxLog> items;
+        if (param != null && param.PageIndex > 0)
+        {
+            var pageSize = param.PageSize > 0 ? param.PageSize : 50;
+            items = await query
+                .Skip((param.PageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+        }
+        else
+        {
+            // Mặc định xuất hết dữ liệu — BE CẢNH BÁO: nếu bảng quá lớn có thể ảnh hưởng performance
+            items = await query.ToListAsync();
+        }
+
+        // Map sang DTO
+        var dtos = items.Select(x => new UnboxLogDto
+        {
+            Id = x.Id,
+            CustomerBlindBoxId = x.CustomerBlindBoxId,
+            CustomerName = x.User?.FullName ?? "N/A",
+            ProductId = x.ProductId,
+            ProductName = x.ProductName,
+            Rarity = x.Rarity,
+            DropRate = x.DropRate,
+            RollValue = x.RollValue,
+            UnboxedAt = x.UnboxedAt,
+            BlindBoxName = x.BlindBoxName ?? "N/A",
+            Reason = x.Reason ?? "N/A"
+        }).ToList();
+
+        return dtos;
+    }
+
     #region Private methods
 
     private string BuildUnboxReasonForFrontend(
@@ -383,7 +383,7 @@ public class UnboxingService : IUnboxingService
         sb.AppendLine();
         sb.AppendLine($"- **Random Seed:** {Math.Round(roll, 6)} (Giá trị ngẫu nhiên sinh ra)");
         sb.AppendLine($"- **Tổng xác suất:** {Math.Round(totalProbability, 4)}% (Tổng tỷ lệ của tất cả items)");
-        sb.AppendLine($"- **Thuật toán:** Weighted Random (Phương pháp chọn item)");
+        sb.AppendLine("- **Thuật toán:** Weighted Random (Phương pháp chọn item)");
         sb.AppendLine();
 
         // PROBABILITY DISTRIBUTION LIST
@@ -519,7 +519,7 @@ public class UnboxingService : IUnboxingService
 
 
     /// <summary>
-    /// Cấp vật phẩm mở được cho user, trừ stock, tính lại drop rate và thêm vào inventory
+    ///     Cấp vật phẩm mở được cho user, trừ stock, tính lại drop rate và thêm vào inventory
     /// </summary>
     private async Task GrantUnboxedItemToUser(
         BlindBoxItem selectedItem,
@@ -583,12 +583,12 @@ public class UnboxingService : IUnboxingService
     }
 
     /// <summary>
-    /// Cập nhật DropRate cho tất cả item trong BlindBox sau khi stock thay đổi
+    ///     Cập nhật DropRate cho tất cả item trong BlindBox sau khi stock thay đổi
     /// </summary>
     /// <summary>
-    /// Cập nhật DropRate cho tất cả item trong BlindBox sau khi stock thay đổi
-    /// - Nếu có item Common hết hàng => disable box + gửi email cho Seller
-    /// - Nếu còn stock => tính toán lại DropRate dựa trên Quantity và Weight
+    ///     Cập nhật DropRate cho tất cả item trong BlindBox sau khi stock thay đổi
+    ///     - Nếu có item Common hết hàng => disable box + gửi email cho Seller
+    ///     - Nếu còn stock => tính toán lại DropRate dựa trên Quantity và Weight
     /// </summary>
     private async Task UpdateDropRatesAfterUnboxingAsync(BlindBox blindBox)
     {
@@ -717,7 +717,7 @@ public class UnboxingService : IUnboxingService
     {
         if (blindBox == null || item == null) return;
 
-        blindBox.Status = BlindBoxStatus.Rejected;
+        blindBox.Status = BlindBoxStatus.PendingApproval;
         await _unitOfWork.BlindBoxes.Update(blindBox);
 
         // Persist status change ngay lập tức

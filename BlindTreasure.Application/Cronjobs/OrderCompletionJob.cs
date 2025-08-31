@@ -1,5 +1,4 @@
 ﻿using BlindTreasure.Application.Interfaces;
-using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -11,8 +10,8 @@ namespace BlindTreasure.Application.Cronjobs;
 
 public class OrderCompletionJob : BackgroundService
 {
-    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<OrderCompletionJob> _logger;
+    private readonly IServiceProvider _serviceProvider;
 
     public OrderCompletionJob(IServiceProvider serviceProvider, ILogger<OrderCompletionJob> logger)
     {

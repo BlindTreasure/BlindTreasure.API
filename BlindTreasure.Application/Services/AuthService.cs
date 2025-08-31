@@ -123,29 +123,35 @@ public class AuthService : IAuthService
     {
         _logger.Info($"[LoginAsync] Login attempt for {loginDto.Email}");
 
-        // Get user from cache or DBB
-        var user = await GetUserByEmailAsync(loginDto.Email!, false);
-        var seller = new Seller();
-        if (user.RoleName.ToString() == RoleType.Seller.ToString())
-        {
-            seller = await GetSellerByUserIdAsync(user.Id);
-            user.Seller = seller;
-        }
+        // Lấy user từ DB (không dùng cache ở bước đầu để đảm bảo tính chính xác)
+        var user = await GetUserByEmailAsync(loginDto.Email!);
 
+        // ✅ Check null sớm: nếu không tồn tại thì throw NotFound
         if (user == null)
             throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
 
-        if (!loginDto.IsLoginGoole.Value)
+        // Nếu là Seller thì lấy thêm thông tin Seller
+        if (user.RoleName == RoleType.Seller)
+        {
+            var seller = await GetSellerByUserIdAsync(user.Id);
+            if (seller == null)
+                throw ErrorHelper.NotFound("Không tìm thấy thông tin người dùng");
+
+            user.Seller = seller;
+        }
+
+        // Nếu không phải login Google thì verify password
+        if (!loginDto.IsLoginGoole.GetValueOrDefault())
             if (!new PasswordHasher().VerifyPassword(loginDto.Password!, user.Password))
                 throw ErrorHelper.Unauthorized(ErrorMessages.AccountWrongPassword);
 
-
+        // Check account status
         if (user.Status != UserStatus.Active)
             throw ErrorHelper.Forbidden(ErrorMessages.AccountNotVerified);
 
-
         _logger.Success($"[LoginAsync] User {loginDto.Email} authenticated successfully.");
 
+        // Generate JWT & RefreshToken
         var accessToken = JwtUtils.GenerateJwtToken(
             user.Id,
             user.Email,
@@ -160,8 +166,11 @@ public class AuthService : IAuthService
 
         await _unitOfWork.Users.Update(user);
         await _unitOfWork.SaveChangesAsync();
+
+        // Cache user
         await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
 
+        // Push welcome notification nếu chưa gửi
         await SendWelcomeNotificationIfNotSentAsync(user);
 
         _logger.Info($"[LoginAsync] Tokens generated and user cache updated for {user.Email}");
@@ -435,15 +444,21 @@ public class AuthService : IAuthService
             var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
             if (cachedUser != null) return cachedUser;
 
-            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
-            if (user != null)
-                await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
-            else
+            var userFromDb = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+            if (userFromDb == null)
                 throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
-            return user;
+
+            await _cacheService.SetAsync(cacheKey, userFromDb, TimeSpan.FromHours(1));
+            return userFromDb;
         }
 
-        return await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
+        var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
+
+        // ✅ Bắt buộc throw NotFound nếu null
+        if (user == null)
+            throw ErrorHelper.NotFound(ErrorMessages.AccountNotFound);
+
+        return user;
     }
 
     private async Task<Seller?> GetSellerByUserIdAsync(Guid userId)

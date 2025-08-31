@@ -10,19 +10,8 @@ namespace BlindTreasure.Application.Services.ThirdParty.AIModels;
 public class GeminiService : IGeminiService
 {
     private readonly string _apiKey;
-    private readonly HttpClient _httpClient;
     private readonly ICacheService _cache;
-
-
-    // Danh sách model khả dụng
-    public static class GeminiModels
-    {
-        public const string Pro = "gemini-2.5-pro";
-        public const string Flash = "gemini-2.5-flash";
-        public const string FlashLite = "gemini-2.5-flash-lite-preview";
-        public const string FlashV2 = "gemini-2.0-flash";
-        public const string FlashLiteV2 = "gemini-2.0-flash-lite";
-    }
+    private readonly HttpClient _httpClient;
 
     public GeminiService(IHttpClientFactory httpClientFactory, IConfiguration config, ICacheService cache)
     {
@@ -32,90 +21,8 @@ public class GeminiService : IGeminiService
                   ?? throw new Exception("Gemini API key not configured.");
     }
 
-    private async Task<AiMemory> LoadMemoryAsync(Guid userId)
-    {
-        var mem = await _cache.GetAsync<AiMemory>(AiMemKeys.MemoryKey(userId));
-        return mem ?? new AiMemory();
-    }
-
-    private async Task SaveMemoryAsync(Guid userId, AiMemory mem)
-    {
-        mem.UpdatedAt = DateTime.UtcNow;
-        await _cache.SetAsync(AiMemKeys.MemoryKey(userId), mem, TimeSpan.FromDays(90));
-    }
-
-    private static string BuildMemoryPreface(AiMemory mem)
-    {
-        var facts = mem.Facts?.Count > 0
-            ? "- " + string.Join("\n- ", mem.Facts)
-            : "- (chưa có)";
-        var summary = string.IsNullOrWhiteSpace(mem.Summary) ? "(chưa có)" : mem.Summary;
-
-        return $"""
-                [USER PROFILE – dùng nội bộ]
-                Summary: {summary}
-                Facts:
-                {facts}
-                """;
-    }
-
-    private static void ApplyPatch(AiMemory mem, MemoryPatch patch, int maxFacts = 20)
-    {
-        if (!patch.ShouldRemember) return;
-
-        var set = new HashSet<string>(mem.Facts ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
-        foreach (var f in patch.Facts) set.Add(f.Trim());
-        mem.Facts = set.Where(x => !string.IsNullOrWhiteSpace(x)).Take(maxFacts).ToList();
-
-        if (!string.IsNullOrWhiteSpace(patch.SummaryDelta))
-        {
-            var combined = (mem.Summary + " " + patch.SummaryDelta).Trim();
-            mem.Summary = combined.Length > 320 ? combined[..320] : combined;
-        }
-    }
-
-    private async Task<MemoryPatch> ExtractMemoryPatchAsync(string userUtterance)
-    {
-        var extractorPrompt = """
-                              Bạn là "Memory Extractor". Trích xuất các thông tin nên ghi nhớ lâu dài từ câu nói của user.
-
-                              CHỈ TRẢ VỀ JSON, KHÔNG THÊM TEXT KHÁC. Mẫu:
-                              {
-                                "shouldRemember": true,
-                                "facts": ["...","..."],
-                                "summaryDelta": "..."
-                              }
-                              """;
-
-        var full = extractorPrompt + "\n\n---\nUser said:\n" + userUtterance;
-
-        var url =
-            $"https://generativelanguage.googleapis.com/v1beta/models/{GeminiModels.Flash}:generateContent?key={_apiKey}";
-        var body = new
-        {
-            contents = new[] { new { parts = new[] { new { text = full } } } },
-            generationConfig = new { temperature = 0.1, maxOutputTokens = 400 }
-        };
-
-        var req = new HttpRequestMessage(HttpMethod.Post, url)
-        {
-            Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
-        };
-        var res = await _httpClient.SendAsync(req);
-        var json = await res.Content.ReadAsStringAsync();
-
-        if (!res.IsSuccessStatusCode) return new MemoryPatch();
-
-        using var doc = JsonDocument.Parse(json);
-        var text = doc.RootElement.GetProperty("candidates")[0]
-            .GetProperty("content").GetProperty("parts")[0]
-            .GetProperty("text").GetString() ?? "{}";
-
-        return JsonSerializer.Deserialize<MemoryPatch>(text) ?? new MemoryPatch();
-    }
-
     /// <summary>
-    /// Generate response từ Gemini AI với model linh hoạt
+    ///     Generate response từ Gemini AI với model linh hoạt
     /// </summary>
     /// <param name="userPrompt">Prompt của người dùng</param>
     /// <param name="modelName">Tên model (ví dụ: gemini-2.5-pro)</param>
@@ -244,6 +151,88 @@ public class GeminiService : IGeminiService
             "{\"isValid\": false, \"reasons\": [\"API validation không khả dụng, bài đánh giá cần kiểm duyệt thủ công.\"]}";
     }
 
+    private async Task<AiMemory> LoadMemoryAsync(Guid userId)
+    {
+        var mem = await _cache.GetAsync<AiMemory>(AiMemKeys.MemoryKey(userId));
+        return mem ?? new AiMemory();
+    }
+
+    private async Task SaveMemoryAsync(Guid userId, AiMemory mem)
+    {
+        mem.UpdatedAt = DateTime.UtcNow;
+        await _cache.SetAsync(AiMemKeys.MemoryKey(userId), mem, TimeSpan.FromDays(90));
+    }
+
+    private static string BuildMemoryPreface(AiMemory mem)
+    {
+        var facts = mem.Facts?.Count > 0
+            ? "- " + string.Join("\n- ", mem.Facts)
+            : "- (chưa có)";
+        var summary = string.IsNullOrWhiteSpace(mem.Summary) ? "(chưa có)" : mem.Summary;
+
+        return $"""
+                [USER PROFILE – dùng nội bộ]
+                Summary: {summary}
+                Facts:
+                {facts}
+                """;
+    }
+
+    private static void ApplyPatch(AiMemory mem, MemoryPatch patch, int maxFacts = 20)
+    {
+        if (!patch.ShouldRemember) return;
+
+        var set = new HashSet<string>(mem.Facts ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+        foreach (var f in patch.Facts) set.Add(f.Trim());
+        mem.Facts = set.Where(x => !string.IsNullOrWhiteSpace(x)).Take(maxFacts).ToList();
+
+        if (!string.IsNullOrWhiteSpace(patch.SummaryDelta))
+        {
+            var combined = (mem.Summary + " " + patch.SummaryDelta).Trim();
+            mem.Summary = combined.Length > 320 ? combined[..320] : combined;
+        }
+    }
+
+    private async Task<MemoryPatch> ExtractMemoryPatchAsync(string userUtterance)
+    {
+        var extractorPrompt = """
+                              Bạn là "Memory Extractor". Trích xuất các thông tin nên ghi nhớ lâu dài từ câu nói của user.
+
+                              CHỈ TRẢ VỀ JSON, KHÔNG THÊM TEXT KHÁC. Mẫu:
+                              {
+                                "shouldRemember": true,
+                                "facts": ["...","..."],
+                                "summaryDelta": "..."
+                              }
+                              """;
+
+        var full = extractorPrompt + "\n\n---\nUser said:\n" + userUtterance;
+
+        var url =
+            $"https://generativelanguage.googleapis.com/v1beta/models/{GeminiModels.Flash}:generateContent?key={_apiKey}";
+        var body = new
+        {
+            contents = new[] { new { parts = new[] { new { text = full } } } },
+            generationConfig = new { temperature = 0.1, maxOutputTokens = 400 }
+        };
+
+        var req = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json")
+        };
+        var res = await _httpClient.SendAsync(req);
+        var json = await res.Content.ReadAsStringAsync();
+
+        if (!res.IsSuccessStatusCode) return new MemoryPatch();
+
+        using var doc = JsonDocument.Parse(json);
+        var text = doc.RootElement.GetProperty("candidates")[0]
+            .GetProperty("content").GetProperty("parts")[0]
+            .GetProperty("text").GetString() ?? "{}";
+
+        return JsonSerializer.Deserialize<MemoryPatch>(text) ?? new MemoryPatch();
+    }
+
     // thêm helper này trong class GeminiService
     private static string NormalizeNewlines(string input)
     {
@@ -266,6 +255,17 @@ public class GeminiService : IGeminiService
         input = input.Trim();
 
         return input;
+    }
+
+
+    // Danh sách model khả dụng
+    public static class GeminiModels
+    {
+        public const string Pro = "gemini-2.5-pro";
+        public const string Flash = "gemini-2.5-flash";
+        public const string FlashLite = "gemini-2.5-flash-lite-preview";
+        public const string FlashV2 = "gemini-2.0-flash";
+        public const string FlashLiteV2 = "gemini-2.0-flash-lite";
     }
 }
 

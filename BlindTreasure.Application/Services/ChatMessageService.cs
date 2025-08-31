@@ -4,9 +4,7 @@ using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ChatDTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
-using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
-using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
@@ -14,19 +12,18 @@ using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualBasic;
 
 namespace BlindTreasure.Application.Services;
 
 public class ChatMessageService : IChatMessageService
 {
+    private readonly IBlobService _blobService;
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
-    private readonly ILoggerService _logger;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IHubContext<ChatHub> _hubContext;
-    private readonly IBlobService _blobService;
+    private readonly ILoggerService _logger;
     private readonly Dictionary<string, DateTime> _onlineUsers = new();
+    private readonly IUnitOfWork _unitOfWork;
 
     public ChatMessageService(ICacheService cacheService, IClaimsService claimsService, ILoggerService logger,
         IUnitOfWork unitOfWork, IHubContext<ChatHub> hubContext, IBlobService blobService)
@@ -106,79 +103,6 @@ public class ChatMessageService : IChatMessageService
     }
 
 
-    public async Task SaveImageMessageAsync(Guid senderId, Guid receiverId,
-        string imageUrl, string fileName, string fileSize, string mimeType)
-    {
-        var receiver = await _unitOfWork.Users.GetByIdAsync(receiverId);
-        if (receiver == null || receiver.IsDeleted)
-            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
-
-        var message = new ChatMessage
-        {
-            SenderId = senderId,
-            SenderType = ChatParticipantType.User,
-            ReceiverId = receiverId,
-            ReceiverType = ChatParticipantType.User,
-            Content = "[Hình ảnh]", // Nội dung mặc định cho ảnh
-            FileUrl = imageUrl,
-            FileName = fileName,
-            FileSize = fileSize,
-            FileMimeType = mimeType,
-            SentAt = DateTime.UtcNow,
-            IsRead = false,
-            MessageType = ChatMessageType.ImageMessage
-        };
-
-        await _unitOfWork.ChatMessages.AddAsync(message);
-        await _unitOfWork.SaveChangesAsync();
-
-        var previewKey = GetLastMessageCacheKey(senderId, receiverId);
-        await _cacheService.SetAsync(previewKey, message, TimeSpan.FromHours(1));
-
-        _logger.Info($"[Chat] {senderId} → {receiverId}: [Image: {imageUrl}]");
-    }
-
-    public async Task SaveInventoryItemMessageAsync(Guid senderId, Guid receiverId, Guid inventoryItemId,
-        string customMessage = "")
-    {
-        var receiver = await _unitOfWork.Users.GetByIdAsync(receiverId);
-        if (receiver == null || receiver.IsDeleted)
-            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
-
-        var inventoryItem = await _unitOfWork.InventoryItems.GetByIdAsync(inventoryItemId);
-        if (inventoryItem == null)
-            throw ErrorHelper.NotFound("Vật phẩm không tồn tại.");
-
-        if (inventoryItem.UserId != senderId)
-            throw ErrorHelper.Forbidden("Bạn không có quyền chia sẻ vật phẩm này.");
-
-        var content = string.IsNullOrEmpty(customMessage)
-            ? $"[Chia sẻ vật phẩm: {inventoryItem.Product?.Name ?? "Không xác định"}]"
-            : customMessage;
-
-        var message = new ChatMessage
-        {
-            SenderId = senderId,
-            SenderType = ChatParticipantType.User,
-            ReceiverId = receiverId,
-            ReceiverType = ChatParticipantType.User,
-            Content = content,
-            InventoryItemId = inventoryItemId,
-            SentAt = DateTime.UtcNow,
-            IsRead = false,
-            MessageType = ChatMessageType.InventoryItemMessage
-        };
-
-        await _unitOfWork.ChatMessages.AddAsync(message);
-        await _unitOfWork.SaveChangesAsync();
-
-        var previewKey = GetLastMessageCacheKey(senderId, receiverId);
-        await _cacheService.SetAsync(previewKey, message, TimeSpan.FromHours(1));
-
-        _logger.Info($"[Chat] {senderId} → {receiverId}: [InventoryItem: {inventoryItemId}]");
-    }
-
-
     public async Task SetUserOffline(string userId)
     {
         _onlineUsers.Remove(userId);
@@ -192,7 +116,7 @@ public class ChatMessageService : IChatMessageService
     }
 
     /// <summary>
-    /// Upload và gửi tin nhắn hình ảnh hoặc video
+    ///     Upload và gửi tin nhắn hình ảnh hoặc video
     /// </summary>
     /// <param name="senderId">ID người gửi</param>
     /// <param name="receiverId">ID người nhận</param>
@@ -279,7 +203,7 @@ public class ChatMessageService : IChatMessageService
 
 
     /// <summary>
-    /// Lấy danh sách cuộc trò chuyện của user hiện tại với một user khác
+    ///     Lấy danh sách cuộc trò chuyện của user hiện tại với một user khác
     /// </summary>
     /// <param name="currentUserId">ID người gửi</param>
     /// <param name="receiverId">ID người nhận</param>
@@ -871,6 +795,79 @@ public class ChatMessageService : IChatMessageService
 
         await _unitOfWork.ChatMessages.AddAsync(message);
         await _unitOfWork.SaveChangesAsync();
+    }
+
+
+    public async Task SaveImageMessageAsync(Guid senderId, Guid receiverId,
+        string imageUrl, string fileName, string fileSize, string mimeType)
+    {
+        var receiver = await _unitOfWork.Users.GetByIdAsync(receiverId);
+        if (receiver == null || receiver.IsDeleted)
+            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
+
+        var message = new ChatMessage
+        {
+            SenderId = senderId,
+            SenderType = ChatParticipantType.User,
+            ReceiverId = receiverId,
+            ReceiverType = ChatParticipantType.User,
+            Content = "[Hình ảnh]", // Nội dung mặc định cho ảnh
+            FileUrl = imageUrl,
+            FileName = fileName,
+            FileSize = fileSize,
+            FileMimeType = mimeType,
+            SentAt = DateTime.UtcNow,
+            IsRead = false,
+            MessageType = ChatMessageType.ImageMessage
+        };
+
+        await _unitOfWork.ChatMessages.AddAsync(message);
+        await _unitOfWork.SaveChangesAsync();
+
+        var previewKey = GetLastMessageCacheKey(senderId, receiverId);
+        await _cacheService.SetAsync(previewKey, message, TimeSpan.FromHours(1));
+
+        _logger.Info($"[Chat] {senderId} → {receiverId}: [Image: {imageUrl}]");
+    }
+
+    public async Task SaveInventoryItemMessageAsync(Guid senderId, Guid receiverId, Guid inventoryItemId,
+        string customMessage = "")
+    {
+        var receiver = await _unitOfWork.Users.GetByIdAsync(receiverId);
+        if (receiver == null || receiver.IsDeleted)
+            throw ErrorHelper.NotFound("Người nhận không tồn tại.");
+
+        var inventoryItem = await _unitOfWork.InventoryItems.GetByIdAsync(inventoryItemId);
+        if (inventoryItem == null)
+            throw ErrorHelper.NotFound("Vật phẩm không tồn tại.");
+
+        if (inventoryItem.UserId != senderId)
+            throw ErrorHelper.Forbidden("Bạn không có quyền chia sẻ vật phẩm này.");
+
+        var content = string.IsNullOrEmpty(customMessage)
+            ? $"[Chia sẻ vật phẩm: {inventoryItem.Product?.Name ?? "Không xác định"}]"
+            : customMessage;
+
+        var message = new ChatMessage
+        {
+            SenderId = senderId,
+            SenderType = ChatParticipantType.User,
+            ReceiverId = receiverId,
+            ReceiverType = ChatParticipantType.User,
+            Content = content,
+            InventoryItemId = inventoryItemId,
+            SentAt = DateTime.UtcNow,
+            IsRead = false,
+            MessageType = ChatMessageType.InventoryItemMessage
+        };
+
+        await _unitOfWork.ChatMessages.AddAsync(message);
+        await _unitOfWork.SaveChangesAsync();
+
+        var previewKey = GetLastMessageCacheKey(senderId, receiverId);
+        await _cacheService.SetAsync(previewKey, message, TimeSpan.FromHours(1));
+
+        _logger.Info($"[Chat] {senderId} → {receiverId}: [InventoryItem: {inventoryItemId}]");
     }
 
     private static string GetLastMessageCacheKey(Guid user1Id, Guid user2Id)
