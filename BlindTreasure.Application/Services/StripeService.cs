@@ -727,49 +727,6 @@ public class StripeService : IStripeService
     }
 
     /// <summary>
-    ///     Refund một order thuộc group payment (multi-order Stripe session).
-    ///     Tự động lấy paymentIntentId từ GroupPaymentSession, kiểm tra số tiền, gọi Stripe refund và lưu transaction.
-    /// </summary>
-    public async Task<Refund> RefundOrderAsync(Guid orderId)
-    {
-        // 1. Lấy order
-        var order = await _unitOfWork.Orders.GetQueryable()
-                        .Include(o => o.OrderDetails)
-                        .Include(o => o.OrderSellerPromotions)
-                        .Include(o => o.Payment)
-                        .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted)
-                    ?? throw ErrorHelper.NotFound("Order not found.");
-
-        // 2. Lấy group payment session
-        if (order.CheckoutGroupId == null)
-            throw ErrorHelper.BadRequest("Order does not belong to a group payment session.");
-
-        var groupSession = await _unitOfWork.GroupPaymentSessions
-                               .FirstOrDefaultAsync(s => s.CheckoutGroupId == order.CheckoutGroupId)
-                           ?? throw ErrorHelper.NotFound("Group payment session not found.");
-
-        if (string.IsNullOrEmpty(groupSession.PaymentIntentId))
-            throw ErrorHelper.BadRequest("PaymentIntentId not found for group session.");
-
-        // 3. Xác định số tiền cần refund cho order này
-        var refundAmount = order.FinalAmount ?? order.TotalAmount;
-        if (refundAmount <= 0)
-            throw ErrorHelper.BadRequest("Refund amount must be greater than zero.");
-
-        // 4. Gọi Stripe refund
-        var refund = await RefundPaymentAsync(groupSession.PaymentIntentId, refundAmount, order);
-
-        // 5. Lưu lại tổng số tiền đã refund cho order (nếu cần)
-        order.TotalRefundAmount = (order.TotalRefundAmount ?? 0) + refundAmount;
-        await _unitOfWork.Orders.Update(order);
-        await _unitOfWork.SaveChangesAsync();
-
-        _loggerService.Success($"Refunded {refundAmount} VND for order {order.Id} (Stripe refundId: {refund.Id})");
-
-        return refund;
-    }
-
-    /// <summary>
     ///     Tạo Stripe Coupon động cho đơn hàng
     /// </summary>
     private async Task<string> CreateStripeCouponForOrder(Guid orderId, decimal discountAmount)
@@ -964,4 +921,114 @@ public class StripeService : IStripeService
             throw ErrorHelper.BadRequest($"Stripe error: {ex.StripeError?.Message ?? ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Refund một order thuộc group payment (multi-order Stripe session).
+    /// Tự động lấy paymentIntentId từ GroupPaymentSession, kiểm tra số tiền, gọi Stripe refund và lưu transaction.
+    /// </summary>
+    public async Task<Refund> RefundOrderAsync(Guid orderId)
+    {
+        // 1. Lấy order
+        var order = await _unitOfWork.Orders.GetQueryable()
+    .Include(o => o.OrderDetails).ThenInclude(od => od.InventoryItems)
+    .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+    .Include(o => o.OrderSellerPromotions)
+    .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+    .Include(o => o.User)
+    .Include(o => o.Seller)
+    .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted)
+            ?? throw ErrorHelper.NotFound("Order not found.");
+
+        // 2. Lấy group payment session
+        if (order.CheckoutGroupId == null)
+            throw ErrorHelper.BadRequest("Order does not belong to a group payment session.");
+
+        var groupSession = await _unitOfWork.GroupPaymentSessions
+            .FirstOrDefaultAsync(s => s.CheckoutGroupId == order.CheckoutGroupId)
+            ?? throw ErrorHelper.NotFound("Group payment session not found.");
+
+        if (string.IsNullOrEmpty(groupSession.PaymentIntentId))
+            throw ErrorHelper.BadRequest("PaymentIntentId not found for group session.");
+
+        // 3. Xác định số tiền cần refund cho order này
+        var refundAmount = order.FinalAmount ?? order.TotalAmount;
+        if (refundAmount <= 0)
+            throw ErrorHelper.BadRequest("Refund amount must be greater than zero.");
+
+        // 4. Gọi Stripe refund
+        var refund = await RefundPaymentAsync(groupSession.PaymentIntentId, refundAmount, order);
+
+        // 5. Lưu lại tổng số tiền đã refund cho order (nếu cần)
+        order.TotalRefundAmount = (order.TotalRefundAmount ?? 0) + refundAmount;
+
+        await _unitOfWork.Orders.Update(order);
+        await HandleOrderEntitiesOnRefundAsync(order);
+
+        await _unitOfWork.SaveChangesAsync();
+
+        _loggerService.Success($"Refunded {refundAmount} VND for order {order.Id} (Stripe refundId: {refund.Id})");
+
+        return refund;
+    }
+
+    private async Task HandleOrderEntitiesOnRefundAsync(Order order)
+    {
+        // 1. Cập nhật trạng thái Order
+        order.Status = OrderStatus.REFUNDED.ToString();
+        order.UpdatedAt = DateTime.UtcNow;
+
+        // 2. Cập nhật các OrderDetail
+        foreach (var detail in order.OrderDetails)
+        {
+            // Trạng thái và thời gian
+            detail.Status = OrderDetailItemStatus.REFUNDED;
+            detail.RefundedAmount = (detail.RefundedAmount ?? 0) + (detail.FinalDetailPrice ?? detail.TotalPrice);
+            detail.UpdatedAt = DateTime.UtcNow;
+
+            // Ghi log trạng thái
+            detail.Logs += $"\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}] Đã hoàn tiền cho order-detail.";
+
+            await _unitOfWork.OrderDetails.Update(detail);
+
+            // 3. Cập nhật các Shipment liên quan (nếu có)
+            if (detail.Shipments != null)
+            {
+                foreach (var shipment in detail.Shipments)
+                {
+                    shipment.Status = ShipmentStatus.CANCELLED; // Không có REFUNDED, dùng CANCELLED
+                    shipment.UpdatedAt = DateTime.UtcNow;
+                    await _unitOfWork.Shipments.Update(shipment);
+                }
+            }
+
+            // 4. Cập nhật các InventoryItem liên quan (nếu có)
+            if (detail.InventoryItems != null)
+            {
+                foreach (var item in detail.InventoryItems)
+                {
+                    item.Status = InventoryItemStatus.Archived;
+                    item.ArchivedAt = DateTime.UtcNow;
+                    item.ArchivedReason = "Refunded order";
+                    item.UpdatedAt = DateTime.UtcNow;
+                    await _unitOfWork.InventoryItems.Update(item);
+
+                    // Ghi log trạng thái inventory
+                    if (item.OrderDetailInventoryItemLogs != null)
+                    {
+                        item.OrderDetailInventoryItemLogs.Add(new OrderDetailInventoryItemShipmentLog
+                        {
+                            OrderDetailId = detail.Id,
+                            InventoryItemId = item.Id,
+                            CreatedAt = DateTime.UtcNow,
+                            ValueStatusType = Domain.Entities.ValueType.INVENTORY_ITEM
+                        });
+                    }
+                }
+            }
+        }
+
+        // 5. Cập nhật Order
+        await _unitOfWork.Orders.Update(order);
+    }
+
 }
