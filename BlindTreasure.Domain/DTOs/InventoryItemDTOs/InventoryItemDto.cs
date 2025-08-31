@@ -29,4 +29,7 @@ public class InventoryItemDto
 
     public bool IsOnHold { get; set; }
     public bool HasActiveListing { get; set; }
+
+    public DateTime? ArchivedAt { get; set; } // Thời điểm bị archived
+    public string? ArchivedReason { get; set; } // Lý do bị archived
 }

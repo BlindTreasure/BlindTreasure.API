@@ -811,7 +811,7 @@ public class TransactionService : ITransactionService
                 .Where(t => t.ExternalRef == sessionId).ToListAsync();
 
             var groupSession = await _unitOfWork.GroupPaymentSessions
-                .FirstOrDefaultAsync(s => s.StripeSessionId == sessionId && !s.IsCompleted);
+                .FirstOrDefaultAsync(s => s.StripeSessionId == sessionId);
 
             if (groupSession != null)
             {

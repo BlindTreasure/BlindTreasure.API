@@ -366,23 +366,16 @@ public class StripeController : ControllerBase
     /// </summary>
     /// <param name="dto">Thông tin refund (PaymentIntentId, số tiền)</param>
     /// <returns>Thông tin Stripe Refund</returns>
-    [HttpPost("refund")]
-    [Authorize(Roles = "Admin,Staff")]
-    public async Task<IActionResult> RefundPayment([FromBody] RefundRequestDto dto)
+    [HttpPost("refund-order")]
+    public async Task<IActionResult> RefundOrder([FromBody] RefundOrderRequestDto dto)
     {
-        _logger.Info(
-            $"[Stripe][Refund] Thực hiện refund cho paymentIntent: {dto.PaymentIntentId}, amount: {dto.Amount}");
-        try
-        {
-            var refund = await _stripeService.RefundPaymentAsync(dto.PaymentIntentId, dto.Amount);
-            _logger.Success("[Stripe][Refund] Refund thành công.");
-            return Ok(ApiResult<object>.Success(refund, "200", "Refund successful."));
-        }
-        catch (Exception ex)
-        {
-            _logger.Error($"[Stripe][Refund] Lỗi: {ex.Message}");
-            return StatusCode(500, ApiResult<object>.Failure(ex.Message));
-        }
+        var refund = await _stripeService.RefundOrderAsync(dto.OrderId);
+        return Ok(ApiResult<object>.Success(refund, "200", "Refund successful."));
+    }
+
+    public class RefundOrderRequestDto
+    {
+        public Guid OrderId { get; set; }
     }
 
     /// <summary>

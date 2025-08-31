@@ -199,17 +199,27 @@ public class PromotionService : IPromotionService
         if (promotion == null)
             throw ErrorHelper.NotFound("Không tìm thấy voucher.");
 
-        // Áp dụng từng trường nếu có giá trị, nếu null thì dùng default value từ UpdatePromotionDto
-        promotion.Code = (dto.Code ?? string.Empty).Trim().ToUpper();
-        promotion.Description = dto.Description ?? "mã giảm 100% cho đơn 1k";
+        // Chỉ cập nhật nếu có giá trị
+        if (dto.Description != null)
+            promotion.Description = dto.Description;
+
+        // DiscountType là kiểu enum, luôn có giá trị mặc định, nên luôn cập nhật
         promotion.DiscountType = dto.DiscountType;
-        promotion.DiscountValue = dto.DiscountValue ?? 100;
-        promotion.StartDate =
-            dto.StartDate ?? DateTime.SpecifyKind(DateTime.Parse("2000-01-01T00:00:00Z"), DateTimeKind.Utc);
-        promotion.EndDate =
-            dto.EndDate ?? DateTime.SpecifyKind(DateTime.Parse("2100-01-01T00:00:00Z"), DateTimeKind.Utc);
-        promotion.UsageLimit = dto.UsageLimit ?? 100;
-        promotion.MaxUsagePerUser = dto.MaxUsagePerUser ?? 2;
+
+        if (dto.DiscountValue.HasValue)
+            promotion.DiscountValue = dto.DiscountValue.Value;
+
+        if (dto.StartDate.HasValue)
+            promotion.StartDate = DateTime.SpecifyKind(dto.StartDate.Value, DateTimeKind.Utc);
+
+        if (dto.EndDate.HasValue)
+            promotion.EndDate = DateTime.SpecifyKind(dto.EndDate.Value, DateTimeKind.Utc);
+
+        if (dto.UsageLimit.HasValue)
+            promotion.UsageLimit = dto.UsageLimit.Value;
+
+        if (dto.MaxUsagePerUser.HasValue)
+            promotion.MaxUsagePerUser = dto.MaxUsagePerUser.Value;
 
         promotion.UpdatedAt = DateTime.UtcNow;
         promotion.CreatedByRole = user.RoleName;
@@ -217,7 +227,6 @@ public class PromotionService : IPromotionService
         await _unitOfWork.Promotions.Update(promotion);
         await _unitOfWork.SaveChangesAsync();
 
-        // Xóa cache detail và list
         await _cacheService.RemoveAsync($"Promotion:Detail:{id}");
         await _cacheService.RemoveByPatternAsync("Promotion:List:*");
 
@@ -385,6 +394,9 @@ public class PromotionService : IPromotionService
             throw ErrorHelper.Unauthorized("Chỉ có seller mới có quyền tham gia voucher.");
 
         await ValidateParticipantPromotionAsync(currentUser, id);
+
+   
+
         var participantPromotion = await SetParticipantPromotionDataAsync(currentUser.Id, id);
         await _unitOfWork.PromotionParticipants.AddAsync(participantPromotion);
         await _unitOfWork.SaveChangesAsync();
@@ -580,6 +592,12 @@ public class PromotionService : IPromotionService
         if (activeParticipantCount >= 2)
             throw ErrorHelper.BadRequest(
                 "Bạn chỉ được tham gia tối đa 2 chiến dịch toàn sàn cùng lúc. Vui lòng chờ chiến dịch hiện tại kết thúc.");
+
+        // Kiểm tra đã tham gia chưa
+        var existed = await _unitOfWork.PromotionParticipants
+            .FirstOrDefaultAsync(pp => pp.PromotionId == promotionId && pp.SellerId == seller.Id && !pp.IsDeleted);
+        if (existed != null)
+            throw ErrorHelper.Conflict("Seller đã tham gia chiến dịch này.");
     }
 
     private async Task ValidatePromotionInputAsync(CreatePromotionDto dto)

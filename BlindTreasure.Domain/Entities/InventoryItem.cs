@@ -20,6 +20,10 @@ public class InventoryItem : BaseEntity
     public Address? Address { get; set; }
     public RarityName? Tier { get; set; }
 
+    //Archived  
+    public DateTime? ArchivedAt { get; set; } // Thời điểm bị archived
+    public string? ArchivedReason { get; set; } // Lý do bị archived
+
     // FK → OrderDetail
     public Guid? OrderDetailId { get; set; }
     public OrderDetail? OrderDetail { get; set; }
