@@ -28,12 +28,13 @@ public class SystemController : ControllerBase
     private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemLogService;
     private readonly INotificationService _notificationService;
     private readonly IAdminService _adminService;
-    private readonly IInventoryItemService _inventoryItemService;   
+    private readonly IInventoryItemService _inventoryItemService;
 
 
     public SystemController(BlindTreasureDbContext context, ILoggerService logger, ICacheService cacheService,
         IOrderDetailInventoryItemShipmentLogService orderDetailInventoryItemLogService,
-        INotificationService notificationService, IAdminService adminService, IInventoryItemService inventoryItemService)
+        INotificationService notificationService, IAdminService adminService,
+        IInventoryItemService inventoryItemService)
     {
         _context = context;
         _logger = logger;
@@ -1109,12 +1110,11 @@ public class SystemController : ControllerBase
         if (item == null)
             return NotFound("InventoryItem not found.");
 
-        if(item.Status != InventoryItemStatus.Available)
+        if (item.Status != InventoryItemStatus.Available)
         {
             throw ErrorHelper.BadRequest("InventoryItem must be in Available status to simulate lifecycle.");
         }
 
-    
 
         var results = new List<object>();
         var milestones = new[] { 30, 60, 83, 90 };
@@ -1167,41 +1167,9 @@ public class SystemController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Simulate the inventory item lifecycle at a specific milestone (30, 60, 83, 90 days).
-    /// <para>
-    /// <b>Milestone enum values (InventoryItemLifecycleMilestone):</b>
-    /// <list type="table">
-    /// <item>
-    ///   <term>Notify30Days</term>
-    ///   <description>30 days inactive: Sends first reminder notification to user.</description>
-    /// </item>
-    /// <item>
-    ///   <term>Notify60Days</term>
-    ///   <description>60 days inactive: Sends warning notification to user.</description>
-    /// </item>
-    /// <item>
-    ///   <term>Notify83Days</term>
-    ///   <description>83 days inactive: Sends final warning notification to user.</description>
-    /// </item>
-    /// <item>
-    ///   <term>Archive90Days</term>
-    ///   <description>90 days inactive: Archives the item, notifies user and seller.</description>
-    /// </item>
-    /// </list>
-    /// </para>
-    /// <para>
-    /// Example request:
-    /// <code>
-    /// {
-    ///   "InventoryItemId": "GUID_HERE",
-    ///   "Milestone": "Notify60Days"
-    /// }
-    /// </code>
-    /// </para>
-    /// </summary>
     [HttpPost("dev/simulate-inventory-item-lifecycle-at-milestone")]
-    public async Task<IActionResult> SimulateInventoryItemLifecycleAtMilestone([FromBody] SimulateInventoryItemLifecycleAtMilestoneRequest req)
+    public async Task<IActionResult> SimulateInventoryItemLifecycleAtMilestone(
+        [FromBody] SimulateInventoryItemLifecycleAtMilestoneRequest req)
     {
         if (req.InventoryItemId == Guid.Empty)
             return BadRequest("InventoryItemId is required.");
@@ -1292,6 +1260,7 @@ public class SystemController : ControllerBase
         /// </summary>
         Archive90Days = 90
     }
+
     private List<User> GetPredefinedUsers()
     {
         var passwordHasher = new PasswordHasher();
@@ -1986,7 +1955,7 @@ public class SystemController : ControllerBase
                             ProductType = ProductSaleType.DirectSale,
                             Height = 30
                         },
-                        
+
                         // blindbox Only
                         new Product
                         {

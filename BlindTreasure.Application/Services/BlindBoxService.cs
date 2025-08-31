@@ -638,14 +638,17 @@ public class BlindBoxService : IBlindBoxService
         _logger.Success($"[DeleteBlindBoxAsync] Đã xoá Blind Box {blindBoxId}.");
 
         var result = _mapperService.Map<BlindBox, BlindBoxDetailDto>(blindBox);
-        result.Items = blindBox.BlindBoxItems.Select(item => new BlindBoxItemResponseDto
-        {
-            ProductId = item.ProductId,
-            ProductName = item.Product?.Name ?? string.Empty,
-            DropRate = item.DropRate,
-            ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
-            Quantity = item.Quantity
-        }).ToList();
+        result.Items = blindBox.BlindBoxItems
+            .OrderByDescending(i => i.DropRate)
+            .Select(item => new BlindBoxItemResponseDto
+            {
+                ProductId = item.ProductId,
+                ProductName = item.Product?.Name ?? string.Empty,
+                DropRate = item.DropRate,
+                ImageUrl = item.Product?.ImageUrls.FirstOrDefault(),
+                Quantity = item.Quantity
+            }).ToList();
+
 
         return result;
     }
@@ -711,6 +714,23 @@ public class BlindBoxService : IBlindBoxService
             _logger.Warn(
                 $"[ValidateBlindBoxItemsFullRule] Số lượng item không hợp lệ [ActualCount={items.Count}]. Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
             throw ErrorHelper.BadRequest("Blind Box phải có đúng 6 hoặc 12 sản phẩm.");
+        }
+
+        // ✅ Validate ProductId không trùng nhau
+        var duplicateProductIds = items.GroupBy(i => i.ProductId)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+
+        if (duplicateProductIds.Any())
+        {
+            var duplicateList = string.Join(", ", duplicateProductIds);
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Phát hiện ProductId trùng nhau [DuplicateProductIds={duplicateList}].");
+            throw ErrorHelper.BadRequest(
+                $"Blind Box chứa nhiều item trùng ProductId: {duplicateList}. " +
+                $"Mỗi sản phẩm chỉ được khai báo một lần."
+            );
         }
 
         var countSecret = items.Count(i => i.Rarity == RarityName.Secret);
@@ -897,16 +917,18 @@ public class BlindBoxService : IBlindBoxService
 
     private List<BlindBoxItemResponseDto> MapToBlindBoxItemDtos(IEnumerable<BlindBoxItem> items)
     {
-        return items.Select(item => new BlindBoxItemResponseDto
-        {
-            ProductId = item.ProductId,
-            ProductName = item.Product?.Name ?? string.Empty,
-            DropRate = item.DropRate,
-            ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
-            Quantity = item.Quantity,
-            Rarity = item.RarityConfig?.Name ?? default,
-            Weight = item.RarityConfig?.Weight ?? 0
-        }).ToList();
+        return items
+            .OrderByDescending(item => item.DropRate) // Sắp xếp giảm dần theo DropRate
+            .Select(item => new BlindBoxItemResponseDto
+            {
+                ProductId = item.ProductId,
+                ProductName = item.Product?.Name ?? string.Empty,
+                DropRate = item.DropRate,
+                ImageUrl = item.Product?.ImageUrls?.FirstOrDefault(),
+                Quantity = item.Quantity,
+                Rarity = item.RarityConfig?.Name ?? default,
+                Weight = item.RarityConfig?.Weight ?? 0
+            }).ToList();
     }
 
     private async Task LoadBlindBoxItemsAsync(List<BlindBox> blindBoxes, bool includeProbabilityConfigs = false)
