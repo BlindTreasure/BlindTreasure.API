@@ -262,9 +262,9 @@ public class EmailService : IEmailService
     }
 
     /// <summary>
-    /// Gửi email thông báo giao dịch thành công cho người mua hàng.
-    /// Nếu đơn hàng có shipment, thông báo trạng thái giao hàng.
-    /// Nếu không có shipment, thông báo sản phẩm đã được thêm vào kho hoặc BlindBox đã được mở.
+    ///     Gửi email thông báo giao dịch thành công cho người mua hàng.
+    ///     Nếu đơn hàng có shipment, thông báo trạng thái giao hàng.
+    ///     Nếu không có shipment, thông báo sản phẩm đã được thêm vào kho hoặc BlindBox đã được mở.
     /// </summary>
     public async Task SendOrderPaymentSuccessToBuyerAsync(Order order)
     {
@@ -385,7 +385,7 @@ public class EmailService : IEmailService
     }
 
     /// <summary>
-    /// Gửi email thông báo đơn hàng đã hết hạn hoặc bị hủy cho người mua hàng.
+    ///     Gửi email thông báo đơn hàng đã hết hạn hoặc bị hủy cho người mua hàng.
     /// </summary>
     public async Task SendOrderExpiredOrCancelledToBuyerAsync(Order order,
         string reason = "Đơn hàng đã hết hạn hoặc bị hủy do không thanh toán thành công.")

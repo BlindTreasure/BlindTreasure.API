@@ -1,11 +1,10 @@
 ﻿using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Interfaces.ThirdParty.AIModels;
-using BlindTreasure.Application.Services.ThirdParty.AIModels;
-using BlindTreasure.Domain.DTOs.GeminiDTOs;
 using BlindTreasure.Infrastructure.Interfaces;
 
 namespace BlindTreasure.Application.Services;
@@ -13,8 +12,8 @@ namespace BlindTreasure.Application.Services;
 public class BlindyService : IBlindyService
 {
     private readonly IDataAnalyzerService _analyzerService;
-    private readonly IGeminiService _geminiService;
     private readonly IClaimsService _claimsService;
+    private readonly IGeminiService _geminiService;
 
     public BlindyService(IGeminiService geminiService, IDataAnalyzerService analyzerService,
         IClaimsService claimsService)
@@ -64,38 +63,6 @@ public class BlindyService : IBlindyService
                       """;
 
         return await AskUserAsync(prompt);
-    }
-
-
-    public async Task<string> AnalyzeTrendingProductsWithAi()
-    {
-        var stats = await _analyzerService.GetTrendingProductsForAiAsync();
-
-        var formatted = string.Join("\n", stats.Select(p =>
-            $"""
-             Tên: {p.ProductName}
-             Số đơn: {p.TotalOrders}
-             Tổng SL bán: {p.TotalQuantity}
-             Doanh thu: {p.TotalRevenue:N0}đ
-             Lượt review: {p.ReviewCount}
-             Lượt yêu thích: {p.FavouriteCount}
-             Tăng trưởng 30 ngày: {p.GrowthRate:F2}%
-             """
-        ));
-
-        var prompt = $"""
-                          Dưới đây là thống kê các sản phẩm trong hệ thống BlindTreasure:
-                          {formatted}
-
-                          Phân tích:
-                          - Top 5 sản phẩm trending nhất (có thể dựa trên tăng trưởng, số lượng bán, doanh thu).
-                          - Giải thích ngắn gọn tại sao các sản phẩm đó trending.
-                          - Gợi ý hành động cho staff (ví dụ: đẩy quảng cáo, kiểm tra hàng tồn, highlight trên trang chủ).
-
-                          Trả lời ngắn gọn, rõ ràng, dạng bullet point.
-                      """;
-
-        return await AskStaffAsync(prompt);
     }
 
 
@@ -199,67 +166,6 @@ public class BlindyService : IBlindyService
         }
     }
 
-    private bool BasicTextValidation(string text)
-    {
-        // Từ khóa cấm
-        var bannedWords = new[] { "fuck", "shit", "địt", "đụ", "lồn", "cặc", "đéo", "đm", "đ.m", "clm", "vl", "vcl" };
-
-        // Dấu hiệu quảng cáo
-        var adIndicators = new[]
-        {
-            "shop", "giảm giá", "liên hệ", "mua", "bán", "zalo", "facebook",
-            "instagram", "tiktok", "@", "page", "fanpage", "group", "telegram",
-            ".com", ".vn", ".net", "http", "www", "shopee", "lazada", "tiki",
-            "cod", "freeship", "mã giảm", "tư vấn", "nhắn tin", "inbox", "chat",
-            "follow", "theo dõi", "đặt hàng", "ship", "giao hàng", "chuyển khoản"
-        };
-
-        // Kiểm tra số điện thoại (chuỗi 10-11 số liên tiếp hoặc có dấu cách/gạch ngang)
-        if (System.Text.RegularExpressions.Regex.IsMatch(text,
-                @"(0|\+84)\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}"))
-            return false;
-
-        // Kiểm tra URL/domain
-        if (System.Text.RegularExpressions.Regex.IsMatch(text,
-                @"(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b"))
-            return false;
-
-        // Kiểm tra từ cấm
-        if (bannedWords.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase)))
-            return false;
-
-        // Kiểm tra dấu hiệu quảng cáo
-        if (adIndicators.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase)))
-            return false;
-
-        return true;
-    }
-
-    private class GeminiValidationResponse
-    {
-        public bool IsValid { get; set; }
-
-        // Linh hoạt hơn với thuộc tính Reasons
-        [JsonIgnore]
-        public IEnumerable<string> ReasonsList
-        {
-            get
-            {
-                if (Reasons != null && Reasons.Length > 0)
-                    return Reasons;
-
-                if (ReasonArray != null && ReasonArray.Count > 0)
-                    return ReasonArray;
-
-                return Array.Empty<string>();
-            }
-        }
-
-        public string[]? Reasons { get; set; } = Array.Empty<string>();
-
-        public List<string>? ReasonArray { get; set; }
-    }
-
 
     public async Task<string> AnalyzeUsersWithAi()
     {
@@ -327,6 +233,99 @@ public class BlindyService : IBlindyService
                       """;
 
         return await AskStaffAsync(prompt);
+    }
+
+
+    public async Task<string> AnalyzeTrendingProductsWithAi()
+    {
+        var stats = await _analyzerService.GetTrendingProductsForAiAsync();
+
+        var formatted = string.Join("\n", stats.Select(p =>
+            $"""
+             Tên: {p.ProductName}
+             Số đơn: {p.TotalOrders}
+             Tổng SL bán: {p.TotalQuantity}
+             Doanh thu: {p.TotalRevenue:N0}đ
+             Lượt review: {p.ReviewCount}
+             Lượt yêu thích: {p.FavouriteCount}
+             Tăng trưởng 30 ngày: {p.GrowthRate:F2}%
+             """
+        ));
+
+        var prompt = $"""
+                          Dưới đây là thống kê các sản phẩm trong hệ thống BlindTreasure:
+                          {formatted}
+
+                          Phân tích:
+                          - Top 5 sản phẩm trending nhất (có thể dựa trên tăng trưởng, số lượng bán, doanh thu).
+                          - Giải thích ngắn gọn tại sao các sản phẩm đó trending.
+                          - Gợi ý hành động cho staff (ví dụ: đẩy quảng cáo, kiểm tra hàng tồn, highlight trên trang chủ).
+
+                          Trả lời ngắn gọn, rõ ràng, dạng bullet point.
+                      """;
+
+        return await AskStaffAsync(prompt);
+    }
+
+    private bool BasicTextValidation(string text)
+    {
+        // Từ khóa cấm
+        var bannedWords = new[] { "fuck", "shit", "địt", "đụ", "lồn", "cặc", "đéo", "đm", "đ.m", "clm", "vl", "vcl" };
+
+        // Dấu hiệu quảng cáo
+        var adIndicators = new[]
+        {
+            "shop", "giảm giá", "liên hệ", "mua", "bán", "zalo", "facebook",
+            "instagram", "tiktok", "@", "page", "fanpage", "group", "telegram",
+            ".com", ".vn", ".net", "http", "www", "shopee", "lazada", "tiki",
+            "cod", "freeship", "mã giảm", "tư vấn", "nhắn tin", "inbox", "chat",
+            "follow", "theo dõi", "đặt hàng", "ship", "giao hàng", "chuyển khoản"
+        };
+
+        // Kiểm tra số điện thoại (chuỗi 10-11 số liên tiếp hoặc có dấu cách/gạch ngang)
+        if (Regex.IsMatch(text,
+                @"(0|\+84)\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}\s*\d{1}"))
+            return false;
+
+        // Kiểm tra URL/domain
+        if (Regex.IsMatch(text,
+                @"(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b"))
+            return false;
+
+        // Kiểm tra từ cấm
+        if (bannedWords.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        // Kiểm tra dấu hiệu quảng cáo
+        if (adIndicators.Any(word => text.Contains(word, StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        return true;
+    }
+
+    private class GeminiValidationResponse
+    {
+        public bool IsValid { get; set; }
+
+        // Linh hoạt hơn với thuộc tính Reasons
+        [JsonIgnore]
+        public IEnumerable<string> ReasonsList
+        {
+            get
+            {
+                if (Reasons != null && Reasons.Length > 0)
+                    return Reasons;
+
+                if (ReasonArray != null && ReasonArray.Count > 0)
+                    return ReasonArray;
+
+                return Array.Empty<string>();
+            }
+        }
+
+        public string[]? Reasons { get; set; } = Array.Empty<string>();
+
+        public List<string>? ReasonArray { get; set; }
     }
 
 

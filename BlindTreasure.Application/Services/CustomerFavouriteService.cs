@@ -14,9 +14,9 @@ namespace BlindTreasure.Application.Services;
 
 public class CustomerFavouriteService : ICustomerFavouriteService
 {
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IClaimsService _claimsService;
     private readonly IMapperService _mapperService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CustomerFavouriteService(
         IUnitOfWork unitOfWork,
@@ -141,6 +141,20 @@ public class CustomerFavouriteService : ICustomerFavouriteService
         return new Pagination<CustomerFavouriteDto>(favouriteDtos, count, param.PageIndex, param.PageSize);
     }
 
+    public async Task<bool> IsInFavouriteAsync(Guid? productId, Guid? blindBoxId)
+    {
+        var currentUserId = _claimsService.CurrentUserId;
+        if (currentUserId == Guid.Empty)
+            return false;
+
+        return await _unitOfWork.CustomerFavourites
+            .GetQueryable()
+            .AnyAsync(cf => cf.UserId == currentUserId &&
+                            cf.ProductId == productId &&
+                            cf.BlindBoxId == blindBoxId &&
+                            !cf.IsDeleted);
+    }
+
     private CustomerFavouriteDto MapToCustomerFavouriteDto(CustomerFavourite cf)
     {
         return new CustomerFavouriteDto
@@ -186,19 +200,5 @@ public class CustomerFavouriteService : ICustomerFavouriteService
                 }
                 : null
         };
-    }
-
-    public async Task<bool> IsInFavouriteAsync(Guid? productId, Guid? blindBoxId)
-    {
-        var currentUserId = _claimsService.CurrentUserId;
-        if (currentUserId == Guid.Empty)
-            return false;
-
-        return await _unitOfWork.CustomerFavourites
-            .GetQueryable()
-            .AnyAsync(cf => cf.UserId == currentUserId &&
-                            cf.ProductId == productId &&
-                            cf.BlindBoxId == blindBoxId &&
-                            !cf.IsDeleted);
     }
 }

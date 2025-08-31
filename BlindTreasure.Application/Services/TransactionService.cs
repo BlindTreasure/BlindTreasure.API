@@ -3,14 +3,11 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs;
-using BlindTreasure.Domain.DTOs.CustomerInventoryDTOs;
-using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using Stripe.Checkout;
 
 namespace BlindTreasure.Application.Services;
 
@@ -19,15 +16,15 @@ public class TransactionService : ITransactionService
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ICustomerBlindBoxService _customerBlindBoxService;
+    private readonly IEmailService _emailService;
+    private readonly IGhnShippingService _ghnShippingService;
     private readonly IInventoryItemService _inventoryItemService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
-    private readonly IOrderService _orderService;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly IGhnShippingService _ghnShippingService;
-    private readonly IEmailService _emailService;
     private readonly INotificationService _notificationService; // Thêm dòng này
     private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemLogService;
+    private readonly IOrderService _orderService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public TransactionService(
         ICacheService cacheService,
@@ -66,8 +63,8 @@ public class TransactionService : ITransactionService
     ///     Đảm bảo cập nhật đúng trạng thái InventoryItem, OrderDetail, ghi log đầy đủ.
     /// </summary>
     /// <summary>
-    /// Xử lý khi thanh toán Stripe shipment thành công (webhook).
-    /// Đảm bảo cập nhật đúng trạng thái InventoryItem, OrderDetail, ghi log đầy đủ.
+    ///     Xử lý khi thanh toán Stripe shipment thành công (webhook).
+    ///     Đảm bảo cập nhật đúng trạng thái InventoryItem, OrderDetail, ghi log đầy đủ.
     /// </summary>
     public async Task HandleSuccessfulShipmentPaymentAsync(IEnumerable<Guid> shipmentIds)
     {
@@ -166,7 +163,7 @@ public class TransactionService : ITransactionService
                 orderDetail,
                 oldStatus,
                 orderDetail.Status,
-                $"Cập nhật trạng thái sau khi thanh toán shipment thành công"
+                "Cập nhật trạng thái sau khi thanh toán shipment thành công"
             );
             await _unitOfWork.OrderDetails.Update(orderDetail);
         }
@@ -175,7 +172,7 @@ public class TransactionService : ITransactionService
     }
 
     /// <summary>
-    /// Handles successful Stripe payment (webhook).
+    ///     Handles successful Stripe payment (webhook).
     /// </summary>
     public async Task HandleSuccessfulPaymentAsync(string sessionId, string orderId)
     {
@@ -289,7 +286,7 @@ public class TransactionService : ITransactionService
                     Vui lòng kiểm tra trạng thái đơn hàng và chuẩn bị giao hàng nếu có.";
                 await _notificationService.PushNotificationToUser(order.Seller.User.Id, new NotificationDto
                 {
-                    Title = $"Đơn hàng mới đã được thanh toán",
+                    Title = "Đơn hàng mới đã được thanh toán",
                     Message = sellerMsg,
                     Type = NotificationType.Order,
                     SourceUrl = null
@@ -304,262 +301,6 @@ public class TransactionService : ITransactionService
             _logger.Error($"[HandleSuccessfulPaymentAsync] {ex}");
             throw;
         }
-    }
-
-    /// <summary>
-    /// Updates transaction, payment, and order status for successful payment.
-    /// </summary>
-    private void UpdatePaymentAndOrderStatus(Transaction transaction, Order order)
-    {
-        transaction.Status = TransactionStatus.Successful.ToString();
-        transaction.Payment.Status = PaymentStatus.Paid;
-        transaction.Payment.PaidAt = DateTime.UtcNow;
-        order.Status = OrderStatus.PAID.ToString();
-        // order.CompletedAt = DateTime.UtcNow; order chưa mới paid chứ chưa completed
-        order.UpdatedAt = DateTime.UtcNow;
-        order.Payment.UpdatedAt = DateTime.UtcNow;
-        transaction.UpdatedAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Creates GHN shipment orders and updates shipment info.
-    /// </summary>
-    private async Task CreateGhnOrdersAndUpdateShipments(Order order)
-    {
-        var shipmentIds = order.OrderDetails
-            .SelectMany(od => od.Shipments ?? Enumerable.Empty<Shipment>())
-            .Where(s => s.Status == ShipmentStatus.WAITING_PAYMENT)
-            .Select(s => s.Id)
-            .Distinct()
-            .ToList();
-
-        if (!shipmentIds.Any()) return;
-
-        var shipments = await _unitOfWork.Shipments.GetQueryable()
-            .Where(s => shipmentIds.Contains(s.Id))
-            .Include(s => s.OrderDetails)
-            .ToListAsync();
-
-        foreach (var shipment in shipments)
-        {
-            var seller = order.Seller;
-            var address = order.ShippingAddress;
-            var orderDetailsInGroup = shipment.OrderDetails?.ToList() ?? new List<OrderDetail>();
-
-            var ghnOrderRequest = BuildGhnOrderRequestFromOrderDetails(orderDetailsInGroup, seller, address);
-            var ghnCreateResponse = await _ghnShippingService.CreateOrderAsync(ghnOrderRequest);
-
-            UpdateShipmentWithGhnResponse(shipment, ghnCreateResponse);
-        }
-
-        await _unitOfWork.Shipments.UpdateRange(shipments);
-    }
-
-    /// <summary>
-    /// Builds GHN order request from order details, seller, and address.
-    /// </summary>
-    private GhnOrderRequest BuildGhnOrderRequestFromOrderDetails(
-        List<OrderDetail> orderDetails, Seller seller, Address address)
-    {
-        var items = orderDetails.Where(od => od.Product != null).Select(od => new GhnOrderItemDto
-        {
-            Name = od.Product.Name,
-            Code = od.Product.Id.ToString(),
-            Quantity = od.Quantity,
-            Price = Convert.ToInt32(od.Product.RealSellingPrice),
-            Length = Convert.ToInt32(od.Product.Length ?? 10),
-            Width = Convert.ToInt32(od.Product.Width ?? 10),
-            Height = Convert.ToInt32(od.Product.Height ?? 10),
-            Weight = Convert.ToInt32(od.Product.Weight ?? 1000),
-            Category = new GhnItemCategory
-            {
-                Level1 = od.Product.Category?.Name,
-                Level2 = od.Product.Category?.Parent?.Name,
-                Level3 = od.Product.Category?.Parent?.Parent?.Name
-            }
-        }).ToArray();
-
-        return new GhnOrderRequest
-        {
-            PaymentTypeId = 2,
-            Note = $"Giao hàng cho seller {seller.CompanyName}",
-            RequiredNote = "CHOXEMHANGKHONGTHU",
-            FromName = seller.CompanyName ?? "BlindTreasure Warehouse",
-            FromPhone = seller.CompanyPhone ?? "0925136907",
-            FromAddress = seller.CompanyAddress ?? "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, TP.HCM",
-            FromWardName = seller.CompanyWardName ?? "Phường 14",
-            FromDistrictName = seller.CompanyDistrictName ?? "Quận 10",
-            FromProvinceName = seller.CompanyProvinceName ?? "HCM",
-            ToName = address.FullName,
-            ToPhone = address.Phone,
-            ToAddress = address.AddressLine,
-            ToWardName = address.Ward ?? "",
-            ToDistrictName = address.District ?? "",
-            ToProvinceName = address.Province,
-            CodAmount = 0,
-            Content = $"Giao hàng cho {address.FullName} từ seller {seller.CompanyName}",
-            Length = items.Max(i => i.Length),
-            Width = items.Max(i => i.Width),
-            Height = items.Max(i => i.Height),
-            Weight = items.Sum(i => i.Weight),
-            InsuranceValue = items.Sum(i => i.Price * i.Quantity),
-            ServiceTypeId = 2,
-            Items = items
-        };
-    }
-
-    /// <summary>
-    /// Updates shipment entity with GHN response.
-    /// </summary>
-    private void UpdateShipmentWithGhnResponse(Shipment shipment, GhnCreateResponse? ghnCreateResponse)
-    {
-        shipment.OrderCode = ghnCreateResponse?.OrderCode;
-        shipment.TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0;
-        shipment.MainServiceFee = (int)(ghnCreateResponse?.Fee?.MainService ?? 0);
-        shipment.TrackingNumber = ghnCreateResponse?.OrderCode ?? "";
-        //shipment.ShippedAt = DateTime.UtcNow.AddDays(4);
-        shipment.EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3))
-            .AddHours(new Random().Next(8, 18)).AddMinutes(new Random().Next(60));
-        shipment.EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3);
-        shipment.Status = ShipmentStatus.PROCESSING;
-    }
-
-    /// <summary>
-    /// Creates inventory items for each physical product in the order after successful payment.
-    /// </summary>
-    private async Task CreateInventoryForOrderDetailsAsync(Order order)
-    {
-        Address? shippingAddress = null;
-        if (order.ShippingAddressId.HasValue)
-        {
-            shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(order.ShippingAddressId.Value);
-            if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != order.UserId)
-            {
-                _logger.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
-                throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
-            }
-        }
-
-        var shipmentsByDetail = order.OrderDetails
-            .Where(od => od.Shipments != null && od.Shipments.Any())
-            .ToDictionary(od => od.Id, od => od.Shipments!.ToList());
-
-        var inventoryItems = new List<InventoryItem>();
-        foreach (var od in order.OrderDetails.Where(od => od.ProductId.HasValue))
-        {
-            shipmentsByDetail.TryGetValue(od.Id, out var shipmentList);
-
-            for (var i = 0; i < od.Quantity; i++)
-            {
-                Guid? shipmentId = null;
-                var status = InventoryItemStatus.Available;
-                Shipment? selectedShipment = null;
-
-                if (shipmentList != null && shipmentList.Count > 0)
-                {
-                    selectedShipment = shipmentList[0];
-                    shipmentId = selectedShipment.Id;
-                    status = selectedShipment.Status switch
-                    {
-                        ShipmentStatus.PROCESSING => InventoryItemStatus.Delivering,
-                        ShipmentStatus.WAITING_PAYMENT => InventoryItemStatus.Available,
-                        ShipmentStatus.CANCELLED => InventoryItemStatus.Available,
-                        _ => InventoryItemStatus.Available
-                    };
-                }
-
-                var dto = new InventoryItem
-                {
-                    ProductId = od.ProductId!.Value,
-                    Location = order.Seller.CompanyAddress,
-                    Status = status,
-                    ShipmentId = shipmentId,
-                    IsFromBlindBox = false,
-                    OrderDetailId = od.Id,
-                    AddressId = shippingAddress?.Id,
-                    UserId = order.UserId
-                };
-
-                inventoryItems.Add(dto);
-                if (od.InventoryItems == null)
-                    od.InventoryItems = new List<InventoryItem>();
-                od.InventoryItems.Add(dto);
-                // Track new inventory item creation for logging
-                dto = await _unitOfWork.InventoryItems.AddAsync(dto);
-
-                // Log: InventoryItem vừa được tạo cho OrderDetail sử dụng TEntity
-                var orderDetaillog =
-                    await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
-                        od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
-                    );
-
-                od.OrderDetailInventoryItemLogs.Add(orderDetaillog);
-
-                // Nếu có shipment, log trạng thái shipment cho inventory item
-                if (selectedShipment != null)
-                {
-                    var oldItemStatus = InventoryItemStatus.Available;
-                    var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
-                        selectedShipment,
-                        ShipmentStatus.WAITING_PAYMENT,
-                        selectedShipment.Status,
-                        order.Seller,
-                        shippingAddress
-                    );
-
-                    _logger.Info($"Generate tracking message succesfully: {trackingMessage}");
-
-                    var itemInventoryLog =
-                        await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
-                            od,
-                            oldItemStatus,
-                            dto,
-                            trackingMessage
-                        );
-                    _logger.Info(
-                        $"[CreateInventoryForOrderDetailsAsync] Đã log trạng thái shipment cho inventory item {dto.Id}.");
-
-                    dto.OrderDetailInventoryItemLogs.Add(itemInventoryLog);
-                }
-            }
-        }
-        //if (inventoryItems.Any())
-        //    await _unitOfWork.InventoryItems.AddRangeAsync(inventoryItems);
-    }
-
-    /// <summary>
-    /// Creates customer blind boxes for blind box order details.
-    /// </summary>
-    private async Task CreateCustomerBlindBoxForOrderDetails(Order order)
-    {
-        var blindBoxes = new List<CustomerBlindBox>();
-        foreach (var detail in order.OrderDetails.Where(od => od.BlindBoxId.HasValue))
-        {
-            for (var i = 0; i < detail.Quantity; i++)
-            {
-                var cbBox = new CustomerBlindBox
-                {
-                    BlindBoxId = detail.BlindBoxId.Value,
-                    OrderDetailId = detail.Id,
-                    UserId = order.UserId,
-                    IsOpened = false
-                };
-                blindBoxes.Add(cbBox);
-                cbBox = await _unitOfWork.CustomerBlindBoxes.AddAsync(cbBox);
-                // Log: CustomerBlindBox vừa được tạo cho OrderDetail sử dụng TEntity
-                var log = await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
-                    detail, null, cbBox, $"CustomerBlindBox created for OrderDetail {detail.Id} after payment."
-                );
-            }
-
-            var oldStatus = detail.Status;
-            detail.Status = OrderDetailItemStatus.IN_INVENTORY;
-            if (oldStatus != detail.Status)
-                await _orderDetailInventoryItemLogService.LogOrderDetailStatusChangeAsync(detail, oldStatus,
-                    detail.Status, "Chuyển sang IN_INVENTORY sau khi tạo Customer BlindBox.");
-        }
-        //if (blindBoxes.Any())
-        //    await _unitOfWork.CustomerBlindBoxes.AddRangeAsync(blindBoxes);
     }
 
 
@@ -888,5 +629,261 @@ public class TransactionService : ITransactionService
             throw ErrorHelper.BadRequest("TransactionId is required.");
 
         return await _unitOfWork.Transactions.GetByIdAsync(transactionId);
+    }
+
+    /// <summary>
+    ///     Updates transaction, payment, and order status for successful payment.
+    /// </summary>
+    private void UpdatePaymentAndOrderStatus(Transaction transaction, Order order)
+    {
+        transaction.Status = TransactionStatus.Successful.ToString();
+        transaction.Payment.Status = PaymentStatus.Paid;
+        transaction.Payment.PaidAt = DateTime.UtcNow;
+        order.Status = OrderStatus.PAID.ToString();
+        // order.CompletedAt = DateTime.UtcNow; order chưa mới paid chứ chưa completed
+        order.UpdatedAt = DateTime.UtcNow;
+        order.Payment.UpdatedAt = DateTime.UtcNow;
+        transaction.UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    ///     Creates GHN shipment orders and updates shipment info.
+    /// </summary>
+    private async Task CreateGhnOrdersAndUpdateShipments(Order order)
+    {
+        var shipmentIds = order.OrderDetails
+            .SelectMany(od => od.Shipments ?? Enumerable.Empty<Shipment>())
+            .Where(s => s.Status == ShipmentStatus.WAITING_PAYMENT)
+            .Select(s => s.Id)
+            .Distinct()
+            .ToList();
+
+        if (!shipmentIds.Any()) return;
+
+        var shipments = await _unitOfWork.Shipments.GetQueryable()
+            .Where(s => shipmentIds.Contains(s.Id))
+            .Include(s => s.OrderDetails)
+            .ToListAsync();
+
+        foreach (var shipment in shipments)
+        {
+            var seller = order.Seller;
+            var address = order.ShippingAddress;
+            var orderDetailsInGroup = shipment.OrderDetails?.ToList() ?? new List<OrderDetail>();
+
+            var ghnOrderRequest = BuildGhnOrderRequestFromOrderDetails(orderDetailsInGroup, seller, address);
+            var ghnCreateResponse = await _ghnShippingService.CreateOrderAsync(ghnOrderRequest);
+
+            UpdateShipmentWithGhnResponse(shipment, ghnCreateResponse);
+        }
+
+        await _unitOfWork.Shipments.UpdateRange(shipments);
+    }
+
+    /// <summary>
+    ///     Builds GHN order request from order details, seller, and address.
+    /// </summary>
+    private GhnOrderRequest BuildGhnOrderRequestFromOrderDetails(
+        List<OrderDetail> orderDetails, Seller seller, Address address)
+    {
+        var items = orderDetails.Where(od => od.Product != null).Select(od => new GhnOrderItemDto
+        {
+            Name = od.Product.Name,
+            Code = od.Product.Id.ToString(),
+            Quantity = od.Quantity,
+            Price = Convert.ToInt32(od.Product.RealSellingPrice),
+            Length = Convert.ToInt32(od.Product.Length ?? 10),
+            Width = Convert.ToInt32(od.Product.Width ?? 10),
+            Height = Convert.ToInt32(od.Product.Height ?? 10),
+            Weight = Convert.ToInt32(od.Product.Weight ?? 1000),
+            Category = new GhnItemCategory
+            {
+                Level1 = od.Product.Category?.Name,
+                Level2 = od.Product.Category?.Parent?.Name,
+                Level3 = od.Product.Category?.Parent?.Parent?.Name
+            }
+        }).ToArray();
+
+        return new GhnOrderRequest
+        {
+            PaymentTypeId = 2,
+            Note = $"Giao hàng cho seller {seller.CompanyName}",
+            RequiredNote = "CHOXEMHANGKHONGTHU",
+            FromName = seller.CompanyName ?? "BlindTreasure Warehouse",
+            FromPhone = seller.CompanyPhone ?? "0925136907",
+            FromAddress = seller.CompanyAddress ?? "72 Thành Thái, Phường 14, Quận 10, Hồ Chí Minh, TP.HCM",
+            FromWardName = seller.CompanyWardName ?? "Phường 14",
+            FromDistrictName = seller.CompanyDistrictName ?? "Quận 10",
+            FromProvinceName = seller.CompanyProvinceName ?? "HCM",
+            ToName = address.FullName,
+            ToPhone = address.Phone,
+            ToAddress = address.AddressLine,
+            ToWardName = address.Ward ?? "",
+            ToDistrictName = address.District ?? "",
+            ToProvinceName = address.Province,
+            CodAmount = 0,
+            Content = $"Giao hàng cho {address.FullName} từ seller {seller.CompanyName}",
+            Length = items.Max(i => i.Length),
+            Width = items.Max(i => i.Width),
+            Height = items.Max(i => i.Height),
+            Weight = items.Sum(i => i.Weight),
+            InsuranceValue = items.Sum(i => i.Price * i.Quantity),
+            ServiceTypeId = 2,
+            Items = items
+        };
+    }
+
+    /// <summary>
+    ///     Updates shipment entity with GHN response.
+    /// </summary>
+    private void UpdateShipmentWithGhnResponse(Shipment shipment, GhnCreateResponse? ghnCreateResponse)
+    {
+        shipment.OrderCode = ghnCreateResponse?.OrderCode;
+        shipment.TotalFee = ghnCreateResponse?.TotalFee != null ? Convert.ToInt32(ghnCreateResponse.TotalFee.Value) : 0;
+        shipment.MainServiceFee = ghnCreateResponse?.Fee?.MainService ?? 0;
+        shipment.TrackingNumber = ghnCreateResponse?.OrderCode ?? "";
+        //shipment.ShippedAt = DateTime.UtcNow.AddDays(4);
+        shipment.EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3))
+            .AddHours(new Random().Next(8, 18)).AddMinutes(new Random().Next(60));
+        shipment.EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3);
+        shipment.Status = ShipmentStatus.PROCESSING;
+    }
+
+    /// <summary>
+    ///     Creates inventory items for each physical product in the order after successful payment.
+    /// </summary>
+    private async Task CreateInventoryForOrderDetailsAsync(Order order)
+    {
+        Address? shippingAddress = null;
+        if (order.ShippingAddressId.HasValue)
+        {
+            shippingAddress = await _unitOfWork.Addresses.GetByIdAsync(order.ShippingAddressId.Value);
+            if (shippingAddress == null || shippingAddress.IsDeleted || shippingAddress.UserId != order.UserId)
+            {
+                _logger.Warn(ErrorMessages.OrderShippingAddressInvalidLog);
+                throw ErrorHelper.BadRequest(ErrorMessages.OrderShippingAddressInvalid);
+            }
+        }
+
+        var shipmentsByDetail = order.OrderDetails
+            .Where(od => od.Shipments != null && od.Shipments.Any())
+            .ToDictionary(od => od.Id, od => od.Shipments!.ToList());
+
+        var inventoryItems = new List<InventoryItem>();
+        foreach (var od in order.OrderDetails.Where(od => od.ProductId.HasValue))
+        {
+            shipmentsByDetail.TryGetValue(od.Id, out var shipmentList);
+
+            for (var i = 0; i < od.Quantity; i++)
+            {
+                Guid? shipmentId = null;
+                var status = InventoryItemStatus.Available;
+                Shipment? selectedShipment = null;
+
+                if (shipmentList != null && shipmentList.Count > 0)
+                {
+                    selectedShipment = shipmentList[0];
+                    shipmentId = selectedShipment.Id;
+                    status = selectedShipment.Status switch
+                    {
+                        ShipmentStatus.PROCESSING => InventoryItemStatus.Delivering,
+                        ShipmentStatus.WAITING_PAYMENT => InventoryItemStatus.Available,
+                        ShipmentStatus.CANCELLED => InventoryItemStatus.Available,
+                        _ => InventoryItemStatus.Available
+                    };
+                }
+
+                var dto = new InventoryItem
+                {
+                    ProductId = od.ProductId!.Value,
+                    Location = order.Seller.CompanyAddress,
+                    Status = status,
+                    ShipmentId = shipmentId,
+                    IsFromBlindBox = false,
+                    OrderDetailId = od.Id,
+                    AddressId = shippingAddress?.Id,
+                    UserId = order.UserId
+                };
+
+                inventoryItems.Add(dto);
+                if (od.InventoryItems == null)
+                    od.InventoryItems = new List<InventoryItem>();
+                od.InventoryItems.Add(dto);
+                // Track new inventory item creation for logging
+                dto = await _unitOfWork.InventoryItems.AddAsync(dto);
+
+                // Log: InventoryItem vừa được tạo cho OrderDetail sử dụng TEntity
+                var orderDetaillog =
+                    await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
+                        od, dto, null, $"Inventory item created for OrderDetail {od.Id} after payment."
+                    );
+
+                od.OrderDetailInventoryItemLogs.Add(orderDetaillog);
+
+                // Nếu có shipment, log trạng thái shipment cho inventory item
+                if (selectedShipment != null)
+                {
+                    var oldItemStatus = InventoryItemStatus.Available;
+                    var trackingMessage = await _orderDetailInventoryItemLogService.GenerateTrackingMessageAsync(
+                        selectedShipment,
+                        ShipmentStatus.WAITING_PAYMENT,
+                        selectedShipment.Status,
+                        order.Seller,
+                        shippingAddress
+                    );
+
+                    _logger.Info($"Generate tracking message succesfully: {trackingMessage}");
+
+                    var itemInventoryLog =
+                        await _orderDetailInventoryItemLogService.LogShipmentTrackingInventoryItemUpdateAsync(
+                            od,
+                            oldItemStatus,
+                            dto,
+                            trackingMessage
+                        );
+                    _logger.Info(
+                        $"[CreateInventoryForOrderDetailsAsync] Đã log trạng thái shipment cho inventory item {dto.Id}.");
+
+                    dto.OrderDetailInventoryItemLogs.Add(itemInventoryLog);
+                }
+            }
+        }
+        //if (inventoryItems.Any())
+        //    await _unitOfWork.InventoryItems.AddRangeAsync(inventoryItems);
+    }
+
+    /// <summary>
+    ///     Creates customer blind boxes for blind box order details.
+    /// </summary>
+    private async Task CreateCustomerBlindBoxForOrderDetails(Order order)
+    {
+        var blindBoxes = new List<CustomerBlindBox>();
+        foreach (var detail in order.OrderDetails.Where(od => od.BlindBoxId.HasValue))
+        {
+            for (var i = 0; i < detail.Quantity; i++)
+            {
+                var cbBox = new CustomerBlindBox
+                {
+                    BlindBoxId = detail.BlindBoxId.Value,
+                    OrderDetailId = detail.Id,
+                    UserId = order.UserId,
+                    IsOpened = false
+                };
+                blindBoxes.Add(cbBox);
+                cbBox = await _unitOfWork.CustomerBlindBoxes.AddAsync(cbBox);
+                // Log: CustomerBlindBox vừa được tạo cho OrderDetail sử dụng TEntity
+                var log = await _orderDetailInventoryItemLogService.LogInventoryItemOrCustomerBlindboxAddedAsync(
+                    detail, null, cbBox, $"CustomerBlindBox created for OrderDetail {detail.Id} after payment."
+                );
+            }
+
+            var oldStatus = detail.Status;
+            detail.Status = OrderDetailItemStatus.IN_INVENTORY;
+            if (oldStatus != detail.Status)
+                await _orderDetailInventoryItemLogService.LogOrderDetailStatusChangeAsync(detail, oldStatus,
+                    detail.Status, "Chuyển sang IN_INVENTORY sau khi tạo Customer BlindBox.");
+        }
+        //if (blindBoxes.Any())
+        //    await _unitOfWork.CustomerBlindBoxes.AddRangeAsync(blindBoxes);
     }
 }

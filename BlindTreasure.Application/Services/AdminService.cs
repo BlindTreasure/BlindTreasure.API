@@ -11,7 +11,6 @@ using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.Services;
@@ -21,8 +20,8 @@ public class AdminService : IAdminService
     private readonly IBlobService _blobService;
     private readonly ICacheService _cacheService;
     private readonly ILoggerService _logger;
-    private readonly IUnitOfWork _unitOfWork;
     private readonly IPayoutService _payoutService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public AdminService(
         IUnitOfWork unitOfWork,
@@ -276,7 +275,7 @@ public class AdminService : IAdminService
             var cachedUser = await _cacheService.GetAsync<User>(cacheKey);
             if (cachedUser != null) return cachedUser;
 
-            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted, x=> x.Seller);
+            var user = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted, x => x.Seller);
             if (user != null)
                 await _cacheService.SetAsync(cacheKey, user, TimeSpan.FromHours(1));
             return user;

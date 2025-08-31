@@ -7,8 +7,8 @@ namespace BlindTreasure.Application.Cronjobs;
 
 public class ItemHoldReleaseJob : BackgroundService
 {
-    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<ItemHoldReleaseJob> _logger;
+    private readonly IServiceProvider _serviceProvider;
 
     public ItemHoldReleaseJob(
         IServiceProvider serviceProvider,

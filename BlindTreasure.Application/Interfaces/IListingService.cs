@@ -1,6 +1,5 @@
 ﻿using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.ListingDTOs;
-using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using BlindTreasure.Infrastructure.Commons;
 
 namespace BlindTreasure.Application.Interfaces;

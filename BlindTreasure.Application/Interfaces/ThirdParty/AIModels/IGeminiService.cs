@@ -3,7 +3,7 @@
 public interface IGeminiService
 {
     /// <summary>
-    /// Generate response từ Gemini AI với model linh hoạt
+    ///     Generate response từ Gemini AI với model linh hoạt
     /// </summary>
     /// <param name="userPrompt">Prompt của người dùng</param>
     /// <param name="modelName">Tên model (ví dụ: gemini-2.5-pro)</param>

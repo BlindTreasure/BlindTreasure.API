@@ -1,19 +1,17 @@
 ﻿using BlindTreasure.Application.Interfaces;
-using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
 namespace BlindTreasure.Application.SignalR.Hubs;
 
 public class ChatHub : Hub
 {
-    private readonly IChatMessageService _chatMessageService;
     private readonly IBlindyService _blindyService;
-    private readonly IAdminService _userService;
-    private readonly ICacheService _cacheService;
     private readonly IBlobService _blobService;
+    private readonly ICacheService _cacheService;
+    private readonly IChatMessageService _chatMessageService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAdminService _userService;
 
     public ChatHub(IChatMessageService chatMessageService, IBlindyService blindyService, IAdminService userService,
         ICacheService cacheService, IBlobService blobService, IUnitOfWork unitOfWork)
@@ -28,7 +26,7 @@ public class ChatHub : Hub
 
 
     /// <summary>
-    /// Đánh dấu toàn bộ tin nhắn trong cuộc trò chuyện là đã đọc
+    ///     Đánh dấu toàn bộ tin nhắn trong cuộc trò chuyện là đã đọc
     /// </summary>
     /// <param name="otherUserId">ID của người gửi tin nhắn</param>
     /// <returns>Task</returns>
@@ -63,8 +61,8 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Xử lý khi client kết nối tới SignalR hub
-    /// Thêm user vào group và cập nhật trạng thái online
+    ///     Xử lý khi client kết nối tới SignalR hub
+    ///     Thêm user vào group và cập nhật trạng thái online
     /// </summary>
     /// <returns>Task</returns>
     public override async Task OnConnectedAsync()
@@ -93,7 +91,7 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Đánh dấu tin nhắn đã được xem bởi người nhận
+    ///     Đánh dấu tin nhắn đã được xem bởi người nhận
     /// </summary>
     /// <param name="messageId">ID của tin nhắn</param>
     /// <param name="senderId">ID của người gửi</param>
@@ -138,8 +136,8 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Xử lý khi client ngắt kết nối khỏi SignalR hub
-    /// Xóa user khỏi group và thông báo trạng thái offline
+    ///     Xử lý khi client ngắt kết nối khỏi SignalR hub
+    ///     Xóa user khỏi group và thông báo trạng thái offline
     /// </summary>
     /// <param name="exception">Exception gây ra việc disconnect (nếu có)</param>
     /// <returns>Task</returns>
@@ -162,7 +160,7 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Kiểm tra trạng thái online của một user cụ thể
+    ///     Kiểm tra trạng thái online của một user cụ thể
     /// </summary>
     /// <param name="targetUserId">ID của user cần kiểm tra</param>
     /// <returns>Task</returns>
@@ -185,7 +183,7 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Gửi tin nhắn từ user hiện tại tới user khác
+    ///     Gửi tin nhắn từ user hiện tại tới user khác
     /// </summary>
     /// <param name="receiverId">ID của người nhận</param>
     /// <param name="content">Nội dung tin nhắn</param>
@@ -255,7 +253,7 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Thông báo rằng user đang soạn tin nhắn (typing indicator)
+    ///     Thông báo rằng user đang soạn tin nhắn (typing indicator)
     /// </summary>
     /// <param name="receiverId">ID của người nhận sẽ thấy typing indicator</param>
     /// <returns>Task</returns>
@@ -267,7 +265,7 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Thông báo rằng user đã ngừng soạn tin nhắn (stop typing indicator)
+    ///     Thông báo rằng user đã ngừng soạn tin nhắn (stop typing indicator)
     /// </summary>
     /// <param name="receiverId">ID của người nhận sẽ ngừng thấy typing indicator</param>
     /// <returns>Task</returns>
@@ -279,7 +277,7 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Xóa cache liên quan đến tin nhắn giữa hai người dùng
+    ///     Xóa cache liên quan đến tin nhắn giữa hai người dùng
     /// </summary>
     /// <param name="user1Id">ID của người dùng 1</param>
     /// <param name="user2Id">ID của người dùng 2</param>
@@ -296,7 +294,7 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Xóa cache liên quan đến danh sách cuộc trò chuyện của người dùng
+    ///     Xóa cache liên quan đến danh sách cuộc trò chuyện của người dùng
     /// </summary>
     /// <param name="userId">ID của người dùng</param>
     /// <returns>Task</returns>
@@ -306,7 +304,7 @@ public class ChatHub : Hub
     }
 
     /// <summary>
-    /// Tạo key cache cho tin nhắn cuối cùng
+    ///     Tạo key cache cho tin nhắn cuối cùng
     /// </summary>
     /// <param name="user1Id">ID của người dùng 1</param>
     /// <param name="user2Id">ID của người dùng 2</param>
@@ -320,7 +318,7 @@ public class ChatHub : Hub
     #region AI ko liên quan
 
     /// <summary>
-    /// Gửi tin nhắn tới AI Blindy và nhận phản hồi
+    ///     Gửi tin nhắn tới AI Blindy và nhận phản hồi
     /// </summary>
     /// <param name="prompt">Câu hỏi/prompt gửi tới AI</param>
     /// <returns>Task</returns>

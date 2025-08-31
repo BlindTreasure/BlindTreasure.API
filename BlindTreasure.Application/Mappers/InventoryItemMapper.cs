@@ -26,7 +26,7 @@ public static class InventoryItemMapper
             //OrderDetail = item.OrderDetail != null ? OrderDtoMapper.ToOrderDetailDto(item.OrderDetail) : null,
             ShipmentId = item.ShipmentId,
             ArchivedAt = item.ArchivedAt,
-            ArchivedReason = item.ArchivedReason,
+            ArchivedReason = item.ArchivedReason
             //Shipment = item.Shipment != null ? ShipmentDtoMapper.ToShipmentDto(item.Shipment) : null
         };
     }

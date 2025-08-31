@@ -3,7 +3,6 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
-using BlindTreasure.Domain.Entities;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,10 +12,10 @@ public class ShipmentService : IShipmentService
 {
     private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
+    private readonly IGhnShippingService _ghnShippingService;
     private readonly ILoggerService _loggerService;
     private readonly IProductService _productService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly IGhnShippingService _ghnShippingService;
 
     public ShipmentService(
         ICacheService cacheService,
