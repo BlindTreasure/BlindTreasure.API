@@ -930,11 +930,13 @@ public class StripeService : IStripeService
     {
         // 1. Lấy order
         var order = await _unitOfWork.Orders.GetQueryable()
-            .Include(o => o.OrderDetails).ThenInclude(o => o.InventoryItems)
-            .Include(o=> o.OrderDetails).ThenInclude(o=>o.Shipments)
-            .Include(o => o.OrderSellerPromotions)
-            .Include(o => o.Payment).ThenInclude(o=>o.Transactions)
-            .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted)
+    .Include(o => o.OrderDetails).ThenInclude(od => od.InventoryItems)
+    .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+    .Include(o => o.OrderSellerPromotions)
+    .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+    .Include(o => o.User)
+    .Include(o => o.Seller)
+    .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted)
             ?? throw ErrorHelper.NotFound("Order not found.");
 
         // 2. Lấy group payment session
