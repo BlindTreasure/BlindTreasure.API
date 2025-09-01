@@ -52,18 +52,28 @@ public class PayoutService : IPayoutService
 
     public async Task AddCompletedOrderToPayoutAsync(Order order, CancellationToken? ct = default)
     {
-        if (!IsOrderEligibleForPayout(order))
+        try
         {
-            _logger.Warn($"[Payout] Order {order?.Id} is not eligible for payout accumulation.");
-            return;
+            if (!IsOrderEligibleForPayout(order))
+            {
+                _logger.Warn($"[Payout] Order {order?.Id} is not eligible for payout accumulation.");
+                return;
+            }
+
+            var payout = await GetOrCreatePendingPayoutAsync(order.SellerId, ct, order);
+            await AddOrderDetailsToPayoutAsync(payout, order, ct);
+            await UpdatePayoutAmountsAsync(payout, order);
+
+            var result = await _unitOfWork.SaveChangesAsync();
+
+            _logger.Success(
+                $"[Payout] Updated payout {payout.Id} for seller {order.SellerId}. Gross: {payout.GrossAmount:N0}, Net: {payout.NetAmount:N0}.");
         }
-
-        var payout = await GetOrCreatePendingPayoutAsync(order.SellerId, ct);
-        await AddOrderDetailsToPayoutAsync(payout, order, ct);
-        await UpdatePayoutAmountsAsync(payout, order);
-
-        _logger.Success(
-            $"[Payout] Updated payout {payout.Id} for seller {order.SellerId}. Gross: {payout.GrossAmount:N0}, Net: {payout.NetAmount:N0}.");
+        catch (Exception ex)
+        {
+            _logger.Error(ex.Message);
+            throw;
+        }
     }
 
     public async Task<Payout?> GetEligiblePayoutForSellerAsync(Guid sellerId)
@@ -272,60 +282,88 @@ public class PayoutService : IPayoutService
         return order != null && order.Status == OrderStatus.COMPLETED.ToString();
     }
 
-    private async Task<Payout> GetOrCreatePendingPayoutAsync(Guid sellerId, CancellationToken? ct)
+ 
+  private async Task<Payout> GetOrCreatePendingPayoutAsync(Guid sellerId,  CancellationToken? ct, Order order)
+{
+    var cancellationToken = ct ?? CancellationToken.None;
+
+    // Normalize order completed date to UTC date-only
+    DateTime orderCompletedDateUtc;
+    if (order.CompletedAt.HasValue)
     {
-        var (periodStart, periodEnd) = await CalculatePayoutPeriodAsync(sellerId);
+        orderCompletedDateUtc = DateTime.SpecifyKind(order.CompletedAt.Value, DateTimeKind.Utc).Date;
+    }
+    else
+    {
+        // Nếu CompletedAt null => fallback, nhưng nên log để dễ debug
+        orderCompletedDateUtc = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
+        _logger.Warn($"[Payout] Order {order.Id} has no CompletedAt. Using UTC today {orderCompletedDateUtc:yyyy-MM-dd} as fallback.");
+    }
 
-        var payout = await _unitOfWork.Payouts.GetQueryable()
-            .FirstOrDefaultAsync(p =>
-                p.SellerId == sellerId &&
-                p.PeriodStart == periodStart &&
-                p.PeriodEnd == periodEnd &&
-                p.Status == PayoutStatus.PENDING, ct ?? CancellationToken.None);
+    var orderMonday = GetMondayOfWeek(orderCompletedDateUtc);             // Monday 00:00 UTC
+    var orderNextMonday = DateTime.SpecifyKind(orderMonday.AddDays(7), DateTimeKind.Utc);
 
-        if (payout == null)
+    // 1) Try get existing pending payout (one per seller)
+    var payout = await _unitOfWork.Payouts.GetQueryable()
+        .FirstOrDefaultAsync(p => p.SellerId == sellerId && p.Status == PayoutStatus.PENDING, cancellationToken);
+
+    if (payout == null)
+    {
+        // Create new payout — wrap create into try/catch to handle race condition (unique index)
+        var newPayout = new Payout
         {
-            payout = new Payout
-            {
-                SellerId = sellerId,
-                PeriodStart = periodStart,
-                PeriodEnd = periodEnd,
-                PeriodType = PayoutPeriodType.WEEKLY,
-                Status = PayoutStatus.PENDING,
-                GrossAmount = 0,
-                PlatformFeeRate = PLATFORM_FEE_RATE,
-                PlatformFeeAmount = 0,
-                NetAmount = 0
-            };
-            payout = await _unitOfWork.Payouts.AddAsync(payout);
+            SellerId = sellerId,
+            PeriodStart = orderMonday,
+            PeriodEnd = orderNextMonday,
+            PeriodType = PayoutPeriodType.WEEKLY,
+            Status = PayoutStatus.PENDING,
+            GrossAmount = 0m,
+            PlatformFeeRate = PLATFORM_FEE_RATE,
+            PlatformFeeAmount = 0m,
+            NetAmount = 0m
+        };
+
+        try
+        {
+            newPayout = await _unitOfWork.Payouts.AddAsync(newPayout);
             await _unitOfWork.SaveChangesAsync();
 
-            _logger.Info(
-                $"[Payout] Created new pending payout for seller {sellerId} for period {periodStart:yyyy-MM-dd} - {periodEnd:yyyy-MM-dd}.");
+            _logger.Info($"[Payout] Created new pending payout for seller {sellerId} for period {orderMonday:yyyy-MM-dd} - {orderNextMonday:yyyy-MM-dd}.");
+            return newPayout;
         }
-
-        return payout;
-    }
-
-    private async Task<(DateTime periodStart, DateTime periodEnd)> CalculatePayoutPeriodAsync(Guid sellerId)
-    {
-        var now = DateTime.UtcNow.Date;
-        var currentMonday = GetMondayOfWeek(now);
-
-        var lastCompletedPayout = await _unitOfWork.Payouts.GetQueryable()
-            .Where(p => p.SellerId == sellerId && p.Status != PayoutStatus.PENDING && p.Status != PayoutStatus.COMPLETED)
-            .OrderByDescending(p => p.PeriodEnd)
-            .FirstOrDefaultAsync();
-
-        if (lastCompletedPayout == null || lastCompletedPayout.PeriodEnd < currentMonday)
+        catch (DbUpdateException ex)
         {
-            return (currentMonday, currentMonday.AddDays(7)); // Monday -> Sunday
-        }
+            // Có thể là do race -> một pending được tạo đồng thời, nên re-query
+            _logger.Warn($"[Payout] Concurrency create conflict for seller {sellerId}. Re-query pending payout. Error: {ex.Message}");
+            payout = await _unitOfWork.Payouts.GetQueryable()
+                .FirstOrDefaultAsync(p => p.SellerId == sellerId && p.Status == PayoutStatus.PENDING, cancellationToken);
 
-        var nextPeriodStart = lastCompletedPayout.PeriodEnd;
-        var nextMonday = GetMondayOfWeek(nextPeriodStart);
-        return (nextMonday, nextMonday.AddDays(7));
+            if (payout == null) throw; // nếu vẫn null, rethrow để surface lỗi
+        }
     }
+
+    // 2) If we have a pending payout, ensure period covers the order's week
+    // Normalize existing period datetimes to UTC kind/date-only for safe comparison
+    var existingStart = DateTime.SpecifyKind(payout.PeriodStart.Date, DateTimeKind.Utc);
+    var existingEnd = DateTime.SpecifyKind(payout.PeriodEnd.Date, DateTimeKind.Utc);
+
+    var newStart = orderMonday < existingStart ? orderMonday : existingStart;
+    var newEnd = orderNextMonday > existingEnd ? orderNextMonday : existingEnd;
+
+    if (newStart != existingStart || newEnd != existingEnd)
+    {
+        payout.PeriodStart = newStart;
+        payout.PeriodEnd = newEnd;
+
+        await _unitOfWork.Payouts.Update(payout);
+        await _unitOfWork.SaveChangesAsync();
+
+        _logger.Info($"[Payout] Updated payout {payout.Id} period to {newStart:yyyy-MM-dd} - {newEnd:yyyy-MM-dd} for seller {sellerId}.");
+    }
+
+    return payout;
+}
+
 
     private DateTime GetMondayOfWeek(DateTime date)
     {

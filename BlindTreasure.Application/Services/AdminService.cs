@@ -311,7 +311,7 @@ public class AdminService : IAdminService
                 await _payoutService.AddCompletedOrderToPayoutAsync(order, cancellationToken);
                 await _unitOfWork.SaveChangesAsync();
 
-                await _emailService.SendOrderCompletedToBuyerAsync(order);
+             //   await _emailService.SendOrderCompletedToBuyerAsync(order);
 
                 return true;
             }
