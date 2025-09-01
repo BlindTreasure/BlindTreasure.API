@@ -358,114 +358,89 @@ public class UnboxingService : IUnboxingService
     #region Private methods
 
     private string BuildUnboxReasonForFrontend(
-        Dictionary<BlindBoxItem, decimal> probabilities,
-        decimal roll,
-        BlindBoxItem selectedItem)
+    Dictionary<BlindBoxItem, decimal> probabilities,
+    decimal roll,
+    BlindBoxItem selectedItem)
+{
+    var totalProbability = probabilities.Values.Sum();
+
+    // Chuẩn bị rows HTML
+    int index = 1;
+    decimal cumulative = 0;
+    var rows = new StringBuilder();
+
+    foreach (var kvp in probabilities.OrderByDescending(p => p.Value).ThenBy(p => p.Key.ProductId))
     {
-        var sb = new StringBuilder();
-        var totalProbability = probabilities.Values.Sum();
+        var start = cumulative;
+        var end = start + kvp.Value;
+        cumulative = end;
 
-        // ANSI escape codes for colors
-        const string reset = "\x1b[0m";
-        const string green = "\x1b[32m";
-        const string yellow = "\x1b[33m";
-        const string cyan = "\x1b[36m";
+        var isSelected = kvp.Key.Id == selectedItem.Id;
+        var style = isSelected ? "font-weight:bold; background-color:#fef3c7;" : "";
+        var selectedSuffix = isSelected ? " (ĐÃ TRÚNG)" : "";
 
-        // HEADER SECTION
-        sb.AppendLine("# Báo Cáo Kết Quả Mở Hộp");
-        sb.AppendLine();
-        sb.AppendLine($"**Thời gian:** {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-        sb.AppendLine($"**Hộp ID:** {selectedItem.BlindBoxId}");
-        sb.AppendLine();
+        rows.AppendLine($"""
+            <tr style="border:1px solid #ccc; {style}">
+              <td style="border:1px solid #ccc; padding:4px; text-align:center;">{index}</td>
+              <td style="border:1px solid #ccc; padding:4px;">{kvp.Key.Product.Name}{selectedSuffix}</td>
+              <td style="border:1px solid #ccc; padding:4px; text-align:center;">{kvp.Key.RarityConfig.Name}</td>
+              <td style="border:1px solid #ccc; padding:4px; text-align:right;">{kvp.Value:F2}%</td>
+              <td style="border:1px solid #ccc; padding:4px; text-align:right;">{start:F2} - {end:F2}</td>
+            </tr>
+        """);
 
-        // TECHNICAL INFO SECTION
-        sb.AppendLine("## Thông Số Kỹ Thuật");
-        sb.AppendLine();
-        sb.AppendLine($"- **Random Seed:** {Math.Round(roll, 6)} (Giá trị ngẫu nhiên sinh ra)");
-        sb.AppendLine($"- **Tổng xác suất:** {Math.Round(totalProbability, 4)}% (Tổng tỷ lệ của tất cả items)");
-        sb.AppendLine("- **Thuật toán:** Weighted Random (Phương pháp chọn item)");
-        sb.AppendLine();
-
-        // PROBABILITY DISTRIBUTION LIST
-        sb.AppendLine("## Phân Phối Xác Suất");
-        sb.AppendLine();
-
-        var index = 1;
-        decimal cumulative = 0;
-
-        foreach (var kvp in probabilities
-                     .OrderByDescending(p => p.Value)
-                     .ThenBy(p => p.Key.ProductId))
-        {
-            var start = cumulative;
-            var end = start + kvp.Value;
-            cumulative = end;
-
-            var itemName = kvp.Key.Product.Name;
-            var rarity = GetRarityBadge(kvp.Key.RarityConfig.Name.ToString());
-            var dropRate = Math.Round(kvp.Value, 4);
-            var range = $"{Math.Round(start, 4)} - {Math.Round(end, 4)}";
-
-            // Highlight selected item
-            if (kvp.Key.Id == selectedItem.Id)
-                sb.AppendLine($"{cyan}- **{index}. Sản phẩm: {itemName} (ĐÃ CHỌN){reset}**");
-            else
-                sb.AppendLine($"- {index}. Sản phẩm: {itemName}");
-
-            sb.AppendLine($"  - Độ hiếm: {rarity}");
-            sb.AppendLine($"  - Tỷ lệ Drop: {dropRate}%");
-            sb.AppendLine($"  - Range: {range}");
-            sb.AppendLine();
-
-            index++;
-        }
-
-        // SELECTION RESULT
-        sb.AppendLine("## Kết Quả Lựa Chọn");
-        sb.AppendLine();
-        sb.AppendLine("### Chi Tiết Sản Phẩm Được Chọn");
-        sb.AppendLine();
-        sb.AppendLine($"- **Product Name:** {selectedItem.Product.Name}");
-        sb.AppendLine($"- **Configured Drop Rate:** {Math.Round(selectedItem.DropRate, 4)}%");
-        sb.AppendLine($"- **Rarity Level:** {GetRarityBadge(selectedItem.RarityConfig.Name.ToString())}");
-        sb.AppendLine($"- **Roll Hit Range:** {GetHitRange(probabilities, selectedItem)}");
-        sb.AppendLine();
-
-        // VALIDATION SECTION
-        sb.AppendLine("## Kiểm Tra Validation");
-        sb.AppendLine();
-        sb.AppendLine(
-            $"- **Tổng xác suất:** {Math.Round(totalProbability, 4)}% ({(Math.Abs(totalProbability - 100) < 0.01m ? $"{green}Hợp lệ{reset}" : $"{yellow}Cảnh báo{reset}")})");
-        sb.AppendLine($"- **Roll trong khoảng hợp lệ:** 0 ≤ {roll} ≤ {totalProbability} ({green}Hợp lệ{reset})");
-        sb.AppendLine($"- **Lựa chọn Item:** Thuật toán đã thực thi ({green}Thành công{reset})");
-        sb.AppendLine();
-
-        // TECHNICAL NOTES
-        sb.AppendLine("---");
-        sb.AppendLine();
-        sb.AppendLine("**Lưu ý kỹ thuật:**");
-        sb.AppendLine("- Log này chỉ dành cho mục đích kiểm tra và debug");
-        sb.AppendLine("- Không chia sẻ thông tin này với khách hàng");
-        sb.AppendLine("- Liên hệ team dev nếu có bất thường trong thuật toán");
-
-        return sb.ToString();
+        index++;
     }
 
+    var table = $"""
+        <table style="border-collapse:collapse; width:100%; font-size:13px;">
+          <thead style="background-color:#f3f4f6;">
+            <tr>
+              <th style="border:1px solid #ccc; padding:6px;">#</th>
+              <th style="border:1px solid #ccc; padding:6px;">Sản phẩm</th>
+              <th style="border:1px solid #ccc; padding:6px;">Độ hiếm</th>
+              <th style="border:1px solid #ccc; padding:6px;">Tỉ lệ (%)</th>
+              <th style="border:1px solid #ccc; padding:6px;">Phạm vi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows}
+          </tbody>
+        </table>
+    """;
 
-// Helper methods
-    private string GetRarityBadge(string? rarity)
-    {
-        return rarity?.ToLower() switch
-        {
-            "common" => "🟢 `COMMON`",
-            "uncommon" => "🟡 `UNCOMMON`",
-            "rare" => "🔵 `RARE`",
-            "epic" => "🟣 `EPIC`",
-            "legendary" => "🟠 `LEGENDARY`",
-            "mythic" => "🔴 `MYTHIC`",
-            _ => "⚫ `UNKNOWN`"
-        };
-    }
+    var totalValid = Math.Abs(totalProbability - 100) < 0.01m;
+    var totalStatus = totalValid ? "Hợp lệ" : "⚠ Tổng chưa đúng 100%";
+
+    return $"""
+        <div style="font-family:Arial, sans-serif; font-size:14px; color:#111;">
+          <h2 style="font-size:16px; font-weight:bold; margin-bottom:8px;">Báo Cáo Kết Quả Mở Hộp</h2>
+          <p><strong>Thời gian:</strong> {DateTime.Now:dd/MM/yyyy HH:mm:ss}</p>
+
+          <h3 style="margin-top:16px; font-size:15px;">Kết quả</h3>
+          <ul>
+            <li><strong>Sản phẩm trúng:</strong> {selectedItem.Product.Name}</li>
+            <li><strong>Độ hiếm:</strong> {selectedItem.RarityConfig.Name}</li>
+            <li><strong>Tỉ lệ thiết lập:</strong> {selectedItem.DropRate:F2}%</li>
+          </ul>
+
+          <h3 style="margin-top:16px; font-size:15px;">Bảng tỉ lệ các sản phẩm</h3>
+          {table}
+
+          <h3 style="margin-top:16px; font-size:15px;">Kiểm tra nhanh</h3>
+          <ul>
+            <li><strong>Tổng tỉ lệ:</strong> {totalProbability:F2}% → {totalStatus}</li>
+            <li><strong>Thuật toán chọn item:</strong> Thành công</li>
+          </ul>
+
+          <p style="margin-top:12px; font-size:12px; color:#555;">
+            <em>Lưu ý: Báo cáo này chỉ dành cho seller theo dõi và kiểm soát cấu hình tỉ lệ.</em>
+          </p>
+        </div>
+    """;
+}
+
+
 
     private string GetHitRange(Dictionary<BlindBoxItem, decimal> probabilities, BlindBoxItem selectedItem)
     {
