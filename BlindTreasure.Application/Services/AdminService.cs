@@ -311,7 +311,7 @@ public class AdminService : IAdminService
                 await _payoutService.AddCompletedOrderToPayoutAsync(order, cancellationToken);
                 await _unitOfWork.SaveChangesAsync();
 
-             //   await _emailService.SendOrderCompletedToBuyerAsync(order);
+                await _emailService.SendOrderCompletedToBuyerAsync(order);
 
                 return true;
             }
@@ -320,6 +320,7 @@ public class AdminService : IAdminService
         }
         catch (Exception ex)
         {
+            _logger.Info( $"Error completing order {order.Id}: {ex.Message}"  );
             throw ErrorHelper.BadRequest(ex.Message);
         }
     }
