@@ -34,7 +34,7 @@ public class OrderCompletionJob : BackgroundService
                 // Get all orders that are not completed/cancelled/expired
                 var orders = await unitOfWork.Orders.GetQueryable()
                     .Where(o => o.Status == OrderStatus.PAID.ToString() || o.Status == OrderStatus.PENDING.ToString())
-                    .Include(o => o.OrderDetails)
+                    .Include(o => o.OrderDetails).ThenInclude(x=>x.Shipments)
                     .ToListAsync();
 
                 var completedCount = 0;

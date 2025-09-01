@@ -1,6 +1,7 @@
 ﻿using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -24,6 +25,7 @@ public interface IAdminService
     Task<bool> TryCompleteOrderAsync(Order order, CancellationToken cancellationToken = default);
     Task<Pagination<PayoutTransactionDto>> GetPayoutTransactionsAsync(PayoutTransactionQueryParameter param);
     Task<PayoutTransactionDto?> GetPayoutTransactionByIdAsync(Guid id);
+    Task<Pagination<ShipmentDto>> GetAllShipmentsAsync(ShipmentQueryParameter param);
 
     //AI analysis
 }
