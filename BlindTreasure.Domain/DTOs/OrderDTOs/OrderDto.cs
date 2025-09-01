@@ -19,4 +19,7 @@ public class OrderDto
     public Guid? CheckoutGroupId { get; set; } // MỚI: Group ID để nhóm các order cùng checkout
     public Guid? SellerId { get; set; }
     public SellerProfileDto? Seller { get; set; }
+
+    public decimal? TotalRefundAmount { get; set; }
+    public string? RefundReason { get; set; }
 }

@@ -369,13 +369,15 @@ public class StripeController : ControllerBase
     [HttpPost("refund-order")]
     public async Task<IActionResult> RefundOrder([FromBody] RefundOrderRequestDto dto)
     {
-        var refund = await _stripeService.RefundOrderAsync(dto.OrderId);
+        var refund = await _stripeService.RefundOrderAsync(dto.OrderId, dto.RefundReason ?? "Customer want to refund");
         return Ok(ApiResult<object>.Success(refund, "200", "Refund successful."));
     }
 
     public class RefundOrderRequestDto
     {
         public Guid OrderId { get; set; }
+        public string? RefundReason { get; set; }
+
     }
 
     /// <summary>
