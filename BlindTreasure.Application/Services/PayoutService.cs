@@ -64,7 +64,7 @@ public class PayoutService : IPayoutService
             await AddOrderDetailsToPayoutAsync(payout, order, ct);
             await UpdatePayoutAmountsAsync(payout, order);
 
-            var result = await _unitOfWork.SaveChangesAsync();
+            //var result = await _unitOfWork.SaveChangesAsync();
 
             _logger.Success(
                 $"[Payout] Updated payout {payout.Id} for seller {order.SellerId}. Gross: {payout.GrossAmount:N0}, Net: {payout.NetAmount:N0}.");

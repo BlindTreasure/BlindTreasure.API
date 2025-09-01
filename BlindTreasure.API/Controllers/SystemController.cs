@@ -1003,6 +1003,7 @@ public class SystemController : ControllerBase
     public async Task<IActionResult> SimulateOrderCompletionFlow(Guid orderId)
     {
         var order = await _context.Orders
+            .Include(o => o.User)
             .Include(o => o.OrderDetails)
             .ThenInclude(od => od.InventoryItems)
             .Include(o => o.OrderDetails)
