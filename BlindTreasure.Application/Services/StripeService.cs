@@ -22,15 +22,18 @@ public class StripeService : IStripeService
     private readonly IStripeClient _stripeClient;
     private readonly string _successRedirectUrl;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IOrderDetailInventoryItemShipmentLogService _orderDetailInventoryItemShipmentLogService;
 
     public StripeService(IUnitOfWork unitOfWork, IStripeClient stripeClient,
-        IClaimsService claimsService, IConfiguration configuration, ILoggerService loggerService)
+        IClaimsService claimsService, IConfiguration configuration, ILoggerService loggerService,
+        IOrderDetailInventoryItemShipmentLogService orderDetailInventoryItemShipmentLogService)
     {
         _unitOfWork = unitOfWork;
         _stripeClient = stripeClient;
         _claimsService = claimsService;
         _configuration = configuration;
         _loggerService = loggerService;
+        _orderDetailInventoryItemShipmentLogService = orderDetailInventoryItemShipmentLogService;
 
         _successRedirectUrl = _configuration["STRIPE:SuccessRedirectUrl"] ?? "http://localhost:4040/thankyou";
         _failRedirectUrl = _configuration["STRIPE:FailRedirectUrl"] ?? "http://localhost:4040/fail";
@@ -926,8 +929,9 @@ public class StripeService : IStripeService
     /// Refund một order thuộc group payment (multi-order Stripe session).
     /// Tự động lấy paymentIntentId từ GroupPaymentSession, kiểm tra số tiền, gọi Stripe refund và lưu transaction.
     /// </summary>
-    public async Task<Refund> RefundOrderAsync(Guid orderId)
+    public async Task<Refund> RefundOrderAsync(Guid orderId, string refundReason)
     {
+
         // 1. Lấy order
         var order = await _unitOfWork.Orders.GetQueryable()
     .Include(o => o.OrderDetails).ThenInclude(od => od.InventoryItems)
@@ -938,6 +942,8 @@ public class StripeService : IStripeService
     .Include(o => o.Seller)
     .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted)
             ?? throw ErrorHelper.NotFound("Order not found.");
+
+        await CheckOrderConditionToRefund(order);
 
         // 2. Lấy group payment session
         if (order.CheckoutGroupId == null)
@@ -960,6 +966,7 @@ public class StripeService : IStripeService
 
         // 5. Lưu lại tổng số tiền đã refund cho order (nếu cần)
         order.TotalRefundAmount = (order.TotalRefundAmount ?? 0) + refundAmount;
+        order.RefundReason = refundReason;
 
         await _unitOfWork.Orders.Update(order);
         await HandleOrderEntitiesOnRefundAsync(order);
@@ -973,6 +980,8 @@ public class StripeService : IStripeService
 
     private async Task HandleOrderEntitiesOnRefundAsync(Order order)
     {
+        var actorid = _claimsService.CurrentUserId;
+
         // 1. Cập nhật trạng thái Order
         order.Status = OrderStatus.REFUNDED.ToString();
         order.UpdatedAt = DateTime.UtcNow;
@@ -980,6 +989,7 @@ public class StripeService : IStripeService
         // 2. Cập nhật các OrderDetail
         foreach (var detail in order.OrderDetails)
         {
+            var oldStatus = detail.Status;
             // Trạng thái và thời gian
             detail.Status = OrderDetailItemStatus.REFUNDED;
             detail.RefundedAmount = (detail.RefundedAmount ?? 0) + (detail.FinalDetailPrice ?? detail.TotalPrice);
@@ -1020,7 +1030,11 @@ public class StripeService : IStripeService
                             OrderDetailId = detail.Id,
                             InventoryItemId = item.Id,
                             CreatedAt = DateTime.UtcNow,
-                            ValueStatusType = Domain.Entities.ValueType.INVENTORY_ITEM
+                            ValueStatusType = Domain.Entities.ValueType.ORDER_DETAIL,
+                            ActionType = Domain.Entities.ActionType.ORDER_DETAIL_STATUS_CHANGED,
+                            OldValue = oldStatus.ToString(),
+                            NewValue = detail.Status.ToString(),
+                            ActorId = actorid != Guid.Empty ? actorid : null,
                         });
                     }
                 }
@@ -1029,6 +1043,26 @@ public class StripeService : IStripeService
 
         // 5. Cập nhật Order
         await _unitOfWork.Orders.Update(order);
+    }
+
+    private async Task CheckOrderConditionToRefund(Order order)
+    {
+        if (order.Status == OrderStatus.COMPLETED.ToString())
+            throw ErrorHelper.BadRequest("Order đã hoàn thành, không thể hoàn tiền.");
+
+        // 3. Nếu có shipment, kiểm tra shipment của các OrderDetail
+        var hasShipment = order.OrderDetails.Any(od => od.Shipments != null && od.Shipments.Any());
+        if (hasShipment)
+        {
+            // Nếu tất cả shipment đã PICKED_UP hoặc cao hơn thì không cho refund
+            var canRefund = order.OrderDetails
+                .SelectMany(od => od.Shipments ?? new List<Shipment>())
+                .Any(s => s.Status != ShipmentStatus.PICKED_UP && s.Status != ShipmentStatus.IN_TRANSIT
+                          && s.Status != ShipmentStatus.DELIVERED && s.Status != ShipmentStatus.COMPLETED);
+
+            if (!canRefund)
+                throw ErrorHelper.BadRequest("Đơn hàng đã được giao cho đơn vị vận chuyển, không thể hoàn tiền.");
+        }
     }
 
 }

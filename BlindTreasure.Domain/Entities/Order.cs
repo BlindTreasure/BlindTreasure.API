@@ -21,8 +21,9 @@ public class Order : BaseEntity
     public decimal? FinalAmount { get; set; } = 0;
     public DateTime PlacedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
-
+    //refund fields
     public decimal? TotalRefundAmount { get; set; }
+    public string? RefundReason { get; set; }
 
     // Tách rõ SellerId ở đây
     public Guid SellerId { get; set; }
