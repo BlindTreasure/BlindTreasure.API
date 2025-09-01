@@ -309,21 +309,29 @@ public class PayoutService : IPayoutService
 
     private async Task<(DateTime periodStart, DateTime periodEnd)> CalculatePayoutPeriodAsync(Guid sellerId)
     {
-        var now = DateTime.UtcNow;
-        var currentMonday = now.Date.AddDays(-(int)now.DayOfWeek);
+        var now = DateTime.UtcNow.Date;
+        var currentMonday = GetMondayOfWeek(now);
 
-        var lastPayout = await _unitOfWork.Payouts.GetQueryable()
-            .Where(p => p.SellerId == sellerId)
+        var lastCompletedPayout = await _unitOfWork.Payouts.GetQueryable()
+            .Where(p => p.SellerId == sellerId && p.Status != PayoutStatus.PENDING && p.Status != PayoutStatus.COMPLETED)
             .OrderByDescending(p => p.PeriodEnd)
             .FirstOrDefaultAsync();
 
-        if (lastPayout != null && lastPayout.Status != PayoutStatus.PENDING && lastPayout.PeriodEnd >= currentMonday)
+        if (lastCompletedPayout == null || lastCompletedPayout.PeriodEnd < currentMonday)
         {
-            var periodStart = lastPayout.PeriodEnd.AddDays(1);
-            return (periodStart, periodStart.AddDays(6));
+            return (currentMonday, currentMonday.AddDays(7)); // Monday -> Sunday
         }
 
-        return (currentMonday, currentMonday.AddDays(6));
+        var nextPeriodStart = lastCompletedPayout.PeriodEnd;
+        var nextMonday = GetMondayOfWeek(nextPeriodStart);
+        return (nextMonday, nextMonday.AddDays(7));
+    }
+
+    private DateTime GetMondayOfWeek(DateTime date)
+    {
+        var dayOfWeek = (int)date.DayOfWeek;
+        int daysToSubtract = dayOfWeek == 0 ? 6 : dayOfWeek - 1;
+        return date.AddDays(-daysToSubtract);
     }
 
     private async Task AddOrderDetailsToPayoutAsync(Payout payout, Order order, CancellationToken? ct)
@@ -400,24 +408,45 @@ public class PayoutService : IPayoutService
 
     private async Task<Payout?> GetMainActivePayoutWithDetailsAsync(Guid sellerId)
     {
-        // Ưu tiên payout PROCESSING
+        // 1. Ưu tiên PROCESSING payout (đã được xử lý bởi Stripe)
         var processingPayout = await _unitOfWork.Payouts.GetQueryable()
             .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o => o.Order)
             .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PROCESSING)
-            .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+            .OrderByDescending(p => p.ProcessedAt ?? p.CreatedAt)
             .FirstOrDefaultAsync();
 
         if (processingPayout != null)
+        {
+            _logger.Info($"[Payout] Found PROCESSING payout {processingPayout.Id} for seller {sellerId}");
             return processingPayout;
+        }
 
-        // Nếu không có PROCESSING, lấy payout REQUESTED gần nhất
+        // 2. Tiếp theo là REQUESTED payout (seller đã yêu cầu nhưng chưa xử lý)
         var requestedPayout = await _unitOfWork.Payouts.GetQueryable()
             .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o => o.Order)
             .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.REQUESTED)
-            .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+            .OrderByDescending(p => p.ProcessedAt ?? p.CreatedAt)
             .FirstOrDefaultAsync();
 
-        return requestedPayout;
+        if (requestedPayout != null)
+        {
+            _logger.Info($"[Payout] Found REQUESTED payout {requestedPayout.Id} for seller {sellerId}");
+            return requestedPayout;
+        }
+
+        // 3. Cuối cùng mới là PENDING payout
+        var pendingPayout = await _unitOfWork.Payouts.GetQueryable()
+            .Include(p => p.PayoutDetails).ThenInclude(o => o.OrderDetail).ThenInclude(o => o.Order)
+            .Where(p => p.SellerId == sellerId && p.Status == PayoutStatus.PENDING)
+            .OrderByDescending(p => p.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (pendingPayout != null)
+        {
+            _logger.Info($"[Payout] Found PENDING payout {pendingPayout.Id} for seller {sellerId}");
+        }
+
+        return pendingPayout;
     }
 
     private async Task<Seller?> GetSellerWithStripeAccountAsync(Guid sellerId)
@@ -709,7 +738,7 @@ public class PayoutService : IPayoutService
     private async Task UpdatePayoutToRequestedAsync(Payout payout)
     {
         var now = DateTime.UtcNow;
-        payout.PeriodEnd = now.Date.AddDays(7 - (int)now.DayOfWeek - 1);
+        //payout.PeriodEnd = now.Date.AddDays(7 - (int)now.DayOfWeek - 1);
         payout.Status = PayoutStatus.REQUESTED;
         payout.ProcessedAt = now;
 
