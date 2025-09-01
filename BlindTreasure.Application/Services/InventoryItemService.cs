@@ -852,7 +852,7 @@ public class InventoryItemService : IInventoryItemService
         _loggerService.Info($"[HandleInventoryItemLifecycleAsync] Done for item {item.Id}.");
     }
 
-    private static HoldInfoDto BuildHoldInfo(InventoryItem item)
+    public static HoldInfoDto BuildHoldInfo(InventoryItem item)
     {
         var isOnHold = item.Status == InventoryItemStatus.OnHold;
         var holdUntil = item.HoldUntil;
