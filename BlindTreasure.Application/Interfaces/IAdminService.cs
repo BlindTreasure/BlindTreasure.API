@@ -1,4 +1,5 @@
 ﻿using BlindTreasure.Domain.DTOs.AuthenDTOs;
+using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
@@ -26,6 +27,8 @@ public interface IAdminService
     Task<Pagination<PayoutTransactionDto>> GetPayoutTransactionsAsync(PayoutTransactionQueryParameter param);
     Task<PayoutTransactionDto?> GetPayoutTransactionByIdAsync(Guid id);
     Task<Pagination<ShipmentDto>> GetAllShipmentsAsync(ShipmentQueryParameter param);
+    Task<Pagination<InventoryItemDto>> GetAllInventoryItemsAdminAsync(InventoryItemAdminQuery param);
+    Task<InventoryItemDto> UpdateArchivedInventoryItemStatusAsync(Guid inventoryItemId, InventoryItemStatus newStatus);
 
     //AI analysis
 }
