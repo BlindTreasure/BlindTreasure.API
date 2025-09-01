@@ -339,11 +339,9 @@ public class SystemController : ControllerBase
                 user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId.Value);
                 if (user == null)
                 {
-                    _logger.Warn($"[SeedUserCartItems] Không tìm thấy user với Id: {userId}");
                     return NotFound($"Không tìm thấy user với Id: {userId}");
                 }
 
-                _logger.Info($"[SeedUserCartItems] Bắt đầu seed cart items cho user Id: {userId}");
             }
             else
             {
@@ -351,11 +349,9 @@ public class SystemController : ControllerBase
                 user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
                 if (user == null)
                 {
-                    _logger.Warn($"[SeedUserCartItems] Không tìm thấy user với email: {email}");
                     return NotFound($"Không tìm thấy user với email: {email}");
                 }
 
-                _logger.Info($"[SeedUserCartItems] Bắt đầu seed cart items cho user: {email}");
             }
 
             // Remove existing cart items for the user to avoid duplicates
@@ -675,19 +671,12 @@ public class SystemController : ControllerBase
     {
         try
         {
-            _logger.Info("[SeedPromotionsData] Starting to seed Promotions and PromotionParticipants.");
-
-            _logger.Info("[SeedPromotionsData] Clearing existing PromotionParticipants and Promotions.");
             await _context.PromotionParticipants.ExecuteDeleteAsync();
             await _context.Promotions.ExecuteDeleteAsync();
 
-            _logger.Info("[SeedPromotionsData] Seeding new Promotions.");
             await SeedPromotions();
 
-            _logger.Info("[SeedPromotionsData] Seeding new PromotionParticipants.");
             await SeedPromotionParticipants();
-
-            _logger.Success("[SeedPromotionsData] Promotions and participants seeded successfully.");
             return Ok(ApiResult<object>.Success("200", "Promotions and participants seeded successfully."));
         }
         catch (Exception ex)
@@ -2877,7 +2866,7 @@ public class SystemController : ControllerBase
                 Description = "Giảm 20,000 VNĐ cho đơn hàng - Toàn sàn",
                 DiscountType = DiscountType.Fixed,
                 DiscountValue = 20000,
-                StartDate = now,
+                StartDate = now.AddDays(1),
                 EndDate = now.AddMonths(2),
                 UsageLimit = 500,
                 Status = PromotionStatus.Approved,
@@ -2889,7 +2878,6 @@ public class SystemController : ControllerBase
                 IsDeleted = false
             },
 
-            // 4. ✅ Voucher giảm 15% cho khách hàng mới - Global
             new()
             {
                 Id = Guid.NewGuid(),
@@ -2897,19 +2885,18 @@ public class SystemController : ControllerBase
                 Description = "Chào mừng khách hàng mới - Giảm 15% đơn hàng đầu tiên",
                 DiscountType = DiscountType.Percentage,
                 DiscountValue = 15,
-                StartDate = now,
+                StartDate = now.AddDays(1),
                 EndDate = now.AddMonths(3),
                 UsageLimit = 200, // Giới hạn 200 lượt sử dụng
                 Status = PromotionStatus.Approved,
                 SellerId = null, // Global
-                CreatedByRole = RoleType.Admin,
+                CreatedByRole = RoleType.Staff,
                 CreatedBy = adminUser.Id,
                 CreatedAt = now,
                 UpdatedAt = now,
                 IsDeleted = false
             },
 
-            // 5. ✅ Voucher của seller BlindTreasure cho sản phẩm cao cấp
             new()
             {
                 Id = Guid.NewGuid(),
@@ -2937,7 +2924,7 @@ public class SystemController : ControllerBase
                 Description = "Giảm 50,000 VNĐ cho đơn hàng từ 1 triệu - Ưu đãi lớn toàn sàn",
                 DiscountType = DiscountType.Fixed,
                 DiscountValue = 50000,
-                StartDate = now,
+                StartDate = now.AddDays(1),
                 EndDate = now.AddDays(30),
                 UsageLimit = 100,
                 Status = PromotionStatus.Approved,

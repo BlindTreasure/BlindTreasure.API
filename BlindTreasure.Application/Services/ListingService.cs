@@ -13,7 +13,6 @@ namespace BlindTreasure.Application.Services;
 
 public class ListingService : IListingService
 {
-    private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ILoggerService _logger;
     private readonly IMapperService _mapper;
@@ -26,22 +25,10 @@ public class ListingService : IListingService
         _logger = logger;
         _mapper = mapper;
         _unitOfWork = unitOfWork;
-        _cacheService = cacheService;
     }
 
     public async Task<ListingDetailDto> GetListingByIdAsync(Guid id)
     {
-        var cacheKey = CacheKeys.GetListingDetail(id);
-
-        // Kiểm tra cache trước
-        var cachedListing = await _cacheService.GetAsync<ListingDetailDto>(cacheKey);
-        if (cachedListing != null)
-        {
-            _logger.Info($"[GetByIdAsync] Cache hit cho bài đăng: {id}");
-            return cachedListing;
-        }
-
-        _logger.Info($"[GetByIdAsync] Cache miss cho bài đăng: {id}, truy vấn database");
 
         var listing = await _unitOfWork.Listings
             .GetQueryable()
@@ -54,17 +41,7 @@ public class ListingService : IListingService
         if (listing == null)
             throw ErrorHelper.NotFound("Rất tiếc, bài đăng bạn đang tìm kiếm không tồn tại hoặc đã bị xóa.");
 
-        var result = MapListingToDto(listing);
-
-        // Lưu vào cache với thời gian khác nhau dựa trên status
-        var cacheDuration = listing.Status == ListingStatus.Active
-            ? CacheDurations.ActiveListing
-            : CacheDurations.InactiveListing;
-
-        await _cacheService.SetAsync(cacheKey, result, cacheDuration);
-        _logger.Info($"[GetByIdAsync] Đã cache bài đăng {id} với duration: {cacheDuration}");
-
-        return result;
+        return MapListingToDto(listing);
     }
 
     public async Task<Pagination<ListingDetailDto>> GetAllListingsAsync(ListingQueryParameter param)
@@ -95,12 +72,6 @@ public class ListingService : IListingService
     public async Task<List<InventoryItemDto>> GetAvailableItemsForListingAsync()
     {
         var userId = _claimsService.CurrentUserId;
-        var cacheKey = CacheKeys.GetUserAvailableItems(userId);
-
-        var cachedItems = await _cacheService.GetAsync<List<InventoryItemDto>>(cacheKey);
-        if (cachedItems != null)
-            return cachedItems;
-
         var items = await GetUserListableItemsAsync(userId);
 
         var result = items.Select(item =>
@@ -114,7 +85,6 @@ public class ListingService : IListingService
             return dto;
         }).ToList();
 
-        await _cacheService.SetAsync(cacheKey, result, CacheDurations.UserItems);
         return result;
     }
 
@@ -156,12 +126,6 @@ public class ListingService : IListingService
         await _unitOfWork.Listings.AddAsync(listing);
         await _unitOfWork.SaveChangesAsync();
 
-        // Xóa cache của user items
-        await InvalidateUserItemsCache(userId);
-
-        _logger.Info($"[CreateListing] Đã tạo bài đăng {listing.Id} và xóa cache");
-
-        // Load đầy đủ thông tin bài đăng vừa tạo
         return await GetListingByIdAsync(listing.Id);
     }
 
@@ -183,12 +147,6 @@ public class ListingService : IListingService
         listing.Status = ListingStatus.Sold;
         await _unitOfWork.Listings.Update(listing);
         await _unitOfWork.SaveChangesAsync();
-
-        // Xóa cache
-        await InvalidateListingCache(listingId);
-        await InvalidateUserItemsCache(userId);
-
-        _logger.Info($"[CloseListing] Đã đóng bài đăng {listingId} và xóa cache");
 
         return await GetListingByIdAsync(listingId);
     }
@@ -235,20 +193,6 @@ public class ListingService : IListingService
         public static readonly TimeSpan ActiveListing = TimeSpan.FromMinutes(15);
         public static readonly TimeSpan InactiveListing = TimeSpan.FromHours(1);
         public static readonly TimeSpan UserItems = TimeSpan.FromMinutes(10);
-    }
-
-    private async Task InvalidateListingCache(Guid listingId)
-    {
-        var cacheKey = CacheKeys.GetListingDetail(listingId);
-        await _cacheService.RemoveAsync(cacheKey);
-        _logger.Info($"[Cache] Đã xóa cache bài đăng: {listingId}");
-    }
-
-    private async Task InvalidateUserItemsCache(Guid userId)
-    {
-        var cacheKey = CacheKeys.GetUserAvailableItems(userId);
-        await _cacheService.RemoveAsync(cacheKey);
-        _logger.Info($"[Cache] Đã xóa cache items của user: {userId}");
     }
 
     #endregion
