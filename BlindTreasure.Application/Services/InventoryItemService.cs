@@ -2,7 +2,6 @@
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Application.Utils.SharedCacheKeys;
 using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
@@ -17,7 +16,6 @@ namespace BlindTreasure.Application.Services;
 
 public class InventoryItemService : IInventoryItemService
 {
-    private readonly ICacheService _cacheService;
     private readonly ICategoryService _categoryService;
     private readonly IClaimsService _claimsService;
     private readonly IGhnShippingService _ghnShippingService;
@@ -28,7 +26,6 @@ public class InventoryItemService : IInventoryItemService
 
 
     public InventoryItemService(
-        ICacheService cacheService,
         IClaimsService claimsService,
         ILoggerService loggerService,
         IUnitOfWork unitOfWork,
@@ -37,13 +34,12 @@ public class InventoryItemService : IInventoryItemService
         IStripeService stripeService,
         INotificationService notificationService)
     {
-        _cacheService = cacheService;
         _claimsService = claimsService;
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
-        _categoryService = categoryService; // initialize categoryService
-        _ghnShippingService = ghnShippingService; // initialize ghnShippingService
-        _stripeService = stripeService; // initialize stripeService
+        _categoryService = categoryService; 
+        _ghnShippingService = ghnShippingService; 
+        _stripeService = stripeService;
         _notificationService = notificationService;
     }
 
@@ -114,11 +110,6 @@ public class InventoryItemService : IInventoryItemService
 
         await _unitOfWork.InventoryItems.Update(item);
         await _unitOfWork.SaveChangesAsync();
-
-        // Invalidate cache per-item
-        await _cacheService.RemoveAsync(GetCacheKey(inventoryItemId));
-        // Invalidate user-items cache (item đã chuyển sang Available => ảnh hưởng danh sách)
-        await _cacheService.RemoveAsync(ListingSharedCacheKeys.GetUserAvailableItems(item.UserId));
 
         // Map sang DTO trả về
         var dto = InventoryItemMapper.ToInventoryItemDto(item);
@@ -212,12 +203,6 @@ public class InventoryItemService : IInventoryItemService
 
         var result = await _unitOfWork.InventoryItems.AddAsync(item);
         await _unitOfWork.SaveChangesAsync();
-        // Invalidate cache per-item
-        await _cacheService.RemoveAsync(GetCacheKey(item.Id));
-        // Invalidate cache user-items (listing), vì user có thêm 1 item mới
-        await _cacheService.RemoveAsync(ListingSharedCacheKeys.GetUserAvailableItems(item.UserId));
-
-        _loggerService.Success($"[CreateAsync] Inventory item created for user {userId}, product {product.Name}.");
         return InventoryItemMapper.ToInventoryItemDto(result) ??
                throw ErrorHelper.Internal("Failed to create inventory item.");
     }
@@ -320,8 +305,6 @@ public class InventoryItemService : IInventoryItemService
 
         await _unitOfWork.InventoryItems.Update(item);
         await _unitOfWork.SaveChangesAsync();
-        await _cacheService.RemoveAsync(GetCacheKey(id));
-        await _cacheService.RemoveAsync(ListingSharedCacheKeys.GetUserAvailableItems(item.UserId));
 
         _loggerService.Success($"[UpdateAsync] Inventory item {id} updated.");
         return await GetByIdAsync(id) ??
@@ -341,10 +324,6 @@ public class InventoryItemService : IInventoryItemService
 
         await _unitOfWork.InventoryItems.Update(item);
         await _unitOfWork.SaveChangesAsync();
-        // Invalidate cache per-item
-        await _cacheService.RemoveAsync(GetCacheKey(id));
-        // Invalidate user-items cache
-        await _cacheService.RemoveAsync(ListingSharedCacheKeys.GetUserAvailableItems(item.UserId));
 
         _loggerService.Success($"[DeleteAsync] Inventory item {id} deleted.");
         return true;
@@ -876,10 +855,6 @@ public class InventoryItemService : IInventoryItemService
         };
     }
 
-    private static string GetCacheKey(Guid id)
-    {
-        return $"inventoryitem:{id}";
-    }
 }
 
 public class ShipmentItemResponseDTO
