@@ -52,4 +52,5 @@ public interface IEmailService
         string reason = "Đơn hàng đã hết hạn hoặc bị hủy do không thanh toán thành công.");
 
     Task SendCommonItemOutOfStockAsync(string toEmail, string userName, string boxName, string productName);
+    Task SendOrderCompletedToBuyerAsync(Order order);
 }

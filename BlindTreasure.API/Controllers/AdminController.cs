@@ -4,6 +4,7 @@ using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Infrastructure.Commons;
@@ -356,4 +357,34 @@ public class AdminController : ControllerBase
             return StatusCode(statusCode, errorResponse);
         }
     }
+
+    /// <summary>
+    /// Lấy danh sách shipment (phân trang, filter) cho admin.
+    /// </summary>
+    [HttpGet("shipments")]
+    [ProducesResponseType(typeof(ApiResult<Pagination<ShipmentDto>>), 200)]
+    public async Task<IActionResult> GetAllShipments([FromQuery] ShipmentQueryParameter param)
+    {
+        try
+        {
+            var result = await _userService.GetAllShipmentsAsync(param);
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Danh sách shipment đã được lấy thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+
+
 }

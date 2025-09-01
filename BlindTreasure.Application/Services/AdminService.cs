@@ -5,6 +5,7 @@ using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
+using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
@@ -22,19 +23,22 @@ public class AdminService : IAdminService
     private readonly ILoggerService _logger;
     private readonly IPayoutService _payoutService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IEmailService _emailService;
 
     public AdminService(
         IUnitOfWork unitOfWork,
         ILoggerService logger,
         ICacheService cacheService,
         IBlobService blobService,
-        IPayoutService payoutService)
+        IPayoutService payoutService,
+        IEmailService emailService)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
         _cacheService = cacheService;
         _blobService = blobService;
         _payoutService = payoutService;
+        _emailService = emailService;
     }
 
 
@@ -306,6 +310,9 @@ public class AdminService : IAdminService
 
                 await _payoutService.AddCompletedOrderToPayoutAsync(order, cancellationToken);
                 await _unitOfWork.SaveChangesAsync();
+
+                await _emailService.SendOrderCompletedToBuyerAsync(order);
+
                 return true;
             }
 
@@ -370,6 +377,55 @@ public class AdminService : IAdminService
 
         return PayoutDtoMapper.ToPayoutTransactionDto(entity);
     }
+
+    public async Task<Pagination<ShipmentDto>> GetAllShipmentsAsync(ShipmentQueryParameter param)
+    {
+        _logger.Info($"[GetAllShipmentsAsync] Admin requests shipment list. Page: {param.PageIndex}, Size: {param.PageSize}");
+
+        var query = _unitOfWork.Shipments.GetQueryable()
+            .Include(s => s.OrderDetails)
+            .Include(s => s.InventoryItems)
+            .Where(s => !s.IsDeleted)
+            .AsNoTracking();
+
+        // Filter theo OrderCode (search)
+        if (!string.IsNullOrWhiteSpace(param.Search))
+            query = query.Where(s => s.OrderCode != null && s.OrderCode.Contains(param.Search));
+
+        // Filter theo Status
+        if (param.Status.HasValue)
+            query = query.Where(s => s.Status == param.Status.Value);
+
+        // Filter theo tổng phí vận chuyển
+        if (param.MinTotalFee.HasValue)
+            query = query.Where(s => s.TotalFee.HasValue && s.TotalFee.Value >= param.MinTotalFee.Value);
+        if (param.MaxTotalFee.HasValue)
+            query = query.Where(s => s.TotalFee.HasValue && s.TotalFee.Value <= param.MaxTotalFee.Value);
+
+        // Filter theo EstimatedPickupTime
+        if (param.FromEstimatedPickupTime.HasValue)
+            query = query.Where(s => s.EstimatedPickupTime.HasValue && s.EstimatedPickupTime.Value >= param.FromEstimatedPickupTime.Value);
+        if (param.ToEstimatedPickupTime.HasValue)
+            query = query.Where(s => s.EstimatedPickupTime.HasValue && s.EstimatedPickupTime.Value <= param.ToEstimatedPickupTime.Value);
+
+        // Sắp xếp theo UpdatedAt/CreatedAt
+        query = param.Desc
+            ? query.OrderByDescending(s => s.UpdatedAt ?? s.CreatedAt)
+            : query.OrderBy(s => s.UpdatedAt ?? s.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+        var shipments = param.PageIndex == 0
+            ? await query.ToListAsync()
+            : await query.Skip((param.PageIndex - 1) * param.PageSize).Take(param.PageSize).ToListAsync();
+
+        var dtos = shipments.Select(ShipmentDtoMapper.ToShipmentDto).ToList();
+
+        _logger.Info("[GetAllShipmentsAsync] Loaded shipment list for admin.");
+        return new Pagination<ShipmentDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
+
+
+
 
     // ----------------- PRIVATE HELPER METHODS -----------------
 
