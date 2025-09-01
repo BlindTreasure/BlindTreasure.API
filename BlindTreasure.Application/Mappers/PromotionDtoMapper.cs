@@ -23,7 +23,9 @@ public static class PromotionDtoMapper
             RejectReason = promotion.RejectReason,
             CreatedByRole = promotion.CreatedByRole,
             UpdatedAt = promotion.UpdatedAt,
-            IsDeleted = promotion.IsDeleted
+            IsDeleted = promotion.IsDeleted,
+            MaxUsagePerUser = promotion.MaxUsagePerUser,
+            PromotionUserUsages = promotion.PromotionUserUsages?.Select(ToPromotionUsageDto).ToList() ?? new List<PromotionUserUsageDto>()
         };
     }
 

@@ -1,4 +1,5 @@
-﻿using BlindTreasure.Domain.Enums;
+﻿using BlindTreasure.Domain.Entities;
+using BlindTreasure.Domain.Enums;
 
 namespace BlindTreasure.Domain.DTOs.PromotionDTOs;
 
@@ -19,5 +20,9 @@ public class PromotionDto
     public RoleType? CreatedByRole { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public bool IsDeleted { get; set; }
-    public bool? IsParticipant { get; set; }
+    public int? MaxUsagePerUser { get; set; }
+
+    public ICollection<PromotionUserUsageDto> PromotionUserUsages { get; set; } = new List<PromotionUserUsageDto>();
+
+
 }
