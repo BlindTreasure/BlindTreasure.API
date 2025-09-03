@@ -27,12 +27,27 @@ public class AddressService : IAddressService
     public async Task<List<AddressDto>> GetCurrentUserAddressesAsync()
     {
         var userId = _claimsService.CurrentUserId;
+        var cacheKey = $"addresses:user:{userId}";
+        var cachedAddresses = await _cacheService.GetAsync<List<Address>>(cacheKey);
+
+        if (cachedAddresses != null)
+        {
+            _logger.Info($"[GetCurrentUserAddressesAsync] Cache hit for user {userId}");
+            var sortedFromCache = cachedAddresses
+                .OrderByDescending(a => a.IsDefault)
+                .ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt)
+                .ToList();
+            return sortedFromCache.Select(ToAddressDto).ToList();
+        }
+
         var addresses = await _unitOfWork.Addresses.GetAllAsync(a => a.UserId == userId && !a.IsDeleted);
         // Sắp xếp: IsDefault=true lên đầu, còn lại sort theo UpdatedAt (nếu có) rồi CreatedAt giảm dần
         var sorted = addresses
             .OrderByDescending(a => a.IsDefault)
             .ThenByDescending(a => a.UpdatedAt ?? a.CreatedAt)
             .ToList();
+
+        await _cacheService.SetAsync(cacheKey, sorted, TimeSpan.FromHours(1));
         _logger.Info($"[GetCurrentUserAddressesAsync] Loaded from DB and cached for user {userId}");
         return sorted.Select(ToAddressDto).ToList();
     }
@@ -204,7 +219,7 @@ public class AddressService : IAddressService
     private async Task RemoveAddressCacheAsync(Guid userId, Guid addressId)
     {
         await _cacheService.RemoveAsync($"address:{addressId}");
-        await _cacheService.RemoveAsync($"address:user:{userId}");
+        await _cacheService.RemoveAsync($"addresses:user:{userId}"); // Sửa key thành số nhiều
     }
 
     private static AddressDto ToAddressDto(Address address)

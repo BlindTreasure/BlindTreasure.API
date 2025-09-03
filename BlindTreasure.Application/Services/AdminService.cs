@@ -212,8 +212,8 @@ public class AdminService : IAdminService
 
         await _unitOfWork.Users.AddAsync(user);
         await _unitOfWork.SaveChangesAsync();
-        //await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
-        //await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync($"user:{user.Email}", user, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync($"user:{user.Id}", user, TimeSpan.FromHours(1));
 
         _logger.Success($"[CreateUserAsync] User {user.Email} created by admin.");
         return UserMapper.ToUserDto(user);
@@ -557,7 +557,12 @@ public class AdminService : IAdminService
         if (cachedUser != null) return true;
 
         var existingUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
-        return existingUser != null;
+        if (existingUser != null)
+        {
+            await _cacheService.SetAsync(cacheKey, existingUser, TimeSpan.FromHours(1));
+            return true;
+        }
+        return false;
     }
 
     private async Task<Seller?> GetSellerByUserIdAsync(Guid userId)
