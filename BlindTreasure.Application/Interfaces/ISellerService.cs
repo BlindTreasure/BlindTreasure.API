@@ -2,6 +2,7 @@
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
+using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using Microsoft.AspNetCore.Http;
@@ -10,6 +11,7 @@ namespace BlindTreasure.Application.Interfaces;
 
 public interface ISellerService
 {
+    Task<List<UserDto>> GetCustomersOfSellerAsync();
     Task<string> UploadSellerDocumentAsync(Guid userId, IFormFile file);
     Task<SellerProfileDto> GetSellerProfileByIdAsync(Guid sellerId);
     Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId);
