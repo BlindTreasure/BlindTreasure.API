@@ -393,9 +393,7 @@ public class BlindBoxService : IBlindBoxService
 
         // Nếu BlindBox đã có item từ trước → set PendingApproval
         if (blindBox.BlindBoxItems != null && blindBox.BlindBoxItems.Any())
-        {
             blindBox.Status = BlindBoxStatus.PendingApproval;
-        }
 
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
@@ -747,8 +745,7 @@ public class BlindBoxService : IBlindBoxService
             _logger.Warn(
                 $"[ValidateBlindBoxItemsFullRule] Phát hiện ProductId trùng nhau [DuplicateProductIds={duplicateList}].");
             throw ErrorHelper.BadRequest(
-                $"Mỗi sản phẩm chỉ được thêm một lần vào Blind Box. Các sản phẩm sau đã bị trùng: {duplicateList}."
-            );
+                $"Mỗi sản phẩm chỉ được thêm một lần vào Blind Box. Các sản phẩm sau đã bị trùng: {duplicateList}.");
         }
 
         var countSecret = items.Count(i => i.Rarity == RarityName.Secret);
@@ -785,7 +782,7 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.BadRequest("Tổng trọng số (Weight) của tất cả vật phẩm phải chính xác là 100.");
         }
 
-        // Validate thứ tự weight: Common >= Rare >= Epic >= Secret
+        // Validate thứ tự weight: Common ≥ Rare ≥ Epic ≥ Secret
         var tierOrder = new List<RarityName> { RarityName.Common, RarityName.Rare, RarityName.Epic, RarityName.Secret };
         var groupWeights = tierOrder
             .Select(tier => items.Where(i => i.Rarity == tier).Sum(i => i.Weight))
@@ -794,13 +791,20 @@ public class BlindBoxService : IBlindBoxService
         for (var i = 1; i < groupWeights.Count; i++)
             if (groupWeights[i] > 0 && groupWeights[i - 1] > 0 && groupWeights[i] > groupWeights[i - 1])
             {
-                var detail = string.Join(", ",
-                    tierOrder.Select((r, idx) => $"{r}={groupWeights[idx]}"));
+                var detail = string.Join(", ", tierOrder.Select((r, idx) => $"{r}={groupWeights[idx]}"));
                 _logger.Warn(
                     $"[ValidateBlindBoxItemsFullRule] Tổng trọng số tier sau lớn hơn tier trước [TierOrder={detail}]. Không cho phép trọng số của tier sau lớn hơn tier trước.");
                 throw ErrorHelper.BadRequest(
                     "Trọng số của các bậc độ hiếm phải tuân theo quy tắc: Common ≥ Rare ≥ Epic ≥ Secret.");
             }
+
+        var secretWeight = items.Where(i => i.Rarity == RarityName.Secret).Sum(i => i.Weight);
+        if (secretWeight > 10)
+        {
+            _logger.Warn(
+                $"[ValidateBlindBoxItemsFullRule] Secret weight vượt quá giới hạn [SecretWeight={secretWeight}]. Tối đa cho phép = 10.");
+            throw ErrorHelper.BadRequest("Vật phẩm Secret không được vượt quá 10% tổng trọng số.");
+        }
     }
 
 

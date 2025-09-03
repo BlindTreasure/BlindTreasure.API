@@ -48,7 +48,7 @@ public class PromotionService : IPromotionService
 
         // Base query - chỉ lấy promotions chưa bị xóa
         var query = _unitOfWork.Promotions
-            .GetQueryable().Include(x=> x.PromotionUserUsages).AsNoTracking()
+            .GetQueryable().Include(x => x.PromotionUserUsages).AsNoTracking()
             .Where(p => !p.IsDeleted);
 
         // Nếu là Seller: áp dụng giới hạn chặt
@@ -439,13 +439,35 @@ public class PromotionService : IPromotionService
         if (user?.RoleName != RoleType.Staff && user?.RoleName != RoleType.Admin)
             throw ErrorHelper.Forbidden("Không có quyền xem danh sách tham gia.");
 
-        var participants = await _unitOfWork.PromotionParticipants
+        // Build base query and include navigation
+        var query = _unitOfWork.PromotionParticipants
             .GetQueryable()
             .Include(pp => pp.Seller)
             .ThenInclude(s => s.User)
-            .ToListAsync();
+            .Where(pp => !pp.IsDeleted);
 
-        var result = participants.Select(pp => new SellerParticipantDto
+        // Nếu truyền promotionId thì chỉ lấy participant của promotion đó
+        if (param?.PromotionId != null && param.PromotionId != Guid.Empty)
+        {
+            query = query.Where(pp => pp.PromotionId == param.PromotionId);
+        }
+
+        var participants = await query.ToListAsync();
+
+        List<PromotionParticipant> uniqueParticipants;
+        if (param?.PromotionId != null && param.PromotionId != Guid.Empty)
+        {
+            uniqueParticipants = participants
+                .GroupBy(pp => pp.SellerId)
+                .Select(g => g.OrderBy(pp => pp.JoinedAt).First()) // giữ bản ghi có JoinedAt cũ nhất
+                .ToList();
+        }
+        else
+        {
+            uniqueParticipants = participants;
+        }
+
+        var result = uniqueParticipants.Select(pp => new SellerParticipantDto
         {
             Id = pp.Seller.Id,
             Email = pp.Seller.User.Email,
@@ -461,6 +483,7 @@ public class PromotionService : IPromotionService
         return result;
     }
 
+
     #region private methods
 
     private List<PromotionDto> MapPromotionsToDtos(List<Promotion> promotions)
@@ -470,7 +493,6 @@ public class PromotionService : IPromotionService
         return promotions.Select(promotion =>
             _mapperService.Map<Promotion, PromotionDto>(promotion)
         ).ToList();
-
     }
 
 
@@ -604,19 +626,26 @@ public class PromotionService : IPromotionService
 
     private async Task ValidatePromotionInputAsync(CreatePromotionDto dto)
     {
-        // Validate format: 6 ký tự in hoa
-        if (!Regex.IsMatch(dto.Code, @"^[A-Z]{6}$"))
-            throw ErrorHelper.BadRequest("Mã voucher phải gồm đúng 6 ký tự in hoa (A-Z).");
+        // Normalize và trim
+        var code = (dto.Code ?? string.Empty).Trim().ToUpper();
 
-        // Validate trùng mã
+        // Validate length: 1..6 ký tự
+        if (string.IsNullOrEmpty(code) || code.Length > 6)
+            throw ErrorHelper.BadRequest("Mã voucher phải có tối đa 6 ký tự (ít nhất 1 ký tự).");
+
+        // Validate allowed chars: chỉ chữ in hoa A-Z và số 0-9
+        if (!Regex.IsMatch(code, @"^[A-Z0-9]{1,6}$"))
+            throw ErrorHelper.BadRequest("Mã voucher chỉ được chứa chữ in hoa (A-Z) và chữ số (0-9), tối đa 6 ký tự.");
+
+        // Validate trùng mã (so sánh bằng mã đã chuẩn hoá)
         var isExisted = await _unitOfWork.Promotions
             .GetQueryable()
-            .AnyAsync(p => p.Code == dto.Code);
+            .AnyAsync(p => p.Code == code);
 
         if (isExisted)
             throw ErrorHelper.BadRequest("Mã voucher đã tồn tại. Vui lòng chọn mã khác.");
 
-        // Validate discount
+        // Validate discount (không thay đổi)
         if (dto.DiscountType == DiscountType.Percentage)
         {
             if (dto.DiscountValue <= 0 || dto.DiscountValue > 100)

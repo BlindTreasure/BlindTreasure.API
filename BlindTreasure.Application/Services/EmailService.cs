@@ -443,14 +443,9 @@ public class EmailService : IEmailService
     /// </summary>
     public async Task SendOrderCompletedToBuyerAsync(Order order)
     {
-      
-        if (order == null)
-        {
-            throw new ArgumentNullException(nameof(order), "Order không hợp lệ.");
+        if (order == null) throw new ArgumentNullException(nameof(order), "Order không hợp lệ.");
 
-        }
-
-        if(order.User == null)
+        if (order.User == null)
         {
             order.User = await _unitOfWork.Users.GetByIdAsync(order.UserId);
             if (order.User == null)
@@ -460,7 +455,8 @@ public class EmailService : IEmailService
         var toEmail = order.User.Email;
         var userName = order.User.FullName ?? order.User.Email;
         var orderId = order.Id.ToString();
-        var completedAt = order.CompletedAt?.ToString("dd/MM/yyyy HH:mm") ?? DateTime.UtcNow.ToString("dd/MM/yyyy HH:mm");
+        var completedAt = order.CompletedAt?.ToString("dd/MM/yyyy HH:mm") ??
+                          DateTime.UtcNow.ToString("dd/MM/yyyy HH:mm");
 
         // Kiểm tra có shipment hay không
         var hasShipment = order.OrderDetails.Any(od => od.Shipments != null && od.Shipments.Any());

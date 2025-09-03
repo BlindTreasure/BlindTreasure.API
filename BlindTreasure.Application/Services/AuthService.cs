@@ -435,6 +435,7 @@ public class AuthService : IAuthService
             await _cacheService.SetAsync(cacheKey, existingUser, TimeSpan.FromHours(1));
             return true;
         }
+
         return false;
     }
 

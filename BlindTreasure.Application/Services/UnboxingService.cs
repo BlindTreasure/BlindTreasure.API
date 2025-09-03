@@ -358,88 +358,87 @@ public class UnboxingService : IUnboxingService
     #region Private methods
 
     private string BuildUnboxReasonForFrontend(
-    Dictionary<BlindBoxItem, decimal> probabilities,
-    decimal roll,
-    BlindBoxItem selectedItem)
-{
-    var totalProbability = probabilities.Values.Sum();
-
-    // Chuẩn bị rows HTML
-    int index = 1;
-    decimal cumulative = 0;
-    var rows = new StringBuilder();
-
-    foreach (var kvp in probabilities.OrderByDescending(p => p.Value).ThenBy(p => p.Key.ProductId))
+        Dictionary<BlindBoxItem, decimal> probabilities,
+        decimal roll,
+        BlindBoxItem selectedItem)
     {
-        var start = cumulative;
-        var end = start + kvp.Value;
-        cumulative = end;
+        var totalProbability = probabilities.Values.Sum();
 
-        var isSelected = kvp.Key.Id == selectedItem.Id;
-        var style = isSelected ? "font-weight:bold; background-color:#fef3c7;" : "";
-        var selectedSuffix = isSelected ? " (ĐÃ TRÚNG)" : "";
+        // Chuẩn bị rows HTML
+        var index = 1;
+        decimal cumulative = 0;
+        var rows = new StringBuilder();
 
-        rows.AppendLine($"""
-            <tr style="border:1px solid #ccc; {style}">
-              <td style="border:1px solid #ccc; padding:4px; text-align:center;">{index}</td>
-              <td style="border:1px solid #ccc; padding:4px;">{kvp.Key.Product.Name}{selectedSuffix}</td>
-              <td style="border:1px solid #ccc; padding:4px; text-align:center;">{kvp.Key.RarityConfig.Name}</td>
-              <td style="border:1px solid #ccc; padding:4px; text-align:right;">{kvp.Value:F2}%</td>
-              <td style="border:1px solid #ccc; padding:4px; text-align:right;">{start:F2} - {end:F2}</td>
-            </tr>
-        """);
+        foreach (var kvp in probabilities.OrderByDescending(p => p.Value).ThenBy(p => p.Key.ProductId))
+        {
+            var start = cumulative;
+            var end = start + kvp.Value;
+            cumulative = end;
 
-        index++;
+            var isSelected = kvp.Key.Id == selectedItem.Id;
+            var style = isSelected ? "font-weight:bold; background-color:#fef3c7;" : "";
+            var selectedSuffix = isSelected ? " (ĐÃ TRÚNG)" : "";
+
+            rows.AppendLine($"""
+                                 <tr style="border:1px solid #ccc; {style}">
+                                   <td style="border:1px solid #ccc; padding:4px; text-align:center;">{index}</td>
+                                   <td style="border:1px solid #ccc; padding:4px;">{kvp.Key.Product.Name}{selectedSuffix}</td>
+                                   <td style="border:1px solid #ccc; padding:4px; text-align:center;">{kvp.Key.RarityConfig.Name}</td>
+                                   <td style="border:1px solid #ccc; padding:4px; text-align:right;">{kvp.Value:F2}%</td>
+                                   <td style="border:1px solid #ccc; padding:4px; text-align:right;">{start:F2} - {end:F2}</td>
+                                 </tr>
+                             """);
+
+            index++;
+        }
+
+        var table = $"""
+                         <table style="border-collapse:collapse; width:100%; font-size:13px;">
+                           <thead style="background-color:#f3f4f6;">
+                             <tr>
+                               <th style="border:1px solid #ccc; padding:6px;">#</th>
+                               <th style="border:1px solid #ccc; padding:6px;">Sản phẩm</th>
+                               <th style="border:1px solid #ccc; padding:6px;">Độ hiếm</th>
+                               <th style="border:1px solid #ccc; padding:6px;">Tỉ lệ (%)</th>
+                               <th style="border:1px solid #ccc; padding:6px;">Phạm vi</th>
+                             </tr>
+                           </thead>
+                           <tbody>
+                             {rows}
+                           </tbody>
+                         </table>
+                     """;
+
+        var totalValid = Math.Abs(totalProbability - 100) < 0.01m;
+        var totalStatus = totalValid ? "Hợp lệ" : "⚠ Tổng chưa đúng 100%";
+
+        return $"""
+                    <div style="font-family:Arial, sans-serif; font-size:14px; color:#111;">
+                      <h2 style="font-size:16px; font-weight:bold; margin-bottom:8px;">Báo Cáo Kết Quả Mở Hộp</h2>
+                      <p><strong>Thời gian:</strong> {DateTime.Now:dd/MM/yyyy HH:mm:ss}</p>
+
+                      <h3 style="margin-top:16px; font-size:15px;">Kết quả</h3>
+                      <ul>
+                        <li><strong>Sản phẩm trúng:</strong> {selectedItem.Product.Name}</li>
+                        <li><strong>Độ hiếm:</strong> {selectedItem.RarityConfig.Name}</li>
+                        <li><strong>Tỉ lệ thiết lập:</strong> {selectedItem.DropRate:F2}%</li>
+                      </ul>
+
+                      <h3 style="margin-top:16px; font-size:15px;">Bảng tỉ lệ các sản phẩm</h3>
+                      {table}
+
+                      <h3 style="margin-top:16px; font-size:15px;">Kiểm tra nhanh</h3>
+                      <ul>
+                        <li><strong>Tổng tỉ lệ:</strong> {totalProbability:F2}% → {totalStatus}</li>
+                        <li><strong>Thuật toán chọn item:</strong> Thành công</li>
+                      </ul>
+
+                      <p style="margin-top:12px; font-size:12px; color:#555;">
+                        <em>Lưu ý: Báo cáo này chỉ dành cho seller theo dõi và kiểm soát cấu hình tỉ lệ.</em>
+                      </p>
+                    </div>
+                """;
     }
-
-    var table = $"""
-        <table style="border-collapse:collapse; width:100%; font-size:13px;">
-          <thead style="background-color:#f3f4f6;">
-            <tr>
-              <th style="border:1px solid #ccc; padding:6px;">#</th>
-              <th style="border:1px solid #ccc; padding:6px;">Sản phẩm</th>
-              <th style="border:1px solid #ccc; padding:6px;">Độ hiếm</th>
-              <th style="border:1px solid #ccc; padding:6px;">Tỉ lệ (%)</th>
-              <th style="border:1px solid #ccc; padding:6px;">Phạm vi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows}
-          </tbody>
-        </table>
-    """;
-
-    var totalValid = Math.Abs(totalProbability - 100) < 0.01m;
-    var totalStatus = totalValid ? "Hợp lệ" : "⚠ Tổng chưa đúng 100%";
-
-    return $"""
-        <div style="font-family:Arial, sans-serif; font-size:14px; color:#111;">
-          <h2 style="font-size:16px; font-weight:bold; margin-bottom:8px;">Báo Cáo Kết Quả Mở Hộp</h2>
-          <p><strong>Thời gian:</strong> {DateTime.Now:dd/MM/yyyy HH:mm:ss}</p>
-
-          <h3 style="margin-top:16px; font-size:15px;">Kết quả</h3>
-          <ul>
-            <li><strong>Sản phẩm trúng:</strong> {selectedItem.Product.Name}</li>
-            <li><strong>Độ hiếm:</strong> {selectedItem.RarityConfig.Name}</li>
-            <li><strong>Tỉ lệ thiết lập:</strong> {selectedItem.DropRate:F2}%</li>
-          </ul>
-
-          <h3 style="margin-top:16px; font-size:15px;">Bảng tỉ lệ các sản phẩm</h3>
-          {table}
-
-          <h3 style="margin-top:16px; font-size:15px;">Kiểm tra nhanh</h3>
-          <ul>
-            <li><strong>Tổng tỉ lệ:</strong> {totalProbability:F2}% → {totalStatus}</li>
-            <li><strong>Thuật toán chọn item:</strong> Thành công</li>
-          </ul>
-
-          <p style="margin-top:12px; font-size:12px; color:#555;">
-            <em>Lưu ý: Báo cáo này chỉ dành cho seller theo dõi và kiểm soát cấu hình tỉ lệ.</em>
-          </p>
-        </div>
-    """;
-}
-
 
 
     private string GetHitRange(Dictionary<BlindBoxItem, decimal> probabilities, BlindBoxItem selectedItem)
