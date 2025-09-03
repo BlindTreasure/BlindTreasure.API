@@ -5,7 +5,6 @@ using BlindTreasure.Application.Interfaces;
 using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.SignalR.Hubs;
 using BlindTreasure.Application.Utils;
-using BlindTreasure.Application.Utils.SharedCacheKeys;
 using BlindTreasure.Domain.DTOs;
 using BlindTreasure.Domain.DTOs.BlindBoxDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
@@ -26,7 +25,6 @@ public class UnboxingService : IUnboxingService
 {
     private readonly IAdminService _adminService;
     private readonly IBlindBoxService _blindBoxService;
-    private readonly ICacheService _cacheService;
     private readonly IClaimsService _claimsService;
     private readonly ICurrentTime _currentTime;
     private readonly IEmailService _emailService;
@@ -38,8 +36,8 @@ public class UnboxingService : IUnboxingService
 
     public UnboxingService(ILoggerService loggerService, IUnitOfWork unitOfWork, IClaimsService claimsService,
         ICurrentTime currentTime, INotificationService notificationService, IHubContext<UnboxingHub> notificationHub,
-        IAdminService adminService, IBlindBoxService blindBoxService, IEmailService emailService,
-        ICacheService cacheService)
+        IAdminService adminService, IBlindBoxService blindBoxService, IEmailService emailService
+    )
     {
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
@@ -50,7 +48,6 @@ public class UnboxingService : IUnboxingService
         _adminService = adminService;
         _blindBoxService = blindBoxService;
         _emailService = emailService;
-        _cacheService = cacheService;
     }
 
     public async Task<UnboxResultDto> UnboxAsync(Guid customerBlindBoxId)
@@ -545,15 +542,6 @@ public class UnboxingService : IUnboxingService
         await _unitOfWork.CustomerBlindBoxes.Update(customerBox);
         await _unitOfWork.BlindBoxItems.Update(selectedItem);
         await _unitOfWork.SaveChangesAsync();
-
-        // 7. Invalidate cache: per-inventory item (mới tạo) + user available items (listing)
-        // Xóa cache chi tiết item nếu có
-        var invCacheKey = ListingSharedCacheKeys.GetInventoryItem(inventory.Id);
-        await _cacheService.RemoveAsync(invCacheKey);
-
-        // Xóa cache danh sách items khả dụng của user (ListingService GetAvailableItemsForListingAsync)
-        var userItemsKey = ListingSharedCacheKeys.GetUserAvailableItems(userId);
-        await _cacheService.RemoveAsync(userItemsKey);
     }
 
     /// <summary>
@@ -582,8 +570,6 @@ public class UnboxingService : IUnboxingService
             await _unitOfWork.BlindBoxes.Update(blindBox);
             await _unitOfWork.SaveChangesAsync();
 
-            // invalidate cache blindbox (detail + lists) để frontend cập nhật trạng thái
-            await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
 
             // Gửi email thông báo cho seller
             var sellerUser = blindBox.Seller?.User;
@@ -635,9 +621,6 @@ public class UnboxingService : IUnboxingService
 
         await _unitOfWork.SaveChangesAsync();
 
-        // 7. Invalidate cache blindbox để client lấy về tỷ lệ mới
-        await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
-
         // 8. Log DropRate sau khi cập nhật
         var sbAfter = new StringBuilder();
         sbAfter.AppendLine($"[DropRate-AFTER] BlindBox {blindBox.Id}:");
@@ -648,39 +631,41 @@ public class UnboxingService : IUnboxingService
     }
 
 
+    // UnboxingService.cs - NotifyOutOfStockAsync (đã chỉnh sửa)
     /// <summary>
-    ///     Thông báo khi một item trong BlindBox hết hàng
-    ///     - Đổi trạng thái BlindBox sang PendingApproval
-    ///     - Gửi notification và email cho Seller
+    /// Thông báo khi một item trong BlindBox hết hàng
+    /// - Đổi trạng thái BlindBox sang Disabled (ngưng bán)
+    /// - Gửi notification và email cho Seller, yêu cầu seller chỉnh sửa và gửi duyệt lại
     /// </summary>
     private async Task NotifyOutOfStockAsync(BlindBox blindBox, BlindBoxItem item)
     {
-        // 1. Cập nhật trạng thái BlindBox
-        blindBox.Status = BlindBoxStatus.PendingApproval;
+        if (blindBox == null || item == null) return;
+
+        // 1. Cập nhật trạng thái BlindBox sang Disabled (ngưng bán)
+        blindBox.Status = BlindBoxStatus.Disabled;
         await _unitOfWork.BlindBoxes.Update(blindBox);
 
         // 2. Lưu thay đổi ngay lập tức
         await _unitOfWork.SaveChangesAsync();
 
-        // 3. Invalidate cache để đảm bảo frontend / api client không hiển thị hộp cũ
-        await _blindBoxService.InvalidateBlindBoxCacheAsync(blindBox.Id);
 
         // 4. Gửi thông báo cho Seller
         var sellerUser = blindBox.Seller?.User;
         if (sellerUser != null)
         {
-            // Push notification
+            // Push notification với hướng dẫn cụ thể
             await _notificationService.PushNotificationToUser(
                 sellerUser.Id,
                 new NotificationDto
                 {
-                    Title = $"Item hết hàng trong {blindBox.Name}",
-                    Message = $"Sản phẩm '{item.Product?.Name ?? "Unknown"}' trong blind box đã hết số lượng.",
+                    Title = $"Vật phẩm hết hàng trong {blindBox.Name}",
+                    Message =
+                        $"Sản phẩm '{item.Product?.Name ?? "Unknown"}' trong Blind Box đã hết. Blind Box đã tạm ngưng bán. Vui lòng cập nhật số lượng và gửi duyệt lại.",
                     Type = NotificationType.System
                 }
             );
 
-            // Gửi email
+            // Gửi email yêu cầu seller cập nhật và submit lại
             await _emailService.SendCommonItemOutOfStockAsync(
                 sellerUser.Email,
                 sellerUser.FullName ?? sellerUser.Email,
@@ -690,7 +675,7 @@ public class UnboxingService : IUnboxingService
         }
 
         _loggerService.Info(
-            $"[NotifyOutOfStockAsync] BlindBox {blindBox.Id} marked as Rejected because item {item.Id} ({item.Product?.Name}) is out of stock.");
+            $"[NotifyOutOfStockAsync] BlindBox {blindBox.Id} marked as Disabled because item {item.Id} ({item.Product?.Name}) is out of stock.");
     }
 
 
