@@ -3,6 +3,7 @@ using BlindTreasure.Application.Interfaces.Commons;
 using BlindTreasure.Application.Mappers;
 using BlindTreasure.Application.Utils;
 using BlindTreasure.Domain.DTOs.AuthenDTOs;
+using BlindTreasure.Domain.DTOs.InventoryItemDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
@@ -320,6 +321,7 @@ public class AdminService : IAdminService
         }
         catch (Exception ex)
         {
+            _logger.Info( $"Error completing order {order.Id}: {ex.Message}"  );
             throw ErrorHelper.BadRequest(ex.Message);
         }
     }
@@ -422,6 +424,122 @@ public class AdminService : IAdminService
 
         _logger.Info("[GetAllShipmentsAsync] Loaded shipment list for admin.");
         return new Pagination<ShipmentDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
+
+    public async Task<Pagination<InventoryItemDto>> GetAllInventoryItemsAdminAsync(InventoryItemAdminQuery param)
+    {
+        _logger.Info($"[GetAllInventoryItemsAsync] Admin requests inventory list. Page: {param.PageIndex}, Size: {param.PageSize}");
+
+        var query = _unitOfWork.InventoryItems.GetQueryable()
+            .Where(i => !i.IsDeleted)
+            .Include(i => i.User)
+            .Include(i => i.Product).ThenInclude(p => p.Category)
+            .Include(i => i.OrderDetail)
+            .Include(i => i.Shipment)
+            .AsNoTracking();
+
+        // Filter theo tên sản phẩm
+        if (!string.IsNullOrWhiteSpace(param.Search))
+        {
+            var keyword = param.Search.Trim().ToLower();
+            query = query.Where(i => i.Product.Name.ToLower().Contains(keyword));
+        }
+
+        // Filter theo category
+        if (param.CategoryId.HasValue)
+        {
+            // Nếu có service lấy category con thì dùng, còn không thì chỉ filter theo category hiện tại
+            query = query.Where(i => i.Product.CategoryId == param.CategoryId.Value);
+        }
+
+        // Filter theo status
+        if (param.Status.HasValue)
+            query = query.Where(i => i.Status == param.Status.Value);
+
+        // Filter theo IsFromBlindBox
+        if (param.IsFromBlindBox.HasValue)
+            query = query.Where(i => i.IsFromBlindBox == param.IsFromBlindBox.Value);
+
+        // Filter theo UserId
+        if (param.UserId.HasValue)
+            query = query.Where(i => i.UserId == param.UserId.Value);
+
+        // Filter theo ProductId
+        if (param.ProductId.HasValue)
+            query = query.Where(i => i.ProductId == param.ProductId.Value);
+
+        // Filter theo SellerId (qua Product)
+        if (param.SellerId.HasValue)
+            query = query.Where(i => i.Product.Seller.Id == param.SellerId.Value);
+
+        // Sort: UpdatedAt/CreatedAt theo hướng param.Desc
+        query = param.Desc
+            ? query.OrderByDescending(i => i.UpdatedAt ?? i.CreatedAt)
+            : query.OrderBy(i => i.UpdatedAt ?? i.CreatedAt);
+
+        var totalCount = await query.CountAsync();
+
+        List<InventoryItem> items;
+        if (param.PageIndex == 0)
+            items = await query.ToListAsync();
+        else
+            items = await query
+                .Skip((param.PageIndex - 1) * param.PageSize)
+                .Take(param.PageSize)
+                .ToListAsync();
+
+        var dtos = items.Select(item =>
+        {
+            var dto = InventoryItemMapper.ToInventoryItemDto(item);
+            dto.HoldInfo = InventoryItemService.BuildHoldInfo(item);
+            dto.IsOnHold = dto.HoldInfo.IsOnHold;
+            return dto;
+        }).ToList();
+
+        return new Pagination<InventoryItemDto>(dtos, totalCount, param.PageIndex, param.PageSize);
+    }
+
+    /// <summary>
+    /// Admin/Seller cập nhật lại trạng thái cho InventoryItem đã bị ARCHIVED.
+    /// Chỉ cho phép cập nhật nếu item hiện tại đang ở trạng thái Archived.
+    /// </summary>
+    /// <param name="inventoryItemId">Id của InventoryItem cần cập nhật</param>
+    /// <param name="newStatus">Trạng thái mới muốn cập nhật</param>
+    /// <returns>InventoryItemDto sau khi cập nhật</returns>
+    public async Task<InventoryItemDto> UpdateArchivedInventoryItemStatusAsync(Guid inventoryItemId, InventoryItemStatus newStatus)
+    {
+        _logger.Info($"[UpdateArchivedInventoryItemStatusAsync] Admin/Seller cập nhật trạng thái cho item {inventoryItemId} thành {newStatus}");
+
+        var item = await _unitOfWork.InventoryItems.GetByIdAsync(inventoryItemId, i => i.Product, i => i.User);
+        if (item == null || item.IsDeleted)
+            throw ErrorHelper.NotFound("Không tìm thấy vật phẩm trong kho.");
+
+        if (item.Status != InventoryItemStatus.Archived)
+        {
+            //    throw ErrorHelper.BadRequest("Chỉ có thể cập nhật trạng thái cho vật phẩm đã bị khóa(ARCHIVED).");
+            _logger.Info($"[UpdateArchivedInventoryItemStatusAsync] Item {inventoryItemId} không ở trạng thái Archived. Hiện trạng: {item.Status}. Tiếp tục cập nhật trạng thái.");
+        }
+
+        // Cập nhật trạng thái mới
+        var oldArchivedReason = item.ArchivedReason ?? "";
+        var oldArchivedAt = item.ArchivedAt.HasValue ? item.ArchivedAt.Value.ToString("u") : "N/A";
+        item.Status = newStatus;
+        var archivedMsg = !string.IsNullOrWhiteSpace(oldArchivedReason)
+    ? $"Đã bị archived với lý do: {oldArchivedReason} lúc {oldArchivedAt}"
+    : $"Đã bị archived lúc {oldArchivedAt}";
+        item.ArchivedReason = $"{archivedMsg}\nĐã được mở khóa để có thể ship hàng";
+        item.ArchivedAt = null;
+        item.UpdatedAt = DateTime.UtcNow;
+
+        await _unitOfWork.InventoryItems.Update(item);
+        await _unitOfWork.SaveChangesAsync();
+
+        // Invalidate cache nếu có
+        // await _cacheService.RemoveAsync($"inventoryitem:{inventoryItemId}");
+
+        _logger.Success($"[UpdateArchivedInventoryItemStatusAsync] Đã cập nhật trạng thái cho item {inventoryItemId} thành {newStatus}");
+
+        return InventoryItemMapper.ToInventoryItemDto(item);
     }
 
 

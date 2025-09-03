@@ -48,48 +48,46 @@ public class AdminDashboardService : IAdminDashboardService
     {
         var (periodStart, periodEnd) = GetPeriodRange(req);
 
+        // Lấy tất cả payout trong kỳ, không lấy các payout đã bị xóa
         var payouts = await _unitOfWork.Payouts.GetQueryable()
-            .Where(p => p.PeriodStart >= periodStart && p.PeriodEnd < periodEnd && !p.IsDeleted)
+            .Where(p => p.UpdatedAt >= periodStart && p.UpdatedAt < periodEnd && !p.IsDeleted)
             .ToListAsync();
-
         var validPayouts = payouts
             .Where(p => p.Status == PayoutStatus.PROCESSING || p.Status == PayoutStatus.COMPLETED)
             .ToList();
 
+        // Chỉ lấy các payout đang PENDING hoặc REQUESTED (doanh thu chưa thực hiện)
+        var pendingPayouts = payouts
+            .Where(p => p.Status == PayoutStatus.PENDING || p.Status == PayoutStatus.REQUESTED)
+            .ToList();
+
+        // Doanh thu thực tế (chưa thực hiện)
         var totalGrossAmount = validPayouts.Sum(p => p.GrossAmount);
         var totalPlatformFee = validPayouts.Sum(p => p.PlatformFeeAmount);
         var totalNetAmount = validPayouts.Sum(p => p.NetAmount);
         var totalPayouts = validPayouts.Count;
 
-        var orders = await _unitOfWork.Orders.GetQueryable()
-            .Where(o => o.CreatedAt >= periodStart && o.CreatedAt < periodEnd && !o.IsDeleted)
-            .Include(o => o.OrderDetails)
-            .ToListAsync();
+        // Doanh thu ước tính: cũng lấy từ các payout PENDING/REQUESTED
+        var estimatedGrossAmount = pendingPayouts.Sum(p => p.GrossAmount);
+        var estimatedPlatformFee = pendingPayouts.Sum(p => p.PlatformFeeAmount);
+        var estimatedNetAmount = pendingPayouts.Sum(p => p.NetAmount);
+        var estimatedOrderCount = pendingPayouts.Count; // Số lượng payout ước tính
 
-        var paidOrders = orders.Where(o => o.Status == OrderStatus.PAID.ToString()).ToList();
-        var paidOrderDetails = paidOrders
-            .SelectMany(o => o.OrderDetails)
-            .Where(od => od.Status != OrderDetailItemStatus.CANCELLED)
-            .ToList();
-
-        var estimatedGrossAmount = paidOrderDetails.Sum(od => od.FinalDetailPrice ?? od.TotalPrice);
-        var estimatedPlatformFee = Math.Round(estimatedGrossAmount * 5.0m / 100m, 2);
-        var estimatedNetAmount = estimatedGrossAmount - estimatedPlatformFee;
-        var estimatedOrderCount = paidOrders.Count;
-
-        var platformFeeRate = validPayouts.FirstOrDefault()?.PlatformFeeRate ?? 5.0m;
+        var platformFeeRate = pendingPayouts.FirstOrDefault()?.PlatformFeeRate ?? 5.0m;
         var revenueTakingRate = totalGrossAmount != 0
             ? Math.Round(totalPlatformFee * 100 / totalGrossAmount, 2)
             : 0m;
 
+        // Tính doanh thu kỳ trước (chỉ lấy các payout PENDING/REQUESTED)
         var (prevStart, prevEnd) = GetPreviousPeriodRange(req.Range, periodStart, periodEnd);
         var prevPayouts = await _unitOfWork.Payouts.GetQueryable()
-            .Where(p => p.PeriodStart >= prevStart && p.PeriodEnd < prevEnd && !p.IsDeleted)
+            .Where(p => p.UpdatedAt >= prevStart && p.UpdatedAt < prevEnd && !p.IsDeleted)
             .ToListAsync();
-        var prevValidPayouts = prevPayouts
-            .Where(p => p.Status == PayoutStatus.PROCESSING || p.Status == PayoutStatus.COMPLETED)
+        var prevPendingPayouts = prevPayouts
+            .Where(p => p.Status == PayoutStatus.PENDING || p.Status == PayoutStatus.REQUESTED)
             .ToList();
-        var prevRevenue = prevValidPayouts.Sum(p => p.NetAmount);
+        var prevRevenue = prevPendingPayouts.Sum(p => p.NetAmount);
+
         var revenueGrowthPercent = prevRevenue != 0
             ? Math.Round((totalNetAmount - prevRevenue) * 100 / Math.Abs(prevRevenue), 2)
             : totalNetAmount > 0

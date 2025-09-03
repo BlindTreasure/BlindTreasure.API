@@ -53,7 +53,7 @@ public class OrderCompletionJob : BackgroundService
             }
 
             // Run every 1 minute
-            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+            await Task.Delay(TimeSpan.FromMinutes(100), stoppingToken);
         }
     }
 }
