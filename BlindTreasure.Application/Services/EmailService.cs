@@ -468,6 +468,29 @@ public class EmailService : IEmailService
             od.UpdatedAt.HasValue &&
             (DateTime.UtcNow - od.UpdatedAt.Value).TotalDays >= 3);
 
+        // Lấy thông tin sản phẩm và blindbox
+        var inventoryItems = order.OrderDetails
+            .Where(od => od.ProductId != null)
+            .SelectMany(od => od.InventoryItems ?? new List<InventoryItem>())
+            .Select(ii => $@"
+            <div style=""background-color:#f8f9fa;padding:12px;border-left:3px solid #28a745;margin:8px 0;"">
+                <strong>{ii.Product?.Name ?? "Sản phẩm"}</strong><br/>
+                <span style=""color:#666;"">Vị trí: {ii.Location}</span>
+            </div>")
+            .ToList();
+
+        var blindBoxes = order.OrderDetails
+            .Where(od => od.BlindBoxId != null)
+            .SelectMany(od => od.CustomerBlindBoxes ?? new List<CustomerBlindBox>())
+            .Select(cb => $@"
+            <div style=""background-color:#f8f9fa;padding:12px;border-left:3px solid #6f42c1;margin:8px 0;"">
+                <strong>{cb.BlindBox?.Name ?? "BlindBox"}</strong><br/>
+                <span style=""color:{(cb.IsOpened ? "#28a745" : "#ffc107")};"">
+                    {(cb.IsOpened ? "✅ Đã mở" : "📦 Chưa mở")}
+                </span>
+            </div>")
+            .ToList();
+
         string subject;
         string htmlContent;
 
@@ -510,17 +533,8 @@ public class EmailService : IEmailService
         }
         else if (allInInventory3Days)
         {
-            // Đơn hàng hoàn thành, sản phẩm đã nằm trong túi đồ
-            subject = $"Đơn mua hàng #{orderId} đã hoàn tất - Sản phẩm đã vào túi đồ - BlindTreasure";
-            var inventoryItems = order.OrderDetails
-                .SelectMany(od => od.InventoryItems ?? new List<InventoryItem>())
-                .Select(ii => $@"
-                <div style=""background-color:#f8f9fa;padding:12px;border-left:3px solid #28a745;margin:8px 0;"">
-                    <strong>{ii.Product?.Name ?? "Sản phẩm"}</strong><br/>
-                    <span style=""color:#666;"">Vị trí: {ii.Location}</span>
-                </div>")
-                .ToList();
-
+            // Đơn hàng hoàn thành, sản phẩm và blindbox đã vào kho
+            subject = $"Đơn mua hàng #{orderId} đã hoàn tất - Sản phẩm/BlindBox đã vào kho - BlindTreasure";
             htmlContent = $@"
         <html style=""background-color:#ebeaea;margin:0;padding:0;"">
             <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
@@ -531,12 +545,18 @@ public class EmailService : IEmailService
                     <div style=""padding:24px;"">
                         <p style=""margin:0 0 16px 0;font-size:16px;"">Chào <strong>{userName}</strong>,</p>
                         <p style=""margin:0 0 20px 0;"">Đơn hàng <strong>#{orderId}</strong> của bạn đã hoàn tất vào lúc <strong>{completedAt}</strong>.</p>
+                        {(inventoryItems.Any() ? $@"
                         <div style=""background-color:#f0f9ff;padding:16px;border-radius:6px;margin:20px 0;"">
                             <h3 style=""margin:0 0 12px 0;color:#d02a2a;font-size:18px;"">Sản phẩm đã vào túi đồ</h3>
                             {string.Join("", inventoryItems)}
-                        </div>
+                        </div>" : "")}
+                        {(blindBoxes.Any() ? $@"
+                        <div style=""background-color:#fdf2f8;padding:16px;border-radius:6px;margin:20px 0;"">
+                            <h3 style=""margin:0 0 12px 0;color:#d02a2a;font-size:18px;"">BlindBox đã vào kho của bạn</h3>
+                            {string.Join("", blindBoxes)}
+                        </div>" : "")}
                         <div style=""background-color:#d4edda;padding:16px;border-radius:6px;border-left:4px solid #28a745;"">
-                            <p style=""margin:0;font-size:14px;"">💡 Bạn có thể kiểm tra sản phẩm trong mục ""Kho hàng của tôi"" trên BlindTreasure.</p>
+                            <p style=""margin:0;font-size:14px;"">💡 Bạn có thể kiểm tra sản phẩm và BlindBox trong mục ""Kho hàng của tôi"" trên BlindTreasure.</p>
                         </div>
                         <p style=""margin:24px 0 0 0;"">Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi.</p>
                         <p style=""margin:16px 0 0 0;"">Trân trọng,<br/><strong>Đội ngũ BlindTreasure</strong></p>
