@@ -30,29 +30,25 @@ public class StripeController : ControllerBase
     private readonly ILoggerService _logger;
     private readonly IOrderService _orderService;
     private readonly ISellerService _sellerService;
-    private readonly IStripeClient _stripeClient;
     private readonly IStripeService _stripeService;
     private readonly ITransactionService _transactionService;
-    private readonly IAdminService _userService;
+    private readonly ICacheService _cacheService;
 
 
     public StripeController(
         ISellerService sellerService,
         IClaimsService claimService,
-        IAdminService userService,
         IStripeService stripeService,
         ILoggerService logger,
-        IStripeClient stripeClient,
         IOrderService orderService,
         ITransactionService transactionService,
         IConfiguration configuration,
-        ICartItemService cartItemService)
+        ICartItemService cartItemService,
+        ICacheService cacheService)
     {
         _claimService = claimService;
-        _userService = userService;
         _stripeService = stripeService;
         _logger = logger;
-        _stripeClient = stripeClient;
         _orderService = orderService;
         _transactionService = transactionService;
         _sellerService = sellerService;
@@ -60,6 +56,7 @@ public class StripeController : ControllerBase
         _localStripeSecret = _configuration["STRIPE:LocalWebhookSecret"] ?? "";
         _deployStripeSecret = _configuration["STRIPE:DeployWebhookSecret"] ?? "";
         _cartItemService = cartItemService;
+        _cacheService = cacheService;
     }
 
     /// <summary>
@@ -306,6 +303,8 @@ public class StripeController : ControllerBase
 
             var url = await _stripeService.GenerateSellerOnboardingLinkAsync(seller.SellerId);
             _logger.Success("[Stripe][OnboardingLink] Onboarding link generated.");
+            await _cacheService.ClearAllAppCachesAsync();
+
             return Ok(ApiResult<string>.Success(url, "200", "Onboarding link generated."));
         }
         catch (Exception ex)

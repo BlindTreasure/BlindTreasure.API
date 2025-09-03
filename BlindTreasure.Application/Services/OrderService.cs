@@ -627,7 +627,7 @@ public class OrderService : IOrderService
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
             .Include(o => o.ShippingAddress)
             .Include(o => o.User)
-            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Seller).ThenInclude(o=>o.User)
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
             .AsNoTracking()
             .Where(o => !o.IsDeleted);
@@ -890,7 +890,9 @@ public class OrderService : IOrderService
                         MainServiceFee = ghnResp?.Fee?.MainService ?? 0,
                         TrackingNumber = ghnResp?.OrderCode ?? string.Empty,
                         EstimatedDelivery = ghnResp?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3),
-                        Status = ShipmentStatus.WAITING_PAYMENT
+                        Status = ShipmentStatus.WAITING_PAYMENT,
+                        Description = $"Shipment for seller: {seller?.CompanyName ?? "Unknown Seller"}. Products: " +
+    string.Join(",\n ", grp.Select(i => $"{i.Product.Name} x{i.Quantity}")),
                         //  EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8,18)).AddMinutes(new Random().Next(60)) chưa thanh toán nên chưa có 
                     };
                     await _unitOfWork.Shipments.AddAsync(shipment);

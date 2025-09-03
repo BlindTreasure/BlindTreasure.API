@@ -693,28 +693,7 @@ public class SystemController : ControllerBase
     {
         try
         {
-            await _cacheService.RemoveByPatternAsync("user:");
-            await _cacheService.RemoveByPatternAsync("seller:");
-            await _cacheService.RemoveByPatternAsync("product:");
-            await _cacheService.RemoveByPatternAsync("category:");
-            await _cacheService.RemoveByPatternAsync("blindbox:");
-            await _cacheService.RemoveByPatternAsync("gemini:");
-            await _cacheService.RemoveByPatternAsync("address:");
-            await _cacheService.RemoveByPatternAsync("inventoryitem:");
-            await _cacheService.RemoveByPatternAsync("listings:");
-            await _cacheService.RemoveByPatternAsync("listing:");
-            await _cacheService.RemoveByPatternAsync("Promotion:");
-            await _cacheService.RemoveByPatternAsync("refresh:");
-            await _cacheService.RemoveByPatternAsync("otp-sent:");
-            await _cacheService.RemoveByPatternAsync("otp:");
-            await _cacheService.RemoveByPatternAsync("counter:");
-            await _cacheService.RemoveByPatternAsync("order:");
-            await _cacheService.RemoveByPatternAsync("noti:");
-            await _cacheService.RemoveByPatternAsync("ParticipantPromotion:");
-
-            // ✅ THÊM CÁC CACHE PATTERNS CHO CHAT MESSAGES
-            await _cacheService.RemoveByPatternAsync("chat:");
-            await _cacheService.RemoveByPatternAsync("user_online:");
+            await _cacheService.ClearAllAppCachesAsync();
 
             return Ok(ApiResult<object>.Success("200", "Clear caching thành công."));
         }

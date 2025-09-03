@@ -296,13 +296,14 @@ public class AdminService : IAdminService
             if (order.OrderDetails == null || !order.OrderDetails.Any())
                 return false;
 
-            var allDelivered = order.OrderDetails.All(od => od.Status == OrderDetailItemStatus.DELIVERED);
+            var allDelivered = order.OrderDetails.All(od => od.Status == OrderDetailItemStatus.DELIVERED && od.ProductId != null);
             var allInInventory3Days = order.OrderDetails.All(od =>
                 od.Status == OrderDetailItemStatus.IN_INVENTORY &&
                 od.UpdatedAt.HasValue &&
-                (DateTime.UtcNow - od.UpdatedAt.Value).TotalDays >= 3);
+                (DateTime.UtcNow - od.UpdatedAt.Value).TotalDays >= 3 && od.ProductId != null);
+            var AllBlindboxInInventory = order.OrderDetails.All(od =>  od.BlindBoxId != null && od.Status == OrderDetailItemStatus.IN_INVENTORY);
 
-            if (allDelivered || allInInventory3Days)
+            if (allDelivered || allInInventory3Days || AllBlindboxInInventory)
             {
                 order.Status = OrderStatus.COMPLETED.ToString();
                 order.CompletedAt = DateTime.UtcNow;
