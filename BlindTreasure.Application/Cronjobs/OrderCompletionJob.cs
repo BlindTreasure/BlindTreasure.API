@@ -52,8 +52,8 @@ public class OrderCompletionJob : BackgroundService
                 _logger.LogError(ex, "Error in OrderCompletionJob: {Message}", ex.Message);
             }
 
-            // Run every 1 minute
-            await Task.Delay(TimeSpan.FromMinutes(100), stoppingToken);
+            // Run every 1 minutes
+            await Task.Delay(TimeSpan.FromMinutes(6.8), stoppingToken);
         }
     }
 }

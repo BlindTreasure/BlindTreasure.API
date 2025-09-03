@@ -295,15 +295,25 @@ public class AdminService : IAdminService
         {
             if (order.OrderDetails == null || !order.OrderDetails.Any())
                 return false;
+            var now = DateTime.UtcNow;
 
-            var allDelivered = order.OrderDetails.All(od => od.Status == OrderDetailItemStatus.DELIVERED && od.ProductId != null);
-            var allInInventory3Days = order.OrderDetails.All(od =>
-                od.Status == OrderDetailItemStatus.IN_INVENTORY &&
-                od.UpdatedAt.HasValue &&
-                (DateTime.UtcNow - od.UpdatedAt.Value).TotalDays >= 3 && od.ProductId != null);
-            var AllBlindboxInInventory = order.OrderDetails.All(od =>  od.BlindBoxId != null && od.Status == OrderDetailItemStatus.IN_INVENTORY);
+            // Mỗi OrderDetail phải thỏa mãn điều kiện riêng:
+            var allDetailsCompleted = order.OrderDetails.All(od =>
+                (od.ProductId != null &&
+                    (
+                        od.Status == OrderDetailItemStatus.DELIVERED ||
+                        (od.Status == OrderDetailItemStatus.IN_INVENTORY &&
+                         od.UpdatedAt.HasValue &&
+                         (now - od.UpdatedAt.Value).TotalDays >= 3)
+                    )
+                )
+                ||
+                (od.BlindBoxId != null &&
+                    od.Status == OrderDetailItemStatus.IN_INVENTORY
+                )
+            );
 
-            if (allDelivered || allInInventory3Days || AllBlindboxInInventory)
+            if (allDetailsCompleted)
             {
                 order.Status = OrderStatus.COMPLETED.ToString();
                 order.CompletedAt = DateTime.UtcNow;
@@ -312,8 +322,8 @@ public class AdminService : IAdminService
 
                 await _payoutService.AddCompletedOrderToPayoutAsync(order, cancellationToken);
                 await _unitOfWork.SaveChangesAsync();
-
                 await _emailService.SendOrderCompletedToBuyerAsync(order);
+
 
                 return true;
             }

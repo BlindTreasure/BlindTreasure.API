@@ -329,7 +329,7 @@ public class EmailService : IEmailService
         else
         {
             // Trường hợp không có shipment
-            subject = $"Đơn hàng #{orderId} đã hoàn tất - Sản phẩm đã vào kho";
+            subject = $"Đơn hàng #{orderId} đã hoàn tất - Sản phẩm đã vào túi đồ";
             var inventoryItems = order.OrderDetails
                 .SelectMany(od => od.InventoryItems ?? new List<InventoryItem>())
                 .Select(ii => $@"
@@ -363,7 +363,7 @@ public class EmailService : IEmailService
                             
                             {(inventoryItems.Any() ? $@"
                             <div style=""background-color:#f0f9ff;padding:16px;border-radius:6px;margin:20px 0;"">
-                                <h3 style=""margin:0 0 12px 0;color:#d02a2a;font-size:18px;"">📦 Sản phẩm đã vào kho</h3>
+                                <h3 style=""margin:0 0 12px 0;color:#d02a2a;font-size:18px;"">📦 Sản phẩm đã vào túi đồ của bạn</h3>
                                 {string.Join("", inventoryItems)}
                             </div>" : "")}
                             
@@ -526,7 +526,7 @@ public class EmailService : IEmailService
             <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
                 <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #28a745;border-radius:8px;overflow:hidden;"">
                     <div style=""background-color:#28a745;padding:20px 24px;text-align:center;"">
-                        <h1 style=""margin:0;color:#ffffff;font-size:24px;"">🎉 Đơn mua hàng đã hoàn tất</h1>
+                        <h1 style=""margin:0;color:#ffffff;font-size:24px;"">🎉 Đơn mua hàng đã hoàn thành</h1>
                     </div>
                     <div style=""padding:24px;"">
                         <p style=""margin:0 0 16px 0;font-size:16px;"">Chào <strong>{userName}</strong>,</p>

@@ -514,6 +514,7 @@ public class PromotionService : IPromotionService
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
             UsageLimit = dto.UsageLimit > 0 ? dto.UsageLimit : null,
+            MaxUsagePerUser = dto.MaxUsagePerUser > 0 ? dto.MaxUsagePerUser : null,
             CreatedByRole = user.RoleName
         };
 
