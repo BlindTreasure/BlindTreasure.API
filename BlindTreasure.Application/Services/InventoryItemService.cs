@@ -461,27 +461,27 @@ public class InventoryItemService : IInventoryItemService
             }
 
             // Gán shipment vào các order-detail liên quan (many-to-many)
-            //var orderDetailIds = group
-            //    .Where(i => i.OrderDetailId.HasValue)
-            //    .Select(i => i.OrderDetailId.Value)
-            //    .Distinct()
-            //    .ToList();
+            var orderDetailIds = group
+                .Where(i => i.OrderDetailId.HasValue)
+                .Select(i => i.OrderDetailId.Value)
+                .Distinct()
+                .ToList();
 
-            //foreach (var orderDetailId in orderDetailIds)
-            //{
-            //    var orderDetail = await _unitOfWork.OrderDetails
-            //        .GetByIdAsync(orderDetailId, od => od.Shipments);
-            //    if (orderDetail != null)
-            //    {
-            //        if (orderDetail.Shipments == null)
-            //            orderDetail.Shipments = new List<Shipment>();
-            //        if (!orderDetail.Shipments.Any(s => s.Id == shipment.Id))
-            //        {
-            //            orderDetail.Shipments.Add(shipment);
-            //            await _unitOfWork.OrderDetails.Update(orderDetail);
-            //        }
-            //    }
-            //}
+            foreach (var orderDetailId in orderDetailIds)
+            {
+                var orderDetail = await _unitOfWork.OrderDetails
+                    .GetByIdAsync(orderDetailId, od => od.Shipments);
+                if (orderDetail != null)
+                {
+                    if (orderDetail.Shipments == null)
+                        orderDetail.Shipments = new List<Shipment>();
+                    if (!orderDetail.Shipments.Any(s => s.Id == shipment.Id))
+                    {
+                        orderDetail.Shipments.Add(shipment);
+                        await _unitOfWork.OrderDetails.Update(orderDetail);
+                    }
+                }
+            }
 
             shipments.Add(shipment);
             shipmentDtos.Add(ShipmentDtoMapper.ToShipmentDto(shipment));
