@@ -7,6 +7,7 @@ using BlindTreasure.Domain.DTOs.PayoutDTOs;
 using BlindTreasure.Domain.DTOs.ShipmentDTOs;
 using BlindTreasure.Domain.DTOs.TradeRequestDTOs;
 using BlindTreasure.Domain.DTOs.UserDTOs;
+using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -274,20 +275,20 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             //_.Error($"[GetPayoutsForAdmin] {ex.Message}");
-            return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi lấy danh sách payouts."));
+            return StatusCode(500, ApiResult<object>.Failure("500", "Có lỗi xảy ra khi lấy danh sách payouts: "+ex.Message));
         }
     }
 
-    [HttpPost("payouts/{payoutId}/confirm")]
+    [HttpPost("payouts/{id}/confirm")]
     // [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResult<PayoutDetailResponseDto>), 200)]
     [ProducesResponseType(typeof(ApiResult<object>), 400)]
-    public async Task<IActionResult> AdminConfirmPayoutWithProof(Guid payoutId, [FromForm] List<IFormFile> files)
+    public async Task<IActionResult> AdminConfirmPayoutWithProof(Guid id, [FromForm] List<IFormFile> files)
     {
         try
         {
             var adminUserId = _claimsService.CurrentUserId;
-            var result = await _payoutService.AdminConfirmPayoutWithProofAsync(payoutId, files, adminUserId);
+            var result = await _payoutService.AdminConfirmPayoutWithProofAsync(id, files, adminUserId);
             if (result == null)
                 return BadRequest(ApiResult<object>.Failure("400", "Payout confirmation failed."));
 
@@ -383,6 +384,91 @@ public class AdminController : ControllerBase
             var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
             return StatusCode(statusCode, errorResponse);
         }
+    }
+
+    /// <summary>
+    /// Lấy danh sách toàn bộ InventoryItem (phân trang, filter) cho admin.
+    /// </summary>
+    /// <remarks>
+    /// Trả về danh sách vật phẩm trong kho của tất cả người dùng, có thể lọc theo UserId, ProductId, SellerId, CategoryId, Status, IsFromBlindBox, tên sản phẩm.
+    /// </remarks>
+    /// <param name="param">Tham số phân trang và filter cho InventoryItem (InventoryItemAdminQuery)</param>
+    /// <returns>
+    /// Danh sách InventoryItemDto phân trang, kèm tổng số lượng, số trang, trang hiện tại, pageSize.
+    /// </returns>
+    /// <response code="200">Danh sách InventoryItem đã được lấy thành công.</response>
+    /// <response code="500">Có lỗi xảy ra khi lấy danh sách InventoryItem.</response>
+    [HttpGet("inventory-items")]
+    [ProducesResponseType(typeof(ApiResult<Pagination<InventoryItemDto>>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 500)]
+    public async Task<IActionResult> GetAllInventoryItems([FromQuery] InventoryItemAdminQuery param)
+    {
+        try
+        {
+            var result = await _userService.GetAllInventoryItemsAdminAsync(param);
+
+            return Ok(ApiResult<object>.Success(new
+            {
+                result,
+                count = result.TotalCount,
+                pageSize = result.PageSize,
+                currentPage = result.CurrentPage,
+                totalPages = result.TotalPages
+            }, "200", "Danh sách InventoryItem đã được lấy thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    /// <summary>
+    /// Admin/Seller cập nhật lại trạng thái cho InventoryItem đã bị ARCHIVED.
+    /// Chỉ cho phép cập nhật nếu item hiện tại đang ở trạng thái Archived.
+    /// </summary>
+    /// <remarks>
+    /// Truyền vào inventoryItemId trên route và trạng thái mới (InventoryItemStatus) trong body.
+    /// </remarks>
+    /// <param name="id">Id của InventoryItem cần cập nhật</param>
+    /// <param name="dto">DTO chứa trạng thái mới muốn cập nhật</param>
+    /// <returns>
+    /// InventoryItemDto sau khi cập nhật trạng thái.
+    /// </returns>
+    /// <response code="200">Cập nhật trạng thái thành công.</response>
+    /// <response code="400">Vật phẩm không ở trạng thái ARCHIVED hoặc dữ liệu không hợp lệ.</response>
+    /// <response code="404">Không tìm thấy vật phẩm trong kho.</response>
+    [HttpPut("inventory-items/{id}/status")]
+    [ProducesResponseType(typeof(ApiResult<InventoryItemDto>), 200)]
+    [ProducesResponseType(typeof(ApiResult<object>), 400)]
+    [ProducesResponseType(typeof(ApiResult<object>), 404)]
+    public async Task<IActionResult> UpdateArchivedInventoryItemStatus(
+        Guid id,
+        [FromQuery] UpdateInventoryItemStatusDto dto)
+    {
+        try
+        {
+            var result = await _userService.UpdateArchivedInventoryItemStatusAsync(id, dto.Status);
+            return Ok(ApiResult<InventoryItemDto>.Success(result, "200", "Cập nhật trạng thái vật phẩm thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<object>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
+    /// <summary>
+    /// DTO truyền trạng thái mới cho InventoryItem.
+    /// </summary>
+    public class UpdateInventoryItemStatusDto
+    {
+        /// <summary>
+        /// Trạng thái mới muốn cập nhật cho InventoryItem.
+        /// </summary>
+        public InventoryItemStatus Status { get; set; }
     }
 
 

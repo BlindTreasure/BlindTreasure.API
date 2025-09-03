@@ -9,3 +9,10 @@ public class InventoryItemQueryParameter : PaginationParameter
     public InventoryItemStatus? Status { get; set; } // enum
     public bool? IsFromBlindBox { get; set; }
 }
+
+public class  InventoryItemAdminQuery : InventoryItemQueryParameter
+{
+    public Guid? UserId { get; set; }
+    public Guid? ProductId { get; set; }
+    public Guid? SellerId { get; set; }
+}

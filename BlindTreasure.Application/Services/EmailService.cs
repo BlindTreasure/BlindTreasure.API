@@ -2,6 +2,7 @@
 using BlindTreasure.Domain.DTOs.EmailDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
+using BlindTreasure.Infrastructure.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Resend;
 
@@ -17,11 +18,13 @@ public class EmailService : IEmailService
 {
     private readonly string _fromEmail;
     private readonly IResend _resend;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public EmailService(IResend resend, IConfiguration configuration)
+    public EmailService(IResend resend, IConfiguration configuration, IUnitOfWork unitOfWork)
     {
         _resend = resend;
         _fromEmail = configuration["RESEND_FROM"] ?? "noreply@fpt-devteam.fun";
+        _unitOfWork = unitOfWork;
     }
 
     public async Task SendCommonItemOutOfStockAsync(string toEmail, string userName, string boxName, string productName)
@@ -440,8 +443,19 @@ public class EmailService : IEmailService
     /// </summary>
     public async Task SendOrderCompletedToBuyerAsync(Order order)
     {
-        if (order == null || order.User == null)
-            throw new ArgumentNullException(nameof(order), "Order hoặc User không hợp lệ.");
+      
+        if (order == null)
+        {
+            throw new ArgumentNullException(nameof(order), "Order không hợp lệ.");
+
+        }
+
+        if(order.User == null)
+        {
+            order.User = await _unitOfWork.Users.GetByIdAsync(order.UserId);
+            if (order.User == null)
+                throw new ArgumentNullException(nameof(order.User), "User không hợp lệ.");
+        }
 
         var toEmail = order.User.Email;
         var userName = order.User.FullName ?? order.User.Email;
