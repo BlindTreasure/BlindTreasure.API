@@ -32,7 +32,7 @@ public class PromotionController : ControllerBase
         try
         {
             var result = await _promotionService.CreatePromotionAsync(dto);
-            return Ok(ApiResult<PromotionDto>.Success(result, "200", "Gửi yêu cầu tạo voucher thành công."));
+            return Ok(ApiResult<PromotionDto>.Success(result, "200", "Tạo voucher thành công."));
         }
         catch (Exception ex)
         {
