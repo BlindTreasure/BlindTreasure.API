@@ -329,7 +329,7 @@ public class EmailService : IEmailService
         else
         {
             // Trường hợp không có shipment
-            subject = $"Đơn hàng #{orderId} đã hoàn tất - Sản phẩm đã vào kho";
+            subject = $"Đơn hàng #{orderId} đã hoàn tất - Sản phẩm đã vào túi đồ";
             var inventoryItems = order.OrderDetails
                 .SelectMany(od => od.InventoryItems ?? new List<InventoryItem>())
                 .Select(ii => $@"
@@ -363,7 +363,7 @@ public class EmailService : IEmailService
                             
                             {(inventoryItems.Any() ? $@"
                             <div style=""background-color:#f0f9ff;padding:16px;border-radius:6px;margin:20px 0;"">
-                                <h3 style=""margin:0 0 12px 0;color:#d02a2a;font-size:18px;"">📦 Sản phẩm đã vào kho</h3>
+                                <h3 style=""margin:0 0 12px 0;color:#d02a2a;font-size:18px;"">📦 Sản phẩm đã vào túi đồ của bạn</h3>
                                 {string.Join("", inventoryItems)}
                             </div>" : "")}
                             
