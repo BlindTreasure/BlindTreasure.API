@@ -333,7 +333,7 @@ public class CategoryService : ICategoryService
         await _unitOfWork.SaveChangesAsync();
 
         await _cacheService.RemoveAsync($"category:{id}");
-        await _cacheService.RemoveByPatternAsync("category:all");
+        await _cacheService.RemoveByPatternAsync("category:all*");
         _logger.Success($"[DeleteAsync] Category {id} deleted.");
 
         return ToCategoryDto(category);

@@ -182,13 +182,13 @@ public class SellerService : ISellerService
 
     public async Task<SellerProfileDto> GetSellerProfileByUserIdAsync(Guid userId)
     {
-        //var cacheKey = $"seller:user:{userId}";
-        //var cached = await _cacheService.GetAsync<Seller>(cacheKey);
-        //if (cached != null)
-        //{
-        //    _loggerService.Info($"[GetSellerProfileByUserIdAsync] Cache hit for seller user {userId}");
-        //    return SellerMapper.ToSellerProfileDto(cached);
-        //}
+        var cacheKey = $"seller:user:{userId}";
+        var cached = await _cacheService.GetAsync<Seller>(cacheKey);
+        if (cached != null)
+        {
+            _loggerService.Info($"[GetSellerProfileByUserIdAsync] Cache hit for seller user {userId}");
+            return SellerMapper.ToSellerProfileDto(cached);
+        }
 
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == userId, s => s.User);
         if (seller == null)
@@ -197,7 +197,7 @@ public class SellerService : ISellerService
             throw ErrorHelper.NotFound("Không tìm thấy hồ sơ seller.");
         }
 
-        //  await _cacheService.SetAsync(cacheKey, seller, TimeSpan.FromHours(1));
+        await _cacheService.SetAsync(cacheKey, seller, TimeSpan.FromHours(1));
         _loggerService.Info($"[GetSellerProfileByUserIdAsync] Seller user {userId} loaded from DB and cached.");
         return SellerMapper.ToSellerProfileDto(seller);
     }
@@ -327,7 +327,7 @@ public class SellerService : ISellerService
         var result = await _productService.CreateAsync(newProduct);
 
         // Xóa cache danh sách sản phẩm của seller để đảm bảo dữ liệu mới nhất
-        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
+        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}*");
 
         _loggerService.Success($"[CreateProductAsync] Seller {seller.Id} đã tạo sản phẩm mới.");
         return result;
@@ -349,7 +349,7 @@ public class SellerService : ISellerService
         var result = await _productService.UpdateAsync(productId, dto);
 
         // Xóa cache danh sách sản phẩm của seller để đảm bảo dữ liệu mới nhất
-        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
+        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}*");
 
         _loggerService.Success($"[UpdateProductAsync] Seller {seller.Id} đã cập nhật sản phẩm {productId}.");
         return result;
@@ -371,7 +371,7 @@ public class SellerService : ISellerService
         var result = await _productService.DeleteAsync(productId);
 
         // Xóa cache danh sách sản phẩm của seller để đảm bảo dữ liệu mới nhất
-        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}");
+        await _cacheService.RemoveByPatternAsync($"product:all:{seller.Id}*");
 
         _loggerService.Success($"[DeleteProductAsync] Seller {seller.Id} đã xóa sản phẩm {productId}.");
         return result;

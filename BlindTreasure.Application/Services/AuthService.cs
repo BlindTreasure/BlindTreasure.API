@@ -430,7 +430,12 @@ public class AuthService : IAuthService
         if (cachedUser != null) return true;
 
         var existingUser = await _unitOfWork.Users.FirstOrDefaultAsync(u => u.Email == email);
-        return existingUser != null;
+        if (existingUser != null)
+        {
+            await _cacheService.SetAsync(cacheKey, existingUser, TimeSpan.FromHours(1));
+            return true;
+        }
+        return false;
     }
 
     /// <summary>

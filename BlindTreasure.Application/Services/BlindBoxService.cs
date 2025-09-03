@@ -257,6 +257,7 @@ public class BlindBoxService : IBlindBoxService
 
         blindBox.UpdatedAt = _time.GetCurrentTime();
         blindBox.UpdatedBy = currentUserId;
+        blindBox.Status = BlindBoxStatus.PendingApproval;
 
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
@@ -268,6 +269,7 @@ public class BlindBoxService : IBlindBoxService
 
     public async Task<BlindBoxDetailDto> AddItemsToBlindBoxAsync(Guid blindBoxId, List<BlindBoxItemRequestDto> items)
     {
+        // ===================== Phase 1: Validate Input =====================
         if (items == null || items.Count == 0)
             throw ErrorHelper.BadRequest("Vui lòng thêm ít nhất một sản phẩm vào Blind Box.");
 
@@ -282,7 +284,6 @@ public class BlindBoxService : IBlindBoxService
             throw ErrorHelper.NotFound("Không tìm thấy Blind Box được chỉ định.");
 
         var currentUserId = _claimsService.CurrentUserId;
-
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(x =>
             x.Id == blindBox.SellerId && x.UserId == currentUserId && !x.IsDeleted);
 
@@ -291,12 +292,13 @@ public class BlindBoxService : IBlindBoxService
 
         ValidateBlindBoxItemsFullRule(items);
 
-        // validate số lượng stock dựa trên TotalQuantity
+        // ===================== Phase 2: Validate Product Stock =====================
         await ValidateProductStockForBlindBoxAsync(blindBox, items);
 
         var products = await _unitOfWork.Products.GetAllAsync(p =>
             items.Select(i => i.ProductId).Contains(p.Id) && p.SellerId == seller.Id && !p.IsDeleted);
 
+        // ===================== Phase 3: Chuẩn bị dữ liệu DropRate =====================
         var dropRates = CalculateDropRates(items);
         var now = _time.GetCurrentTime();
 
@@ -307,12 +309,13 @@ public class BlindBoxService : IBlindBoxService
         var newBlindBoxItems = new List<BlindBoxItem>();
         var newRarityConfigs = new List<RarityConfig>();
 
+        // ===================== Phase 4: Xử lý từng item =====================
         for (var i = 0; i < items.Count; i++)
         {
             var item = items[i];
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
-                throw ErrorHelper.BadRequest($"Sản phẩm được chọn không hợp lệ hoặc không thuộc về bạn.");
+                throw ErrorHelper.BadRequest("Sản phẩm được chọn không hợp lệ hoặc không thuộc về bạn.");
             if (item.Quantity > product.TotalStockQuantity)
                 throw ErrorHelper.BadRequest($"Sản phẩm '{product.Name}' không đủ số lượng trong kho.");
 
@@ -320,6 +323,7 @@ public class BlindBoxService : IBlindBoxService
 
             if (i < existingItems.Count)
             {
+                // Update item cũ
                 var existing = existingItems[i];
                 existing.ProductId = item.ProductId;
                 existing.Quantity = item.Quantity;
@@ -331,6 +335,7 @@ public class BlindBoxService : IBlindBoxService
 
                 await _unitOfWork.BlindBoxItems.Update(existing);
 
+                // Update rarity config
                 var rarity = await _unitOfWork.RarityConfigs.FirstOrDefaultAsync(r =>
                     r.BlindBoxItemId == existing.Id && !r.IsDeleted);
 
@@ -346,6 +351,7 @@ public class BlindBoxService : IBlindBoxService
             }
             else
             {
+                // Add item mới
                 var newItem = new BlindBoxItem
                 {
                     Id = Guid.NewGuid(),
@@ -373,21 +379,31 @@ public class BlindBoxService : IBlindBoxService
             }
         }
 
+        // ===================== Phase 5: Lưu dữ liệu Item + Config =====================
         if (newBlindBoxItems.Any())
             await _unitOfWork.BlindBoxItems.AddRangeAsync(newBlindBoxItems);
         if (newRarityConfigs.Any())
             await _unitOfWork.RarityConfigs.AddRangeAsync(newRarityConfigs);
 
+        // ===================== Phase 6: Update BlindBox (HasSecretItem + Status) =====================
         blindBox.HasSecretItem = items.Any(i => i.Rarity == RarityName.Secret);
         blindBox.SecretProbability = dropRates
             .Where(kv => kv.Key.Rarity == RarityName.Secret)
             .Sum(kv => kv.Value);
 
+        // Nếu BlindBox đã có item từ trước → set PendingApproval
+        if (blindBox.BlindBoxItems != null && blindBox.BlindBoxItems.Any())
+        {
+            blindBox.Status = BlindBoxStatus.PendingApproval;
+        }
+
         await _unitOfWork.BlindBoxes.Update(blindBox);
         await _unitOfWork.SaveChangesAsync();
 
+        // ===================== Phase 7: Invalidate Cache =====================
         await RemoveBlindBoxCacheAsync(blindBoxId, seller.Id);
 
+        // ===================== Phase 8: Trả về kết quả =====================
         return await GetBlindBoxByIdAsync(blindBoxId);
     }
 
@@ -412,7 +428,8 @@ public class BlindBoxService : IBlindBoxService
         {
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
-                throw ErrorHelper.BadRequest("Một hoặc nhiều sản phẩm trong Blind Box không còn tồn tại hoặc đã bị xóa.");
+                throw ErrorHelper.BadRequest(
+                    "Một hoặc nhiều sản phẩm trong Blind Box không còn tồn tại hoặc đã bị xóa.");
 
             // Kiểm tra AvailableToSell thay vì Stock
             if (item.Quantity > product.AvailableToSell)
@@ -531,6 +548,7 @@ public class BlindBoxService : IBlindBoxService
 
         await _unitOfWork.SaveChangesAsync();
 
+        await RemoveBlindBoxCacheAsync(blindBoxId);
         await _notificationService.PushNotificationToUser(
             blindBox.Seller.UserId,
             new NotificationDto
@@ -693,7 +711,8 @@ public class BlindBoxService : IBlindBoxService
         {
             var product = products.FirstOrDefault(p => p.Id == item.ProductId);
             if (product == null)
-                throw ErrorHelper.BadRequest($"Không tìm thấy sản phẩm với ID: {item.ProductId}. Vui lòng kiểm tra lại.");
+                throw ErrorHelper.BadRequest(
+                    $"Không tìm thấy sản phẩm với ID: {item.ProductId}. Vui lòng kiểm tra lại.");
 
             // Tổng số lượng cần thiết cho product này
             var requiredQuantity = item.Quantity * blindBox.TotalQuantity;
@@ -754,7 +773,8 @@ public class BlindBoxService : IBlindBoxService
             var invalidList = string.Join(", ", invalids.Select(i => $"{i.Rarity}"));
             _logger.Warn(
                 $"[ValidateBlindBoxItemsFullRule] Phát hiện rarity không hợp lệ [InvalidRarity={invalidList}]. Chỉ chấp nhận các rarity: Common, Rare, Epic, Secret.");
-            throw ErrorHelper.BadRequest("Độ hiếm của vật phẩm không hợp lệ. Vui lòng chỉ sử dụng các giá trị: Common, Rare, Epic, Secret.");
+            throw ErrorHelper.BadRequest(
+                "Độ hiếm của vật phẩm không hợp lệ. Vui lòng chỉ sử dụng các giá trị: Common, Rare, Epic, Secret.");
         }
 
         var totalWeight = items.Sum(i => i.Weight);
