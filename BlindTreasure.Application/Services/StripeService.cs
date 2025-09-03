@@ -931,17 +931,16 @@ public class StripeService : IStripeService
     /// </summary>
     public async Task<Refund> RefundOrderAsync(Guid orderId, string refundReason)
     {
-
         // 1. Lấy order
         var order = await _unitOfWork.Orders.GetQueryable()
-    .Include(o => o.OrderDetails).ThenInclude(od => od.InventoryItems)
-    .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
-    .Include(o => o.OrderSellerPromotions)
-    .Include(o => o.Payment).ThenInclude(p => p.Transactions)
-    .Include(o => o.User)
-    .Include(o => o.Seller)
-    .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted)
-            ?? throw ErrorHelper.NotFound("Order not found.");
+                        .Include(o => o.OrderDetails).ThenInclude(od => od.InventoryItems)
+                        .Include(o => o.OrderDetails).ThenInclude(od => od.Shipments)
+                        .Include(o => o.OrderSellerPromotions)
+                        .Include(o => o.Payment).ThenInclude(p => p.Transactions)
+                        .Include(o => o.User)
+                        .Include(o => o.Seller)
+                        .FirstOrDefaultAsync(o => o.Id == orderId && !o.IsDeleted)
+                    ?? throw ErrorHelper.NotFound("Order not found.");
 
         await CheckOrderConditionToRefund(order);
 
@@ -950,8 +949,8 @@ public class StripeService : IStripeService
             throw ErrorHelper.BadRequest("Order does not belong to a group payment session.");
 
         var groupSession = await _unitOfWork.GroupPaymentSessions
-            .FirstOrDefaultAsync(s => s.CheckoutGroupId == order.CheckoutGroupId)
-            ?? throw ErrorHelper.NotFound("Group payment session not found.");
+                               .FirstOrDefaultAsync(s => s.CheckoutGroupId == order.CheckoutGroupId)
+                           ?? throw ErrorHelper.NotFound("Group payment session not found.");
 
         if (string.IsNullOrEmpty(groupSession.PaymentIntentId))
             throw ErrorHelper.BadRequest("PaymentIntentId not found for group session.");
@@ -1002,18 +1001,15 @@ public class StripeService : IStripeService
 
             // 3. Cập nhật các Shipment liên quan (nếu có)
             if (detail.Shipments != null)
-            {
                 foreach (var shipment in detail.Shipments)
                 {
                     shipment.Status = ShipmentStatus.CANCELLED; // Không có REFUNDED, dùng CANCELLED
                     shipment.UpdatedAt = DateTime.UtcNow;
                     await _unitOfWork.Shipments.Update(shipment);
                 }
-            }
 
             // 4. Cập nhật các InventoryItem liên quan (nếu có)
             if (detail.InventoryItems != null)
-            {
                 foreach (var item in detail.InventoryItems)
                 {
                     item.Status = InventoryItemStatus.Archived;
@@ -1024,21 +1020,18 @@ public class StripeService : IStripeService
 
                     // Ghi log trạng thái inventory
                     if (item.OrderDetailInventoryItemLogs != null)
-                    {
                         item.OrderDetailInventoryItemLogs.Add(new OrderDetailInventoryItemShipmentLog
                         {
                             OrderDetailId = detail.Id,
                             InventoryItemId = item.Id,
                             CreatedAt = DateTime.UtcNow,
                             ValueStatusType = Domain.Entities.ValueType.ORDER_DETAIL,
-                            ActionType = Domain.Entities.ActionType.ORDER_DETAIL_STATUS_CHANGED,
+                            ActionType = ActionType.ORDER_DETAIL_STATUS_CHANGED,
                             OldValue = oldStatus.ToString(),
                             NewValue = detail.Status.ToString(),
-                            ActorId = actorid != Guid.Empty ? actorid : null,
+                            ActorId = actorid != Guid.Empty ? actorid : null
                         });
-                    }
                 }
-            }
         }
 
         // 5. Cập nhật Order
@@ -1058,11 +1051,11 @@ public class StripeService : IStripeService
             var canRefund = order.OrderDetails
                 .SelectMany(od => od.Shipments ?? new List<Shipment>())
                 .Any(s => s.Status != ShipmentStatus.PICKED_UP && s.Status != ShipmentStatus.IN_TRANSIT
-                          && s.Status != ShipmentStatus.DELIVERED && s.Status != ShipmentStatus.COMPLETED);
+                                                               && s.Status != ShipmentStatus.DELIVERED &&
+                                                               s.Status != ShipmentStatus.COMPLETED);
 
             if (!canRefund)
                 throw ErrorHelper.BadRequest("Đơn hàng đã được giao cho đơn vị vận chuyển, không thể hoàn tiền.");
         }
     }
-
 }

@@ -29,7 +29,6 @@ public class ListingService : IListingService
 
     public async Task<ListingDetailDto> GetListingByIdAsync(Guid id)
     {
-
         var listing = await _unitOfWork.Listings
             .GetQueryable()
             .Include(l => l.InventoryItem)

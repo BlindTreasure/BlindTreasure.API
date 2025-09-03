@@ -48,7 +48,7 @@ public class PromotionService : IPromotionService
 
         // Base query - chỉ lấy promotions chưa bị xóa
         var query = _unitOfWork.Promotions
-            .GetQueryable().Include(x=> x.PromotionUserUsages).AsNoTracking()
+            .GetQueryable().Include(x => x.PromotionUserUsages).AsNoTracking()
             .Where(p => !p.IsDeleted);
 
         // Nếu là Seller: áp dụng giới hạn chặt
@@ -470,7 +470,6 @@ public class PromotionService : IPromotionService
         return promotions.Select(promotion =>
             _mapperService.Map<Promotion, PromotionDto>(promotion)
         ).ToList();
-
     }
 
 

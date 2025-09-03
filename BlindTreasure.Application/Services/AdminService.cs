@@ -321,7 +321,7 @@ public class AdminService : IAdminService
         }
         catch (Exception ex)
         {
-            _logger.Info( $"Error completing order {order.Id}: {ex.Message}"  );
+            _logger.Info($"Error completing order {order.Id}: {ex.Message}");
             throw ErrorHelper.BadRequest(ex.Message);
         }
     }
@@ -382,7 +382,8 @@ public class AdminService : IAdminService
 
     public async Task<Pagination<ShipmentDto>> GetAllShipmentsAsync(ShipmentQueryParameter param)
     {
-        _logger.Info($"[GetAllShipmentsAsync] Admin requests shipment list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        _logger.Info(
+            $"[GetAllShipmentsAsync] Admin requests shipment list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.Shipments.GetQueryable()
             .Include(s => s.OrderDetails)
@@ -406,9 +407,11 @@ public class AdminService : IAdminService
 
         // Filter theo EstimatedPickupTime
         if (param.FromEstimatedPickupTime.HasValue)
-            query = query.Where(s => s.EstimatedPickupTime.HasValue && s.EstimatedPickupTime.Value >= param.FromEstimatedPickupTime.Value);
+            query = query.Where(s =>
+                s.EstimatedPickupTime.HasValue && s.EstimatedPickupTime.Value >= param.FromEstimatedPickupTime.Value);
         if (param.ToEstimatedPickupTime.HasValue)
-            query = query.Where(s => s.EstimatedPickupTime.HasValue && s.EstimatedPickupTime.Value <= param.ToEstimatedPickupTime.Value);
+            query = query.Where(s =>
+                s.EstimatedPickupTime.HasValue && s.EstimatedPickupTime.Value <= param.ToEstimatedPickupTime.Value);
 
         // Sắp xếp theo UpdatedAt/CreatedAt
         query = param.Desc
@@ -428,7 +431,8 @@ public class AdminService : IAdminService
 
     public async Task<Pagination<InventoryItemDto>> GetAllInventoryItemsAdminAsync(InventoryItemAdminQuery param)
     {
-        _logger.Info($"[GetAllInventoryItemsAsync] Admin requests inventory list. Page: {param.PageIndex}, Size: {param.PageSize}");
+        _logger.Info(
+            $"[GetAllInventoryItemsAsync] Admin requests inventory list. Page: {param.PageIndex}, Size: {param.PageSize}");
 
         var query = _unitOfWork.InventoryItems.GetQueryable()
             .Where(i => !i.IsDeleted)
@@ -447,10 +451,8 @@ public class AdminService : IAdminService
 
         // Filter theo category
         if (param.CategoryId.HasValue)
-        {
             // Nếu có service lấy category con thì dùng, còn không thì chỉ filter theo category hiện tại
             query = query.Where(i => i.Product.CategoryId == param.CategoryId.Value);
-        }
 
         // Filter theo status
         if (param.Status.HasValue)
@@ -506,27 +508,28 @@ public class AdminService : IAdminService
     /// <param name="inventoryItemId">Id của InventoryItem cần cập nhật</param>
     /// <param name="newStatus">Trạng thái mới muốn cập nhật</param>
     /// <returns>InventoryItemDto sau khi cập nhật</returns>
-    public async Task<InventoryItemDto> UpdateArchivedInventoryItemStatusAsync(Guid inventoryItemId, InventoryItemStatus newStatus)
+    public async Task<InventoryItemDto> UpdateArchivedInventoryItemStatusAsync(Guid inventoryItemId,
+        InventoryItemStatus newStatus)
     {
-        _logger.Info($"[UpdateArchivedInventoryItemStatusAsync] Admin/Seller cập nhật trạng thái cho item {inventoryItemId} thành {newStatus}");
+        _logger.Info(
+            $"[UpdateArchivedInventoryItemStatusAsync] Admin/Seller cập nhật trạng thái cho item {inventoryItemId} thành {newStatus}");
 
         var item = await _unitOfWork.InventoryItems.GetByIdAsync(inventoryItemId, i => i.Product, i => i.User);
         if (item == null || item.IsDeleted)
             throw ErrorHelper.NotFound("Không tìm thấy vật phẩm trong kho.");
 
         if (item.Status != InventoryItemStatus.Archived)
-        {
             //    throw ErrorHelper.BadRequest("Chỉ có thể cập nhật trạng thái cho vật phẩm đã bị khóa(ARCHIVED).");
-            _logger.Info($"[UpdateArchivedInventoryItemStatusAsync] Item {inventoryItemId} không ở trạng thái Archived. Hiện trạng: {item.Status}. Tiếp tục cập nhật trạng thái.");
-        }
+            _logger.Info(
+                $"[UpdateArchivedInventoryItemStatusAsync] Item {inventoryItemId} không ở trạng thái Archived. Hiện trạng: {item.Status}. Tiếp tục cập nhật trạng thái.");
 
         // Cập nhật trạng thái mới
         var oldArchivedReason = item.ArchivedReason ?? "";
         var oldArchivedAt = item.ArchivedAt.HasValue ? item.ArchivedAt.Value.ToString("u") : "N/A";
         item.Status = newStatus;
         var archivedMsg = !string.IsNullOrWhiteSpace(oldArchivedReason)
-    ? $"Đã bị archived với lý do: {oldArchivedReason} lúc {oldArchivedAt}"
-    : $"Đã bị archived lúc {oldArchivedAt}";
+            ? $"Đã bị archived với lý do: {oldArchivedReason} lúc {oldArchivedAt}"
+            : $"Đã bị archived lúc {oldArchivedAt}";
         item.ArchivedReason = $"{archivedMsg}\nĐã được mở khóa để có thể ship hàng";
         item.ArchivedAt = null;
         item.UpdatedAt = DateTime.UtcNow;
@@ -537,12 +540,11 @@ public class AdminService : IAdminService
         // Invalidate cache nếu có
         // await _cacheService.RemoveAsync($"inventoryitem:{inventoryItemId}");
 
-        _logger.Success($"[UpdateArchivedInventoryItemStatusAsync] Đã cập nhật trạng thái cho item {inventoryItemId} thành {newStatus}");
+        _logger.Success(
+            $"[UpdateArchivedInventoryItemStatusAsync] Đã cập nhật trạng thái cho item {inventoryItemId} thành {newStatus}");
 
         return InventoryItemMapper.ToInventoryItemDto(item);
     }
-
-
 
 
     // ----------------- PRIVATE HELPER METHODS -----------------
@@ -562,6 +564,7 @@ public class AdminService : IAdminService
             await _cacheService.SetAsync(cacheKey, existingUser, TimeSpan.FromHours(1));
             return true;
         }
+
         return false;
     }
 

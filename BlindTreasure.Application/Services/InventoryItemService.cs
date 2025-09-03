@@ -37,8 +37,8 @@ public class InventoryItemService : IInventoryItemService
         _claimsService = claimsService;
         _loggerService = loggerService;
         _unitOfWork = unitOfWork;
-        _categoryService = categoryService; 
-        _ghnShippingService = ghnShippingService; 
+        _categoryService = categoryService;
+        _ghnShippingService = ghnShippingService;
         _stripeService = stripeService;
         _notificationService = notificationService;
     }
@@ -854,7 +854,6 @@ public class InventoryItemService : IInventoryItemService
             LastTradeId = lastTradeId
         };
     }
-
 }
 
 public class ShipmentItemResponseDTO
