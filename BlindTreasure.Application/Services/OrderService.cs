@@ -627,7 +627,7 @@ public class OrderService : IOrderService
             .Include(o => o.OrderDetails).ThenInclude(od => od.BlindBox)
             .Include(o => o.ShippingAddress)
             .Include(o => o.User)
-            .Include(o => o.Seller).ThenInclude(s => s.User)
+            .Include(o => o.Seller).ThenInclude(o=>o.User)
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
             .AsNoTracking()
             .Where(o => !o.IsDeleted);

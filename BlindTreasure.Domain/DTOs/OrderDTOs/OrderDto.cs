@@ -1,5 +1,6 @@
 ﻿using BlindTreasure.Domain.DTOs.PaymentDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
+using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 
 namespace BlindTreasure.Domain.DTOs.OrderDTOs;
@@ -22,4 +23,7 @@ public class OrderDto
 
     public decimal? TotalRefundAmount { get; set; }
     public string? RefundReason { get; set; }
+
+    public Guid UserId { get; set; }
+    public UserDto User { get; set; }
 }
