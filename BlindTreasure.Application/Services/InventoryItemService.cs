@@ -446,7 +446,8 @@ public class InventoryItemService : IInventoryItemService
                 EstimatedDelivery = ghnCreateResponse?.ExpectedDeliveryTime.AddDays(1) != default
                     ? ghnCreateResponse.ExpectedDeliveryTime.AddDays(1)
                     : DateTime.UtcNow.AddDays(3),
-                Status = ShipmentStatus.WAITING_PAYMENT
+                Status = ShipmentStatus.WAITING_PAYMENT,
+                Description = $"Shipment for items from seller {seller.CompanyName}, item products: {string.Join(", ", group.Select(i => i.Product.Name))}",
             };
             shipment = await _unitOfWork.Shipments.AddAsync(shipment);
             await _unitOfWork.SaveChangesAsync();

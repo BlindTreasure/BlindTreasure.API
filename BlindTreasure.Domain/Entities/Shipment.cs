@@ -18,6 +18,8 @@ public class Shipment : BaseEntity
     public string Provider { get; set; }
     public string TrackingNumber { get; set; }
 
+    //
+    public string? Description { get; set; } // Mô tả thêm
 
     public DateTime? ShippedAt { get; set; }
     public DateTime EstimatedDelivery { get; set; } //expected delivery date
