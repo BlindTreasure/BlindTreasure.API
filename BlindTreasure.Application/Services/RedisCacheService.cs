@@ -65,4 +65,43 @@ public class RedisCacheService : ICacheService
                 await _database.KeyDeleteAsync(keys);
         }
     }
+
+    public async Task ClearAllAppCachesAsync()
+    {
+        //xóa het me luon 
+        foreach (var endpoint in _connection.GetEndPoints())
+        {
+            var server = _connection.GetServer(endpoint);
+            var keys = server.Keys(database: _database.Database).ToArray();
+
+            if (keys.Any())
+            {
+                await _database.KeyDeleteAsync(keys);
+            }
+        }
+        //await RemoveByPatternAsync("user:");
+        //await RemoveByPatternAsync("seller:");
+        //await RemoveByPatternAsync("product:");
+        //await RemoveByPatternAsync("category:");
+        //await RemoveByPatternAsync("blindbox:");
+        //await RemoveByPatternAsync("gemini:");
+        //await RemoveByPatternAsync("address:");
+        //await RemoveByPatternAsync("inventoryitem:");
+        //await RemoveByPatternAsync("listings:");
+        //await RemoveByPatternAsync("listing:");
+        //await RemoveByPatternAsync("Promotion:");
+        //await RemoveByPatternAsync("refresh:");
+        //await RemoveByPatternAsync("otp-sent:");
+        //await RemoveByPatternAsync("otp:");
+        //await RemoveByPatternAsync("counter:");
+        //await RemoveByPatternAsync("order:");
+        //await RemoveByPatternAsync("noti:");
+        //await RemoveByPatternAsync("ParticipantPromotion:");
+        //await RemoveByPatternAsync("chat:");
+        //await RemoveByPatternAsync("user_online:");
+
+    }
+
+
+
 }
