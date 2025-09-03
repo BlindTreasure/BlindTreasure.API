@@ -4,6 +4,7 @@ using BlindTreasure.Domain.DTOs.OrderDTOs;
 using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
+using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
 using BlindTreasure.Infrastructure.Interfaces;
@@ -27,6 +28,29 @@ public class SellerController : ControllerBase
         _claimsService = claimsService;
         _sellerVerificationService = sellerVerificationService;
     }
+    
+    // Thêm vào class SellerController (cùng chỗ với các action khác)
+    /// <summary>
+    /// Lấy danh sách users đã mua hàng của seller đang đăng nhập.
+    /// </summary>
+    [Authorize]
+    [HttpGet("orders/users")]
+    [ProducesResponseType(typeof(ApiResult<List<UserDto>>), 200)]
+    public async Task<IActionResult> GetCustomersOfSeller()
+    {
+        try
+        {
+            var result = await _sellerService.GetCustomersOfSellerAsync();
+            return Ok(ApiResult<List<UserDto>>.Success(result, "200", "Lấy danh sách khách hàng mua từ seller thành công."));
+        }
+        catch (Exception ex)
+        {
+            var statusCode = ExceptionUtils.ExtractStatusCode(ex);
+            var errorResponse = ExceptionUtils.CreateErrorResponse<List<UserDto>>(ex);
+            return StatusCode(statusCode, errorResponse);
+        }
+    }
+
 
     /// <summary>
     /// Lấy thông tin tổng quan của Seller theo sellerId.

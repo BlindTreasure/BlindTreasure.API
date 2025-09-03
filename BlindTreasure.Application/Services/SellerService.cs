@@ -9,6 +9,7 @@ using BlindTreasure.Domain.DTOs.Pagination;
 using BlindTreasure.Domain.DTOs.ProductDTOs;
 using BlindTreasure.Domain.DTOs.SellerDTOs;
 using BlindTreasure.Domain.DTOs.SellerStatisticDTOs;
+using BlindTreasure.Domain.DTOs.UserDTOs;
 using BlindTreasure.Domain.Entities;
 using BlindTreasure.Domain.Enums;
 using BlindTreasure.Infrastructure.Commons;
@@ -51,6 +52,49 @@ public class SellerService : ISellerService
         _notificationService = notificationService;
     }
 
+    // SellerService: thêm method
+    public async Task<List<UserDto>> GetCustomersOfSellerAsync()
+    {
+        // Lấy seller hiện tại
+        var currentUserId = _claimsService.CurrentUserId;
+        var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == currentUserId);
+        if (seller == null)
+            throw ErrorHelper.Forbidden("Không tìm thấy seller.");
+
+        // Lấy danh sách userId distinct từ Orders của seller
+        var userIds = await _unitOfWork.Orders.GetQueryable()
+            .Where(o => o.SellerId == seller.Id && !o.IsDeleted && o.UserId != Guid.Empty)
+            .Select(o => o.UserId)
+            .Distinct()
+            .ToListAsync();
+
+        if (!userIds.Any())
+            return new List<UserDto>();
+
+        // Lấy users và map sang UserDto
+        var users = await _unitOfWork.Users.GetQueryable()
+            .Where(u => userIds.Contains(u.Id) && !u.IsDeleted)
+            .ToListAsync();
+
+        var result = users.Select(u => new UserDto
+        {
+            UserId = u.Id,
+            FullName = u.FullName,
+            Email = u.Email,
+            AvatarUrl = u.AvatarUrl,
+            DateOfBirth = u.DateOfBirth,
+            Gender = u.Gender,
+            Status = u.Status,
+            PhoneNumber = u.Phone,
+            RoleName = u.RoleName,
+            Reason = u.Reason,
+            CreatedAt = u.CreatedAt,
+            SellerId = u.Seller != null ? (Guid?)u.Seller.Id : null
+        }).ToList();
+
+        return result;
+    }
+    
     public async Task<SellerDto> UpdateSellerInfoAsync(Guid userId, UpdateSellerInfoDto dto)
     {
         _loggerService.Info($"[UpdateSellerInfoAsync] Seller {userId} yêu cầu cập nhật thông tin.");
