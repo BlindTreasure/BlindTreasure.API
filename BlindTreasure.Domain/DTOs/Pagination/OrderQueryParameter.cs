@@ -19,6 +19,8 @@ public class OrderQueryParameter : PaginationParameter
     /// </summary>
     public DateTime? PlacedTo { get; set; }
 
+    public Guid? UserId { get; set; }
+    
     public Guid? CheckoutGroupId { get; set; } = Guid.Empty;
 }
 

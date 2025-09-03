@@ -500,6 +500,9 @@ public class SellerService : ISellerService
             .Include(o => o.Payment).ThenInclude(p => p.Transactions)
             .AsNoTracking();
 
+        if (param.UserId.HasValue)
+            query = query.Where(o => o.UserId == param.UserId.Value);
+        
         if (param.Status.HasValue)
             query = query.Where(o => o.Status == param.Status.Value.ToString());
         if (param.PlacedFrom.HasValue)
