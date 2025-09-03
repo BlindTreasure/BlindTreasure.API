@@ -891,7 +891,7 @@ public class OrderService : IOrderService
                         TrackingNumber = ghnResp?.OrderCode ?? string.Empty,
                         EstimatedDelivery = ghnResp?.ExpectedDeliveryTime.AddDays(3) ?? DateTime.UtcNow.AddDays(3),
                         Status = ShipmentStatus.WAITING_PAYMENT,
-                        Description = $"Shipment for seller: {seller?.CompanyName ?? "Unknown Seller"}. Products: " +
+                        Description = $"Đơn giao hàng cho sản phẩm từ seller: {seller?.CompanyName ?? "Unknown Seller"}. Các sản phẩm: " +
     string.Join(",\n ", grp.Select(i => $"{i.Product.Name} x{i.Quantity}")),
                         //  EstimatedPickupTime = DateTime.UtcNow.Date.AddDays(new Random().Next(1, 3)).AddHours(new Random().Next(8,18)).AddMinutes(new Random().Next(60)) chưa thanh toán nên chưa có 
                     };

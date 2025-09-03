@@ -15,13 +15,13 @@ public class CreatePromotionDto
 
     [DefaultValue(100)] public decimal DiscountValue { get; set; } = 0;
 
-    [DefaultValue(typeof(DateTime), "2000-01-01T00:00:00Z")]
+    [DefaultValue(typeof(DateTime), "2025-09-09T00:00:00Z")]
     public DateTime StartDate { get; set; } =
-        DateTime.SpecifyKind(DateTime.Parse("2000-01-01T00:00:00Z"), DateTimeKind.Utc);
+        DateTime.SpecifyKind(DateTime.Parse("2025-09-09T00:00:00Z"), DateTimeKind.Utc);
 
-    [DefaultValue(typeof(DateTime), "2100-01-01T00:00:00Z")]
+    [DefaultValue(typeof(DateTime), "2025-10-10T00:00:00Z")]
     public DateTime EndDate { get; set; } =
-        DateTime.SpecifyKind(DateTime.Parse("2100-01-01T00:00:00Z"), DateTimeKind.Utc);
+        DateTime.SpecifyKind(DateTime.Parse("2025-10-10T00:00:00Z"), DateTimeKind.Utc);
 
     [DefaultValue(100)] public int UsageLimit { get; set; }
     [DefaultValue(2)] public int? MaxUsagePerUser { get; set; } = 2; // e.g. 2
