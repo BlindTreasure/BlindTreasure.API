@@ -32,6 +32,6 @@ public class ShipmentDto
     public ShipmentStatus? Status { get; set; }
     public DateTime? EstimatedPickupTime { get; set; } // Thời gian dự kiến lấy hàng
     public DateTime? PickedUpAt { get; set; }
-
+    public string? Description { get; set; }
     public ICollection<InventoryItemDto>? InventoryItems { get; set; }
 }
