@@ -185,7 +185,7 @@ public class BlindBoxService : IBlindBoxService
 
         // Không cho seller update sau khi được duyệt
         if (blindBox.Status == BlindBoxStatus.Approved)
-            throw ErrorHelper.Forbidden("BlindBox đã được duyệt, không thể chỉnh sửa.");
+            throw ErrorHelper.BadRequest("BlindBox đã được duyệt, không thể chỉnh sửa.");
 
         var currentUserId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s =>
