@@ -59,7 +59,7 @@ public class SellerService : ISellerService
         var currentUserId = _claimsService.CurrentUserId;
         var seller = await _unitOfWork.Sellers.FirstOrDefaultAsync(s => s.UserId == currentUserId);
         if (seller == null)
-            throw ErrorHelper.Forbidden("Không tìm thấy seller.");
+            throw ErrorHelper.Forbidden("Không tìm thấy thông tin nhãn hàng.");
 
         // Lấy danh sách userId distinct từ Orders của seller
         var userIds = await _unitOfWork.Orders.GetQueryable()
