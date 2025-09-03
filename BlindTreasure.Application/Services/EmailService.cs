@@ -526,7 +526,7 @@ public class EmailService : IEmailService
             <body style=""font-family:Arial,sans-serif;color:#252424;padding:40px 0;background-color:#ebeaea;"">
                 <div style=""max-width:600px;margin:auto;background:#ffffff;border:1px solid #28a745;border-radius:8px;overflow:hidden;"">
                     <div style=""background-color:#28a745;padding:20px 24px;text-align:center;"">
-                        <h1 style=""margin:0;color:#ffffff;font-size:24px;"">🎉 Đơn mua hàng đã hoàn tất</h1>
+                        <h1 style=""margin:0;color:#ffffff;font-size:24px;"">🎉 Đơn mua hàng đã hoàn thành</h1>
                     </div>
                     <div style=""padding:24px;"">
                         <p style=""margin:0 0 16px 0;font-size:16px;"">Chào <strong>{userName}</strong>,</p>
