@@ -103,7 +103,9 @@ public static class OrderDtoMapper
                 SellerId = order.SellerId,
                 Seller = order.Seller != null ? SellerMapper.ToSellerProfileDto(order.Seller) : null,
                 TotalRefundAmount = order.TotalRefundAmount,
-                RefundReason = order.RefundReason
+                RefundReason = order.RefundReason,
+                UserId = order.UserId,
+                User = order.User != null ? UserMapper.ToUserDto(order.User) : null
             };
         }
         catch (Exception ex)
