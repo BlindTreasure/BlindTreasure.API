@@ -303,6 +303,8 @@ public class StripeController : ControllerBase
 
             var url = await _stripeService.GenerateSellerOnboardingLinkAsync(seller.SellerId);
             _logger.Success("[Stripe][OnboardingLink] Onboarding link generated.");
+            await _cacheService.ClearAllAppCachesAsync();
+
             return Ok(ApiResult<string>.Success(url, "200", "Onboarding link generated."));
         }
         catch (Exception ex)
@@ -323,7 +325,6 @@ public class StripeController : ControllerBase
         try
         {
             var url = await _stripeService.GenerateExpressLoginLink();
-            await _cacheService.ClearAllAppCachesAsync();
             _logger.Success("[Stripe][LoginLink] Login link generated.");
             return Ok(ApiResult<string>.Success(url, "200", "Login link generated."));
         }
