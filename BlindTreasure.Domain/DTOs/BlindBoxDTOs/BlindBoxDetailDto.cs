@@ -22,6 +22,7 @@ public class BlindBoxDetailDto
     public string? RejectReason { get; set; }
     public string? BindBoxTags { get; set; } // JSON string or array of tags
 
+    public Dictionary<RarityName, int> TierWeights { get; set; } = new();
 
     public bool IsDeleted { get; set; }
     public List<BlindBoxItemResponseDto>? Items { get; set; }

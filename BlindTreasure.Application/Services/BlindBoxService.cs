@@ -876,6 +876,14 @@ public class BlindBoxService : IBlindBoxService
         dto.Brand = blindBox.Seller?.CompanyName;
         dto.Items = MapToBlindBoxItemDtos(blindBox.BlindBoxItems);
 
+        // ✅ Tính tổng weight theo từng rarity từ dto.Items
+        dto.TierWeights = dto.Items
+            .GroupBy(i => i.Rarity)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(x => x.Weight)
+            );
+
         return Task.FromResult(dto);
     }
 
